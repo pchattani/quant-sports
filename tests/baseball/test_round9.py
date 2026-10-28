@@ -51,3 +51,73 @@ def test_actual_postseason_triple_a_league_finals_and_championship():
 
 def test_actual_postseason_none_without_postseason_games():
     assert SN.actual_postseason(_ctx("mlb", {}, [{"gpk": "1", "gtype": "R", "home": "a", "away": "b", "status": "final", "hs": 1, "as": 0}])) is None
+
+
+def test_team_history_from_the_committed_lahman_copy(monkeypatch):
+    from oddsmarkets.baseball.analytics import team_history as TH
+    from oddsmarkets.baseball.sources import lahman
+    monkeypatch.setattr(lahman, "load", lambda name: None)      # no cache on this machine: the committed copy is used
+    d = TH.build([])
+    assert d["ok"] and d["first"] == 1901 and d["lahman_last"] >= 2025
+    ch = {c["season"]: c for c in d["champions"]}
+    assert 1904 not in ch and 1994 not in ch                     # no World Series
+    assert ch[1903]["fid"] == "BOS" and ch[2016]["fid"] == "CHC" and ch[2025]["fid"] == "LAD"
+    assert ch[2025]["opp"]["fid"] == "TOR"
+    assert d["franchises"]["NYY"]["titles"] == 27
+    assert len(d["droughts"]) == 30 and d["droughts"][0]["years"] >= d["droughts"][-1]["years"]
+    best = d["best"][0]
+    assert best["season"] == 1906 and best["fid"] == "CHC"
+    rec = {r["key"]: r for r in d["records"]}
+    assert rec["most_w"]["value"] == 116 and any(a["fid"] == "SEA" and a["season"] == 2001 for a in rec["most_w"].get("also", []))
+
+
+def test_award_history_from_the_committed_calls():
+    from oddsmarkets.baseball.analytics import award_history as AH
+    d = AH.build(2026, {"awards": {"al_mvp": {"rows": [{"pid": "1", "name": "A", "p": 0.7}, {"pid": "2", "name": "B", "p": 0.3}]}}}, True)
+    assert d["ok"] and "2025" in d["seasons"] and "2015" in d["seasons"]
+    w = d["seasons"]["2025"]["al_mvp"]["winner"]
+    assert w["name"] == "Aaron Judge" and w["rank"] == 1
+    assert d["seasons"]["2026"]["al_mvp"]["winner"] is None and d["seasons"]["2026"]["al_mvp"]["pick"]["pid"] == "1"
+    s = d["summary"]
+    assert s["n"] >= 55 and 0 < s["top_pick_won"] <= s["winner_in_top3"] <= s["n"]
+    # a season still under way adds no call
+    assert "2026" not in AH.build(2026, {"awards": {"al_mvp": {"rows": [{"pid": "1", "p": 1.0}]}}}, False)["seasons"]
+
+
+def test_recap_calls_only_for_the_twelve_club_format():
+    ctx = SimpleNamespace(level="mlb", season=2019, games={}, store={})
+    assert SN.recap_calls(ctx) is None
+    assert SN.recap_calls(SimpleNamespace(level="aaa", season=2025, games={}, store={})) is None
+
+
+def test_on_il_drops_placements_with_no_end_after_a_season_and_a_winter():
+    from datetime import date
+    from oddsmarkets.baseball.analytics import moves as M
+    st = {"1": [{"start": "2015-08-08", "end": None, "il": 15, "part": "arm", "club": "146"}],
+          "2": [{"start": "2026-08-01", "end": None, "il": 60, "part": "knee", "club": "119"}],
+          "3": [{"start": "2026-04-01", "end": "2026-05-01", "il": 10, "part": "back", "club": "147"}]}
+    on = M.on_il(st, date(2026, 10, 28))
+    assert set(on) == {"2"}
+
+
+def test_form_ranks_each_player_against_their_own_season():
+    from oddsmarkets.baseball.analytics import form as FM
+    hit = {"players": {str(i): {"name": f"H{i}", "team": "147", "pos": "SS", "pa": 400, "values": {"xwoba_plus": 0.330}} for i in range(20)}}
+    blocks = {str(i): {"rolling": [["2026-09-01", 0.300], ["2026-09-20", 0.330 + (i - 10) / 100]]} for i in range(20)}
+    blocks["99"] = {"rolling": [["2026-09-20", 0.9]]}                     # not in the catalogue: left out
+    out = FM.build("mlb", 2026, blocks, hit, {"players": {}})
+    assert out["hitters"]["hot"][0]["pid"] == "19" and out["hitters"]["cold"][0]["pid"] == "0"
+    assert out["hitters"]["hot"][0]["delta"] == 0.09 and out["asof"] == "2026-09-20"
+    assert len(out["hitters"]["hot"]) == FM.TOP
+
+
+def test_record_chases_pace_and_rank():
+    from oddsmarkets.baseball.analytics import records as RD
+    hit = {"team_games": 81, "players": {"1": {"name": "A", "team": "147", "values": {"hr": 33}}, "2": {"name": "B", "team": "119", "values": {"hr": 20}}}}
+    out = RD.build(2026, hit, {"team_games": 81, "players": {}}, "regular")
+    hr = out["stats"]["hr"]
+    assert not out["final"] and hr["record"][2] == 73
+    a = hr["leaders"][0]
+    assert a["pid"] == "1" and a["pace"] == 66.0 and a["rank"] is not None and a["behind"] == 7.0
+    fin = RD.build(2026, dict(hit, team_games=162), {"team_games": 162, "players": {}}, "offseason")
+    assert fin["final"] and fin["stats"]["hr"]["leaders"][0]["pace"] == 33.0 and fin["stats"]["hr"]["leaders"][0]["rank"] is None

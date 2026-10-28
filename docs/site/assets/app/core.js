@@ -10,13 +10,18 @@
  *   #/competitions[?f=<family>]                  every competition, by family                          [standings]
  *   #/competition/<slug>[/<tab>][?s=<sid>&view=…] one competition: overview, table, fixtures, bracket,
  *                                                odds, power, players, analytics, clubs, seasons       [standings]
- *   #/clubs[/<tab>]                              clubs on one scale, national teams, "If they met"     [teams]
+ *   #/clubs[/<tab>]                              Teams: clubs on one scale (the power board), leagues,
+ *                                                national teams, head to head with "If they met"        [teams]
  *   #/club/<tid>[?c=<slug>&e=<era>&tab=…]        ONE club page across every competition                [teams]
- *   #/players[/<tab>]                            search, leaders across competitions                   [players]
- *   #/player/<pid>[?c=<slug>&scope=club|intl&e=<era>&tab=…]  ONE player page across every competition [players]
+ *   #/scout[?view=board|chart|leaders&…]         the Scouting Room (scout-room.js): every player, every
+ *                                                metric, the profile drawer and the compare tray        [scout]
+ *   #/player/<pid>[?c=<slug>&scope=club|intl&e=<era>&tab=…]  ONE player page across every competition [scout]
+ *   #/compare/players/<a>/<b>[?p3=<c>]           the full compare page (the tray's "Full compare")      [scout]
  *   #/value[/<tab>][?…]                          value, best by position, transfers, simulator, budgets [value]
  *   #/fantasy[?…]                                fantasy projections, picks, squad                      [fantasy]
- *   #/lab[/<comp>/<pos>]  #/compare[/<kind>[/<a>[/<b>]]]                                              [lab]
+ * Round 9 (28 Oct 2026): #/players, #/players/leaders and #/lab[/<scope>/<pos>] redirect into the Scouting Room with
+ * their parameters; #/compare/clubs[/<a>/<b>] and #/clubs/pricer into Teams' head to head (#/clubs/h2h?a=&b=).
+ * QK.sections('football', { scout: true }): "Players" is the Scouting Room and "Lab" is hidden.
  *   #/model[/<tab>[/<key>]]                      methodology, glossary, disclaimer                      [model]
  * Every older route (#/<slug>/<tab>, #/<slug>/match/<id>, #/<slug>/team/<club>, #/<slug>/player/<id>,
  * #/nations, #/leaders, #/transfer, #/glossary, #/methodology, #/disclaimer, #/hub …) is redirected by
@@ -53,19 +58,13 @@ addRoute('competition/:slug/:tab', 'competition', 'standings');
 addRoute('clubs', 'clubs', 'teams');
 addRoute('clubs/:tab', 'clubs', 'teams');
 addRoute('club/:tid', 'club', 'teams');
-addRoute('players', 'players', 'players');
-addRoute('players/:tab', 'players', 'players');
-addRoute('player/:pid', 'player', 'players');
+addRoute('scout', 'scout', 'scout');
+addRoute('player/:pid', 'player', 'scout');
 addRoute('value', 'value', 'value');
 addRoute('value/:tab', 'value', 'value');
 addRoute('fantasy', 'fantasy', 'fantasy');
-addRoute('lab', 'lab', 'lab');
-addRoute('lab/:comp', 'lab', 'lab');
-addRoute('lab/:comp/:pos', 'lab', 'lab');
-addRoute('compare', 'compare', 'lab');
-addRoute('compare/:kind', 'compare', 'lab');
-addRoute('compare/:kind/:a', 'compare', 'lab');
-addRoute('compare/:kind/:a/:b', 'compare', 'lab');
+addRoute('compare/players/:a', 'compare', 'scout');
+addRoute('compare/players/:a/:b', 'compare', 'scout');
 addRoute('model', 'model', 'model');
 addRoute('model/:tab', 'model', 'model');
 addRoute('model/:tab/:key', 'model', 'model');
@@ -73,8 +72,8 @@ addRoute('team-legacy/:slug/:team', 'teamLegacy', 'teams');
 
 var TITLES = {
   overview: '', matches: 'Matches', match: 'Match centre', competitions: 'Competitions', competition: 'Competition',
-  clubs: 'Clubs', club: 'Club', players: 'Players', player: 'Player', value: 'Value & Transfers', fantasy: 'Fantasy',
-  lab: 'Lab', compare: 'Compare', model: 'Model', teamLegacy: 'Club'
+  clubs: 'Teams', club: 'Club', players: 'Players', player: 'Player', value: 'Value & Transfers', fantasy: 'Fantasy',
+  lab: 'Lab', scout: 'Scouting Room', compare: 'Compare', model: 'Model', teamLegacy: 'Club'
 };
 
 /* The old competition tabs -> [new tab, extra query]. Past-season tabs (p-*) keep their ?s=. */
@@ -82,11 +81,11 @@ var COMP_TAB_MAP = {
   overview: ['overview'], table: ['table'], zones: ['table', { view: 'zones' }], anual: ['table', { view: 'anual' }],
   relegation: ['table', { view: 'relegation' }], fixtures: ['fixtures'], matches: ['fixtures', { view: 'played' }],
   bracket: ['bracket'], probs: ['odds'], market: ['odds'], history: ['odds', { view: 'history' }],
-  power: ['power'], team: ['clubs'], players: ['players'], analytics: ['analytics'],
+  power: ['teams'], team: ['teams'], players: ['players'], analytics: ['teams'], clubs: ['teams'],
   'p-table': ['table'], 'p-results': ['fixtures'], 'p-bracket': ['bracket'], 'p-players': ['players'], 'p-leaders': ['players', { view: 'leaders' }]
 };
 /* Competition tabs the new page knows (the competition module may hide some per competition). */
-var COMP_TABS = ['overview', 'race', 'table', 'fixtures', 'bracket', 'odds', 'power', 'players', 'analytics', 'clubs', 'seasons'];
+var COMP_TABS = ['overview', 'race', 'table', 'fixtures', 'bracket', 'odds', 'teams', 'players', 'races', 'seasons'];
 
 function splitHash(hash) {
   var h = String(hash === undefined ? location.hash : hash).replace(/^#\/?/, '');
@@ -130,7 +129,15 @@ function legacyRedirect(hash) {
   var p0 = p[0];
   if (p0 === 'hub' || p0 === 'home' || p0 === 'index' || p0 === 'ballon-dor') return '#/';
   if (p0 === 'nations') return '#/clubs/nations' + qs(q);
-  if (p0 === 'leaders') return '#/players/leaders' + qs(q);
+  if (p0 === 'leaders') return scoutLeaders(q);
+  /* round 9: the Players pages and the Lab are the Scouting Room; Compare clubs and "If they met" are Teams' head to head */
+  if (p0 === 'players') return p[1] === 'leaders' ? scoutLeaders(q) : '#/scout' + qs(q.q ? { q: q.q } : {});
+  if (p0 === 'lab') return scoutChart(p[1], p[2], p[3], q);
+  if (p0 === 'compare') {
+    if (p[1] === 'clubs') return '#/clubs/h2h' + qs(merge(q, { a: p[2] ? String(p[2]).split(':').pop() : null, b: p[3] ? String(p[3]).split(':').pop() : null }));
+    return '#/scout' + qs(p[1] === 'players' && p[2] ? { cmp: String(p[2]).split(':').pop() } : {});
+  }
+  if (p0 === 'clubs' && p[1] === 'pricer') return '#/clubs/h2h' + qs(q);
   if (p0 === 'transfer') {
     var v = q.view;
     var rest = merge(q, {}); delete rest.view;
@@ -142,7 +149,6 @@ function legacyRedirect(hash) {
   if (p0 === 'methodology' || p0 === 'methodologysite') return '#/model/methodology' + (p[1] ? '/' + enc(p[1]) : '') + qs(q);
   if (p0 === 'disclaimer') return '#/model/disclaimer';
   if (p0 === 'calibration') return '#/model/calibration';
-  if (p0 === 'lab' && p.length === 4) return '#/lab/' + enc(p[1]) + '/' + enc(p[2]) + qs(merge(q, { w: p[3] }));
   if (INDEX.bySlug[p0]) {
     if (p.length === 1) return '#/competition/' + enc(p0) + qs(q);
     var tab = p[1];
@@ -157,6 +163,19 @@ function legacyRedirect(hash) {
   // A bare old tab name (#/table) belonged to "the open competition", which no longer exists.
   if (p.length === 1 && (COMP_TAB_MAP[p0] || p0 === 'methodology')) return '#/competitions';
   return null;
+}
+/* #/players/leaders?w=&c=|scope=&pos=<letter>&min=&m=<metric> -> the Scouting Room's Leaders view */
+function scoutLeaders(q) {
+  return '#/scout' + qs({ view: 'leaders', w: q.w && q.w !== 'season' ? q.w : null, c: q.c || q.scope || null, grp: q.pos && /^[GDMFO]$/.test(q.pos) ? q.pos : null, min: q.min, sort: q.m });
+}
+/* #/lab[/<scope>/<letter>[/<w>]]?w=&x=&y=&color=&size=&preset=&min=&q=&within=&pos= -> the Scouting Room's Chart view */
+function scoutChart(scope, letter, w, q) {
+  var out = { view: 'chart', w: w || q.w, c: scope && scope !== 'all' ? scope : null, x: q.x, y: q.y, color: q.color, size: q.size, preset: q.preset, min: q.min, q: q.q };
+  if (q.within === 'pos' && q.pos) { out.within = 'pos'; out.pos = q.pos; }
+  else if (letter && /^[GDMFO]$/.test(letter) && letter !== 'O') out.grp = letter;
+  else if (q.pos && /^[GDMF]$/.test(q.pos)) out.grp = q.pos;
+  if (out.w === 'season') out.w = null;
+  return '#/scout' + qs(out);
 }
 /* Rewrite href="#/old" links inside a block of static HTML to their new homes. */
 function fixLinks(html) {
@@ -332,6 +351,9 @@ function seasonsOf(c) {
   return p.then(function (doc) {
     var list = ((doc || {}).seasons || []).map(function (s) { return merge(s, { sid: String(s.sid) }); });
     if (!list.length) list = base;
+    /* an archive season with no match, no table and no champion has nothing to show (the build drops them too) */
+    list = list.filter(function (s) { return !(s.source === 'archive' && !s.matches && !(s.champion && s.champion.team) && !s.standings); });
+    list.forEach(function (s) { if (s.champion && s.champion.tid && clubName(s.champion.tid)) s.champion = merge(s.champion, { team: clubName(s.champion.tid) }); });
     if (c.ok && !list.some(function (s) { return s.source === 'live'; })) list = [{ sid: cur.sid, season: cur.season, era: cur.era, source: 'live', name: c.season }].concat(list);
     list.forEach(function (s) { if (s.source === 'live') s.status = cur.status; });
     return list;
@@ -357,7 +379,11 @@ function clubsIndex() {
   return load('clubs_index.json').then(function (d) {
     var list = rows(d);
     var byId = {};
-    list.forEach(function (r) { byId[String(r.id)] = r; });
+    list.forEach(function (r) {
+      byId[String(r.id)] = r;
+      /* a senior national team's FIFA code (ISO_FIFA), so "Switzerland" reads SUI and never SWI */
+      if (r.national && r.country && /^[A-Z]{3}$/.test(r.country) && !/\b(U\d\d|B|C|A|Olympic)\b/.test(r.name)) NAT_CODES[r.name] = ISO_FIFA[r.country] || r.country;
+    });
     CLUBS = { list: list, byId: byId };
     return CLUBS;
   });
@@ -378,13 +404,44 @@ var CODE_SKIP = { fc: 1, cf: 1, afc: 1, sc: 1, ac: 1, ca: 1, cd: 1, club: 1, de:
 function codeWords(name) {
   return String(name || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9\s-]/g, '').split(/[\s-]+/).filter(function (w) { return w && !CODE_SKIP[w.toLowerCase()]; });
 }
+/* National teams take their FIFA code (FIFA's own three letters: SUI, GER, NED, KSA ...). clubs_index.json carries the
+   ISO 3166 alpha-3 country of each national team; FIFA's code differs for these. */
+var ISO_FIFA = { DZA: 'ALG', AGO: 'ANG', ABW: 'ARU', BHS: 'BAH', BGD: 'BAN', BMU: 'BER', BTN: 'BHU', BES: 'BOE', BRN: 'BRU', BGR: 'BUL', KHM: 'CAM',
+  CYM: 'CAY', CAF: 'CTA', TCD: 'CHA', CHL: 'CHI', TWN: 'TPE', COG: 'CGO', CRI: 'CRC', HRV: 'CRO', DNK: 'DEN', GNQ: 'EQG', DEU: 'GER', GMB: 'GAM',
+  GRC: 'GRE', GTM: 'GUA', GIN: 'GUI', HTI: 'HAI', HND: 'HON', KWT: 'KUW', LBN: 'LIB', LSO: 'LES', MDG: 'MAD', MYS: 'MAS', MRT: 'MTN', MUS: 'MRI',
+  MMR: 'MYA', NPL: 'NEP', NLD: 'NED', NIC: 'NCA', NER: 'NIG', PSE: 'PLE', PRY: 'PAR', PHL: 'PHI', PRT: 'POR', PRI: 'PUR', KNA: 'SKN', MAF: 'SMN',
+  VCT: 'VIN', SAU: 'KSA', SGP: 'SIN', SXM: 'SMA', SLB: 'SOL', ZAF: 'RSA', LKA: 'SRI', CHE: 'SUI', PYF: 'TAH', TZA: 'TAN', TGO: 'TOG', TTO: 'TRI',
+  ARE: 'UAE', URY: 'URU', VUT: 'VAN', VNM: 'VIE', ZMB: 'ZAM', ZWE: 'ZIM', XKX: 'KVX', BWA: 'BOT', SLV: 'SLV', IRL: 'IRL', TLS: 'TLS', GLP: 'GLP' };
+/* The clubs whose made-up code would be wrong or ambiguous, by name: the codes the clubs and the broadcasts use. */
+var CLUB_CODES = {
+  'Arsenal': 'ARS', 'Aston Villa': 'AVL', 'Bournemouth': 'BOU', 'AFC Bournemouth': 'BOU', 'Brentford': 'BRE', 'Brighton & Hove Albion': 'BHA', 'Brighton': 'BHA',
+  'Burnley': 'BUR', 'Chelsea': 'CHE', 'Crystal Palace': 'CRY', 'Everton': 'EVE', 'Fulham': 'FUL', 'Leeds United': 'LEE', 'Leeds': 'LEE', 'Liverpool': 'LIV',
+  'Manchester City': 'MCI', 'Manchester United': 'MUN', 'Newcastle United': 'NEW', 'Newcastle': 'NEW', 'Nottingham Forest': 'NFO', 'Sunderland': 'SUN',
+  'Tottenham Hotspur': 'TOT', 'Tottenham': 'TOT', 'West Ham United': 'WHU', 'West Ham': 'WHU', 'Wolverhampton': 'WOL', 'Wolverhampton Wanderers': 'WOL', 'Wolves': 'WOL',
+  'Ipswich Town': 'IPS', 'Ipswich': 'IPS', 'Leicester City': 'LEI', 'Southampton': 'SOU',
+  'Real Madrid': 'RMA', 'Barcelona': 'BAR', 'FC Barcelona': 'BAR', 'Atlético Madrid': 'ATM', 'Atletico Madrid': 'ATM', 'Athletic Club': 'ATH', 'Real Betis': 'BET',
+  'Real Sociedad': 'RSO', 'Rayo Vallecano': 'RAY', 'Celta Vigo': 'CEL', 'Real Oviedo': 'OVI', 'Real Valladolid': 'VLL', 'Villarreal': 'VIL', 'Valencia': 'VAL',
+  'Bayern München': 'FCB', 'FC Bayern München': 'FCB', 'Bayern Munich': 'FCB', 'Borussia Dortmund': 'BVB', 'Bayer 04 Leverkusen': 'B04', 'Bayer Leverkusen': 'B04',
+'Borussia Mönchengladbach': 'BMG', 'RB Leipzig': 'RBL', 'Eintracht Frankfurt': 'SGE', 'VfB Stuttgart': 'VFB',
+  'Paris Saint-Germain': 'PSG', 'Olympique de Marseille': 'OM', 'Marseille': 'OM', 'Olympique Lyonnais': 'OL', 'Lyon': 'OL', 'AS Monaco': 'ASM', 'Monaco': 'ASM',
+  'Inter': 'INT', 'Inter Milan': 'INT', 'Milan': 'MIL', 'AC Milan': 'MIL', 'Juventus': 'JUV', 'Napoli': 'NAP', 'Roma': 'ROM', 'AS Roma': 'ROM', 'Lazio': 'LAZ',
+  'Atalanta': 'ATA', 'Fiorentina': 'FIO', 'Ajax': 'AJA', 'PSV Eindhoven': 'PSV', 'PSV': 'PSV', 'Feyenoord': 'FEY', 'Sporting CP': 'SCP', 'Benfica': 'SLB',
+  'SL Benfica': 'SLB', 'FC Porto': 'POR', 'Porto': 'POR', 'Celtic': 'CLT', 'Rangers': 'RAN', 'Al-Hilal': 'HIL', 'Al Hilal': 'HIL', 'Al-Nassr': 'NAS', 'Al Nassr': 'NAS',
+  'Al-Ittihad': 'ITT', 'Al Ittihad': 'ITT', 'Al-Ahli': 'AHL', 'Al Ahli': 'AHL', 'Inter Miami CF': 'MIA', 'Inter Miami': 'MIA', 'LA Galaxy': 'LAG', 'Los Angeles FC': 'LAFC',
+  'Boca Juniors': 'BOC', 'River Plate': 'RIV', 'Flamengo': 'FLA', 'Palmeiras': 'PAL', 'América': 'AME', 'Club América': 'AME', 'Cruz Azul': 'CAZ', 'Club Brugge KV': 'BRU', 'Club Brugge': 'BRU'
+};
+var NAT_CODES = {};
 function clubCode(name, other) {
+  var known = CLUB_CODES[name] || NAT_CODES[name];
+  if (known) return known;
   var w = codeWords(name);
   if (!w.length) return String(name || '').slice(0, 3).toUpperCase();
-  var c = w.length === 1 ? w[0].slice(0, 3) : w.slice(0, 3).map(function (x) { return x.charAt(0); }).join('');
+  /* one word: its first three letters; two: the first letter and the second word's first two ("Manchester City" MCI,
+     "Manchester United" MUN); three or more: the initials ("West Ham United" WHU) */
+  var c = w.length === 1 ? w[0].slice(0, 3) : w.length === 2 ? w[0].charAt(0) + w[1].slice(0, 2) : w.slice(0, 3).map(function (x) { return x.charAt(0); }).join('');
   c = c.toUpperCase();
   if (other !== undefined && other !== null) {
-    var o = codeWords(other), oc = o.length === 1 ? o[0].slice(0, 3).toUpperCase() : o.slice(0, 3).map(function (x) { return x.charAt(0); }).join('').toUpperCase();
+    var oc = clubCode(other);
     if (oc === c && w.length > 1) c = w[w.length - 1].slice(0, 3).toUpperCase();
   }
   return c;
@@ -867,11 +924,17 @@ var href = {
   matches: function (q) { return '#/matches' + qs(q); }
 };
 /* A crest (or a monogram when the file is missing). size: undefined | 'sm' | 'lg'. */
-function crest(tid, name, size) { return QK.teamMark({ logo: tid ? crestUrl(tid) : null, name: name || clubName(tid) || '?' }, size); }
+function crest(tid, name, size) {
+  var nm = name || clubName(tid) || '?';
+  /* the monogram reads the club's code (FIFA's for a national team: SUI, ESP), never the name's first three letters */
+  return QK.teamMark({ logo: tid ? crestUrl(tid) : null, name: nm, abbr: clubCode((tid && clubName(tid)) || nm), colour: tid ? clubColour(tid) : null }, size);
+}
 /* A club link with its crest. opts {q, size, nocrest, short}. Without an id: the name only. */
 function clubLink(tid, name, opts) {
   var o = opts || {};
-  var nm = name || clubName(tid) || '—';
+  /* one name source: a known club reads as its page spells it (clubs_index.json), whatever spelling the row carried
+     ("Liverpool FC" in one archive table, "Liverpool" in another) */
+  var nm = (tid && clubName(tid)) || name || '—';
   if (!tid) return '<span class="fb-ent">' + (o.nocrest ? '' : crest(null, nm, o.size || 'sm')) + '<span class="fb-ent-n">' + esc(nm) + '</span></span>';
   return '<a class="fb-ent" href="' + esc(href.club(tid, o.q)) + '">' + (o.nocrest ? '' : crest(tid, nm, o.size || 'sm')) + '<span class="fb-ent-n">' + esc(nm) + '</span></a>';
 }
@@ -1032,6 +1095,27 @@ function kpi(label, value, o) {
   return QK.statTile({ label: label, value: value, sub: sub + (o.spark ? '<span class="fb-stat-spark">' + o.spark + '</span>' : ''), html: true, cls: o.cls, tip: o.tip, text: text,
     signal: !!o.signal, pctl: isNum(o.pctl) ? o.pctl : null, href: o.href || null, unit: o.unit, trend: o.trend, delta: o.delta, deltaFmt: o.deltaFmt });
 }
+/* Matches with line-ups in THIS edition of a competition (meta.detail_season; meta.detail_matches counts every season
+   the store holds, so it is used only when it cannot exceed the matches played). null when unknown. */
+function detailNow(m, played) {
+  if (!m) return null;
+  if (isNum(m.detail_season)) return m.detail_season;
+  return isNum(m.detail_matches) && isNum(played) && m.detail_matches <= played ? m.detail_matches : null;
+}
+/* How old a competition's data is at the page clock: the build wrote its age at build time (store_age_hours), and the
+   page may be read days later. null when unknown. */
+function dataAge(m) {
+  if (!m || !isNum(m.store_age_hours)) return null;
+  var built = parseDate(m.updated_at), now = QK.now ? QK.now() : Date.now();
+  return m.store_age_hours + (built ? Math.max(0, (now - built.getTime()) / 36e5) : 0);
+}
+/* The "Data" tile: fresh under a day at the page clock, else its age. */
+function dataTile(m, label) {
+  var h = dataAge(m);
+  var stale = (m || {}).store_fresh === false || (isNum(h) && h > 24);
+  return kpi(label || 'Data', stale ? '<span class="fb-down">' + (isNum(h) ? (h >= 48 ? Math.round(h / 24) + ' days old' : Math.round(h) + ' h old') : 'stale') + '</span>' : 'fresh', { text: true,
+    sub: isNum(h) ? num(h, 1) + ' h since the last refresh' + (m.updated_at ? ' · built ' + esc(fmtStamp(m.updated_at)) : '') : '' });
+}
 function kpis(list, cls) { return '<div class="qk-stats fb-kpis' + (cls ? ' ' + cls : '') + '">' + list.join('') + '</div>'; }
 function badge(text, kind, tip) { return '<span class="qk-badge' + (kind ? ' ' + kind : '') + '"' + (tip ? ' data-tip="' + esc(tip) + '"' : '') + '>' + esc(text) + '</span>'; }
 function muted(text) { return '<p class="fb-muted">' + text + '</p>'; }
@@ -1112,9 +1196,11 @@ function heatColour(t) {
 
 // ── shell, search, competition picker ─────────────────────────────────────
 
-var SECTION_HREF = { overview: '#/', fixtures: '#/matches', standings: '#/competitions', teams: '#/clubs', players: '#/players', value: '#/value', fantasy: '#/fantasy', lab: '#/lab', model: '#/model' };
+var SECTION_HREF = { overview: '#/', fixtures: '#/matches', standings: '#/competitions', teams: '#/clubs', scout: '#/scout', value: '#/value', fantasy: '#/fantasy', model: '#/model' };
 function compPickerHTML() {
   var groups = FAMILIES.map(function (f) {
+    /* the super cups fold into their host competition's page (round 9): not in the picker */
+    if (f.key === 'super') return { group: f.label, items: [] };
     return { group: f.label, items: INDEX.comps.filter(function (c) { return c.ok && familyOf(c) === f.key; }).map(function (c) { return [c.slug, c.name]; }) };
   }).filter(function (g) { return g.items.length; });
   return '<label class="fb-picker">' + select('fb-comp-pick', [['', 'Competition…']].concat(groups), '', 'Go to a competition') + '</label>';
@@ -1143,14 +1229,14 @@ function searchRows() {
         w: arr[1].names ? 2.5 * p._rank : (isNum(p.mv) && p.mv > 0 ? Math.max(0, Math.log10(p.mv) - 4) : 0) + Math.min(1, (isNum(p.min) ? p.min : 0) / 3000) });
     });
     [['Matches today', '#/matches'], ['Value leaderboard', '#/value'], ['Transfers', '#/value/transfers'], ['Transfer simulator', '#/value/simulator'],
-      ['Fantasy', '#/fantasy'], ['Player lab', '#/lab'], ['Compare players', '#/compare/players'], ['Compare clubs', '#/compare/clubs'], ['Clubs on one scale', '#/clubs'],
-      ['National teams', '#/clubs/nations'], ['Leaders across competitions', '#/players/leaders'], ['Methodology', '#/model/methodology'], ['Glossary', '#/model/glossary']]
+      ['Fantasy', '#/fantasy'], ['Scouting Room', '#/scout'], ['Player chart (any two metrics)', '#/scout?view=chart'], ['Leaders across competitions', '#/scout?view=leaders'],
+      ['Clubs on one scale', '#/clubs'], ['Head to head (if they met)', '#/clubs/h2h'], ['National teams', '#/clubs/nations'], ['Methodology', '#/model/methodology'], ['Glossary', '#/model/glossary']]
       .forEach(function (p) { out.push({ sport: 'football', t: p[0], s: 'Page', href: p[1] }); });
     return out;
   });
 }
 function bootShell() {
-  var secs = QK.sections('football', { fixtures: 'Matches', standings: 'Competitions', teams: 'Clubs', value: 'Value & Transfers' }).map(function (s) {
+  var secs = QK.sections('football', { fixtures: 'Matches', standings: 'Competitions', teams: 'Teams', value: 'Value & Transfers', scout: true }).map(function (s) {
     s.href = SECTION_HREF[s.key] || s.href;
     return s;
   });
@@ -1186,7 +1272,7 @@ HANDLERS.teamLegacy = function (el, p) {
     var slugOf = function (n) { return String(teams[n].slug || n).toLowerCase(); };
     var name = Object.keys(teams).filter(function (n) { return slugOf(n) === String(p.team).toLowerCase(); })[0];
     var tid = name && teams[name].team_id;
-    var to = tid ? href.club(tid, { c: p.slug }) : href.comp(p.slug, 'clubs');
+    var to = tid ? href.club(tid, { c: p.slug }) : href.comp(p.slug, 'teams');
     try { history.replaceState(null, '', to); } catch (e) { location.hash = to; return; }
     render();
   });
@@ -1229,7 +1315,7 @@ return {
   stageLabel: stageLabel, roundText: roundText, stageText: stageText, coverageChip: coverageChip, formChips: formChips,
   href: href, crest: crest, clubLink: clubLink, playerLink: playerLink, compLink: compLink,
   toGame: toGame, matchCard: matchCard, gameCard: matchCard, loadMarkets: loadMarkets, marketOf: marketOf, wpBar: wpBar, staleLive: staleLive, probBar3: probBar3, scoreText: scoreText, fixtureRow: fixtureRow,
-  card: card, grid: grid, chartBox: chartBox, kpi: kpi, kpis: kpis, badge: badge, muted: muted, empty: empty, note: note, aside: aside, crumb: crumb, loading: loading,
+  card: card, grid: grid, chartBox: chartBox, kpi: kpi, kpis: kpis, detailNow: detailNow, dataAge: dataAge, dataTile: dataTile, badge: badge, muted: muted, empty: empty, note: note, aside: aside, crumb: crumb, loading: loading,
   pageHead: pageHead, secHead: secHead, chances: chances, subnav: subnav, seg: seg, wireSeg: wireSeg, select: select, toolbar: toolbar, field: field, table: table, set: set,
   pctl: pctl, probBar: probBar, deltaHTML: deltaHTML, heatColour: heatColour, setCompPicker: setCompPicker, hubLive: hubLive
 };

@@ -269,11 +269,15 @@ The existing `moves` (inferred transfers that happened) is unchanged.
 Kit-native like Hardwood's `hw-*` sections and Gridiron: `index.html` (data-sport `college`), `assets/qk/` (copied by
 the build), `assets/campus.css`, `assets/js/*.js` with a small router `window.CC`. Hash routes, level first:
 `#/` (level from state, default by phase: whichever level is in season, cfb in the autumn), `#/<L>`, `#/<L>/games`,
-`#/<L>/game/<gid>`, `#/<L>/standings` (tabs: Conferences, Polls, Playoff (cfb) / Bracket (mbb, wbb), Bowls (cfb) /
-Conference tournaments), `#/<L>/teams`, `#/<L>/team/<tid>`, `#/<L>/players`, `#/<L>/player/<pid>`, `#/<L>/value`
-(Value, By position, Transfers), `#/<L>/fantasy`, `#/<L>/lab`, `#/<L>/model` (Methodology, Calibration, Glossary,
-Terms); `?season=S` or `/<S>` suffix for past seasons. Shell: `QK.shell({sport: 'college', sections:
-QK.sections('college')...})` with the nine-section IA (Overview · Games · Standings · Teams · Players · Value & Moves ·
-Fantasy · Lab · Model), level switch CFB / MBB / WBB (a `QK.seg` in `ctx`, with the season picker), mobile-clean at
-375 px, both themes. Disclaimer: unofficial, not affiliated with the NCAA, the CFP, any conference, school, ESPN or a
+`#/<L>/game/<gid>`, `#/<L>/standings` (tabs: The race, Conferences, Polls, Playoff (cfb) / Bracket (mbb, wbb), Bowls (cfb)
+/ Conference tournaments, History, Races), `#/<L>/teams` (round 9: power board, team profile grid, style map, strengths
+and weaknesses, head to head, through the season; `cc-teamspage.js`), `#/<L>/team/<tid>`, `#/<L>/scout` (round 9: the
+Scouting Room, Players and the Lab in one: Board / Chart / Leaders, the profile drawer and the compare tray, reading
+`lab_players.json`; `cc-scout.js`), `#/<L>/player/<pid>`, `#/<L>/compare?p=<pid>,<pid>`, `#/<L>/value` (By position,
+Value, Transfers), `#/<L>/fantasy`, `#/<L>/model` (How it works, How we're doing, Our forecasts v the market, Who moves
+next, Glossary, Terms); `?season=S` or `/<S>` suffix for past seasons. Old routes redirect (`CC.redirect`:
+`#/<L>/players` and `#/<L>/lab` to the Scouting Room, the Teams page's style map or the compare page). Shell:
+`QK.shell({sport: 'college', sections: QK.sections('college', { scout: true })...})` (Overview · Games · Standings · Teams ·
+Scouting Room · Value & Moves · Fantasy · Model), level switch CFB / MBB / WBB (a `QK.seg` in `ctx`, with the season
+picker), mobile-clean at 375 px, both themes. Disclaimer: unofficial, not affiliated with the NCAA, the CFP, any conference, school, ESPN or a
 bookmaker; no logos.

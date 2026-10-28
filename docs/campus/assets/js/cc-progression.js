@@ -111,7 +111,8 @@ function compare(el, p) {
 
 CC.route('compare', function (el, p) {
   if (p.id === 'progression') return compare(el, p);
-  el.innerHTML = QK.empty('Pick players to compare', 'Open a player page and use “Compare progression”, or the Lab.');
+  if (CC.compareFull) return CC.compareFull(el, p);       /* #/<L>/compare?p=<pid>,<pid>: the full compare page (cc-scout.js) */
+  el.innerHTML = QK.empty('Pick players to compare', 'Open a player page and use “Compare progression”, or the Scouting Room’s compare tray.');
   return null;
 });
 CC.progression = { tab: tab, compare: compare, toP: toP, compareHref: compareHref };

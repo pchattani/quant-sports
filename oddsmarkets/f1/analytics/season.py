@@ -625,18 +625,41 @@ def elo_payload(history: dict | None) -> dict:
     return {"updated_at": _now(), "all_time": at, "current": cur, "params": h.get("params") or {}, "seasons": h.get("seasons") or []}
 
 
-def lab_payload(catalogues: dict[int, dict], current: int) -> dict:
-    """lab.json: one row per driver-season (2018-), columns = driverId, name, team, year, races, then every catalogue metric."""
+def season_age(dob: Any, year: int) -> int | None:
+    """Age in whole years on 1 July of the season: one fixed date for every season (MIGRATION_V4 "Ages"), so two seasons
+    never share an age and the Scouting Room's age band means the same thing in March and in December."""
+    try:
+        b = date.fromisoformat(str(dob)[:10])
+    except (TypeError, ValueError):
+        return None
+    return year - b.year - (1 if (7, 1) < (b.month, b.day) else 0)
+
+
+def lab_payload(catalogues: dict[int, dict], current: int, dobs: dict[str, Any] | None = None) -> dict:
+    """lab.json: one row per driver-season (2018-), columns = driverId, name, team, year, races, age (on 1 July of the
+    season, from the store's date of birth; round 9, for the Scouting Room's age band), then every catalogue metric.
+    `dobs` {driverId: 'YYYY-MM-DD'}; read from the season stores on disk when not given (no fetch)."""
     from oddsmarkets.f1.analytics.drivers import METRICS
     keys = [m["key"] for m in METRICS if m["key"] != "races"]
-    fields = ["driver", "name", "team", "year", "races"] + keys
+    fields = ["driver", "name", "team", "year", "races", "age"] + keys
+    if dobs is None:
+        dobs = {}
+        for y in catalogues:
+            if y < 2018:
+                continue
+            try:
+                for d, info in ((canon.season(y) or {}).get("drivers") or {}).items():
+                    if (info or {}).get("dob") and d not in dobs:
+                        dobs[d] = info["dob"]
+            except Exception:                                        # pragma: no cover - a missing store: no ages
+                logger.warning("lab: no store for %s", y)
     rows = []
     for y in sorted(catalogues, reverse=True):
         if y < 2018:
             continue
         for d, e in (catalogues[y].get("drivers") or {}).items():
             v = e.get("values") or {}
-            rows.append([d, e.get("name"), e.get("team"), y, e.get("races")] + [v.get(k) for k in keys])
+            rows.append([d, e.get("name"), e.get("team"), y, e.get("races"), season_age(dobs.get(d), y)] + [v.get(k) for k in keys])
     metrics = [{k: m[k] for k in ("key", "label", "group", "fmt", "lower", "scope")} | {"desc": m.get("desc", "")}
                for m in (catalogues.get(current) or next(iter(catalogues.values()), {})).get("metrics") or METRICS if m["key"] != "races"]
     return {"updated_at": _now(), "fields": fields, "metrics": metrics, "rows": rows, "windows": {"season": current},

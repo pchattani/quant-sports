@@ -12,6 +12,11 @@
  *   #/markets  #/calibration  #/glossary[/<key>]  #/methodology  #/disclaimer
  *   #/value  #/trade                    player value (GAR, WAR) and the trade simulator (state in ?t=&m=)
  *   #/value?tab=val  #/moves  #/fantasy  multi-season valuation, transactions and trade grades, fantasy
+ *   #/scout                             the Scouting Room (round 9, 28 Oct 2026: rk-scout.js; Players and the Lab in
+ *                                       one page: ?view=board|chart|leaders, kind, within, pos, min, team, age, hand, q, p,
+ *                                       cmp). The old #/players?tab=, #/skaters, #/goalies, #/leaders and #/lab redirect
+ *                                       into it with their parameters mapped (scoutRedirect below); lines go to Teams,
+ *                                       award races to Standings › Races, the Lab's team charts to the Teams style map.
  *
  * Season: every page reads RK.state.season (an 8-digit NHL season id, a Number: 20262027). It comes
  * from the route (#/standings/<S>, #/playoffs/<S>), the game id (#/game/<id>), else a "?s=<S>" query
@@ -155,6 +160,8 @@ addRoute('player/:id', 'player');
 addRoute('value', 'value');
 addRoute('fantasy', 'fantasy');
 addRoute('lab', 'lab');
+addRoute('scout', 'scout');
+addRoute('series/:S/:round/:num', 'series');
 addRoute('compare', 'compare');
 addRoute('compare/:a', 'compare');
 addRoute('compare/:a/:b', 'compare');
@@ -164,20 +171,51 @@ addRoute('glossary/:id', 'glossary');
 addRoute('methodology', 'methodology');
 addRoute('disclaimer', 'disclaimer');
 
-const ALIASES = { home: 'hub', index: 'hub', '': 'hub' };
+const ALIASES = { home: 'hub', index: 'hub', '': 'hub', scouting: 'scout' };
 const ALIAS_SEGS = { schedule: 'games', scores: 'games', scoreboard: 'games' };
 /* Old routes (before the October 2026 redesign) -> [section route, tab]. A one-segment hash (plus its query) is
  * replaced; '#/playoffs/<S>' keeps its season. Deep links with an id (#/glossary/<key>, #/methodology/<part>,
  * #/compare/<a>/<b>) still render where they are, inside their section. */
 const REDIRECTS = {
-  skaters: ['players', 'skaters'], goalies: ['players', 'goalies'], leaders: ['players', 'leaders'], leaderboards: ['players', 'leaders'],
-  lines: ['players', 'lines'], awards: ['players', 'awards'],
+  awards: ['standings', 'races'],
   playoffs: ['standings', 'bracket'], bracket: ['standings', 'bracket'], postseason: ['standings', 'bracket'],
-  markets: ['standings', 'markets'], history: ['standings', 'history'],
+  markets: ['model', 'market'], odds: ['model', 'market'], history: ['standings', 'history'], lottery: ['standings', 'lottery'],
   trade: ['value', 'trade'], moves: ['value', 'moves'], valuation: ['value', 'val'],
   calibration: ['model', 'calibration'], docs: ['model', 'methodology'], hub: ['', null]
 };
+/* Round 9: the old Players and Lab routes open the Scouting Room (or Teams, Standings) with their parameters mapped.
+   Returns the new hash, or null. */
+function scoutRedirect(hash) {
+  let h = String(hash || '').replace(/^#\/?/, '');
+  const qi = h.indexOf('?');
+  const q = parseQuery(qi >= 0 ? h.slice(qi + 1) : '');
+  h = qi >= 0 ? h.slice(0, qi) : h;
+  const parts = h.split('/').filter(Boolean);
+  if (parts.length !== 1 || ['players', 'skaters', 'goalies', 'leaders', 'leaderboards', 'lines', 'lab'].indexOf(parts[0]) < 0) return null;
+  const out = {}, r = parts[0];
+  const S = q.s || q.season || q.y;
+  const tab = r === 'players' ? (q.tab || 'leaders') : r;
+  const qs = o => { const ks = Object.keys(o).filter(x => o[x] !== undefined && o[x] !== null && o[x] !== ''); return ks.length ? '?' + ks.map(x => encodeURIComponent(x) + '=' + encodeURIComponent(o[x])).join('&') : ''; };
+  if (tab === 'lines') return '#/teams' + qs({ go: 'lines', s: S });
+  if (tab === 'awards') return '#/standings' + qs({ tab: 'races', s: S });
+  if (r === 'lab') {
+    const kd = String(q.kind || q.g || '').toUpperCase().charAt(0);
+    if (kd === 'T') return '#/teams' + qs({ go: 'map', map: q.x && q.y ? -1 : '', mx: q.x, my: q.y, s: S });
+    out.view = 'chart';
+    if (q.within === 'pos' && /^(F|D|G)$/.test(q.pos || '')) { out.within = 'pos'; out.pos = q.pos; }
+    else if (kd === 'G') out.kind = 'g';
+    else if (/^(F|D)$/.test(q.pos || '')) { out.within = 'pos'; out.pos = q.pos; }
+    ['x', 'y', 'q'].forEach(k => { if (q[k]) out[k] = q[k]; });
+  } else if (tab === 'goalies') out.kind = 'g';
+  else if (tab === 'leaders' || tab === 'leaderboards' || tab === 'boards') out.view = 'leaders';
+  if (q.team) out.team = q.team;
+  if (q.q && !out.q) out.q = q.q;
+  out.s = S;
+  return '#/scout' + qs(out);
+}
 function redirectFor(hash) {
+  const sr = scoutRedirect(hash);
+  if (sr) return sr;
   let h = String(hash || '').replace(/^#\/?/, '');
   let q = '';
   const qi = h.indexOf('?');
@@ -198,17 +236,17 @@ function redirectFor(hash) {
   return '#/' + to[0] + (all.length ? '?' + all.join('&') : '');
 }
 const TITLES = {
-  hub: 'Overview', games: 'Games', game: 'Game centre', standings: 'Standings', teams: 'Teams', team: 'Team', players: 'Players', player: 'Player',
+  hub: 'Overview', games: 'Games', game: 'Game centre', standings: 'Standings', teams: 'Teams', team: 'Team', players: 'Players', player: 'Player', scout: 'Scouting Room', series: 'Playoff series',
   value: 'Value & Moves', fantasy: 'Fantasy', lab: 'Lab', compare: 'Compare', model: 'Model', glossary: 'Glossary', methodology: 'Methodology', disclaimer: 'Disclaimer & terms'
 };
 /* Which kit section each route belongs to (QK.SECTIONS keys). */
-const SECTION_OF = { hub: 'overview', games: 'fixtures', game: 'fixtures', standings: 'standings', teams: 'teams', team: 'teams',
-  players: 'players', player: 'players', value: 'value', fantasy: 'fantasy', lab: 'lab', compare: 'lab',
+const SECTION_OF = { hub: 'overview', games: 'fixtures', game: 'fixtures', standings: 'standings', series: 'standings', teams: 'teams', team: 'teams',
+  players: 'scout', player: 'scout', scout: 'scout', value: 'value', fantasy: 'fantasy', lab: 'scout', compare: 'scout',
   model: 'model', glossary: 'model', methodology: 'model', disclaimer: 'model' };
 const NAV_OF = SECTION_OF;
 /* Names the redesigned pages own: a legacy module's RK.route(name) registers a view (RK.view(name)) that a section
  * page renders inside its tabs, not the route itself. */
-const OWNED = { hub: 1, games: 1, game: 1, standings: 1, teams: 1, team: 1, players: 1, player: 1, value: 1, fantasy: 1, lab: 1, compare: 1,
+const OWNED = { hub: 1, games: 1, game: 1, standings: 1, series: 1, teams: 1, team: 1, players: 1, player: 1, scout: 1, value: 1, fantasy: 1, lab: 1, compare: 1,
   model: 1, glossary: 1, methodology: 1 };
 const VIEWS = {};
 
@@ -1402,8 +1440,8 @@ function fillPickers() {
 function updateHeader() {
   const S = state.season;
   if (SHELL) {
-    const map = { overview: '#/', fixtures: gamesHref(null, S), standings: standingsHref(S), teams: href('teams', S), players: href('players', S),
-      value: href('value', S), fantasy: '#/fantasy', lab: href('lab', S), model: '#/model' };
+    const map = { overview: '#/', fixtures: gamesHref(null, S), standings: standingsHref(S), teams: href('teams', S), scout: href('scout', S),
+      value: href('value', S), fantasy: '#/fantasy', model: '#/model' };
     document.querySelectorAll('.qk-secnav a[data-sec]').forEach(a => { const h = map[a.getAttribute('data-sec')]; if (h) a.setAttribute('href', h); });
   }
   const links = { hub: '#/', games: gamesHref(null, S), standings: standingsHref(S), playoffs: playoffsHref(S),
@@ -1509,7 +1547,7 @@ function initHeader() {
   if (window.QK) {
     SHELL = QK.shell({
       sport: 'hockey', section: 'overview',
-      sections: QK.sections('hockey'),
+      sections: QK.sections('hockey', { scout: true }),
       ctx: '<label class="qk-sr" for="season-select">Season</label><select id="season-select" class="qk-select rk-season" aria-label="Season"></select>',
       search: { load: () => loadSearch().then(items => items.map(it => ({ sport: 'hockey', t: it.label, s: (it.kind === 'Teams' ? 'Team · ' : '') + (it.sub || ''), href: it.href }))) }
     });

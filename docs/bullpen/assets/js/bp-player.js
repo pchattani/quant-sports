@@ -223,7 +223,7 @@ function draw(el, c) {
     simU.map(m => '<li>' + U.playerEnt(m.pid, L, String(m.season) + (m.team ? ' · ' + BP.teamAbbr(m.team) : ''), kind) + '<a class="v bp-link" href="' + esc(BP.compareHref(pid, m.pid)) + '">Compare</a></li>').join('') + '</ul>' +
     '<div class="qk-aside" style="margin-top:10px">The nearest player-seasons since 2015 in the same ' + (pit ? 'role' : 'position') + ' group, on the spec’s weighted metrics.</div></div></article>' : '';
 
-  const crumb = '<nav class="bp-crumb" aria-label="Breadcrumb"><a href="' + esc(BP.href(pit ? 'pitchers' : 'hitters', L, S)) + '">' + esc(BP.levelName(L)) + ' ' + (pit ? 'pitchers' : 'hitters') + '</a><span aria-hidden="true">›</span>' +
+  const crumb = '<nav class="bp-crumb" aria-label="Breadcrumb"><a href="' + esc(BP.href('scout', L, S) + (pit ? '?kind=sp' : '')) + '">' + esc(BP.levelName(L)) + ' ' + (pit ? 'pitchers' : 'hitters') + '</a><span aria-hidden="true">›</span>' +
     (tid ? '<a href="' + esc(BP.teamHref(tid, L, S)) + '">' + esc(BP.teamName(tid)) + '</a><span aria-hidden="true">›</span>' : '') + esc(p.name) + '</nav>';
   /* v4: the hero carries the black strip; then the meters (7) beside the tale of the tape against the closest match (5) */
   const tapeOn = ok;

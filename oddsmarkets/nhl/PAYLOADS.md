@@ -117,7 +117,7 @@ Names above are kept; additions and the exact shapes the front end reads:
   simulations, every 3 days from the first game day, at most 90 s a build).
 - **leaders.json**: {cols [id, value, name, team], skaters {key: {label, fmt, lower, rows}}, goalies {...}, teams {key:
   [[abbr, value]]}}. Counting stats rank everyone; rates the qualified pool.
-- **lab.json** (column-major: data[key][i] belongs to ids[i]): {skaters / goalies: {cols, ids, name, team, pos, qualified,
+- **lab.json** (column-major: data[key][i] belongs to ids[i]): {skaters / goalies: {cols, ids, name, team, pos, qualified, hand (shoots / catches, L | R | null; round 9),
   age, data {key: [...]}, labels {key: [label, fmt, lower, group]}}, teams {cols, ids, data}, lines_forwards / lines_pairs
   {cols, ids ("p1-p2-p3"), team, names, data}}.
 - **lines.json**: {forwards [LINE], pairs [LINE], min_toi (20 min), model (builder B's lines with xgf_pct_shrunk)}.

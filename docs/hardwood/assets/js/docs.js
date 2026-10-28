@@ -58,7 +58,7 @@ function entryHTML(e, isModel) {
   const q = [e.label, e.key, e.desc, e.group, e.kind, isModel ? 'model' : ''].join(' ').toLowerCase();
   return '<div class="gl-entry" id="gl-' + esc(e.key) + '" data-q="' + esc(q) + '">' +
     '<dt><span>' + esc(e.label || e.key) + ' <a class="doc-anchor" href="#/glossary/' + encodeURIComponent(e.key) + '" title="Link to this entry">#</a></span>' +
-    '<span class="gl-tags"><span class="gl-key">' + esc(e.key) + '</span>' + (isModel ? '<span class="gl-tag model">model</span>' : fmtHint(e)) + '</span></dt>' +
+    '<span class="gl-tags">' + (isModel ? '<span class="gl-tag model">model</span>' : fmtHint(e)) + '</span></dt>' +
     '<dd>' + (e.desc ? esc(e.desc) : '<span class="muted-inline">No definition yet.</span>') + '</dd></div>';
 }
 

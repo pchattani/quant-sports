@@ -1019,6 +1019,8 @@ class Unified:
             champ = crown(mlist, standings or computed, comp["kind"])
             if champ:
                 row["champion"] = champ
+            if not mlist and not standings and not champ:
+                continue                                # an empty archive season: nothing to show, no page
             keep_dirs.add(sid)
             self._write_past_season(out_dir / "s" / sid, slug, comp, sid, sm, mlist, {}, {}, standings, computed, a,
                                     source="archive", name_to_tid=name_to_tid, pms=pms)
@@ -1045,6 +1047,8 @@ class Unified:
             rows.append(row)
 
         rows.sort(key=_season_sort, reverse=True)
+        for r in rows:
+            self._canon_champion(r.get("champion"))
         # The live season first even when an older edition sorts later (it never should).
         rows.sort(key=lambda r: r["source"] != "live")
         live_ms = list((by_season.get(current_key) or {}).values())
@@ -1056,6 +1060,7 @@ class Unified:
         manifest = {"slug": slug, "current": current_key, "status": status, "seasons": rows,
                     "updated_at": self.today.strftime("%Y-%m-%dT%H:%M:%SZ")}
         if winner:
+            self._canon_champion(winner)
             manifest["winner"] = winner
             for r in rows:
                 if r["source"] == "live":
@@ -1737,6 +1742,15 @@ class Unified:
                 eras.append(era)
         return min(eras, key=era_key) if eras else None
 
+    def _canon_champion(self, champ: dict | None) -> None:
+        """A champion's name as the club's page spells it (one name source: "Liverpool", never "Liverpool FC" from one
+        archive table and "Liverpool" from another; "Bayern München" whatever the season's source wrote)."""
+        if not champ or champ.get("tid") is None:
+            return
+        c = self.clubs.get(str(champ["tid"])) or self.clubs.get(champ["tid"])
+        if c and c.get("name"):
+            champ["team"] = c["name"]
+
     def _archive_club(self, team: str | None, slug: str | None, international: bool) -> str | None:
         """
         The one club (or national team) an archive spelling names: its folded words, else the
@@ -2105,6 +2119,19 @@ def season_totals(rows: list[dict]) -> list[dict]:
     return out
 
 
+# Leagues whose title is decided after the table (a play-off or a final): first place is not the trophy there.
+PLAYOFF_TITLE_LEAGUES = frozenset({"mls", "liga-mx", LIGA_ARGENTINA_SLUG})
+
+
+def won_title(r: dict) -> bool:
+    """A trophy in this row: a cup won (stage "winner"), or a finished league season in first place (a league
+    decided by a play-off counts only its play-off winner). The season under way never counts."""
+    if r.get("stage") == "winner":
+        return True
+    return (r.get("kind") == "league" and r.get("source") != "live" and r.get("pos") == 1
+            and r.get("comp") not in PLAYOFF_TITLE_LEAGUES and int(_num(r.get("played"))) > 0)
+
+
 def club_season_totals(rows: list[dict]) -> list[dict]:
     """A club's year by year: each season key's competition rows summed (a row without a record leaves it "partial")."""
     by: dict[str, dict] = {}
@@ -2114,14 +2141,14 @@ def club_season_totals(rows: list[dict]) -> list[dict]:
             continue
         y = by.setdefault(era, {"era": era, "comps": 0, "played": 0, "w": 0, "d": 0, "l": 0, "gf": 0, "ga": 0, "record": COVERAGE_FULL})
         y["comps"] += 1
+        if won_title(r):
+            y.setdefault("won", []).append(r["comp"])
         if r.get("w") is None:
             if r.get("played"):
                 y["record"] = COVERAGE_PARTIAL
             continue
         for k in ("played", "w", "d", "l", "gf", "ga"):
             y[k] += int(_num(r.get(k)))
-        if r.get("stage") == "winner":
-            y.setdefault("won", []).append(r["comp"])
     return sorted(by.values(), key=lambda y: era_key(y["era"]), reverse=True)
 
 

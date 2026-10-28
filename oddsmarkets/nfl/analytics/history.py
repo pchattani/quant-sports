@@ -52,7 +52,71 @@ def league_summary(ctx: SeasonContext) -> dict | None:
             "cpoe_available": bool(num(S, "cpoe").notna().any()), "adot": an.rnd(num(S[db], "air_yards").mean(), 2)}
 
 
-def build(rows_by_season: dict[int, dict | None], league: dict[int, dict | None]) -> dict | None:
+ROUND = {"WC": 1, "DIV": 2, "CON": 3, "SB": 4}
+RESULT = {0: "Missed the playoffs", 1: "Lost in the Wild Card round", 2: "Lost in the Divisional round", 3: "Lost the conference final",
+          4: "Lost the Super Bowl", 5: "Won the Super Bowl"}
+
+
+def champions(stores: dict[int, dict]) -> dict | None:
+    """Every season since 1999 from the season stores: the Super Bowl (winner, loser, score), the two conference
+    champions, the best regular-season record, and each franchise's season (record, points, how far it went: 0 missed
+    the playoffs ... 5 won the Super Bowl). Franchises carry their current abbreviation (OAK -> LV, SD -> LAC, STL -> LA,
+    store `franchise`), with the season's own abbreviation kept as `as`."""
+    seasons, teams = [], {}
+    for s in sorted(stores):
+        st = stores.get(s) or {}
+        G = [g for g in (st.get("games") or {}).values() if g.get("status") == "final" and g.get("hs") is not None and g.get("as") is not None]
+        T = st.get("teams") or {}
+        fr = {k: (v.get("franchise") or k) for k, v in T.items()}
+        conf = {k: v.get("conf") for k, v in T.items()}
+        post = [g for g in G if g.get("gtype") in ROUND]
+        sb = [g for g in post if g.get("gtype") == "SB"]
+        reg = [g for g in G if g.get("gtype") == "REG"]
+        if not reg:
+            continue
+
+        def win(g):
+            return (g["home"], g["away"], g["hs"], g["as"]) if g["hs"] > g["as"] else (g["away"], g["home"], g["as"], g["hs"])
+        row: dict = {"season": int(s)}
+        if sb:
+            w, l, ws, ls = win(sb[0])
+            row["sb"] = [fr.get(w, w), fr.get(l, l), ws, ls]
+        for g in post:
+            if g.get("gtype") == "CON":
+                w = win(g)[0]
+                if conf.get(w):
+                    row[str(conf[w]).lower()] = fr.get(w, w)
+        rec: dict[str, list] = {}
+        for g in reg:
+            for t, me, op in ((g["home"], g["hs"], g["as"]), (g["away"], g["as"], g["hs"])):
+                r = rec.setdefault(t, [0, 0, 0, 0, 0])
+                r[0 if me > op else 1 if me < op else 2] += 1
+                r[3] += me
+                r[4] += op
+        far = {t: 0 for t in rec}
+        for g in post:
+            k = ROUND[g["gtype"]]
+            w, l = win(g)[0], win(g)[1]
+            far[l] = max(far.get(l, 0), k)
+            far[w] = max(far.get(w, 0), k + 1 if g["gtype"] == "SB" else k)
+        best = max(rec, key=lambda t: ((rec[t][0] + 0.5 * rec[t][2]) / max(1, sum(rec[t][:3])), rec[t][3] - rec[t][4]))
+        row["best"] = [fr.get(best, best)] + rec[best][:3]
+        try:                                                    # the AP award winners (models/award_winners.py, 2006 on)
+            from oddsmarkets.nfl.models.award_winners import WINNERS
+            aw = {k: list(v[int(s)]) for k, v in WINNERS.items() if int(s) in v}
+            if aw:
+                row["awards"] = aw
+        except ImportError:
+            pass
+        seasons.append(row)
+        for t, r in rec.items():
+            teams.setdefault(fr.get(t, t), []).append([int(s), r[0], r[1], r[2], r[3], r[4], far.get(t, 0)] + ([t] if fr.get(t, t) != t else []))
+    if not seasons:
+        return None
+    return {"cols": ["season", "w", "l", "t", "pf", "pa", "far", "as"], "far": RESULT, "seasons": seasons, "teams": teams}
+
+
+def build(rows_by_season: dict[int, dict | None], league: dict[int, dict | None], stores: dict[int, dict] | None = None) -> dict | None:
     if not rows_by_season:
         return None
     season_boards = {}
@@ -99,6 +163,7 @@ def build(rows_by_season: dict[int, dict | None], league: dict[int, dict | None]
     trends = [league[s] for s in sorted(league) if league.get(s)]
     return {"ok": True, "updated_at": an.now(), "seasons": sorted(rows_by_season), "season_cols": ["pid", "name", "season", "team", "value", "plus"],
             "season_records": records, "record_cols": ["pid", "name", "season", "team", "value"],
+            "champions": champions(stores) if stores else None,
             "season_leaders": season_boards, "career_cols": ["pid", "name", "first", "last", "seasons", "total"], "career_leaders": career_boards,
             "league": trends, "era_note": "plus = 100 + 10 z within the season's qualified pool at the position (lower-is-better rates reversed).",
             "season_floor": {g: {"metric": k, "min": v} for g, (k, v) in SEASON_FLOOR.items()},

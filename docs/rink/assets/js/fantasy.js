@@ -8,7 +8,10 @@
  * z, pre_rank; points (default weights), weeks, roster, teams (games per week, back-to-backs, opponent factor),
  * goalie_next {pid: [[date, opp, P(start), P(win), points]]}, picks, backtest summary) and data/fantasy_backtest.json.
  * Points weights are editable here and kept in this browser (localStorage, best effort); the defaults are our own, not
- * any platform's. No fantasy platform's ownership, ADP or rankings are used. Uses RK.fk (skaters.js). */
+ * any platform's. No fantasy platform's ownership, ADP or rankings are used. Uses RK.fk (skaters.js).
+ * Round 9 (28 Oct 2026): rebuilt in the house order: the headline numbers, then a chart (this week and next for the top
+ * twenty), then the scoring and the rankings table, the picks and the side tables, then the explain strip; the method is a
+ * link to Model › How it works and the backtest is folded under "Technical detail". */
 (function (RK) {
 'use strict';
 
@@ -97,9 +100,10 @@ function draw(el, S, d, bt, tabs) {
   const all = rowsOf(d);
   const W = loadWeights(d.points || {});
   const wk = d.weeks || [];
-  let h = tabs + QK.explain('<b>What’s that number?</b> Every projection here is fantasy points under our default scoring (change any weight under Scoring and the rankings follow) over the games left on each club’s schedule. The backtest at the foot shows how close these projections came in past seasons.', { html: true }) +
-    '<div class="card"><div class="card-header">Fantasy ' + k.esc(k.sLabel(S)) + ' <span class="card-sub">Projections for the standard NHL categories (skaters G, A, +/-, PPP, SOG, HIT, BLK; goalies W, GA, SV, SO, with GAA and SV%) from our own models: ice time and power-play role, individual expected goals × finishing, assists from on-ice chances, opponents\' goals- and shots-against, the schedule, goalie starts and the game model\'s win probabilities. As of ' + k.esc(k.fmtDate(d.asof)) + '. No fantasy platform\'s ownership, ADP or rankings are used (their terms do not allow it): "add" and "drop" come from our own season-start and current projections. <a href="#/methodology/fantasy">Method</a></span></div><div id="fy-tiles"></div></div>';
-  h += '<div class="card"><div class="card-header">Our picks <span class="card-sub">A short list, each with the data behind it.</span></div><div id="fy-picks" class="fy-picks"></div></div>';
+  let h = tabs + '<div id="fy-tiles"></div>' +
+    '<section class="qk-section">' + QK.sectionHead({ kicker: 'The next two weeks', title: 'Who scores the most, week by week', sub: 'Projected fantasy points for the top twenty in the rankings this week (the rest of it, Monday to Sunday) and next, under your scoring. More games in a week means more points.' }) +
+    '<div class="qk-card"><div class="qk-card-body"><div id="fy-wkc" class="qk-chart" style="--h:560px" role="img" aria-label="Projected points this week and next"></div></div></div></section>' +
+    '<div class="card"><div class="card-header">Our picks <span class="card-sub">A short list, each with the data behind it.</span></div><div id="fy-picks" class="fy-picks"></div></div>';
   h += '<div class="card"><div class="card-header">Scoring <span class="card-sub">Points per category (our default, not any platform\'s; change any weight, it stays in this browser) or categories (sum of z-scores over the top 240 skaters / 48 goalies, default categories).</span></div><div class="lab-controls vl-ctl fy-w">' +
     '<label>Format<select id="fy-fmt"><option value="pts">Points</option><option value="cat">Categories (z)</option></select></label>' +
     CS.concat(CG).map(c => '<label>' + k.esc((d.labels || {})[c] || c) + '<input type="number" step="0.1" id="fy-w-' + c + '" value="' + W[c] + '"></label>').join('') +
@@ -116,7 +120,8 @@ function draw(el, S, d, bt, tabs) {
     '<div class="card"><div class="card-header">Schedule <span class="card-sub">Games per fantasy week (back-to-backs) and the opponents\' goals-against factor (1.00 = league average; higher = easier to score on).</span></div><div id="fy-sched"></div></div></div>';
   h += '<div class="grid-2"><div class="card"><div class="card-header">Buy low / sell high <span class="card-sub">Shooting or goaltending far from what the underlying numbers support, with the expected change in points a game.</span></div><div id="fy-luck"></div></div>' +
     '<div class="card"><div class="card-header">Waiver targets and breakouts <span class="card-sub">Adds: outside our season-start top ' + d.top_n + ', inside it now (drops: the reverse). Breakouts: 24 or younger with more ice time or power-play time than last season.</span></div><div id="fy-adds"></div></div></div>';
-  h += '<div class="card" id="fy-bt-card"><div class="card-header">How good are these projections? <span class="card-sub">A walk-forward backtest: at every weekly checkpoint of the last five completed seasons, the projection made from games before that day only, against what followed over the next week and the rest of the season, beside two naive baselines. MAE per player-game (skaters, per game played) or per club game (goalies), in default points; Spearman: rank correlation across players, averaged over checkpoints.</span></div><div id="fy-bt"></div></div>';
+  h += QK.explain('<b>What’s that number?</b> Every projection here is fantasy points under our default scoring (change any weight under Scoring and the rankings follow) over the games left on each club’s schedule, from our own models: ice time and power-play role, expected goals and finishing, assists from on-ice chances, opponents, goalie starts and the game model’s win chances. As of ' + k.esc(k.fmtDate(d.asof)) + '. No fantasy platform’s ownership, rankings or draft data are used. How it works: <a class="qk-link" href="#/model?tab=methodology">the Model page</a>.', { html: true });
+  h += '<details class="rk-fold"><summary>Technical detail: how good are these projections? (the backtest)</summary><div class="rk-fold-b"><div class="card" id="fy-bt-card"><div class="card-header">How good are these projections? <span class="card-sub">A walk-forward backtest: at every weekly checkpoint of the last five completed seasons, the projection made from games before that day only, against what followed over the next week and the rest of the season, beside two naive baselines. MAE per player-game (skaters, per game played) or per club game (goalies), in default points; Spearman: rank correlation across players, averaged over checkpoints.</span></div><div id="fy-bt"></div></div></div></details>';
   el.innerHTML = h;
   const $ = id => document.getElementById(id);
   $('fy-fmt').value = FS.fmt; $('fy-pos').value = FS.pos; $('fy-team').value = teams.indexOf(FS.team) >= 0 ? FS.team : 'all'; $('fy-flag').value = FS.flag; $('fy-n').value = FS.n; $('fy-inj').value = FS.inj;
@@ -163,10 +168,14 @@ function draw(el, S, d, bt, tabs) {
     const add = all.filter(r => (r.flags || []).indexOf('add') >= 0).sort((a, b) => a._rank - b._rank)[0];
     const bs = (d.backtest || {}).pts || {};
     const m = (bs.S_ros || {}).model, b1 = (bs.S_ros || {}).std;
-    $('fy-tiles').innerHTML = k.tiles([k.tile('Top skater', sk ? k.playerLink(sk.id, sk.name) : '—', sk ? k.num(sk._pg, 2) + ' points a game · ' + k.esc(sk.team) : ''),
-      k.tile('Top goalie', gl ? k.playerLink(gl.id, gl.name) : '—', gl ? k.num(gl._pg, 2) + ' a start · ' + k.pct(gl.share, 0) + ' of starts' : ''),
-      k.tile('Best add', add ? k.playerLink(add.id, add.name) : '—', add ? 'rank ' + add._rank + ' now, ' + (add.pre_rank || '—') + ' at the start' : ''),
-      k.tile('Backtest, rest of season', m ? k.num(m[0], 3) : '—', m && b1 ? 'MAE a game v ' + k.num(b1[0], 3) + ' (season to date); Spearman ' + k.num(m[1], 2) : 'not computed yet')]);
+    void m; void b1;
+    $('fy-tiles').innerHTML = QK.stats([sk ? { label: 'Top skater', value: RK.surnameOf(sk.name) + ' ' + k.num(sk._pg, 2), unit: 'a game', signal: true, href: k.playerHref(sk.id), sub: sk.name + ' · ' + RK.teamAbbr(sk.team) + ' · ' + k.num(sk._ros, 0) + ' rest of season' } : null,
+      gl ? { label: 'Top goalie', value: RK.surnameOf(gl.name) + ' ' + k.num(gl._pg, 2), unit: 'a start', href: k.playerHref(gl.id), sub: gl.name + ' · ' + k.pct(gl.share, 0) + ' of the starts' } : null,
+      add ? { label: 'Best add', value: RK.surnameOf(add.name), text: true, href: k.playerHref(add.id), sub: 'rank ' + add._rank + ' now, ' + (add.pre_rank || '—') + ' at the start of the season' } : null].filter(Boolean));
+    const t20 = all.slice().sort((a, b) => a._rank - b._rank).slice(0, 20);
+    const host = $('fy-wkc');
+    if (host && t20.length && window.QKC) QKC.bar(host, { cats: t20.map(r => r.name + ' (' + (POS_ONE[r.pos] || r.pos) + ')'), horizontal: true, labels: true, fmt: x => k.num(x, 1), labelWidth: 170, legend: true, valName: 'Projected fantasy points',
+      series: [{ name: 'This week', data: t20.map(r => r._wk[0].p), color: 'model' }, { name: 'Next week', data: t20.map(r => r._wk[1].p), color: QKC.tokens().other }], hrefs: t20.map(r => k.playerHref(r.id)) });
   }
   function drawSide() {
     const gl = all.filter(r => r.kind === 'G').sort((a, b) => a._rank - b._rank);

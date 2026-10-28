@@ -24,7 +24,14 @@
  * it and at least 30% of the group on screen has a value (else the default falls back within its set). The pickers
  * list the view's three sets first, the presets lead with the view's, a "Position view" line sits under the control,
  * the ranked table gains a value column (the view's colour metric, else the next value metric, when it is not on an
- * axis) with its percentile, and "Most like" uses the view's metrics (4 excellence, 4 production, 2 value). */
+ * axis) with its percentile, and "Most like" uses the view's metrics (4 excellence, 4 production, 2 value).
+ * Round 9 (28 Oct 2026): the Lab is the Scouting Room's Chart view (rk-scout.js). RK.lab.mount(host, S, ext) draws the
+ * same chart, presets, colour, shrink, medians, corners, ranked table and "Most like" inside the room from lab.json
+ * alone (with glossary.json for the stabilisation points; never the 3-4 MB catalogues), without its own kind, group,
+ * minimum, qualified and highlight controls: those come from the room's bar through ext = { within, bg ('S'|'G'),
+ * pg ('F'|'D'|'G'), q, x, y, color, keep(get) -> bool (the room's minimum, team, age and hand; get(field) reads the row),
+ * onPick(pid, kind) (a point or a name opens the room's drawer), onAxes({ x, y, color }) }. #/lab redirects to
+ * #/scout?view=chart; teams (kind T) live on the Teams page's style map. */
 (function (RK) {
 'use strict';
 
@@ -52,6 +59,7 @@ const PRESETS = [
 ];
 const NO_SHRINK = /^(gp|gs|games|age|season|toi|toi\d*_gp|toi5|value|gar|war|gar_.*|rapm_.*|.*_se|g|a|a1|a2|p|pts|sog|iff|icf|shots|ixg|gax|xgf|xga|gsax|gsax_.*|shots_faced|sa|ga|w|l|otl|so|edge_.*|.*speed.*|bursts.*|ozs_pct|dzs_share|oz_start_pct|dz_start_pct|qo[ct]_.*|proj_.*|pts_pace|hits|blocks|pim|pp_p|sh_p|fo_taken|fo_net|pen_net)$/;
 let LAB = null, LABK = '', LAB_RESET = null, LAB_REDRAW = null;
+let EXT = null;    // the Scouting Room's state when the chart is mounted inside it (RK.lab.mount), else null
 const S0 = { kind: 'S', pos: 'A', min: null, shrink: true, preset: 0, x: '', y: '', color: 'team', q: '', qual: true, within: 'broad', grp: 'F' };
 /* "Compare within: Position": [address code, spec group id, fallback display] */
 const PGROUPS = [['F', 'forwards', 'Forwards'], ['D', 'defence', 'Defence'], ['G', 'goalies', 'Goaltenders']];
@@ -78,6 +86,7 @@ function headOrder() {
 }
 /* the address: kind, the within choice (or the old skater filter under Broad), the axes; other keys kept */
 function writeHash() {
+  if (EXT) { if (EXT.onAxes) EXT.onAxes({ x: S0.preset < 0 ? S0.x : '', y: S0.preset < 0 ? S0.y : '', color: S0.color && S0.color !== 'team' ? S0.color : '' }); return; }
   try {
     const h = String(location.hash || '#/lab'), qi = h.indexOf('?');
     const path = qi >= 0 ? h.slice(0, qi) : h, keep = [];
@@ -133,7 +142,8 @@ function prep(raw, sk, gk, tms) {
     if (!X || !Array.isArray(X.ids) || !X.data) return;
     const keys = (X.cols || Object.keys(X.data)).filter(c => Array.isArray(X.data[c]));
     const lab = X.labels || {};
-    const metrics = keys.map(c => { const L = lab[c] || extraMeta[c] || null; return { key: c, label: L ? L[0] : c, fmt: L ? L[1] : '', lower: L ? !!L[2] : false, group: L ? (L[3] || 'Other') : 'Other' }; });
+    const fix = t => String(t || '').replace(/^EDGE tracking$/, 'Puck and player tracking').replace(/^EDGE /, 'Tracked ');
+    const metrics = keys.map(c => { const L = lab[c] || extraMeta[c] || null; return { key: c, label: L ? fix(L[0]) : c, fmt: L ? L[1] : '', lower: L ? !!L[2] : false, group: L ? fix(L[3] || 'Other') : 'Other' }; });
     const head = g === 'T' ? ['team'] : ['pid', 'name', 'team', 'pos', 'qualified', 'age'];
     const cols = head.concat(keys.filter(c => head.indexOf(c) < 0));
     const rows = X.ids.map((id, i) => cols.map(c => (c === 'pid' || c === 'team' && g === 'T' ? String(id) : (head.indexOf(c) >= 0 ? (X[c] || [])[i] : X.data[c][i]))));
@@ -180,7 +190,10 @@ function posOk(r) {
 /* The Position default view: the spec group's view, its sets kept to the metrics the group on screen has (30%+ of its
    rows), or null (Broad, teams, no spec, no view). The payload's keys are the spec's ids. */
 let VIEW = null, VIEWK = '';
-function onScreen() { return G().rows.filter(r => S0.kind === 'T' || ((nOf(r) >= S0.min) && posOk(r) && (!S0.qual || G().idx.qualified === undefined || raw(r, 'qualified') !== false))); }
+function onScreen() {
+  const keep = EXT && EXT.keep ? EXT.keep : null;
+  return G().rows.filter(r => S0.kind === 'T' || ((nOf(r) >= S0.min) && posOk(r) && (!S0.qual || G().idx.qualified === undefined || raw(r, 'qualified') !== false) && (!keep || keep(f => raw(r, f)))));
+}
 function posView() {
   if (!byPos() || !specCat() || !window.QK || !QK.within || !QK.within.view) return null;
   const sg = specCat().group(pgroup(S0.grp).id);
@@ -314,7 +327,7 @@ function draw(S) {
     (S0.shrink && (shrinkable(S0.x) || shrinkable(S0.y)) ? '<br><span style="color:#8b949e">unshrunk: ' + fmt(S0.x, raw(r, S0.x)) + ' · ' + fmt(S0.y, raw(r, S0.y)) + '</span>' : '');
   const trace = (pts, name, color, extra) => Object.assign({
     type: 'scatter', mode: 'markers', name: name, x: pts.map(r => val(r, S0.x)), y: pts.map(r => val(r, S0.y)),
-    text: pts.map(hover), hovertemplate: '%{text}<extra></extra>', customdata: pts.map(href),
+    text: pts.map(hover), hovertemplate: '%{text}<extra></extra>', customdata: pts.map(r => (EXT && EXT.onPick && !team ? 'pick:' + idOf(r) : href(r))),
     marker: { size: pts.map(size), color: color, opacity: 0.85, line: { color: '#0d1117', width: 0.7 } }
   }, extra || {});
   const traces = [];
@@ -338,13 +351,17 @@ function draw(S) {
   const node = k.$('lab-chart');
   const narrow = k.narrow(node);
   const pctAxis = m => (m.fmt === 'pct' ? '.0%' : '');
-  k.plot(node, traces, k.layout({
+  const pl0 = k.plot(node, traces, k.layout({
     showlegend: !narrow && (S0.color === 'team' || S0.color === 'pos' || S0.color === 'conf') && traces.length <= 14, legend: { orientation: 'h', y: -0.18, font: { color: C.text2, size: 9 } }, margin: { l: 66, r: 16, t: 20, b: narrow ? 50 : 90 }, annotations: ann, hovermode: 'closest',
     xaxis: { title: label(S0.x), zeroline: false, autorange: lower(S0.x) ? 'reversed' : true, tickformat: pctAxis(meta(S0.x)) },
     yaxis: { title: label(S0.y), zeroline: false, autorange: lower(S0.y) ? 'reversed' : true, tickformat: pctAxis(meta(S0.y)) },
     shapes: [{ type: 'line', x0: mx, x1: mx, yref: 'paper', y0: 0, y1: 1, line: { color: '#3d444d', dash: 'dot', width: 1 } }, { type: 'line', y0: my, y1: my, xref: 'paper', x0: 0, x1: 1, line: { color: '#3d444d', dash: 'dot', width: 1 } }]
   }));
-  k.clickThrough(node);
+  if (EXT && EXT.onPick && !team) {
+    const pk = EXT.onPick, kd = S0.kind;
+    node.__rkPick = cd => { if (/^pick:/.test(String(cd || ''))) pk(String(cd).slice(5), kd); };
+    Promise.resolve(pl0).then(() => { if (node.on && !node.__rkPickBound) { node.__rkPickBound = true; node.on('plotly_click', ev => { const p = ev && ev.points && ev.points[0]; if (p && node.__rkPick) node.__rkPick(p.customdata); }); } });
+  } else k.clickThrough(node);
   k.set('lab-sim', team ? '' : simStrip(base0, hits, nm, S));
   const mX = meta(S0.x), mY = meta(S0.y);
   const unit = m => k.esc(m.unit || (S0.kind === 'G' ? 'shots' : 'minutes'));
@@ -360,11 +377,15 @@ function draw(S) {
     .concat(VK ? [{ label: label(VK), align: 'right', cls: oth(VK), title: 'Overall value; the percentile is within the group on screen' }, { label: 'Pct', align: 'right' }] : [])
     .concat([{ label: 'Combined', align: 'right', title: 'Sum of standard scores in the better direction' }]),
   ranked.slice(0, 300).map((o, i) => { const r = o.r, vx = val(r, S0.x), vy = val(r, S0.y), vv = VK ? val(r, VK) : null, pv0 = k.isNum(vv) ? pOf(sortedV, vv, dirv) : null;
-    return { _href: href(r), cells: [{ v: i + 1, cls: 'pos-cell' }, { v: nm(r), html: team ? k.teamChip(idOf(r), S) + ' <a href="' + href(r) + '">' + k.esc(nm(r)) + '</a>' : '<a class="ply-link" href="' + href(r) + '">' + k.esc(nm(r)) + '</a>' }]
+    return { _href: EXT ? null : href(r), cells: [{ v: i + 1, cls: 'pos-cell' }, { v: nm(r), html: team ? k.teamChip(idOf(r), S) + ' <a href="' + href(r) + '">' + k.esc(nm(r)) + '</a>' : '<a class="ply-link" href="' + href(r) + '"' + (EXT && EXT.onPick ? ' data-pick="' + k.esc(idOf(r)) + '"' : '') + '>' + k.esc(nm(r)) + '</a>' }]
       .concat(team ? [] : [{ v: tm(r) || '', html: k.teamChip(tm(r), S) }].concat(G().nKey ? [{ v: nOf(r), html: k.int(nOf(r)) }] : []))
       .concat([{ v: vx, html: fmt(S0.x, vx) }, { v: pOf(sortedX, vx, dirx), html: k.pill(pOf(sortedX, vx, dirx)) }, { v: vy, html: fmt(S0.y, vy) }, { v: pOf(sortedY, vy, diry), html: k.pill(pOf(sortedY, vy, diry)) }])
       .concat(VK ? [{ v: vv, html: fmt(VK, vv) }, { v: pv0, html: k.isNum(pv0) ? k.pill(pv0) : '—' }] : []).concat([{ v: o.z, html: '<strong>' + k.num(o.z, 2) + '</strong>' }]) }; }), { sticky: true, compact: true });
   k.sortable(host);
+  if (EXT && EXT.onPick && !host.__pickWired) {
+    host.__pickWired = true;
+    host.addEventListener('click', ev => { const a = ev.target.closest ? ev.target.closest('a[data-pick]') : null; if (!a || ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.button) return; ev.preventDefault(); if (EXT && EXT.onPick) EXT.onPick(a.getAttribute('data-pick'), S0.kind); });
+  }
 }
 
 /* "Most like": the five nearest the highlighted player within the group on screen, on standard scores of the group's
@@ -382,19 +403,59 @@ function simStrip(rows, hits, nm, S) {
     sub: [raw(o.row, 'team') || '', k.posLabel(raw(o.row, 'pos'))].filter(Boolean).join(' · ') + ' · compare' })));
 }
 
-function render(el, params, state) {
+function markup(embedded) {
   const k = K();
-  el.innerHTML = QK.explain('<b>What’s that number?</b> Each dot is a player or a club on the two metrics you pick. The ranked list orders them by the combined standard score on both axes: 0 is average, +1 one standard deviation better on each. Compare within Position opens on what makes a player at that position good, against their scoring (goalies: results), coloured by their overall value.', { html: true }) +
-    '<div class="card"><div class="card-header">Lab <span class="card-sub" id="lab-sub">Loading…</span><span class="gq-ctl">' + k.toggle('lab-kind', KINDS, S0.kind) + '</span></div>' +
-    '<div id="lab-within" class="rk-lab-within-wrap"></div><div class="lab-controls gq-controls"><label>Preset<select id="lab-preset" class="gq-wide"></select></label><label>Skaters<select id="lab-pos"><option value="A">All</option><option value="F">Forwards</option><option value="D">Defence</option></select></label>' +
+  const hide = embedded ? ' hidden style="display:none"' : '';
+  return (embedded ? '' : QK.explain('<b>What’s that number?</b> Each dot is a player or a club on the two metrics you pick. The ranked list orders them by the combined standard score on both axes: 0 is average, +1 one standard deviation better on each. Compare within Position opens on what makes a player at that position good, against their scoring (goalies: results), coloured by their overall value.', { html: true })) +
+    '<div class="card"><div class="card-header">' + (embedded ? 'Any two metrics' : 'Lab') + ' <span class="card-sub" id="lab-sub">Loading…</span><span class="gq-ctl"' + hide + '>' + k.toggle('lab-kind', KINDS, S0.kind) + '</span></div>' +
+    '<div id="lab-within" class="rk-lab-within-wrap"' + hide + '></div><div class="lab-controls gq-controls"><label>Preset<select id="lab-preset" class="gq-wide"></select></label><label' + hide + '>Skaters<select id="lab-pos"><option value="A">All</option><option value="F">Forwards</option><option value="D">Defence</option></select></label>' +
     '<label>X axis<select id="lab-x"></select></label><label>Y axis<select id="lab-y"></select></label><label>&nbsp;<button type="button" id="lab-swap" class="gq-btn" title="Swap the axes">⇄ swap</button></label>' +
-    '<label>Colour<select id="lab-color"></select></label><label><span>Min <span id="lab-min-u"></span> <span id="lab-min-v"></span></span><input id="lab-min" type="range" min="0" max="2000" step="10"></label>' +
-    '<label class="inline"><input id="lab-qual" type="checkbox"> qualified only</label><label class="inline"><input id="lab-shrink" type="checkbox"> shrink by stabilisation</label><label>Highlight<input id="lab-q" class="gq-search" type="search" placeholder="player or team…"></label>' +
+    '<label>Colour<select id="lab-color"></select></label><label' + hide + '><span>Min <span id="lab-min-u"></span> <span id="lab-min-v"></span></span><input id="lab-min" type="range" min="0" max="2000" step="10"></label>' +
+    '<label class="inline"' + hide + '><input id="lab-qual" type="checkbox"> qualified only</label><label class="inline"><input id="lab-shrink" type="checkbox"> shrink by stabilisation</label><label' + hide + '>Highlight<input id="lab-q" class="gq-search" type="search" placeholder="player or team…"></label>' +
     '</div><div id="lab-ours" class="rk-lab-ours"></div><div id="lab-chart" class="gq-lab-chart"></div><div id="lab-sim" class="rk-lab-sim"></div><div class="pg-note gq-note" id="lab-note"></div></div>' +
-    '<div class="card"><div class="card-header">Ranked <span class="card-sub">By the combined standard score on both axes (top 300). Click a row for the page.</span></div><div id="lab-table"></div></div>';
+    '<div class="card"><div class="card-header">Ranked <span class="card-sub">By the combined standard score on both axes (top 300). ' + (embedded ? 'Tap a name for the profile.' : 'Click a row for the page.') + '</span></div><div id="lab-table"></div></div>';
+}
+/* glossary.json -> the lab metas' explanations, units and stabilisation points (lab.json carries labels only) */
+function mergeGlossary(g) {
+  const by = { S: {}, G: {} };
+  ((g && g.groups) || []).forEach(gr => (gr.entries || []).forEach(e => { if (e && e.key) by[e.kind === 'goalie' ? 'G' : 'S'][e.key] = e; }));
+  ['S', 'G'].forEach(kd => {
+    const L = LAB && LAB[kd];
+    if (!L) return;
+    Object.keys(L.meta).forEach(key => {
+      const e = by[kd][key], m = L.meta[key];
+      if (!e || !m) return;
+      if (!K().isNum(m.stabilises_at) && K().isNum(e.stabilises_at)) m.stabilises_at = e.stabilises_at;
+      if (!m.unit && e.unit) m.unit = e.unit;
+      if (!m.desc && e.desc) m.desc = e.desc;
+    });
+  });
+}
+function render(el, params, state) {
+  EXT = null;
+  el.innerHTML = markup(false);
+  return boot(el, params, state, params.query || {});
+}
+/* The Scouting Room's Chart: draw into host with the room's state (ext, above). Returns a promise. */
+function mount(host, S, ext) {
+  EXT = ext || {};
+  S0.color = 'team';      // each mount starts from the group's own colour (Position: the view's value metric)
+  host.innerHTML = markup(true);
+  const qy = { q: EXT.q || '' };
+  if (EXT.within === 'pos') { qy.within = 'pos'; qy.pos = EXT.pg; } else qy.kind = EXT.bg === 'G' ? 'G' : 'S';
+  if (EXT.x) qy.x = EXT.x;
+  if (EXT.y) qy.y = EXT.y;
+  return boot(host, { season: S, query: qy }, { season: S }, qy, EXT);
+}
+function boot(el, params, state, qy0, ext) {
+  const k = K();
   return k.ready().then(() => {
     const S = k.S(params, state);
-    return Promise.all([k.loadY(S, 'lab.json'), k.loadY(S, 'skaters.json'), k.loadY(S, 'goalies.json'), k.loadY(S, 'teams.json'), k.loadNames(), RK.ours ? RK.ours.load() : null]).then(res => ({ S: S, res: res }));
+    /* the room reads lab.json (and the 50 KB glossary for the stabilisation points); the standalone Lab may also fall
+       back to the catalogues */
+    const more = ext ? [Promise.resolve(null), Promise.resolve(null), Promise.resolve(null), k.loadNames(), RK.ours ? RK.ours.load() : null, RK.load('glossary.json')]
+      : [k.loadY(S, 'skaters.json'), k.loadY(S, 'goalies.json'), k.loadY(S, 'teams.json'), k.loadNames(), RK.ours ? RK.ours.load() : null, Promise.resolve(null)];
+    return Promise.all([k.loadY(S, 'lab.json')].concat(more)).then(res => ({ S: S, res: res }));
   }).then(o => {
     if (!k.alive(el)) return;
     const S = o.S, res = o.res, $ = k.$;
@@ -402,9 +463,11 @@ function render(el, params, state) {
     if (sk) k.learnCat(sk);
     if (gk) k.learnCat(gk);
     const tms = RK.fk.T ? RK.fk.T.teamsOf(res[3]) : null;
-    if (LABK !== String(S)) { LAB = prep(res[0], sk, gk, tms); LABK = String(S); S0.min = null; S0.x = ''; S0.y = ''; S0.preset = 0; }
+    const key = String(S) + (ext ? '|room' : '');
+    if (LABK !== key) { LAB = prep(res[0], sk, gk, tms); LABK = key; S0.min = null; S0.x = ''; S0.y = ''; S0.preset = 0; if (res[6]) mergeGlossary(res[6]); }
+    VIEWK = '';
     if (!Object.keys(LAB).length) { $('lab-chart').innerHTML = k.notBuilt('The ' + k.sLabel(S) + ' lab file', res[0]); $('lab-sub').textContent = ''; return; }
-    const qy = params.query || {};
+    const qy = qy0 || {};
     const qk = String(qy.kind || qy.g || '').toUpperCase().charAt(0);
     if (qk && LAB[qk]) S0.kind = qk;
     const wq = QK.within.read(qy, PCODES);
@@ -424,12 +487,16 @@ function render(el, params, state) {
       if (S0.color === 'pos' && S0.kind !== 'S') S0.color = 'team';
       if (S0.color === 'conf' && S0.kind !== 'T') S0.color = 'team';
     };
+    if (ext) { S0.x = ''; S0.y = ''; S0.preset = 0; S0.qual = false; }    // the room: its keep() holds the floor; its address names the axes
     reset();
+    if (ext) S0.min = 0;
     LAB_RESET = reset;
     if (qy.q !== undefined) S0.q = String(qy.q);
     if (qy.x && G().idx[qy.x] !== undefined) { S0.x = qy.x; S0.preset = -1; }
     if (qy.y && G().idx[qy.y] !== undefined) { S0.y = qy.y; S0.preset = -1; }
     if (S0.x === S0.y) { const alt = G().metrics.find(m => m.key !== S0.x); if (alt) S0.y = alt.key; }
+    if (byPos() && S0.preset < 0) { const pv = posView(); if (pv && pv.color && G().idx[pv.color] !== undefined) S0.color = pv.color; }
+    if (ext && ext.color && (ext.color === 'team' || ext.color === 'pos' || G().idx[ext.color] !== undefined)) S0.color = ext.color;
     sync();
     const redraw = () => draw(S);
     LAB_REDRAW = redraw;
@@ -455,5 +522,6 @@ function render(el, params, state) {
   });
 }
 
+RK.lab = { mount: mount, render: render };
 if (typeof RK.route === 'function') { try { RK.route('lab', render); } catch (e) { /* bound */ } }
 })(window.RK || (window.RK = {}));

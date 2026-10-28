@@ -18,14 +18,15 @@
 var QK = window.QK, QKC = window.QKC;
 var esc = FB.esc, isNum = FB.isNum;
 
+/* A match rating (1-10) on the kit's percentile scale (cold to hot, STYLE_GUIDE 3): 5.8 or less at the cold end, 7.0
+   (about a typical starter) grey in the middle, 8.2 or more at the hot end. ratingPct for the scale position,
+   ratingInk for the number on it (black or white, whichever reads). */
+function ratingPct(r) { return Math.max(0, Math.min(100, (Number(r) - 5.8) / 2.4 * 100)); }
 function ratingColor(r) {
   if (!isNum(r)) return QK.cssVar('--ink-4') || '#6e7681';
-  if (r >= 8) return QK.cssVar('--c-3') || '#199e70';
-  if (r >= 7.3) return QK.cssVar('--st-good') || '#0ca30c';
-  if (r >= 6.8) return QK.cssVar('--st-warn') || '#fab219';
-  if (r >= 6.3) return QK.cssVar('--st-serious') || '#ec835a';
-  return QK.cssVar('--st-crit') || '#d03b3b';
+  return QK.pctHex(ratingPct(r));
 }
+function ratingInk(r) { return isNum(r) ? QK.pctInk(ratingPct(r)) : 'var(--ink-1)'; }
 
 function outcomeOf(s) {
   var t = String(s.shot_type || s.type || s.outcome || '').toLowerCase();
@@ -36,6 +37,10 @@ function outcomeOf(s) {
   return 'miss';
 }
 var OUTCOMES = [['goal', 'Goal'], ['save', 'Saved'], ['post', 'Woodwork'], ['block', 'Blocked'], ['miss', 'Off target']];
+/* One colour per shot outcome, shared by the shot map and the goal mouth, set on the series too so the legend keys
+   match the dots: a goal in volt (what happened), a save cyan, the woodwork red-orange, blocked and off target grey.
+   Never cobalt: blue is reserved for ours. */
+function outcomeColours(T) { return { goal: T.volt, save: T.cat[2], post: T.cat[1], block: T.ink3, miss: T.ink4 }; }
 
 /* ── surfaces (SVG, chart coordinates with y up, drawn as the container's background) */
 function strokeOf(T) { return T.dark ? 'rgba(255,255,255,0.22)' : 'rgba(13,17,23,0.28)'; }
@@ -70,12 +75,11 @@ function shotMap(el, shots, o) {
   el.style.setProperty('--ar', surface === 'half' ? '68 / 54.5' : '105 / 68');
   return QKC.mount(el, function (T) {
     el.style.backgroundImage = surfaceBg(surface, T);
-    /* categorical slots, never the signal (ours) or the market grey: goal orange, save blue, as the match page's goal mouth */
-    var colour = { goal: T.cat[1], save: T.cat[0], post: T.cat[3], block: T.ink3, miss: T.ink4 };
+    var colour = outcomeColours(T);
     var series = OUTCOMES.map(function (k) {
       var pts = list.filter(function (s) { return outcomeOf(s) === k[0]; });
       return {
-        type: 'scatter', name: k[1], z: k[0] === 'goal' ? 4 : 2,
+        type: 'scatter', name: k[1], z: k[0] === 'goal' ? 4 : 2, itemStyle: { color: colour[k[0]] },
         symbolSize: function (v) { return Math.max(6, Math.sqrt(isNum(v[2]) ? v[2] : 0.05) * (o.sizeScale || 34)); },
         data: pts.map(function (s) {
           var p = shotXY(s, surface);
@@ -219,6 +223,6 @@ function radar(el, s) {
 
 FB.charts = {
   shotMap: shotMap, formation: formation, xiPoints: xiPoints, lineupPoints: lineupPoints, radar: radar,
-  ratingColor: ratingColor, outcomeOf: outcomeOf, OUTCOMES: OUTCOMES, halfPitchSVG: halfPitchSVG, surfaceBg: surfaceBg
+  ratingColor: ratingColor, ratingInk: ratingInk, outcomeOf: outcomeOf, OUTCOMES: OUTCOMES, outcomeColours: outcomeColours, halfPitchSVG: halfPitchSVG, surfaceBg: surfaceBg
 };
 })(window.FB);

@@ -10,7 +10,7 @@
 .gi-muted { color: var(--ink-3); font-size: var(--fs-sm); margin: 0; padding: var(--sp-3) var(--sp-4); }
 .qk-card-body > .gi-muted { padding: 0; }
 .gi-cap { color: var(--ink-3); font-size: var(--fs-xs); margin: 8px 0 0; line-height: 1.5; }
-.gi-cap a, .gi-note a, .gi-more { color: var(--accent); }
+.gi-cap a, .gi-note a, .gi-more { color: var(--signal); }
 .gi-up { color: var(--up); }
 .gi-down { color: var(--down); }
 .gi-gap { font-family: var(--font-num); color: var(--ink-1); font-weight: 600; }
@@ -20,7 +20,7 @@
 
 /* links and identity */
 .gi-link { color: var(--ink-1); text-decoration: none; font-weight: 600; }
-.gi-link:hover { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+.gi-link:hover { color: var(--signal); text-decoration: underline; text-underline-offset: 3px; }
 .gi-team { display: inline-flex; align-items: center; gap: 7px; min-width: 0; }
 .gi-team > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gi-team .qk-team-mark.sm { width: 20px; height: 20px; font-size: 8px; }
@@ -29,7 +29,7 @@
   background: color-mix(in srgb, var(--tc) 22%, transparent); border: 1px solid color-mix(in srgb, var(--tc) 55%, transparent); }
 .gi-tchip:hover { background: color-mix(in srgb, var(--tc) 36%, transparent); }
 .gi-gl { color: inherit; text-decoration: none; border-bottom: 1px dotted var(--ink-4); }
-.gi-gl:hover { color: var(--accent); }
+.gi-gl:hover { color: var(--signal); }
 .gi-rowlinks tbody tr { cursor: pointer; }
 
 /* page head (v2 section head), sub-navigation, toolbar */
@@ -55,7 +55,7 @@
 .gi-card-titles { min-width: 0; }
 .gi-card-titles .qk-card-title { margin: 0; font-size: var(--fs-md); }
 .qk-card-head { flex-wrap: wrap; }
-.qk-card-sub a { color: var(--accent); }
+.qk-card-sub a { color: var(--signal); }
 .gi-note { margin: 0; }
 .gi-note b { color: var(--ink-1); }
 .gi-kpis { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
@@ -242,7 +242,7 @@
 .gi-prose p { margin: 0 0 10px; max-width: 88ch; }
 .gi-prose ul, .gi-prose ol { margin: 0 0 10px; padding-left: 20px; max-width: 88ch; }
 .gi-prose li { margin: 4px 0; }
-.gi-prose a { color: var(--accent); }
+.gi-prose a { color: var(--signal); }
 .gi-prose code { font-family: var(--font-num); font-size: 0.92em; background: var(--s-3); padding: 1px 5px; border-radius: 0; overflow-wrap: anywhere; }
 .gi-prose .src { display: inline-block; font: 600 var(--fs-2xs) var(--font-num); color: var(--ink-3); background: var(--s-2); border: 1px solid var(--line-1); border-radius: 0; padding: 1px 6px; margin: 4px 6px 0 0; }
 .gi-prose table { border-collapse: collapse; margin: 8px 0 12px; font-size: var(--fs-xs); display: block; overflow-x: auto; max-width: 100%; }
@@ -252,7 +252,7 @@
 .gi-toc { position: sticky; top: calc(var(--topbar-h) + var(--secnav-h) + 12px); padding: 14px; max-height: calc(100vh - var(--topbar-h) - var(--secnav-h) - 30px); overflow: auto; }
 .gi-toc ol { margin: 8px 0 0; padding-left: 18px; display: grid; gap: 6px; font-size: var(--fs-sm); }
 .gi-toc a { color: var(--ink-2); text-decoration: none; }
-.gi-toc a:hover { color: var(--accent); }
+.gi-toc a:hover { color: var(--signal); }
 .gi-doc-body { display: grid; gap: var(--sp-4); min-width: 0; }
 .gi-doc-body section { scroll-margin-top: calc(var(--topbar-h) + var(--secnav-h) + 12px); }
 .gi-gl-index { margin: 0 0 var(--sp-2); }
@@ -271,7 +271,7 @@
 .gi-notice { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: var(--z-pop); width: min(860px, calc(100% - 24px)); display: flex; gap: 14px; align-items: center;
   padding: 12px 14px; border-radius: var(--r-3); border: 1px solid var(--line-2); background: var(--s-4); box-shadow: var(--sh-3); font-size: var(--fs-xs); color: var(--ink-2); }
 .gi-notice[hidden] { display: none; }
-.gi-notice a { color: var(--accent); }
+.gi-notice a { color: var(--signal); }
 .gi-notice .qk-btn { flex: none; }
 
 /* responsive */
@@ -335,7 +335,7 @@
 .pg-note, .gq-note { color: var(--ink-3); font-size: var(--fs-xs); margin: 8px 0; line-height: 1.5; }
 .gq-read { color: var(--ink-2); font-size: var(--fs-sm); line-height: 1.6; }
 .gq-read p { margin: 0 0 10px; max-width: 92ch; }
-.gq-read a { color: var(--accent); }
+.gq-read a { color: var(--signal); }
 .gq-dotc { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-right: 6px; vertical-align: 0; }
 .gq-ok { color: var(--up); } .gq-no { color: var(--down); }
 .gf-verdict { display: inline-block; padding: 1px 8px; border-radius: 0; font: 600 var(--fs-2xs) var(--font-ui); border: 1px solid var(--line-2); color: var(--ink-2); }
@@ -460,3 +460,57 @@ td.gi-ours-cell { text-align: left; }
 /* round 9: the game page's forecast table wraps inside its card (the market cell was clipped at 1440) */
 .gi-fc-t td, .gi-fc-t th { white-space: normal; }
 .gi-fc-t td:last-child { min-width: 64px; }
+/* round 9, phase 2: Standings › Table games that matter, History, the Bracket's calls and champion */
+.gi-gm { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: var(--sp-3); }
+.gi-gm-c { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; color: inherit; text-decoration: none; }
+.gi-gm-c:hover { border-top-color: var(--volt); }
+.gi-gm-h { display: flex; justify-content: space-between; gap: 8px; font: 700 var(--fs-2xs)/1.2 var(--font-cond); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
+.gi-gm-h b { color: var(--volt); font-weight: 700; }
+.gi-gm-s { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; gap: 10px; align-items: center; }
+.gi-gm-b { position: relative; height: 12px; background: var(--s-3); }
+.gi-gm-b i { position: absolute; top: 0; bottom: 0; background: var(--signal); opacity: .75; }
+.gi-gm-b b { position: absolute; top: -3px; bottom: -3px; width: 3px; margin-left: -1px; background: var(--volt); }
+.gi-gm-n { font: 700 var(--fs-xs)/1 var(--font-cond); color: var(--ink-2); white-space: nowrap; }
+.gi-champs { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 2px; }
+.gi-champ { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px 12px; color: #fff; text-decoration: none; min-width: 0; }
+.gi-champ .y { font: 700 var(--fs-2xs)/1 var(--font-cond); letter-spacing: .08em; opacity: .9; }
+.gi-champ b { font: 400 2rem/1 var(--font-display); letter-spacing: .02em; }
+.gi-champ .s { font: 600 var(--fs-2xs)/1.2 var(--font-cond); text-transform: uppercase; }
+.gi-ttls { display: flex; flex-direction: column; gap: 8px; }
+.gi-ttl { display: grid; grid-template-columns: minmax(0, 200px) minmax(0, 1fr) auto; gap: 12px; align-items: center; }
+.gi-ttl-b { display: flex; flex-wrap: wrap; gap: 2px; min-height: 24px; }
+.gi-ttl-b i { font: 700 11px/24px var(--font-cond); font-style: normal; color: #fff; padding: 0 6px; }
+.gi-ttl-n { font: 600 var(--fs-xs)/1.2 var(--font-cond); color: var(--ink-3); }
+@media (max-width: 720px) { .gi-ttl { grid-template-columns: minmax(0, 1fr); gap: 4px; } }
+.gi-br-call { display: block; padding: 2px 8px 4px; font: 700 10.5px/1.2 var(--font-cond); letter-spacing: .04em; text-transform: uppercase; color: var(--ink-3); }
+.gi-br-call.hit { color: var(--signal); }
+.gi-br-champ { display: flex; align-items: center; gap: 16px; padding: 16px 20px; margin-bottom: var(--sp-5); background: var(--block); border-left: 8px solid var(--tc); }
+.gi-br-champ b { display: block; font: 400 clamp(1.75rem, 4vw, 3rem)/1 var(--font-display); color: var(--ink-1); }
+.gi-br-champ span:not(.qk-kicker) { font: 700 var(--fs-sm)/1.2 var(--font-cond); color: var(--ink-2); text-transform: uppercase; }
+/* round 9, phase 3: folded lists and the past-season recap */
+.gi-more-d { margin: var(--sp-3) 0; }
+.gi-more-d > summary { list-style: none; display: inline-flex; cursor: pointer; margin-bottom: var(--sp-3); max-width: 100%; white-space: normal; text-align: left; height: auto; }
+.gi-more-d > summary::-webkit-details-marker { display: none; }
+.gi-more-d[open] > summary { margin-bottom: var(--sp-4); }
+.gi-recap .gi-stats { margin: var(--sp-4) 0; }
+/* round 9, phase 3: How it works for fans (one diagram per model), the folded technical detail, the glossary search */
+.gi-fans { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr)); gap: var(--sp-4); }
+.gi-fan p { margin: 12px 0 0; font: 500 var(--fs-sm)/1.5 var(--font-ui); color: var(--ink-2); }
+.gi-fan p a { color: var(--signal); }
+.gi-flow { display: grid; grid-template-columns: minmax(0, 1.25fr) auto minmax(0, 1fr); gap: 10px; align-items: center; margin-top: 10px; }
+.gi-flow-in { display: flex; flex-direction: column; gap: 4px; }
+.gi-flow-in span { background: var(--s-2); border-left: 3px solid var(--ink-3); padding: 5px 8px; font: 700 var(--fs-2xs)/1.25 var(--font-cond); letter-spacing: .04em; text-transform: uppercase; color: var(--ink-2); }
+.gi-flow-m { position: relative; padding: 0 14px; }
+.gi-flow-m b { display: block; background: var(--signal-deep); color: #fff; padding: 10px 12px; font: 400 1.15rem/1.05 var(--font-display); letter-spacing: .02em; text-align: center; max-width: 120px; }
+.gi-flow-m::before, .gi-flow-m::after { content: ''; position: absolute; top: 50%; width: 12px; height: 2px; background: var(--volt); }
+.gi-flow-m::before { left: 0; } .gi-flow-m::after { right: 0; }
+.gi-flow-out span { display: block; background: var(--block); border-top: 4px solid var(--volt); padding: 10px 12px; font: 700 var(--fs-xs)/1.3 var(--font-cond); letter-spacing: .03em; text-transform: uppercase; color: var(--ink-1); }
+@media (max-width: 520px) { .gi-flow { grid-template-columns: minmax(0, 1fr); } .gi-flow-m { padding: 6px 0; } .gi-flow-m::before, .gi-flow-m::after { display: none; } .gi-flow-m b { max-width: none; } }
+.gi-tech { margin-top: var(--sp-7); }
+.gi-tech > summary { list-style: none; cursor: pointer; display: flex; flex-direction: column; gap: 6px; padding: 18px 20px; background: var(--s-1); border-top: 5px solid var(--card-rule); margin-bottom: var(--sp-4); }
+.gi-tech > summary::-webkit-details-marker { display: none; }
+.gi-tech > summary b { font: 400 clamp(1.6rem, 3vw, 2.4rem)/1 var(--font-display); color: var(--ink-1); }
+.gi-tech > summary b::after { content: ' +'; color: var(--volt); }
+.gi-tech[open] > summary b::after { content: ' \2212'; }
+.gi-gl-search { margin: var(--sp-4) 0 var(--sp-3); }
+.gi-gl-search .qk-input { width: 100%; font-size: 1.05rem; padding: 14px 16px; }

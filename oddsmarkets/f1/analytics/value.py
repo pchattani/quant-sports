@@ -336,11 +336,19 @@ def needs_payload(year: int, tcat: dict | None, dcat: dict | None, table: dict, 
         xs = [x for x in xs if x is not None]
         elo[t] = float(np.mean(xs)) if xs else None
     elo_pct = percentiles(elo)
+    # Reliability: mechanical retirements need a published cause. Since 2023 the results feed says only "Retired", so a
+    # season where no team has a mechanical DNF but the field has retirements carries no information in dnf_mech (every
+    # team at the 50th percentile). Then the area reads every retirement per start (dnf_rate), and says so.
+    mech_known = any((_num((x.get("values") or {}).get("dnf_mech")) or 0) > 0 for x in T.values())
+    any_dnf = any((_num((x.get("values") or {}).get("dnfs")) or 0) > 0 or (_num((x.get("values") or {}).get("dnf_rate")) or 0) > 0 for x in T.values())
+    rel_alt = None if mech_known or not any_dnf else ("dnf_rate", "retirements per start, any cause (the results feed has not published causes since 2023)")
     out = {}
     for t, x in T.items():
         pc, vals = x.get("pct") or {}, x.get("values") or {}
         areas = []
         for key, label, mk, stat in AREAS:
+            if key == "reliability" and rel_alt:
+                mk, stat = rel_alt
             p = pc.get(mk)
             if p is None or vals.get(mk) is None:
                 continue

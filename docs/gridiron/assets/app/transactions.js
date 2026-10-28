@@ -54,6 +54,9 @@ GI.route('transactions', function (el, params) {
       GI.kpi('Moves logged', GI.int(d.n_feed), 'signings, releases, claims and trades')]);
     el.innerHTML = head + tiles + GI.note('<p>' + esc((d.notes || {}).method || '') + ' ' + esc((d.notes || {}).source || '') + ' Defensive values are a floor (box-score credit only); offensive linemen are not valued.</p>') +
       '<div class="gi-toolbar">' + GI.seg('gx-tab', TABS, ST.tab, 'View') + '</div><div id="gx-body" class="gi-page"></div>';
+    /* round 9: long lists fold away (the page ran past 20,000 px): the first few open, the rest one click away */
+    const more = (list, n, fn, noun) => list.slice(0, n).map(fn).join('') + (list.length > n ? '<details class="gi-more-d"><summary class="qk-btn">Show the other ' + (list.length - n) + ' ' + noun + '</summary>' + list.slice(n).map(fn).join('') + '</details>' : '');
+    const feedMore = list => feedTable(list.slice(0, 40), true) + (list.length > 40 ? '<details class="gi-more-d"><summary class="qk-btn">Show ' + (Math.min(list.length, 300) - 40) + ' more moves</summary>' + feedTable(list.slice(40, 300), true) + '</details>' : '');
     const draw = () => {
       try { history.replaceState(null, '', '#/transactions' + GI.qs({ tab: ST.tab, team: ST.team, type: ST.type })); } catch (e) { /* ok */ }
       const body = document.getElementById('gx-body');
@@ -63,7 +66,7 @@ GI.route('transactions', function (el, params) {
         const list = (D.trades || []).filter(t => !ST.team || (t.teams || []).indexOf(ST.team) >= 0);
         const bw = (arr, title) => GI.card(title, 'Net wins now', '<ol class="gi-ldl">' + (arr || []).slice(0, 8).map(b => '<li>' + GI.mark(b[1]) + '<span class="gi-link">' + esc(GI.teamAbbr(b[1])) + ' from ' + esc(b[2] || '?') + ' <span class="qk-muted">' + esc(GI.fmtDate(b[0], { weekday: false })) + '</span></span><b class="gi-num">' + GI.signed(b[3], 2) + '</b> ' + gradeChip(b[4]) + '</li>').join('') + '</ol>', { span: 6 });
         body.innerHTML = GI.grid(bw(D.best, 'Best deals') + bw(D.worst, 'Worst deals')) +
-          '<div class="gi-toolbar">' + teamSel('All teams') + '<span class="qk-sub">' + list.length + ' trades · grades on the net in wins: A ≥ +1, B ≥ +0.3, C within 0.3 of even, D ≥ −1, F below</span></div>' + list.map(tradeCard).join('');
+          '<div class="gi-toolbar">' + teamSel('All teams') + '<span class="qk-sub">' + list.length + ' trades · grades on the net in wins: A ≥ +1, B ≥ +0.3, C within 0.3 of even, D ≥ −1, F below</span></div>' + more(list, 6, tradeCard, 'trades');
       } else if (ST.tab === 'table') {
         const T2 = (D.table || []).slice().sort((a, b) => (b.wins_now || 0) - (a.wins_now || 0));
         body.innerHTML = GI.card('Net wins from trades, now', 'every club\'s trades in the window, valued now', GI.chartBox('gx-chart', Math.max(420, T2.length * 20 + 30), 'Net wins from trades by club')) +
@@ -79,7 +82,7 @@ GI.route('transactions', function (el, params) {
         const q = GI.fold(ST.q.trim());
         const list = (D.feed || []).filter(f => (!ST.team || f[1] === ST.team) && (!ST.type || f[2] === ST.type) && (!q || GI.fold(f[3]).indexOf(q) >= 0));
         body.innerHTML = GI.card('Feed', list.length + ' shown of ' + GI.int(D.n_feed) + ' moves · practice-squad and reserve moves are in the team ledgers', '<div class="gi-toolbar" style="margin-bottom:12px">' + teamSel('All teams') +
-          GI.field('Type', GI.select('gx-type', TYPES, ST.type, 'Type')) + GI.field('Find', '<input id="gx-q" class="qk-input" type="search" placeholder="Name or text">') + '</div><div id="gx-feed">' + feedTable(list.slice(0, 300), true) + '</div>');
+          GI.field('Type', GI.select('gx-type', TYPES, ST.type, 'Type')) + GI.field('Find', '<input id="gx-q" class="qk-input" type="search" placeholder="Name or text">') + '</div><div id="gx-feed">' + feedMore(list) + '</div>');
       } else {
         if (!ST.team) ST.team = ((D.table || [])[0] || {}).team || 'ARI';
         body.innerHTML = '<div class="gi-toolbar">' + teamSel('Choose') + '</div><div id="gx-ledger">' + QK.skeleton('lines', 4) + '</div>';
@@ -89,7 +92,7 @@ GI.route('transactions', function (el, params) {
           if (!GI.ok(L)) { n.innerHTML = GI.notBuilt('The ledger', L); return; }
           const s = L.summary || {};
           n.innerHTML = GI.kpis([GI.kpi('Trades', GI.int(s.trades)), GI.kpi('Net wins now', GI.signed(s.wins_now, 2), 'at the time ' + GI.signed(s.wins_at, 2), { signal: true }), GI.kpi('Signed', GI.num(s.signed, 0), (s.n_signed || 0) + ' valued players'), GI.kpi('Released', GI.num(s.lost, 0), (s.n_lost || 0) + ' valued players')], 'gi-kpis-4') +
-            ((L.trades || []).length ? L.trades.map(tradeCard).join('') : '') + GI.card('Every move', esc(GI.teamName(L.team)), feedTable((L.feed || []).map(f => [f[0], L.team, f[1], f[2], f[3]]), false), { flush: true });
+            ((L.trades || []).length ? more(L.trades, 4, tradeCard, 'trades') : '') + GI.card('Every move', esc(GI.teamName(L.team)), (function (F) { return feedTable(F.slice(0, 30), false) + (F.length > 30 ? '<details class="gi-more-d"><summary class="qk-btn">Show ' + (F.length - 30) + ' more moves</summary>' + feedTable(F.slice(30), false) + '</details>' : ''); })((L.feed || []).map(f => [f[0], L.team, f[1], f[2], f[3]])), { flush: true });
           GI.sortable(n);
         });
       }
@@ -101,7 +104,7 @@ GI.route('transactions', function (el, params) {
       const qi = document.getElementById('gx-q');
       if (qi) {
         qi.value = ST.q;
-        qi.addEventListener('input', e => { ST.q = e.target.value; const q = GI.fold(ST.q.trim()); GI.set('gx-feed', feedTable((D.feed || []).filter(f => (!ST.team || f[1] === ST.team) && (!ST.type || f[2] === ST.type) && (!q || GI.fold(f[3]).indexOf(q) >= 0)).slice(0, 300), true)); GI.sortable(document.getElementById('gx-feed')); });
+        qi.addEventListener('input', e => { ST.q = e.target.value; const q = GI.fold(ST.q.trim()); GI.set('gx-feed', feedMore((D.feed || []).filter(f => (!ST.team || f[1] === ST.team) && (!ST.type || f[2] === ST.type) && (!q || GI.fold(f[3]).indexOf(q) >= 0)))); GI.sortable(document.getElementById('gx-feed')); });
       }
     };
     GI.wireSeg(el, 'gx-tab', v => { ST.tab = v; draw(); });

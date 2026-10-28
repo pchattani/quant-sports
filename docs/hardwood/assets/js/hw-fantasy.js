@@ -68,8 +68,16 @@ function board(node, L) {
   });
 }
 
+/* round 9: WNBA Fantasy is hidden in the off-season (no nav entry, core.js updateHeader); the route says when it is back */
+HW.fantasyHidden = L => L === 'wnba' && HW.phase(L) === 'offseason';
 function render(el, params) {
   const L = U.L(params), S = U.S(params);
+  if (HW.fantasyHidden(L)) {
+    el.innerHTML = U.secHead('Fantasy', '', null, null, U.kicker(L, HW.currentSeason(L))) +
+      '<div class="qk-card hw-offcard"><div class="qk-card-body">' + QK.sectionHead({ kicker: 'WNBA off-season', title: 'Fantasy returns in May', sub: 'Our WNBA projections, rankings and picks come back with the new season’s rosters, before tip-off in May. Until then, the NBA board is live.' }) +
+      '<p class="hw-flex">' + U.btnLink(HW.href('nba', 'fantasy'), 'NBA fantasy') + U.btnLink(HW.href(L, 'scout'), 'WNBA Scouting Room') + '</p></div></div>';
+    return null;
+  }
   const tab = U.tab(params, ['board', 'tools'], 'board');
   const body = U.section(el, { title: 'Fantasy', kicker: U.kicker(L, HW.currentSeason(L)), sub: 'Projections per game, for the rest of the season and the next fantasy weeks, from our own models: rankings, picks, schedule and streaming.',
     tabs: U.tabs(L, 'fantasy', [['board', 'Board', false], ['tools', 'Rankings & tools', false]], S), active: tab });

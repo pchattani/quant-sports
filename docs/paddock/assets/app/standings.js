@@ -82,7 +82,7 @@ function championship(season) {
   var h = PD.kpis([
     PD.kpi(finished ? 'Champion' : 'Leader', sd[0] ? PD.driverLink(sd[0].driver, { team: sd[0].team }) : '—', sd[0] ? PD.pts(sd[0].points) + ' pts' + (sd[1] ? ' · ' + PD.pts(sd[0].points - sd[1].points) + ' clear' : '') : '', { text: true }),
     PD.kpi(finished ? 'Constructors’ champion' : 'Constructors’ leader', sc[0] ? PD.teamLink(sc[0].team) : '—', sc[0] ? PD.pts(sc[0].points) + ' pts' : '', { text: true }),
-    fav ? PD.kpi('Drivers’ title', esc(PD.driverCode(fav)) + ' ' + PD.pct(ch.drivers[fav].p_title, ch.drivers[fav].p_title > 0.99 ? 2 : 1), esc(PD.driverName(fav)) + ' · our chance', { signal: true, href: PD.driverHref(fav) }) : PD.kpi('Champion’s wins', sd[0] ? String(sd[0].wins) : '—', sd[0] ? sd[0].podiums + ' podiums' : ''),
+    fav ? PD.kpi('Drivers’ title', esc(PD.driverCode(fav)) + ' ' + PD.titlePct(ch.drivers[fav], 1), esc(PD.driverName(fav)) + ' · our chance', { signal: true, href: PD.driverHref(fav) }) : PD.kpi('Champion’s wins', sd[0] ? String(sd[0].wins) : '—', sd[0] ? sd[0].podiums + ' podiums' : ''),
     PD.kpi('Rounds', season.rounds_done + ' / ' + season.rounds_total, (season.calendar || []).filter(function (c) { return c.sprint; }).length + ' sprint weekends')
   ]);
   if (!finished) h += '<div class="pd-mt">' + PD.note('The <b>magic number</b> is how many more points the leader needs to be champion whatever the others do. The bar beside each driver is the middle 90% of our simulated final points: the season ends inside it 9 times in 10.') + '</div>';
@@ -141,7 +141,7 @@ function standingsTable(id, season, kind, compact, chipsOf) {
   cols.push({ key: 'wins', label: 'Wins', num: true });
   if (isD && !compact) { cols.push({ key: 'podiums', label: 'Podiums', num: true }); cols.push({ key: 'poles', label: 'Poles', num: true }); }
   if (ch) {
-    cols.push({ key: 'p', label: 'Title', num: true, tip: 'Our title chance: the share of simulated seasons won', fmt: function (v, r) { return r.elim ? '<span class="qk-muted">out</span>' : PD.probBar(v, PD.tc(isD ? r.team : r.id)); } });
+    cols.push({ key: 'p', label: 'Title', num: true, tip: 'Our title chance: the share of simulated seasons won', fmt: function (v, r) { return r.elim ? '<span class="qk-muted">out</span>' : PD.probBar(v, PD.tc(isD ? r.team : r.id), null, PD.chance(v, { clinched: r.clinched })); } });
     if (!compact) {
       cols.push({ key: 'exp', label: 'Exp. pts', num: true, fmt: function (v) { return PD.num(v, 0); } });
       cols.push({ key: 'lo', label: '90% range', sort: false, tip: 'The middle 90% of simulated final points; the tick is the expectation', fmt: function (v, r) { return rangeBar(r.lo, r.exp, r.hi, maxE); } });
@@ -171,8 +171,8 @@ function odds(season, markets, y) {
   var fav = dTop[0], cfav = cTop[0];
   var cond = (ch.conditional || {}).leader;
   var h = PD.kpis([
-    PD.kpi('Drivers’ title', fav ? esc(PD.driverCode(fav)) + ' ' + PD.pct(ch.drivers[fav].p_title, ch.drivers[fav].p_title > 0.99 ? 2 : 1) : '—', fav ? esc(PD.driverName(fav)) + ' · our chance' : '', { signal: true, href: fav ? PD.driverHref(fav) : null }),
-    PD.kpi('Constructors’ title', cfav ? esc(PD.teamAbbr(cfav)) + ' ' + PD.pct(ch.constructors[cfav].p_title, ch.constructors[cfav].p_title > 0.99 ? 2 : 1) : '—', cfav ? esc(PD.teamName(cfav)) + ' · our chance' : '', { signal: true, href: cfav ? PD.teamHref(cfav) : null }),
+    PD.kpi('Drivers’ title', fav ? esc(PD.driverCode(fav)) + ' ' + PD.titlePct(ch.drivers[fav], 1) : '—', fav ? esc(PD.driverName(fav)) + ' · our chance' : '', { signal: true, href: fav ? PD.driverHref(fav) : null }),
+    PD.kpi('Constructors’ title', cfav ? esc(PD.teamAbbr(cfav)) + ' ' + PD.titlePct(ch.constructors[cfav], 1) : '—', cfav ? esc(PD.teamName(cfav)) + ' · our chance' : '', { signal: true, href: cfav ? PD.teamHref(cfav) : null }),
     PD.kpi('Still in it', String(dTop.filter(function (id) { return ch.drivers[id].p_title >= 0.0005; }).length), 'drivers with at least a 0.05% chance'),
     PD.kpi('Rounds left', String((ch.remaining || []).length), isNum((ch.max_points_left || {}).driver) ? (ch.max_points_left.driver) + ' points still to win' : ''),
     PD.kpi('Simulated seasons', PD.int(ch.n_sims), 'each remaining round raced again')
@@ -195,7 +195,7 @@ function odds(season, markets, y) {
     PD.v2.titleHistory('od-hist', season, kind, isD ? 6 : 5, hm);
     PD.v2.rangeChart('od-range', season, kind, 10);
     PD.set('od-t-s', 'Our chance of the ' + (isD ? 'drivers’' : 'constructors’') + ' title from ' + PD.int(ch.n_sims) + ' simulated seasons.');
-    var rows = PD.v2.chanceRows(ids, function (id) { return ch[kind][id].p_title; }, isD, null);
+    var rows = PD.v2.chanceRows(ids, function (id) { return ch[kind][id].p_title; }, isD, null, function (id) { return ch[kind][id]; });
     rows.forEach(function (r, i) { var c = ch[kind][ids[i]]; r.sub = 'exp. ' + PD.num(c.exp_points, 0) + ' pts'; });
     PD.set('od-t', QK.chances(rows, { max: 1, oursName: 'Our title chance' }) + (Object.keys(ch[kind] || {}).some(function (id) { return ch[kind][id].eliminated; }) ? '<p class="pd-cap">Out of contention: ' + Object.keys(ch[kind]).filter(function (id) { return ch[kind][id].eliminated; }).map(function (id) { return isD ? PD.driverLink(id, { dot: false }) : PD.teamLink(id, { dot: false }); }).join(', ') + '.</p>' : ''));
   };

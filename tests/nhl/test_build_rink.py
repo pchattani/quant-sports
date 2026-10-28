@@ -94,6 +94,7 @@ def test_full_build_payload_keys(site):
     assert "mean_pts" in sp["standings"]["rows"][0]
     lab = rj(d / "20252026" / "lab.json")
     assert set(lab["skaters"]) >= {"cols", "ids", "data"} and len(lab["skaters"]["ids"]) == len(lab["skaters"]["data"]["g"])
+    assert len(lab["skaters"]["hand"]) == len(lab["skaters"]["ids"]) and set(lab["skaters"]["hand"]) <= {"L", "R", None}
     # the value section (models off here: no GAR, so value.json carries no rows; trade.json and needs still built)
     v = rj(d / "20252026" / "value.json") if (d / "20252026" / "value.json").exists() else None
     assert v is None or v["ok"]

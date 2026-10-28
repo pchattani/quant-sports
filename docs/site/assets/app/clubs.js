@@ -1,9 +1,13 @@
 /* The Quant Footballer — Clubs: the directory and ONE page per club (or national team) across every competition.
  *
- *   #/clubs                    every club on the pooled cross-league scale, a jump-to-any-club search
+ *   Teams (round 9: the section is "Teams"; each competition has its own Teams tab, teams.js):
+ *   #/clubs                    every club on the pooled cross-league scale: the power board (our rating, the xG margin
+ *                              split into attack and defence) and the full table, a jump-to-any-club search
  *   #/clubs/leagues            the leagues on one scale and the bridges between continents
- *   #/clubs/nations            national teams on the international model, next internationals, a pricer
- *   #/clubs/pricer[?a=&b=&v=]  "If they met": our chances for any two clubs from the pooled Dixon-Coles model, in the browser
+ *   #/clubs/nations            national teams on the international model: the power board, every team, next internationals
+ *   #/clubs/h2h[?a=&b=]        head to head: any two clubs or national teams, "If they met" (the pooled fit, or the
+ *                              international fit for two national teams) and the tale of the tape (lab.js FB.clubsH2H);
+ *                              #/clubs/pricer and #/compare/clubs land here
  *   #/club/<tid>[?tab=overview|seasons|squad|matches|transfers&c=<slug>&e=<era>]
  *       overview   record in the filter, year by year (all competitions summed per season), this season by
  *                  competition, next and last matches, ratings, strengths and needs, the competition dossier (?c=)
@@ -46,66 +50,26 @@ function board(el, cols, list, o) {
   return QK.leaderboard(el, { columns: cols, rows: list, sort: o.sort || null, rank: !!o.rank, dense: o.dense !== false, maxHeight: o.maxHeight, caption: o.caption, rowClass: o.rowClass });
 }
 
-// ── Dixon-Coles in the browser (the pooled and international fits publish attack, defence, rho, home advantage) ──
-
-function poissonPmf(k, lam) { var p = Math.exp(-lam); for (var i = 1; i <= k; i++) p *= lam / i; return p; }
-function dcMatrix(home, away, model, homeAdv) {
-  var lamH = Math.exp(home.attack + away.defence + (homeAdv || 0));
-  var lamA = Math.exp(away.attack + home.defence);
-  var k = (model.max_goals || 8) + 1, rho = model.rho || 0;
-  var m = [], total = 0, i, j;
-  for (i = 0; i < k; i++) {
-    m.push([]);
-    for (j = 0; j < k; j++) {
-      var p = poissonPmf(i, lamH) * poissonPmf(j, lamA);
-      if (i === 0 && j === 0) p *= 1 - lamH * lamA * rho;
-      else if (i === 1 && j === 0) p *= 1 + lamA * rho;
-      else if (i === 0 && j === 1) p *= 1 + lamH * rho;
-      else if (i === 1 && j === 1) p *= 1 - rho;
-      p = Math.max(p, 0);
-      m[i].push(p); total += p;
-    }
-  }
-  var h = 0, d = 0, a = 0, o25 = 0, btts = 0, best = [0, 0, -1];
-  for (i = 0; i < k; i++) for (j = 0; j < k; j++) {
-    var q = m[i][j] / total;
-    m[i][j] = q;
-    if (i > j) h += q; else if (i === j) d += q; else a += q;
-    if (i + j >= 3) o25 += q;
-    if (i >= 1 && j >= 1) btts += q;
-    if (q > best[2]) best = [i, j, q];
-  }
-  return { h: h, d: d, a: a, lamH: lamH, lamA: lamA, o25: o25, btts: btts, score: best[0] + '–' + best[1], pScore: best[2], m: m };
-}
-/* If they met: our home / draw / away chance (the bar, home on the left as on the game cards), the tiles and the
-   score grid. */
-function chanceHTML(id, home, away, model, neutral) {
-  var r = dcMatrix(home, away, model, neutral ? 0 : model.home_adv);
-  return '<div class="fb-cl-price">' + FB.wpBar({ h: r.h, d: r.d, a: r.a }, home.team, away.team) +
-    FB.kpis([
-      FB.kpi(home.team + ' win', pct(r.h), { signal: r.h >= r.a, sub: neutral ? 'our chance, neutral venue' : 'our chance, at home' }),
-      FB.kpi('Draw', pct(r.d), { sub: 'our chance' }),
-      FB.kpi(away.team + ' win', pct(r.a), { signal: r.a > r.h, sub: neutral ? 'our chance, neutral venue' : 'our chance, away' }),
-      FB.kpi('Expected goals', num(r.lamH, 2) + '–' + num(r.lamA, 2), { sub: 'most likely ' + r.score + ' (' + pct(r.pScore, 1) + ')' }),
-      FB.kpi('3 or more goals', pct(r.o25), { sub: '2 or fewer ' + pct(1 - r.o25) }),
-      FB.kpi('Both score', pct(r.btts), { sub: 'one or neither ' + pct(1 - r.btts) })
-    ], 'fb-mt') +
-    '<div class="qk-card-sub fb-mt">Chance of each score (' + esc(home.team) + ' down the side, ' + esc(away.team) + ' across)</div>' +
-    FB.chartBox(id, 300, 'Chance of each score') + '</div>';
-}
-function drawScoreGrid(el, id, home, away, model, neutral) {
-  var r = dcMatrix(home, away, model, neutral ? 0 : model.home_adv);
-  var n = 6, data = [];
-  for (var i = 0; i < n; i++) for (var j = 0; j < n; j++) data.push([j, i, Math.round(r.m[i][j] * 1000) / 10]);
-  var box = el.querySelector('#' + id);
-  if (!box) return;
-  QKC.heatmap(box, { x: ['0', '1', '2', '3', '4', '5'], y: ['0', '1', '2', '3', '4', '5'], data: data, min: 0, fmt: function (v) { return num(v, 1) + '%'; }, xName: away.team + ' goals', yName: home.team + ' goals', label: 'Score probabilities' });
-}
-
 // ── directory ─────────────────────────────────────────────────────────────
 
+/* The power board for a list on one scale: each team ranked by its rating (expected points a game against the
+   pool-average side, neutral venue), the bar its expected-goal margin against that side split into attack and defence
+   around the list's average. rows: [{ name, tid, strength, xf, xa, sub, cells, form }] */
+function powerBoard(rows, o) {
+  o = o || {};
+  var ok = rows.filter(function (r) { return isNum(r.xf) && isNum(r.xa); });
+  if (ok.length < 3) return '';
+  var mf = ok.reduce(function (s, r) { return s + r.xf; }, 0) / ok.length, ma = ok.reduce(function (s, r) { return s + r.xa; }, 0) / ok.length;
+  var list = ok.map(function (r, i) {
+    var att = r.xf - mf, def = ma - r.xa, nm = (r.tid && FB.clubName(r.tid)) || r.name;
+    return { rank: r.rank || i + 1, name: nm, abbr: FB.clubCode(nm), colour: r.tid ? FB.clubColour(r.tid) : null, href: r.tid ? FB.href.club(r.tid) : null, sub: r.sub || '',
+      value: att + def, text: signed(att + def, 2), parts: { att: att, def: def }, cells: r.cells || [], form: r.form || '' };
+  });
+  return QK.powerBars(list, { valueLabel: 'xG margin', unit: 'goals a match against the average side', formLabel: 'Form', formN: 6,
+    parts: [{ key: 'att', label: 'Attack', color: 'var(--c-2)' }, { key: 'def', label: 'Defence', color: 'var(--c-3)' }] });
+}
 function dirNav(tab) {
-  return FB.subnav([['#/clubs', 'Clubs on one scale', 'clubs'], ['#/clubs/leagues', 'Leagues', 'leagues'], ['#/clubs/nations', 'National teams', 'nations'], ['#/clubs/pricer', 'If they met', 'pricer']], tab, 'Clubs views');
+  return FB.subnav([['#/clubs', 'Clubs on one scale', 'clubs'], ['#/clubs/leagues', 'Leagues', 'leagues'], ['#/clubs/nations', 'Nations', 'nations'], ['#/clubs/h2h', 'Head to head', 'h2h']], tab, 'Teams views');
 }
 function findBox() {
   return '<div class="fb-cl-find"><input class="qk-input" id="cl-find" type="search" placeholder="Jump to any club or national team…" aria-label="Find a club or national team" autocomplete="off"><ul id="cl-find-r" class="fb-cl-find-r" hidden></ul></div>';
@@ -131,19 +95,24 @@ function wireFind(el) {
 
 FB.route('clubs', function (el, p) {
   var tab = p.tab || 'clubs';
-  if (['clubs', 'leagues', 'nations', 'pricer'].indexOf(tab) < 0) tab = 'clubs';
-  el.innerHTML = FB.pageHead('Clubs', tab === 'nations' ? 'National teams' : tab === 'pricer' ? 'If they met' : tab === 'leagues' ? 'Leagues on one scale' : 'Clubs on one scale',
+  if (tab === 'pricer') { tab = 'h2h'; FB.setHashQuiet('#/clubs/h2h' + FB.qs(p.query || {})); }
+  if (['clubs', 'leagues', 'nations', 'h2h'].indexOf(tab) < 0) tab = 'clubs';
+  el.innerHTML = FB.pageHead('Teams', tab === 'nations' ? 'National teams' : tab === 'h2h' ? 'Head to head' : tab === 'leagues' ? 'Leagues on one scale' : 'Clubs on one scale',
     tab === 'nations' ? 'Every national team on the international model: one Dixon-Coles fit over tournaments, qualifiers and the Nations Leagues.'
+      : tab === 'h2h' ? 'Any two clubs or national teams: our chances if they met, the tale of the tape, style and form. Each competition’s own Teams tab compares its clubs on every team metric.'
       : 'One pooled Dixon-Coles fit puts every club of every league on the same scale: cup matches between leagues are the bridges. Open any club for its page across every competition and season.',
     findBox()) + dirNav(tab) + '<div id="cl-dir">' + FB.loading('lines', 6) + '</div>';
   wireFind(el);
   if (tab === 'nations') return drawNations(el, p.query || {});
+  if (tab === 'h2h') {
+    var qq = p.query || {};
+    return FB.clubsH2H(el.querySelector('#cl-dir'), qq.a || '', qq.b || '', function (a, b) { FB.go('#/clubs/h2h' + FB.qs({ a: a || null, b: b || null })); });
+  }
   return FB.load('pool.json').then(function (pool) {
     if (!FB.alive(el)) return;
     var box = el.querySelector('#cl-dir');
     if (!pool || !(pool.clubs || []).length) { box.innerHTML = FB.empty('No pooled model this run', 'The cross-league fit is rebuilt every hour.'); return; }
     if (tab === 'leagues') drawLeagues(box, pool);
-    else if (tab === 'pricer') drawPricer(box, pool, p.query || {});
     else drawPool(box, pool, p.query || {});
   });
 });
@@ -159,14 +128,15 @@ function drawPool(box, pool, q) {
   clubs.forEach(function (c) { if (c.comp) leagues[c.comp] = c.comp_name || FB.compName(c.comp); });
   var lopts = [['', 'All competitions']].concat(Object.keys(leagues).sort(function (a, b) { return String(leagues[a]).localeCompare(String(leagues[b])); }).map(function (k) { return [k, leagues[k]]; }));
   var blocks = Array.from(new Set(clubs.map(function (c) { return c.block; }).filter(Boolean))).sort();
-  box.innerHTML = FB.note('<b>One scale for every club.</b> The rating is the points a game we would expect a club to take against an average side from the whole pool, at a neutral ground. Clubs from different continents rarely meet, so the gaps between continents are the least certain numbers here.') +
+  var top25 = clubs.slice(0, 25).map(function (c) { return { rank: c.rank, name: c.team, tid: c.team_id, xf: c.xg_for, xa: c.xg_against, sub: (c.comp_name || FB.compName(c.comp, true) || '') + (isNum(c.table_rank) ? ' · ' + FB.ordinal(c.table_rank) : ''),
+    cells: [{ label: 'Our rating', text: num(c.strength, 2) }, { label: 'Elo', text: isNum(c.elo) ? num(c.elo, 0) : '—' }], form: (c.form_results || []).join('') }; });
+  box.innerHTML = QK.sectionHead({ kicker: 'Power board', title: 'The 25 strongest clubs anywhere', sub: 'Ranked by our rating: the points a game we expect against the average club of the whole pool, at a neutral ground. The bar is the xG margin a match against that club, split into attack and defence; the volt tick is the margin. Clubs from different continents rarely meet, so the gaps between continents are the least certain numbers here.' }) +
+    '<div class="qk-card"><div class="qk-card-body">' + powerBoard(top25) + '</div></div>' +
     '<div class="fb-mt"></div>' + FB.grid(
     FB.card('Every club', clubs.length + ' clubs with a rated match' + (unrated ? ' (' + unrated + ' cup entrants with none yet are left out: they carry the prior)' : '') + ' · home advantage ' + num(pool.model.home_adv, 2) + ' goals (log scale) · ρ ' + num(pool.model.rho, 3),
       FB.toolbar([FB.field('Competition', FB.select('cl-lg', lopts, q.lg || '', 'Competition')), FB.field('Block', FB.select('cl-bl', [['', 'All blocks']].concat(blocks.map(function (b) { return [b, b]; })), q.bl || '', 'Block')),
         FB.field('Club', '<input class="qk-input" id="cl-q" type="search" placeholder="Filter by name" value="' + esc(q.q || '') + '">')], 'fb-cl-ftb') +
-      '<div id="cl-pool"></div><p class="fb-cap" id="cl-pool-cap"></p>', { span: 12 }) +
-    FB.card('The strongest 25', 'Expected points per game against the pool-average club at a neutral venue.', FB.chartBox('cl-top', 620, 'The strongest 25 clubs'), { span: 7 }) +
-    FB.card('Attack against defence', 'Each club\'s scoring and conceding rates against the pool average; top right is strong at both ends. The 60 strongest.', FB.chartBox('cl-ad', 620, 'Attack against defence'), { span: 5 })
+      '<div id="cl-pool"></div><p class="fb-cap" id="cl-pool-cap"></p>', { span: 12 })
   );
   function draw() {
     var lg = box.querySelector('#cl-lg').value, bl = box.querySelector('#cl-bl').value, qq = box.querySelector('#cl-q').value.trim().toLowerCase();
@@ -193,19 +163,6 @@ function drawPool(box, pool, q) {
   ['cl-lg', 'cl-bl'].forEach(function (id) { box.querySelector('#' + id).addEventListener('change', draw); });
   box.querySelector('#cl-q').addEventListener('input', draw);
   draw();
-  /* the chart ranks measured clubs: cup entrants with no matches yet carry the prior */
-  var top = clubs.slice(0, 25);
-  QKC.bar(box.querySelector('#cl-top'), {
-    horizontal: true, labels: true, labelWidth: 170, fmt: function (v) { return num(v, 2); }, min: 1.4, valName: 'Expected points per game',
-    cats: top.map(function (c) { return c.team + ' · ' + (c.comp_name || ''); }), series: [{ name: 'Strength', data: top.map(function (c) { return c.strength; }) }],
-    colors: top.map(function () { return QK.cssVar('--signal'); }), hrefs: top.map(function (c) { return FB.href.club(c.team_id); }), label: 'Strongest 25 clubs on the pooled scale', catName: 'Club'
-  });
-  var sixty = clubs.slice(0, 60);
-  QKC.scatter(box.querySelector('#cl-ad'), {
-    points: sixty.map(function (c) { return { x: c.xg_for, y: c.xg_against, name: c.team + ' (' + (c.comp_name || '') + ')', label: c.team, href: FB.href.club(c.team_id) }; }),
-    xName: 'xG for per match', yName: 'xG against per match', yMin: undefined, labelTop: 10, xFmt: function (v) { return num(v, 1); }, yFmt: function (v) { return num(v, 1); },
-    label: 'Attack against defence, the 60 strongest clubs'
-  });
 }
 
 function drawLeagues(box, pool) {
@@ -238,34 +195,6 @@ function drawLeagues(box, pool) {
   });
 }
 
-function pricerControls(prefix, teams, ia, ib, venue) {
-  var opts = teams.map(function (t, i) { return [i, t._label || t.team]; });
-  return FB.toolbar([FB.field('Home side', FB.select(prefix + '-a', opts, ia, 'Home side', 'fb-cl-wide')), FB.field('Away side', FB.select(prefix + '-b', opts, ib, 'Away side', 'fb-cl-wide')),
-    FB.field('Venue', FB.select(prefix + '-v', [['home', 'First side at home'], ['neutral', 'Neutral venue']], venue, 'Venue'))], 'fb-cl-ptb');
-}
-function wirePricer(box, prefix, teams, model, onChange) {
-  function show() {
-    var a = teams[parseInt(box.querySelector('#' + prefix + '-a').value, 10)], b = teams[parseInt(box.querySelector('#' + prefix + '-b').value, 10)];
-    var neutral = box.querySelector('#' + prefix + '-v').value === 'neutral';
-    if (!a || !b) return;
-    box.querySelector('#' + prefix + '-out').innerHTML = chanceHTML(prefix + '-grid', a, b, model, neutral);
-    drawScoreGrid(box, prefix + '-grid', a, b, model, neutral);
-    if (onChange) onChange(a, b, neutral);
-  }
-  ['-a', '-b', '-v'].forEach(function (s) { box.querySelector('#' + prefix + s).addEventListener('change', show); });
-  show();
-}
-function drawPricer(box, pool, q) {
-  var teams = pool.clubs.slice().sort(function (a, b) { return String(a.team).localeCompare(String(b.team)); }).map(function (c) { return FB.merge(c, { _label: c.team + ' (' + (c.comp_name || c.comp) + ')' }); });
-  var idx = function (tid, dflt) { for (var i = 0; i < teams.length; i++) if (String(teams[i].team_id) === String(tid)) return i; return dflt; };
-  var byRank = pool.clubs.slice().sort(function (a, b) { return a.rank - b.rank; });
-  var ia = idx(q.a, idx((byRank[0] || {}).team_id, 0)), ib = idx(q.b, idx((byRank[1] || {}).team_id, 1));
-  box.innerHTML = FB.card('Any two clubs, by the numbers', 'Our chances from the pooled Dixon-Coles fit: the same goal rates behind every league\'s forecasts, on one scale.',
-    pricerControls('cp', teams, ia, ib, q.v === 'neutral' ? 'neutral' : 'home') + '<div id="cp-out" class="fb-mt"></div>' +
-    '<p class="fb-cap">Our forecast for a match that may never happen. Between continents the scale rests on few matches (see Leagues), so read those chances loosely.</p>');
-  wirePricer(box, 'cp', teams, pool.model, function (a, b, neutral) { FB.setQuery({ a: a.team_id, b: b.team_id, v: neutral ? 'neutral' : null }); });
-}
-
 function drawNations(el, q) {
   return Promise.all([FB.load('nations.json'), FB.load('hub.json'), FB.clubsIndex()]).then(function (arr) {
     if (!FB.alive(el)) return;
@@ -276,15 +205,16 @@ function drawNations(el, q) {
     var tidOf = {};
     ci.list.forEach(function (r) { if (r.national) tidOf[r.name] = r.id; });
     var confs = Array.from(new Set(teams.map(function (t) { return t.confederation; }).filter(Boolean))).sort();
-    var alpha = teams.slice().sort(function (a, b) { return a.team.localeCompare(b.team); });
-    var ia = 0, ib = 1;
-    alpha.forEach(function (t, i) { if (t.team === teams[0].team) ia = i; if (t.team === teams[1].team) ib = i; });
-    box.innerHTML = FB.grid(
+    /* the power board: the expected-goal margin against the average national team (Dixon-Coles: exp(attack + mean
+       defence) scored, exp(mean attack + defence) conceded), split into attack and defence */
+    var mAtt = teams.reduce(function (s, t) { return s + (t.attack || 0); }, 0) / teams.length, mDef = teams.reduce(function (s, t) { return s + (t.defence || 0); }, 0) / teams.length;
+    var pb = teams.slice(0, 25).map(function (t) { return { rank: t.rank, name: t.team, tid: tidOf[t.team], xf: Math.exp(t.attack + mDef), xa: Math.exp(mAtt + t.defence), sub: (t.confederation || '') + (t.played ? ' · ' + t.played + ' matches' : ''),
+      cells: [{ label: 'Our rating', text: num(t.strength, 2) }, { label: 'Elo', text: isNum(t.elo) ? num(t.elo, 0) : '—' }] }; });
+    box.innerHTML = QK.sectionHead({ kicker: 'Power board', title: 'The 25 strongest national teams', sub: 'Ranked by our rating: the points a game we expect against the average national team at a neutral ground. The bar is the xG margin a match against that team, split into attack and defence; the volt tick is the margin.' }) +
+      '<div class="qk-card"><div class="qk-card-body">' + powerBoard(pb) + '</div></div><div class="fb-mt"></div>' + FB.grid(
       FB.card('Every national team', teams.length + ' teams · ' + esc(n.note || ''), FB.toolbar([FB.field('Confederation', FB.select('cn-conf', [['', 'All']].concat(confs.map(function (c) { return [c, c]; })), q.conf || '', 'Confederation')),
         FB.field('Team', '<input class="qk-input" id="cn-q" type="search" placeholder="Filter by name">')], 'fb-cl-ftb') + '<div id="cn-t"></div>', { span: 7 }) +
-      FB.card('The strongest 25', 'Expected points per game against the average national team, neutral venue.', FB.chartBox('cn-top', 620, 'Strongest national teams'), { span: 5 }) +
-      FB.card('If they met', 'Our chances for any two national teams, from the international fit.', pricerControls('np', alpha, ia, ib, 'neutral') + '<div id="np-out" class="fb-mt"></div>', { span: 7 }) +
-      FB.card('Next internationals', 'Across every national-team competition followed, with our home / draw / away chance.', '<div id="cn-fx" class="fb-fxlist"></div>', { span: 5 })
+      FB.card('Next internationals', 'Across every national-team competition followed, with our home / draw / away chance. Any two teams: <a href="#/clubs/h2h?a=' + esc(tidOf[(teams[0] || {}).team] || '') + '&amp;b=' + esc(tidOf[(teams[1] || {}).team] || '') + '">head to head, if they met →</a>', '<div id="cn-fx" class="fb-fxlist"></div>', { span: 5 })
     );
     function draw() {
       var conf = box.querySelector('#cn-conf').value, qq = box.querySelector('#cn-q').value.trim().toLowerCase();
@@ -303,13 +233,6 @@ function drawNations(el, q) {
     box.querySelector('#cn-conf').addEventListener('change', draw);
     box.querySelector('#cn-q').addEventListener('input', draw);
     draw();
-    var top = teams.slice(0, 25);
-    QKC.bar(box.querySelector('#cn-top'), {
-      horizontal: true, labels: true, labelWidth: 120, min: 1.4, valName: 'Expected points per game', catName: 'National team', fmt: function (v) { return num(v, 2); },
-      cats: top.map(function (t) { return t.team; }), series: [{ name: 'Rating', data: top.map(function (t) { return t.strength; }) }],
-      colors: top.map(function () { return QK.cssVar('--signal'); }), hrefs: top.map(function (t) { return tidOf[t.team] ? FB.href.club(tidOf[t.team]) : undefined; }), label: 'Strongest national teams'
-    });
-    wirePricer(box, 'np', alpha, n.model);
     var all = [];
     var days = (hub || {}).days || {};
     Object.keys(days).forEach(function (k) { all = all.concat(days[k] || []); });
@@ -394,16 +317,24 @@ function seasonHref(s) {
   var cur = FB.currentSeason(c);
   return FB.href.comp(s.comp, 'table', String(s.sid) === cur.sid ? null : { s: s.sid });
 }
+/* A trophy in a season row (as unified.won_title): a cup won, or a finished league season in first place (MLS, Liga MX
+   and Liga Argentina crown a play-off winner, so first place there is not the title). */
+var PLAYOFF_TITLE = { mls: 1, 'liga-mx': 1, 'liga-argentina': 1 };
+function wonTitle(s) {
+  return s.stage === 'winner' || (s.kind === 'league' && s.source !== 'live' && s.pos === 1 && !PLAYOFF_TITLE[s.comp] && (Number(s.played) || 0) > 0);
+}
 /* Year by year: the payload's own years when the whole club is shown, else summed from the filtered rows. */
 function yearRows(C, q) {
-  if (!q.c && (C.doc.years || []).length) return C.doc.years.map(function (y) { return FB.merge(y, { partial: y.record === 'partial' }); });
+  if (!q.c && (C.doc.years || []).length) return C.doc.years.map(function (y) {
+    return FB.merge(y, { partial: y.record === 'partial', won: C.seasons.filter(function (s) { return s.era === y.era && wonTitle(s); }).map(function (s) { return s.comp; }) });
+  });
   var yb = {};
   C.seasons.filter(function (s) { return !q.c || s.comp === q.c; }).forEach(function (s0) {
     var s = clean(s0);
     if (!s.era) return;
     var y = yb[s.era] || (yb[s.era] = { era: s.era, comps: 0, played: 0, w: 0, d: 0, l: 0, gf: 0, ga: 0, partial: false, won: [] });
     y.comps += 1;
-    if (s.stage === 'winner') y.won.push(s.comp);
+    if (wonTitle(s)) y.won.push(s.comp);
     if (!has(s.w)) { if (s0.played) y.partial = true; return; }
     ['played', 'w', 'd', 'l', 'gf', 'ga'].forEach(function (k) { y[k] += Number(s[k]) || 0; });
   });
@@ -445,8 +376,8 @@ function hero(C) {
   var doc = C.doc;
   var home = doc.home ? FB.comp(doc.home) : null;
   var years = doc.years || [];
-  var trophies = 0;
-  years.forEach(function (y) { trophies += (y.won || []).length; });
+  /* every trophy on record, read from the season rows themselves (league titles included: wonTitle) */
+  var trophies = (C.seasons || []).filter(wonTitle).length;
   var curY = years.filter(function (y) { return y.era === C.cur; })[0] || years[0] || null;
   var sq = (doc.squad || {}).players || [];
   var mv = 0, nmv = 0;

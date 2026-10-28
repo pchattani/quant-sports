@@ -237,6 +237,37 @@ bat_wraa, bat_hr, bat_h, bat_wrc_plus, pit_war, pit_k, pit_ra9_minus: {cols, row
 k_pct, bb_pct, ra9]], "n_batters", "n_pitchers", "rules", "sources": {retrosheet, statcast}}`. Ids are MLBAM pids wherever
 people.json maps the Retrosheet id; pre-MLBAM players keep `r:<retroid>` with their name. History starts in 1908.
 
+### team_history.json (`data/mlb/team_history.json`, round 9)
+The clubs' history for Standings > History (`analytics/team_history.py`, about 45 KB): seasons 1901 to the Lahman Baseball
+Database's last year from its Teams.csv (AL and NL rows; SABR, CC BY-SA 3.0; the cache under `<cache>/lahman/`, else the
+committed copy `analytics/lahman_teams_al_nl.csv.gz`), later finished seasons from our season.json. `{first, last, lahman_last,
+sources, franchises {fid: {tid, name, abbr, first, last, seasons, w, l, pct, titles, pennants, postseason, last_title, best}},
+champions [{season, fid, tid, name, abbr (that season's: BRO, NYG, PHA), w, l, opp}], pennants {season: {AL, NL}}, best / worst /
+best_rd [team-season {season, fid, tid, name, abbr, lg, w, l, pct, rs, ra, rdg, champion, pennant}], droughts [{fid, tid, name,
+last_title, first, years}], records [{key, label, value, fmt, season, fid, tid, name, also}]}`. The all-time player boards
+(`history.json`) are the Scouting Room's "All-time" view.
+
+### award_history.json (`data/mlb/award_history.json`, round 9)
+The award winners against our pre-vote calls (`analytics/award_history.py`, about 25 KB): every season from the committed
+walk-forward calls (`models/fitted/award_calls_mlb.json`, `scripts/mlb_award_calls.py`: each season's award model fitted only
+on the verified winners of earlier seasons, scoring that season's full regular-season lines), plus the current season's call
+from its awards.json once its regular season is over (no winner until the vote). `{method, source, labels {key: label},
+seasons {S: {al_mvp ... nl_roy: {winner {pid, name, p, rank} | null, pick {pid, name, p}, top [[pid, name, p] x5], n}}},
+summary {n, top_pick_won, winner_in_top3, mean_p_winner, by_award}}`.
+
+Also round 9: season.json `calls` (a finished MLB season from 2022: `{first {asof, label, p_ws, p_postseason}, preplayoff
+{asof, label, p_ws}, method}`, rebuilt walk-forward with `race.asof_runner`); Triple-A prospects.json `debut` per player and
+`callups` (this season's MLB debuts with big-league time, most first).
+
+### form.json and chases.json (`data/<L>/<S>/`, current MLB season, round 9)
+`form.json` (`analytics/form.py`, a few KB): who is hot and who is cold, each player against their own season: hitters' rolling
+xwOBA+ over the last 100 PA (careers block `rolling`, 250+ PA), pitchers' rolling Pitching+ over the last 500 pitches
+(`pitching_rolling`; starters 300+ BF, relievers 150+). `{asof, rules, hitters {hot, cold}, pitchers {hot, cold}}`, rows `{pid,
+name, team, pos, season, recent, delta, n, last, spark}`. `chases.json` (`analytics/records.py`, MLB): the season's leaders
+in HR, SB, H, BB, 2B, SO, W and SV at their 162-game pace (final once the regular season is over) against the top 15 AL/NL
+seasons since 1901 (`analytics/season_records.json` from Lahman, `scripts/mlb_season_records.py`): `{final, team_games, source,
+stats {key: {label, kind, record, list_min, top, leaders [{pid, name, team, value, pace, rank, behind}]}}}`.
+
 ### players/<pid>.json and players_index.json
 - `players_index.json`: `{pid: [name, team tid, pos, bats, throws, [levels]]}`.
 - Career file: as specified; `seasons` rows `{level, season, kind "hitter"|"pitcher", team, pos|role, ...}` with the keys in

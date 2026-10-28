@@ -181,7 +181,8 @@ function keyMetrics(v) {
 /* ── the address ─────────────────────────────────────────────────────────── */
 function readQuery(q) {
   q = q || {};
-  SC.view = ['board', 'chart', 'leaders'].indexOf(q.view) >= 0 ? q.view : 'board';
+  SC.view = ['board', 'chart', 'leaders', 'alltime'].indexOf(q.view) >= 0 ? q.view : 'board';
+  SC.m = q.m || ''; SC.scope = q.scope || '';
   const KQ = { hitter: 'H', hitters: 'H', sp: 'SP', pitcher: 'SP', pitchers: 'SP', rp: 'RP' };
   if (q.within === 'pos' && POSN.indexOf(q.pos) >= 0) { SC.within = 'pos'; SC.pg = q.pos; }
   else { SC.within = 'broad'; SC.bg = KQ[q.kind] || 'H'; }
@@ -205,6 +206,7 @@ function hashNow() {
   if (SC.p) q.p = SC.p;
   if (SC.cmp.length) q.cmp = SC.cmp.join(',');
   if (SC.view === 'chart') ['x', 'y', 'color'].forEach(k => { if (SC[k]) q[k] = SC[k]; });
+  if (SC.view === 'alltime') { if (SC.m) q.m = SC.m; if (SC.scope) q.scope = SC.scope; }
   if (SC.S && SC.S !== K().curSeason(SC.L)) q.s = SC.S;
   const qs = Object.keys(q).map(k => encodeURIComponent(k) + '=' + encodeURIComponent(q[k])).join('&');
   return '#/' + SC.L + '/scout' + (qs ? '?' + qs : '');
@@ -236,7 +238,7 @@ function render(el, params, state) {
   el.innerHTML = '<div class="sc"><section class="qk-card sc-ctl"><div class="qk-card-body" id="sc-ctl">' + QK.skeleton('lines', 2) + '</div></section>' +
     '<section class="sc-top" id="sc-top" aria-label="Top of the group"></section>' +
     '<div class="qk-tabs sc-tabs" role="tablist" aria-label="Scouting Room views">' +
-    [['board', 'Board'], ['chart', 'Chart'], ['leaders', 'Leaders']].map(t => '<button type="button" class="qk-tab" role="tab" id="sc-tab-' + t[0] + '" data-view="' + t[0] + '" aria-selected="' + (SC.view === t[0]) + '" tabindex="' + (SC.view === t[0] ? 0 : -1) + '">' + t[1] + '</button>').join('') +
+    [['board', 'Board'], ['chart', 'Chart'], ['leaders', 'Leaders'], ['alltime', 'All-time']].map(t => '<button type="button" class="qk-tab" role="tab" id="sc-tab-' + t[0] + '" data-view="' + t[0] + '" aria-selected="' + (SC.view === t[0]) + '" tabindex="' + (SC.view === t[0] ? 0 : -1) + '">' + t[1] + '</button>').join('') +
     '</div><div id="sc-view" class="sc-view" role="tabpanel" aria-labelledby="sc-tab-' + SC.view + '"></div></div>';
   BP.onLeave(() => { if (QK.drawer.isOpen()) QK.drawer.close(true); if (TRAY) { TRAY.destroy(); TRAY = null; } ROOT = null; BOARD = null; });
   el.addEventListener('click', pickClick);
@@ -357,6 +359,14 @@ function drawView() {
   const host = document.getElementById('sc-view');
   if (!host) return;
   BOARD = null;
+  /* the all-time careers (history.js) have their own controls: the season bar and "Top of the group" step aside */
+  ['sc-ctl', 'sc-top'].forEach(id => { const n = document.getElementById(id); const box = n ? (n.closest('.sc-ctl') || n) : null; if (box) box.style.display = SC.view === 'alltime' ? 'none' : ''; });
+  if (SC.view === 'alltime') {
+    host.innerHTML = '';
+    if (BP.allTime) BP.allTime(host, { level: 'mlb', query: { m: SC.m, scope: SC.scope } });
+    else host.innerHTML = QK.empty('Not available', 'The all-time boards did not load.');
+    return;
+  }
   if (SC.view === 'chart') return chartView(host);
   if (SC.view === 'leaders') return leadersView(host);
   return boardView(host);
@@ -465,6 +475,25 @@ function leadersView(host) {
     const vals = rows.filter(r => isNum(val(r, id)) && ranked(r, id)).map(r => ({ v: val(r, id), name: r.name + ' · ' + K().teamAbbr(r.team), id: r.id, hl: hl(r), kind: r.kind }));
     QKC.strip(el, { values: vals, xName: m.label, fmt: m.fmt, lower: m.lower, label: 'Every ' + SING[code()] + ' on ' + m.label, onClick: d => openProfile(d.id, kind()) });
   });
+  bestByPosition(host);
+}
+/* "The best at each position" (round 9, moved here from Value): the three most valuable players at each position by
+   Bullpen WAR, each past the position's floor, with the WAR percentile within the position (the team, age and hand
+   filters apply). */
+function bestByPosition(host) {
+  const war = c => (has('war', grp(c)[0]) ? 'war' : null);
+  const cards = POSN.filter(c => D[grp(c)[0]] && war(c)).map(c => {
+    const list = peers(c).filter(rowKeep).filter(r => isNum(val(r, 'war'))).sort((a, b) => val(b, 'war') - val(a, 'war')).slice(0, 3);
+    if (!list.length) return '';
+    return '<div class="sc-best-c"><div class="qk-kicker">' + esc(GROUPS[c][2]) + '</div><ol class="bp-list bp-lead">' + list.map((r, i) => {
+      const p = pctOf(r, 'war', c);
+      return '<li><span class="n">' + (i + 1) + '</span><span style="min-width:0;flex:1"><a href="' + esc(href(r)) + '">' + esc(r.name) + '</a> <span class="qk-muted">' + esc(K().teamAbbr(r.team)) + '</span></span>' +
+        '<span class="v">' + K().num(val(r, 'war'), 1) + '</span>' + (isNum(p) ? QK.pctlChip(Math.round(p)) : '') + '</li>';
+    }).join('') + '</ol></div>';
+  }).filter(Boolean);
+  if (!cards.length) return;
+  host.insertAdjacentHTML('beforeend', '<section class="qk-section">' + QK.sectionHead({ kicker: 'By position', title: 'The best at each position', sub: 'Bullpen WAR this season, players whose primary position it is (pitchers by role), each past the position’s sample floor; the chip is the WAR percentile within the position.' }) +
+    '<div class="sc-best">' + cards.join('') + '</div></section>');
 }
 
 /* ── the profile drawer ─────────────────────────────────────────────────── */

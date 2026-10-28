@@ -124,9 +124,29 @@ function results(box) {
   });
 }
 
+/* Round 9: with no trade in the address the simulator opens on a real one: the most lopsided trade of the last twelve
+   months (transactions.json, by the wins it moved) whose players are still on the receiving teams, undone, so the page
+   shows what that deal is worth to each side now. */
+function topical(tx) {
+  if (!GI.ok(tx) || !Array.isArray(tx.trades)) return null;
+  const list = tx.trades.map(t => {
+    const sides = (t.sides || []).filter(x => x && x.team);
+    const moves = [];
+    sides.forEach(x => (x.gets || []).forEach(g => {
+      if (g.kind !== 'player' || !g.pid || !P[g.pid]) return;
+      const from = sides.filter(y => y.team !== x.team).map(y => y.team)[0];
+      if (from && GI.canonTeam(P[g.pid].team) === GI.canonTeam(x.team) && D.qb[from]) moves.push({ pid: g.pid, to: from });
+    }));
+    const swing = Math.max.apply(null, sides.map(x => Math.abs(isNum(x.wins_now) ? x.wins_now : 0)).concat([0]));
+    return { t: t, teams: sides.map(x => x.team).filter(x => D.qb[x]).slice(0, 3), moves: moves, swing: swing };
+  }).filter(x => x.moves.length && x.teams.length >= 2).sort((a, b) => b.swing - a.swing);
+  return list[0] || null;
+}
 GI.route('trade', function (el, params) {
   S = GI.currentSeason();
-  return GI.load(GI.ypath('trade.json', S)).then(d => {
+  const qy0 = params.query || {};
+  return Promise.all([GI.load(GI.ypath('trade.json', S)), qy0.t || qy0.m ? Promise.resolve(null) : GI.loadYear('transactions.json', S)]).then(res => {
+    const d = res[0];
     if (!el.isConnected) return;
     D = d;
     const head = GI.pageHead('Value & Moves · ' + S, 'Trade simulator', 'Swap players between two or three teams and see each side\'s strength, wins and our season chances move.' + (GI.ok(d) && d.basis_season && d.basis_season !== S ? ' Player values from ' + d.basis_season + '.' : '')) + GI.sectionNav('value', 'trade') + QK.note('<b>How a trade is scored:</b> each side\'s team rating moves by the value of the players in and out, then the season is simulated again, so you see wins and playoff chances move.');
@@ -138,8 +158,14 @@ GI.route('trade', function (el, params) {
     T.moves = String(qy.m || '').split(',').map(x => { const a = x.split(':'); return { pid: a[0], to: String(a[1] || '').toUpperCase() }; })
       .filter(m => P[m.pid] && T.teams.indexOf(P[m.pid].team) >= 0 && T.teams.indexOf(m.to) >= 0 && m.to !== P[m.pid].team);
     const teams = Object.keys(D.qb).sort();
+    let pre = null;
+    if (!qy.t && !qy.m) {
+      pre = topical(res[1]);
+      if (pre) { T.teams = pre.teams.slice(); T.moves = pre.moves.slice(); }
+    }
     if (T.teams.length < 2) { const free = teams.filter(t => T.teams.indexOf(t) < 0); while (T.teams.length < 2) T.teams.push(free.shift()); }
     el.innerHTML = head + GI.note('<p>' + esc(GI.copyText(d.label || '')) + ' ' + (d.contracts && !d.contracts.enabled ? esc(GI.copyText(d.contracts.note || '')) : '') + ' Each team\'s chances come from its own sensitivity curve (the season simulation re-run with that team\'s strength shifted).</p>') +
+      (pre ? QK.explain('This is the most lopsided trade of the last twelve months by our value model (' + esc(GI.fmtDate(pre.t.date, { year: true })) + ': ' + esc(String((pre.t.notes || [])[0] || pre.teams.join(' and '))) + '), <b>undone</b>: the players go back, and the charts show what the deal is worth to each side now. Change the teams or the players to try your own.', { title: 'A real trade, to start.' }) : '') +
       GI.card('The trade', 'Choose the teams, then the players each one sends', '<div id="tr-pick"></div><div class="gi-toolbar" style="margin-top:12px"><button type="button" class="qk-btn" id="tr-add3">Add a third team</button><button type="button" class="qk-btn" id="tr-clear">Clear</button>' +
         GI.field('Share this trade', '<input id="tr-link" class="qk-input" type="text" readonly>') + '<button type="button" class="qk-btn primary" id="tr-copy">Copy link</button></div>') +
       '<div id="tr-out"></div>';

@@ -4,8 +4,10 @@
  *   #/                      the level in season (remembered choice first)        #/<L>            overview
  *   #/<L>/games             games by week (cfb) or day (basketball)              #/<L>/game/<gid> game centre
  *   #/<L>/standings?tab=    conferences | polls | playoff | bowls (cfb) | bracket | conftourneys (basketball)
- *   #/<L>/teams  #/<L>/team/<tid>  #/<L>/players  #/<L>/player/<pid>
- *   #/<L>/value?tab=value|position|transfers   #/<L>/fantasy   #/<L>/lab   #/<L>/model?tab=method|calibration|glossary|terms
+ *   #/<L>/teams  #/<L>/team/<tid>  #/<L>/scout (the Scouting Room: Players and the Lab in one, round 9)  #/<L>/player/<pid>
+ *   #/<L>/compare?p=<pid>,<pid>  #/<L>/compare/progression/<pid>/<pid>
+ *   #/<L>/value?tab=position|value|transfers   #/<L>/fantasy   #/<L>/model?tab=method|calibration|market|moves|glossary|terms
+ *   old routes redirect (CC.redirect): #/<L>/players -> scout, #/<L>/lab -> scout?view=chart | teams (style map) | compare
  *   ?season=S (or a trailing /S: #/<L>/<S> or #/<L>/<sec>/<id>/<S>) for a past season;  #/disclaimer
  * Data: data/index.json, data/<L>/..., data/<L>/<S>/... (PAYLOADS.md). In local preview only, ?data=<path> points
  * the page at another data folder (the development fixture).
@@ -99,6 +101,18 @@ CC.pname = function (L, pid) { var p = PLAYERS[L][String(pid)]; return p ? p.nam
  * kit's fallbacks apply: QK.color.blockPair gives a clash slate with the kit as its rule) for blocks and heroes */
 CC.traw = function (L, tid) { var t = CC.team(L, tid); return t && QK.color.parse(t.colour) ? t.colour : null; };
 CC.talt = function (L, tid) { var t = CC.team(L, tid) || {}; var a = t.alt || t.alt_colour; return QK.color.parse(a) ? a : null; };
+/* Line colours for several teams on one chart (kit rule: two team colours on one chart kept apart): each team's colour
+ * lifted for the card, else, when it is too close to one already used (QK.color.distinct), the next chart slot. */
+CC.lineColours = function (L, tids) {
+  var used = [], cat = (window.QKC && QKC.tokens ? QKC.tokens().cat : null) || ['#7d93ff', '#ff6b4a', '#38d2e6', '#d4ff3a', '#c78cff', '#ffb347', '#5ee6a8', '#ff7eb6'], k = 0;
+  return (tids || []).map(function (t) {
+    var c = CC.tcol(L, t);
+    var clash = function (x) { return used.some(function (u) { return QK.color.distinct ? !QK.color.distinct(u, x) : u === x; }); };
+    while (clash(c) && k < cat.length * 2) c = cat[k++ % cat.length];
+    used.push(c);
+    return c;
+  });
+};
 CC.tcol = function (L, tid) { var t = CC.team(L, tid); return t && QK.color.parse(t.colour) ? QK.color.team(t.colour) : QK.cssVar('--c-other'); };
 /* Season payload: season.json for (L, S) with its teams and conferences registered. */
 CC.season = function (L, S) {
@@ -119,6 +133,9 @@ CC.href = function (L, sec, id, S, query) {
 CC.teamHref = function (L, tid, S) { return CC.href(L, 'team', tid, S); };
 CC.playerHref = function (L, pid, S) { return CC.href(L, 'player', pid, S); };
 CC.gameHref = function (L, gid, S) { return CC.href(L, 'game', gid, S); };
+/* the Scouting Room (#/<L>/scout) and the full compare page (#/<L>/compare?p=<pid>,<pid>[,<pid>]) */
+CC.scoutHref = function (L, S, query) { return CC.href(L, 'scout', null, S, query); };
+CC.compareHref = function (L, S, ids) { return CC.href(L, 'compare', null, S, 'p=' + (ids || []).map(encodeURIComponent).join(',')); };
 
 /* ── formatting ──────────────────────────────────────────────────────── */
 CC.f = function (v, d) { return isNum(v) ? Number(v).toFixed(d === undefined ? 1 : d) : '—'; };
@@ -444,8 +461,8 @@ U.empty = function (t, s) { return QK.empty(t, s); };
 U.missing = function (what, d) {
   var st = CC.state || {}, L = st.L, S = st.S;
   var prev = L ? CC.seasons(L).filter(function (s) { return s < Number(S); })[0] : null;
-  var sec = { games: 'games', game: 'games', team: 'teams', player: 'players' }[st.sec] || st.sec;
-  var link = prev && sec ? '<div class="cc-empty-act"><a class="qk-btn" href="' + esc(CC.href(L, sec, st.sec === 'team' || st.sec === 'player' ? st.id : null, prev)) + '">See ' + esc(CC.seasonLabel(L, prev)) + '</a></div>' : '';
+  var sec = { games: 'games', game: 'games', team: 'teams', player: 'scout', compare: 'scout' }[st.sec] || st.sec;
+  var link = prev && sec ? '<div class="cc-empty-act"><a class="qk-btn" href="' + esc(CC.href(L, sec, st.sec === 'team' ? st.id : st.sec === 'player' ? null : null, prev)) + '">See ' + esc(CC.seasonLabel(L, prev)) + '</a></div>' : '';
   if (d && d.ok === false && !d.missing) return QK.empty(what + ' starts once games are played', L && CC.isCur(L, S) ? 'Nothing has been played in ' + CC.seasonLabel(L, S) + ' yet; the numbers appear after the first games.' : (d.reason ? 'For ' + CC.seasonLabel(L, S) + ': ' + d.reason + '.' : 'Nothing was played this season.')) + link;
   return QK.empty(what + ' is not published for this season', 'It has not been built for the season shown.') + link;
 };
@@ -469,8 +486,30 @@ function seasonOptions(L, S) {
 var ROUTES = {};
 CC.route = function (name, fn) { ROUTES[name] = fn; };
 CC.state = { L: null, S: null, sec: 'overview' };
-var SEC_OF = { overview: 'overview', games: 'fixtures', game: 'fixtures', standings: 'standings', teams: 'teams', team: 'teams', players: 'players',
-  player: 'players', compare: 'players', value: 'value', fantasy: 'fantasy', lab: 'lab', model: 'model', disclaimer: 'model' };
+var SEC_OF = { overview: 'overview', games: 'fixtures', game: 'fixtures', standings: 'standings', teams: 'teams', team: 'teams', scout: 'scout',
+  player: 'scout', compare: 'scout', value: 'value', fantasy: 'fantasy', model: 'model', disclaimer: 'model' };
+/* Round 9: the old Players and Lab routes open the Scouting Room or the Teams page, their parameters mapped
+   (players?pos=, lab?kind=players|teams|compare&x=&y=&within=&pos=&q=&c=). Returns the new hash, or null. */
+var POS_GROUP = { QB: 'QB', RB: 'RB', WR: 'WR', TE: 'TE', DL: 'DL', LB: 'LB', DB: 'DB', K: 'K', P: 'P', G: 'G', C: 'B', W: 'W', B: 'B' };
+CC.redirect = function (r) {
+  if (r.sec !== 'players' && r.sec !== 'lab') return null;
+  var q = r.query || {}, out = [], L = r.L, S = r.S;
+  var add = function (k, v) { if (v !== undefined && v !== null && v !== '') out.push(encodeURIComponent(k) + '=' + encodeURIComponent(v)); };
+  if (r.sec === 'lab' && q.kind === 'compare') return CC.compareHref(L, S, String(q.p || '').split(',').filter(Boolean));
+  if (r.sec === 'lab' && q.kind !== 'players') {
+    if (q.x && q.y) { add('map', '-1'); add('mx', q.x); add('my', q.y); }
+    return CC.href(L, 'teams', null, S, out.join('&'));
+  }
+  if (r.sec === 'lab') add('view', 'chart');
+  var pos = q.within === 'pos' ? q.pos : q.pos && q.pos !== 'all' ? q.pos : null;
+  if (pos && POS_GROUP[String(pos).toUpperCase()]) { add('within', 'pos'); add('pos', POS_GROUP[String(pos).toUpperCase()]); }
+  if (r.sec === 'lab') { add('x', q.x); add('y', q.y); add('c', q.c); }
+  add('q', q.q);
+  return CC.scoutHref(L, S, out.join('&'));
+};
+/* clean-up work a page registers (the drawer, the tray): run when the next page renders */
+var LEAVE = [];
+CC.onLeave = function (fn) { if (typeof fn === 'function') LEAVE.push(fn); };
 var shell = null;
 CC.parse = function (hash) {
   var h = String(hash || '').replace(/^#\/?/, '');
@@ -502,7 +541,7 @@ CC.defaultLevel = function () {
   return m >= 7 || m === 0 ? 'cfb' : 'mbb';
 };
 function sectionHrefs(L) {
-  var map = { overview: '', fixtures: 'games', standings: 'standings', teams: 'teams', players: 'players', value: 'value', fantasy: 'fantasy', lab: 'lab', model: 'model' };
+  var map = { overview: '', fixtures: 'games', standings: 'standings', teams: 'teams', scout: 'scout', value: 'value', fantasy: 'fantasy', model: 'model' };
   QK.$$('.qk-secnav a[data-sec]').forEach(function (a) { var k = a.getAttribute('data-sec'); a.setAttribute('href', '#/' + L + (map[k] ? '/' + map[k] : '')); });
 }
 function paintCtx(L, S) {
@@ -528,6 +567,9 @@ function render() {
     return;
   }
   var S = r.S && CC.seasons(L).indexOf(r.S) >= 0 ? r.S : (r.S || CC.cur(L));
+  var rd = CC.redirect({ L: L, S: S, sec: r.sec, query: r.query });
+  if (rd) { root.location.replace(rd); return; }
+  LEAVE.splice(0).forEach(function (fn) { try { fn(); } catch (e) { /* gone */ } });
   CC.state = { L: L, S: S, sec: r.sec, id: r.id };
   QK.store('qc-level', L);
   document.documentElement.setAttribute('data-level', L);
@@ -556,13 +598,13 @@ function boot() {
   }).join('') + '</div><select class="qk-select" id="cc-season" aria-label="Season"></select></div>';
   shell = QK.shell({
     sport: 'college', section: 'overview', ctx: ctx,
-    sections: QK.sections('college'),
+    sections: QK.sections('college', { scout: true }),
     search: { load: function () { return CC.load('search.json').then(function (rows) { return Array.isArray(rows) ? rows.map(function (r) { return { sport: 'college', t: r.t, s: r.s, href: r.href, w: r.w }; }) : []; }); } }
   });
   QK.seg(QK.$('#cc-level'), function (L) {
     var st = CC.state, sec = st.sec;
-    var keep = { overview: 1, games: 1, standings: 1, teams: 1, players: 1, value: 1, fantasy: 1, lab: 1, model: 1 };
-    var to = { game: 'games', team: 'teams', player: 'players' }[sec] || (keep[sec] ? sec : 'overview');
+    var keep = { overview: 1, games: 1, standings: 1, teams: 1, scout: 1, value: 1, fantasy: 1, model: 1 };
+    var to = { game: 'games', team: 'teams', player: 'scout', compare: 'scout' }[sec] || (keep[sec] ? sec : 'overview');
     CC.go('#/' + L + (to !== 'overview' ? '/' + to : ''));
   });
   QK.$('#cc-season').addEventListener('change', function (e) {

@@ -15,7 +15,7 @@ const CATS = ['pts', 'reb', 'ast', 'stl', 'blk', 'tpm', 'fg', 'ft', 'tov'];
 const LAB = { pts: 'PTS', reb: 'REB', ast: 'AST', stl: 'STL', blk: 'BLK', tpm: '3PM', fg: 'FG%', ft: 'FT%', tov: 'TO' };
 const WKEYS = ['pts', 'tpm', 'fgm', 'fga', 'ftm', 'fta', 'reb', 'ast', 'stl', 'blk', 'tov', 'dd', 'td'];
 const ROSTER = { G: 4, F: 4, C: 2 };              // starters per position in a 12-team league (replacement line)
-const ST = { fmt: '9cat', hz: 'pg', punt: {}, pos: 'all', team: 'all', q: '', n: '150', w: null };
+const ST = { fmt: '9cat', hz: 'pg', punt: {}, pos: 'all', team: 'all', q: '', n: '50', w: null };
 
 function obj(cols, arr) { const o = {}; (cols || []).forEach((c, i) => { o[c] = arr ? arr[i] : null; }); return o; }
 
@@ -118,12 +118,15 @@ function page(el, L, S, d) {
     '<label>Search<input id="fn-q" type="search" placeholder="Player"></label>' +
     '<label>Show<select id="fn-n"><option value="50">Top 50</option><option value="150">Top 150</option><option value="0">All</option></select></label></div>' +
     '<div class="fn-punts" id="fn-punts"></div><div class="fn-weights" id="fn-w"></div></div>';
-  h += '<div class="card"><div class="card-header">Our picks <span class="card-sub">Built from the default formats (9-category per game and standard points); each with the reason from the data.</span></div><div class="fn-picks" id="fn-picks"></div></div>';
+  /* round 9: the number, then the chart, then the table (Fantasy ▸ Rankings & tools rebuilt on the house order) */
+  h += '<div class="hw-kpis" id="fn-kpis"></div>';
+  h += '<div class="card"><div class="card-header">The top of the board <span class="card-sub">The top 20 in the format and horizon above; the bar is the player’s value, tiers alternate in colour</span></div><div id="fn-chart" class="qk-chart" style="--h:520px" role="img" aria-label="The top 20 by fantasy value"></div></div>';
   h += '<div class="card"><div class="card-header">Rankings and tiers <span class="card-sub" id="fn-sub"></span></div><div id="fn-table"></div><div class="pg-note" id="fn-note"></div></div>';
+  h += '<div class="card"><div class="card-header">Our picks <span class="card-sub">Built from the default formats (9-category per game and standard points); each with the reason from the data.</span></div><div class="fn-picks" id="fn-picks"></div></div>';
   h += '<div class="card"><div class="card-header">Value over replacement by position <span class="card-sub">The replacement line is the ' + Object.keys(ROSTER).map(k => (12 * ROSTER[k]) + 'th ' + k).join(', ') + ' (12 teams starting ' + Object.keys(ROSTER).map(k => ROSTER[k] + ' ' + k).join(', ') + ', ESPN positions); value over it in the chosen format and horizon.</span></div><div class="grid-3" id="fn-vorp"></div></div>';
   if (!d.season_over) h += '<div class="card"><div class="card-header">Schedule and streaming <span class="card-sub">Games per fantasy week (Monday–Sunday, US dates), back-to-backs, light-slate games (days with ' + fx.num((d.constants || {}).light_day, 0) + ' or fewer games, when more fantasy teams have open slots) and the average opponent factor for points (pace × points allowed, 1.00 = league average).</span></div><div id="fn-sched"></div></div>';
   h += '<div class="card"><div class="card-header">Buy low, sell high <span class="card-sub">Shooting luck this season in points a game: points per shot against the shot model\'s expected points per shot plus the player\'s own shot-making over the two previous seasons (shrunk with ' + fx.num((d.constants || {}).shot_k, 0) + ' pseudo-shots), and free throws against the previous percentage. Negative: shooting below what the shots and history predict (buy low); positive: above (sell high).</span></div><div id="fn-luck"></div></div>';
-  h += '<div class="card"><div class="card-header">How good are these projections? <span class="card-sub">Walk-forward on completed seasons: at weekly checkpoints, projections from games before the checkpoint only, scored against what happened.</span></div><div id="fn-bt"></div></div>';
+  h += '<details class="hw-fold"><summary>How good are these projections? The walk-forward test</summary><div class="card"><div class="card-header">How good are these projections? <span class="card-sub">Walk-forward on completed seasons: at weekly checkpoints, projections from games before the checkpoint only, scored against what happened.</span></div><div id="fn-bt"></div></div></details>';
   el.innerHTML = h;
   const $ = id => document.getElementById(id);
   $('fn-fmt').value = ST.fmt; $('fn-hz').value = (d.season_over && ST.hz !== 'pg') ? 'ros' : ST.hz; ST.hz = $('fn-hz').value; $('fn-pos').value = ST.pos; $('fn-n').value = ST.n;
@@ -177,6 +180,14 @@ function page(el, L, S, d) {
         { v: x.rank_pre, html: fx.num(x.rank_pre, 0) }]) };
     }), { compact: true, sticky: true }) : fx.muted('No players match.');
     HW.sortable('fn-table');
+    const top = all.filter(r => ST.pos === 'all' || r.x.posG === ST.pos).slice(0, 20);
+    const kp = document.getElementById('fn-kpis');
+    if (kp && top[0]) kp.innerHTML = QK.stats([{ label: 'Number one', value: top[0].x.name, text: true, signal: true, href: fx.playerHref(L, top[0].x.id), sub: fx.teamAbbr(L, top[0].x.team) + ' · ' + (nine ? 'total z ' + fx.num(top[0].v, 2) : fx.num(top[0].v, nd) + ' points') + ' · ' + hzl },
+      top[1] ? { label: 'Number two', value: top[1].x.name, text: true, sub: fx.teamAbbr(L, top[1].x.team) + ' · ' + (nine ? 'total z ' + fx.num(top[1].v, 2) : fx.num(top[1].v, nd) + ' points') } : null,
+      { label: 'Tier one', value: String(all.filter(r => r.tier === 1).length), sub: 'players before the first big drop' }]);
+    if (top.length) QKC.bar('#fn-chart', { cats: top.map(r => r.x.name), series: [{ name: nine ? 'Total z' : 'Points', data: top.map(r => Math.round(r.v * 100) / 100) }], horizontal: true, labels: true,
+      colors: top.map(r => (r.tier || 1) % 2 ? QK.cssVar('--c-1') : QK.cssVar('--c-3')), fmt: v => fx.num(v, nine ? 2 : nd), labelWidth: 150, valName: nine ? 'Total z-score (9 categories)' : 'Fantasy points', catName: 'Player',
+      hrefs: top.map(r => fx.playerHref(L, r.x.id)) });
     $('fn-note').innerHTML = 'Tiers start where the gap to the next player is more than 1.6 times the median gap (at least three players a tier). 9-category: per-game z-scores (or z-scores of totals for longer horizons) against the top ' + fx.num((d.constants || {}).pool_n, 0) + ' players, FG% and FT% weighted by attempts, turnovers counted negatively. Start rank: our rank before the season\'s first game; players outside the top ' + fx.num((d.constants || {}).waiver_line, 0) + ' then are the waiver proxy (we have no ownership data).';
   }
   function replacement(all) {

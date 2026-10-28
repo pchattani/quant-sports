@@ -241,7 +241,7 @@ function fanModules(el, L, S, season, isCur) {
       link: { text: 'Progression' } }));
     const bx = el.querySelector('#ov-break');
     if (bx) bx.innerHTML = cards.length ? '<section class="qk-section">' + QK.sectionHead({ kicker: 'Breakout watch', title: isCur ? 'Who has found another gear?' : 'The season’s breakouts', sub: 'Near the top of our impact model this season, well down it last season. Percentiles against the same role (guards, wings or bigs), each season on its own.',
-      actions: '<a class="qk-more" href="' + esc(HW.href(L, 'players', S)) + '">Every player</a>' }) + QK.storyCards(cards) + '</section>' : '';
+      actions: '<a class="qk-more" href="' + esc(HW.href(L, 'scout', S)) + '">Every player</a>' }) + QK.storyCards(cards) + '</section>' : '';
 
     /* Records in reach + Biggest surprise, beside Who's for real? */
     const side = [];
@@ -342,7 +342,7 @@ function render(el, params) {
       h += intro({ tag: U.kicker(L, S),
         title: 'Every ' + LN + ' game, player and team, by the numbers.',
         lede: 'Our chance for tonight’s games, playoff and title chances from ' + Number(nSims || 20000).toLocaleString('en-GB') + ' simulated seasons, and who’s for real, in plain English.',
-        links: [{ label: 'Games', sub: 'Every game, our chance', href: HW.href(L, 'games') }, { label: 'Standings', sub: 'The playoff picture', href: HW.href(L, 'standings', S) }, { label: 'Players', sub: 'Ratings and percentiles', href: HW.href(L, 'players', S) }] });
+        links: [{ label: 'Games', sub: 'Every game, our chance', href: HW.href(L, 'games') }, { label: 'Standings', sub: 'The playoff picture', href: HW.href(L, 'standings', S) }, { label: 'Scouting Room', sub: 'Every player, every metric', href: HW.href(L, 'scout', S) }] });
       const extra = liveSeries.slice(0, 2).map(x => { const t = x.teams || [], w = x.wins || {}, a = t[0], b = t[1];
         return { label: x.round || 'Series', value: HW.teamAbbr(L, a) + ' ' + (w[a] || 0) + '–' + (w[b] || 0) + ' ' + HW.teamAbbr(L, b), href: HW.href(L, 'standings') + '?tab=bracket',
           sub: (x.summary ? x.summary + '. ' : 'Series level. ') + (isNum((sim[a] || {}).p_title) ? 'Our title chance: ' + HW.teamAbbr(L, a) + ' ' + U.pct(sim[a].p_title) + ', ' + HW.teamAbbr(L, b) + ' ' + U.pct((sim[b] || {}).p_title) + '.' : '') }; });
@@ -356,7 +356,7 @@ function render(el, params) {
     } else {
       h += U.secHead('How the ' + LN + ' ' + HW.seasonLabel(L, S) + ' season went', esc(sub), null, null, U.kicker(L, S), '<a class="qk-btn" href="' + esc(HW.href(L, 'standings', S)) + '">Final standings</a>');
     }
-    if (!isCur) h += '<div class="hw-tiles">' + tiles(L, S, d) + '</div>';
+    if (!isCur) h += '<div class="hw-tiles">' + tiles(L, S, d) + '</div><div id="ov-recap"></div>';
     let first = null;
     if (G.today.length || G.next.length || G.last.length) {
       first = G.today.length ? 'today' : G.next.length ? 'next' : 'results';
@@ -377,7 +377,7 @@ function render(el, params) {
     /* Who's hot: the black power list, the top qualified name on five boards */
     if (hot.length) h += QK.band(QK.sectionHead({ kicker: isCur ? 'Who’s hot' : 'The season’s best', title: isCur ? 'The leaders, stat by stat' : 'Who led the way',
       sub: 'The top name on five boards, the next best behind, and a line on what the number means. Qualified players only.',
-      actions: '<a class="qk-more" href="' + esc(HW.href(L, 'players', S) + (HW.sq(L, S) ? '&' : '?') + 'tab=leaders') + '">Every leader</a>' }) + QK.hotRow(hot));
+      actions: '<a class="qk-more" href="' + esc(HW.href(L, 'scout', S) + (HW.sq(L, S) ? '&' : '?') + 'view=leaders') + '">Every leader</a>' }) + QK.hotRow(hot));
     /* Breakout watch, then Who's for real? (win % against net rating) beside the surprise and the record chase, then the
        best player nobody talks about (round 6: the fan modules, filled lazily by fanModules) */
     h += '<div id="ov-break"></div>';
@@ -391,16 +391,19 @@ function render(el, params) {
       h += '<section class="qk-section">' + U.head({ kicker: 'Playoffs', title: 'Series in progress', sub: 'The bracket has every round and each team’s chance of reaching it.', actions: '<a class="qk-btn" href="' + esc(HW.href(L, 'standings') + '?tab=bracket') + '">Bracket →</a>' }) +
         '<div class="hw-mini-grid">' + liveSeries.map(x => seriesTile(L, x, sim)).join('') + '</div></section>';
     }
-    const tTeams = Object.keys(sim).filter(t => isNum(sim[t].p_title) && sim[t].p_title > 0);
+    /* round 9: no module twice. With no featured game the hero is already the title race, so the race card here is left
+       out (the award races stay) */
+    const heroRace = isCur && !(feat && feat.c);
+    const tTeams = heroRace ? [] : Object.keys(sim).filter(t => isNum(sim[t].p_title) && sim[t].p_title > 0);
     const awKeys = awards ? (awards.keys || Object.keys(AWN)).filter(k => awards[k] && awards[k].model && Object.keys(awards[k].model).length) : [];
     if (isCur && (tTeams.length || awKeys.length)) {
       h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'Title race', title: 'Who lifts the trophy?', html: true,
         sub: '<span id="ov-title-lede">Our title chances from ' + Number(nSims || 20000).toLocaleString('en-GB') + ' simulated seasons, and our chance for each award.</span>',
-        actions: '<a class="qk-more" href="' + esc(HW.href(L, 'standings', S) + (HW.sq(L, S) ? '&' : '?') + 'tab=odds') + '">Every season forecast</a>' }) + '<div class="qk-grid">';
+        actions: '<a class="qk-more" href="' + esc(HW.href(L, 'standings', S) + (HW.sq(L, S) ? '&' : '?') + 'tab=chances') + '">Every season forecast</a>' }) + '<div class="qk-grid">';
       if (tTeams.length) h += '<div class="qk-span-' + (awKeys.length ? 6 : 12) + '">' + U.card2('Title chances', 'Our chance from the season simulation, in team colours', '<div id="ov-title"></div>',
-        { foot: '<span>' + (tTeams.length > 10 ? 'Top ten of ' + tTeams.length : 'Every team still in it') + '</span>' + U.link(HW.href(L, 'standings', S) + (HW.sq(L, S) ? '&' : '?') + 'tab=odds', 'Every season forecast') }) + '</div>';
+        { foot: '<span>' + (tTeams.length > 10 ? 'Top ten of ' + tTeams.length : 'Every team still in it') + '</span>' + U.link(HW.href(L, 'standings', S) + (HW.sq(L, S) ? '&' : '?') + 'tab=chances', 'Every season forecast') }) + '</div>';
       if (awKeys.length) h += '<div class="qk-span-' + (tTeams.length ? 6 : 12) + '">' + U.card2('Award races', 'Our chance of winning each award', '<div class="qk-seg" id="ov-aw-seg" role="group" aria-label="Award" style="margin-bottom:10px">' + awKeys.map((k, i) => '<button type="button" data-value="' + k + '" aria-pressed="' + (i === 0) + '">' + esc(AWN[k] || k.toUpperCase()) + '</button>').join('') + '</div><div id="ov-aw"></div>',
-        { foot: '<span></span>' + U.link(HW.href(L, 'players') + '?tab=awards', 'Every race with the reasoning') }) + '</div>';
+        { foot: '<span></span>' + U.link(HW.href(L, 'standings', S) + (HW.sq(L, S) ? '&' : '?') + 'tab=races', 'Every race with the reasoning') }) + '</div>';
       h += '</div></section>';
     }
     if (power.length || (isCur && openSim)) {
@@ -431,15 +434,18 @@ function render(el, params) {
           '<div style="padding:4px 16px 16px">' + QK.note('A swing of <b>' + U.f(lev[0].lev * 100, 0) + ' pts</b> means a win instead of a loss moves the two teams’ ' + (ph === 'playoffs' ? 'title' : 'playoff') + ' chances by that many percentage points between them.') + '</div>', { flush: true }) + '</div>' : '') +
         '</div></section>';
     }
-    if (ldKeys.length) {
+    /* round 9: one leaders module (Who's hot above); the full leaderboards live in the Scouting Room */
+    if (ldKeys.length && !hot.length) {
       const LDL = { pts: 'Points', reb: 'Rebounds', ast: 'Assists', '3pm': 'Threes', stl: 'Steals', blk: 'Blocks', ts: 'True shooting', hpm: 'Total impact (HPM)' };
-      h += '<section class="qk-section">' + U.head({ kicker: 'Leaderboards', title: 'Every leaderboard', sub: 'Per game; qualified players only (the league’s minimum games and minutes).', actions: '<a class="qk-btn" href="' + esc(HW.href(L, 'players', S) + (HW.sq(L, S) ? '&' : '?') + 'tab=leaders') + '">Players →</a>' }) +
+      h += '<section class="qk-section">' + U.head({ kicker: 'Leaderboards', title: 'Every leaderboard', sub: 'Per game; qualified players only (the league’s minimum games and minutes).', actions: '<a class="qk-btn" href="' + esc(HW.href(L, 'scout', S) + (HW.sq(L, S) ? '&' : '?') + 'view=leaders') + '">Scouting Room →</a>' }) +
         '<div class="hw-leaders">' + ldKeys.map(k => '<div class="qk-card"><div class="qk-card-head"><div class="qk-card-title">' + esc(LDL[k]) + '</div></div><ul class="hw-list hw-lead">' +
           ld[k].slice(0, 5).map((r, i) => { const p = HW.NAMES[L].players[String(r[0])] || {};
             return '<li><span class="n">' + (i + 1) + '</span>' + U.playerEnt(L, r[0], p.name, p.team, null, S) + '<span class="v">' + HW.fmtVal(r[1], k === 'ts' ? 'pct' : k === 'hpm' ? 'pm' : '1') + '</span></li>'; }).join('') + '</ul></div>').join('') + '</div></section>';
     }
     if (isCur) h += '<p class="qk-sub hw-ov-doing"><a class="qk-link" href="' + esc(HW.href(L, 'model') + '?tab=calibration') + '">How we’re doing →</a> Our record and every forecast checked against the result, on the Model page.</p>';
     el.innerHTML = h;
+    /* round 9: a past season reads as a recap (hw-recap.js): champion, bracket, awards, our calls */
+    if (!isCur && HW.recap) HW.recap.fill(document.getElementById('ov-recap'), L, S, season, awards, hist);
 
     // ── scoreboard
     if (first) {
@@ -510,7 +516,11 @@ function render(el, params) {
       if (isCur && Object.keys(sim).length) {
         cols.push({ key: 'pp', label: 'Playoffs', type: 'bar', max: 1, fmt: v => U.pct(v), tip: 'Our chance of a playoff place (play-in excluded)' });
         cols.push({ key: 'pt', label: 'Title', num: true, fmt: v => U.pct(v), tip: 'Our title chance' });
-      } else cols.push({ key: 'pd', label: 'Diff', num: true, fmt: v => U.sgnHTML(v, 0), tip: 'Points differential' });
+      } else {
+        cols.push({ key: 'pd', label: 'Diff', num: true, fmt: v => U.sgnHTML(v, 0), tip: 'Points differential' });
+        const fl = HW.recap ? HW.recap.flags(season) : {};
+        if (Object.keys(fl).length) cols.push({ key: 'team', label: 'Finish', sort: false, fmt: v => HW.recap.flagHTML(fl[String(v)]), tip: 'z top seed, x playoffs, p out in the play-in, e missed the postseason' });
+      }
       QK.leaderboard(node, { columns: cols, rows: rows.slice(0, 10), dense: true, rowHref: r => HW.teamHref(L, r.team, S) });
     });
     if (document.getElementById('ov-war')) {

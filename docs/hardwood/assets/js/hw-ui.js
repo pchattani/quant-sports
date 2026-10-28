@@ -61,6 +61,25 @@ U.legacy = (name, node, params, state, query) => {
   try { return fn(node, p, state || HW.state); } catch (e) { console.error(e); node.innerHTML = '<div class="error-banner">This view could not be shown: ' + esc(e.message) + '</div>'; return null; }
 };
 
+/* Round 9: a legacy detail view's walls of tables fold away. Every card after the first `keep` that holds a table (or a long grid) and no
+   chart becomes a collapsible row (<details>) titled with its card header, closed; charts stay open (a chart drawn in a
+   closed row would have no size). Runs once the view has rendered (pass the view's promise). */
+U.foldTables = (node, keep, done) => Promise.resolve(done).then(() => setTimeout(() => {
+  if (!node || !node.isConnected) return;
+  const cards = Array.prototype.filter.call(node.querySelectorAll('.card'), c => !c.parentElement.closest('.card'));
+  cards.forEach((c, i) => {
+    if (i < (keep || 0) || !(c.querySelector('table') || (c.textContent || '').length > 1500) || c.querySelector('.qk-chart, .js-plotly-plot, canvas, .hf-lab-chart')) return;
+    const head = c.querySelector('.card-header');
+    const title = head ? (head.childNodes[0] && head.childNodes[0].nodeType === 3 ? head.childNodes[0].textContent : head.textContent).trim() : 'More';
+    const rows = c.querySelectorAll('tbody tr').length;
+    const d = document.createElement('details');
+    d.className = 'hw-fold';
+    d.innerHTML = '<summary>' + esc(title) + (rows ? ' · ' + rows + ' row' + (rows === 1 ? '' : 's') : '') + '</summary>';
+    c.parentNode.insertBefore(d, c);
+    d.appendChild(c);
+  });
+}, 400));
+
 /* ── teams and players ─────────────────────────────────────────────────── */
 /* v4: the team as the kit draws it: full (the city line on the split hero), short (the nickname), alt (the second kit
    colour, for clashes; the kit's fallbacks cover a team without one) */

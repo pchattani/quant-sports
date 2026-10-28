@@ -38,3 +38,15 @@ def test_round_label_names():
     assert round_label("nba", 1, 4) == "First round"
     assert round_label("wnba", 2, 4) == "Second round"
     assert round_label("wnba", 3, 4) == "Semi-finals"
+
+
+def test_lab_payload_carries_age():
+    from oddsmarkets.basketball.analytics.season import lab_payload
+    cat = {"min_floor": 100, "players": {"7": {"name": "A B", "team": "1", "pool": "G", "gp": 10, "min": 300, "qualified": True,
+                                               "role": "G", "age": 24.37, "values": {}},
+                                         "8": {"name": "C D", "team": "2", "pool": "C", "gp": 10, "min": 300, "qualified": True,
+                                               "role": "B", "age": None, "values": {}}}}
+    out = lab_payload("nba", {2026: cat})
+    i = out["fields"].index("age")
+    ages = {r[0]: r[i] for r in out["rows"]}
+    assert ages == {"7": 24.4, "8": None}

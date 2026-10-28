@@ -125,7 +125,7 @@ function entryHTML(e, isModel) {
   if (USED_IDS[e.key]) { id = e.key + '-' + (e.kind || 'x') + '-' + USED_IDS[e.key]; USED_IDS[e.key] += 1; } else USED_IDS[e.key] = 1;
   return '<div class="gl-entry" id="gl-' + esc(id) + '" data-q="' + esc(fold(q)) + '" data-scope="' + esc(isModel ? 'model' : 'metric') + '">' +
     '<dt><span>' + esc(e.label || e.key) + ' <a class="doc-anchor" href="#/glossary/' + encodeURIComponent(e.key) + '" title="Link to this entry">#</a></span>' +
-    '<span class="gl-tags"><span class="gl-key">' + esc(e.key) + '</span>' + (isModel ? '<span class="gl-tag model">model term</span>' : tagsOf(e)) + (e.kind && !isModel ? '<span class="gl-tag">' + esc(e.kind) + '</span>' : '') + '</span></dt>' +
+    '<span class="gl-tags">' + (isModel ? '<span class="gl-tag model">model term</span>' : tagsOf(e)) + (e.kind && !isModel ? '<span class="gl-tag">' + esc(e.kind) + '</span>' : '') + '</span></dt>' +
     '<dd>' + (e.desc ? esc(clean(e.desc)) : '<span class="muted-inline">No definition yet.</span>') + '</dd></div>';
 }
 
@@ -144,29 +144,19 @@ function renderGlossary(el, params) {
     const nStab = groups.reduce((s, x) => s + x.entries.filter(e => typeof e.stabilises_at === 'number').length, 0);
     const index = groups.map(x => '<a href="#/glossary/g:' + esc(slug(x.name)) + '" data-group="' + esc(slug(x.name)) + '">' + esc(x.name) + '</a>').join('') +
       MT.map(x => '<a href="#/glossary/g:model-' + esc(slug(x[0])) + '" data-group="model-' + esc(slug(x[0])) + '">' + esc(x[0]) + '</a>').join('');
-    const cardOf = (name, sl, entries, isModel) => '<div class="card gl-group" data-group="' + esc(sl) + '"><div class="card-header">' + esc(name) + ' <span class="card-sub">' + entries.length + '</span></div><dl class="gl-list">' + entries.map(e => entryHTML(e, isModel)).join('') + '</dl></div>';
+    /* round 9: each group folds (the page ran to 20,000 px); a search opens the groups it finds */
+    const cardOf = (name, sl, entries, isModel) => '<details class="card gl-group rk-glg" data-group="' + esc(sl) + '"><summary class="card-header">' + esc(String(name).replace(/EDGE tracking/, 'Puck and player tracking')) + ' <span class="card-sub">' + entries.length + '</span></summary><dl class="gl-list">' + entries.map(e => entryHTML(e, isModel)).join('') + '</dl></details>';
     const N = g.notices || {};
+    /* Round 9 (28 Oct 2026): search first, then the groups; the stabilisation table lives on Model › How it works */
     root.innerHTML =
-      '<div class="card"><div class="card-header">Glossary <span class="card-sub">Every metric the site computes for skaters, goalies and teams, with the sample at which it stabilises, and the terms the pages use. How each is computed is in the <a href="#/methodology">methodology</a>.</span></div>' +
-      '<div class="gl-top"><input id="gl-search" type="search" placeholder="Filter the glossary…" autocomplete="off" spellcheck="false">' +
-      '<select id="gl-kind"><option value="">metrics and terms</option><option value="metric">catalogue metrics</option><option value="model">terms and models</option></select><span class="gl-count" id="gl-count"></span></div>' +
+      '<div class="gl-top gl-first"><input id="gl-search" type="search" placeholder="Search every metric and term: xG, RAPM, save %…" autocomplete="off" spellcheck="false" aria-label="Search the glossary">' +
+      '<select id="gl-kind" aria-label="Show"><option value="">Metrics and terms</option><option value="metric">Metrics</option><option value="model">Terms and models</option></select><span class="gl-count" id="gl-count"></span></div>' +
       '<div class="gl-index">' + index + '</div>' +
-      '<div class="doc-meta">' + nMetrics + ' metrics in ' + groups.length + ' groups and ' + nModel + ' terms' + (nStab ? '; ' + nStab + ' with a stabilisation point (the sample at which split-half reliability reaches 0.7, which also sets how hard the catalogues shrink small samples)' : '') +
-      (g.updated_at ? ' · updated ' + esc(K() ? K().fmtDate(g.updated_at) : g.updated_at) : '') + (g.source === 'catalogue' ? ' · assembled from this season\'s catalogues until data/glossary.json is published' : '') + '</div></div>' +
-      (nStab ? '<div class="card"><div class="card-header">Stabilisation points <span class="card-sub">The sample at which a metric is 70% signal: with r(n) = n/(n + k), n₀.₇ = 7k/3. Before it, treat the number as mostly noise; the catalogues shrink each value by (n·x + k·mean)/(n + k) before ranking it. Click a header to sort.</span></div><div id="gl-stab"></div></div>' : '') +
+      '<p class="doc-meta">' + nMetrics + ' metrics in ' + groups.length + ' groups and ' + nModel + ' terms. How many games each number needs before it means something is on <a class="qk-link" href="#/model?tab=methodology&go=stab">How it works</a>.</p>' +
       groups.map(x => cardOf(x.name, slug(x.name), x.entries, false)).join('') +
       MT.map(x => cardOf('Terms: ' + x[0], 'model-' + slug(x[0]), x[1].map(t => ({ key: t[0], label: t[1], desc: t[2] })), true)).join('') +
       '<div class="card gl-empty" id="gl-none" style="display:none">Nothing in the glossary matches that.</div>' +
       '<div class="card"><div class="card-header">Data credits</div><div class="gq-read"><p>' + esc(N.nhl || NHL_NOTE) + '</p><p>' + esc(N.moneypuck || MP()) + ' (used only as a benchmark for our own expected-goals model, non-commercially and with credit).</p><p>Betting lines and the probable starting goalies before each game from ESPN\'s public feeds; prediction-market numbers from Kalshi and Polymarket\'s public APIs.</p></div></div>';
-    if (nStab && K()) {
-      const k = K();
-      const rows = [];
-      groups.forEach(x => x.entries.forEach(e => { if (k.isNum(e.stabilises_at) && !rows.some(r => r.key === e.key && r.kind === e.kind)) rows.push(Object.assign({ _g: x.name }, e)); }));
-      rows.sort((a, b) => String(a.unit || '').localeCompare(String(b.unit || '')) || a.stabilises_at - b.stabilises_at);
-      document.getElementById('gl-stab').innerHTML = k.table([{ label: 'Metric' }, { label: 'Group' }, { label: 'Stabilises at', align: 'right' }, { label: 'Measured in' }, { label: 'Shrinkage k', align: 'right', title: '3/7 of the stabilisation point' }],
-        rows.map(e => [{ v: e.label, html: '<a href="#/glossary/' + encodeURIComponent(e.key) + '">' + esc(e.label || e.key) + '</a>' }, { v: e._g, html: esc(e._g) }, { v: e.stabilises_at, html: '<strong>' + k.int(e.stabilises_at) + '</strong>' }, { v: e.unit || '', html: esc(e.unit || 'minutes') }, { v: e.stabilises_at * 3 / 7, html: k.int(e.stabilises_at * 3 / 7) }]), { compact: true, sticky: true });
-      k.sortable(document.getElementById('gl-stab'));
-    }
     const input = document.getElementById('gl-search'), kindSel = document.getElementById('gl-kind'), count = document.getElementById('gl-count');
     const entries = Array.prototype.slice.call(root.querySelectorAll('.gl-entry'));
     const cards = Array.prototype.slice.call(root.querySelectorAll('.gl-group'));
@@ -178,7 +168,7 @@ function renderGlossary(el, params) {
         const hit = (!needle || needle.split(/\s+/).every(w => e.dataset.q.indexOf(w) >= 0)) && (!kind || e.dataset.scope === kind);
         e.classList.toggle('hidden', !hit); if (hit) shown++;
       });
-      cards.forEach(c => c.classList.toggle('hidden', !c.querySelector('.gl-entry:not(.hidden)')));
+      cards.forEach(c => { c.classList.toggle('hidden', !c.querySelector('.gl-entry:not(.hidden)')); if (needle) c.open = !c.classList.contains('hidden') && shown <= 60; });
       document.getElementById('gl-none').style.display = shown ? 'none' : '';
       count.textContent = needle || kind ? shown + ' of ' + total + ' entries' : total + ' entries';
     };
@@ -189,16 +179,16 @@ function renderGlossary(el, params) {
     root.querySelectorAll('.gl-index a').forEach(a => a.addEventListener('click', ev => {
       ev.preventDefault();
       const grp = root.querySelector('.gl-group[data-group="' + a.dataset.group + '"]');
-      if (grp) { grp.classList.remove('hidden'); grp.scrollIntoView({ block: 'start' }); }
+      if (grp) { grp.classList.remove('hidden'); grp.open = true; grp.scrollIntoView({ block: 'start' }); }
       try { history.replaceState(null, '', a.getAttribute('href')); } catch (e) { /* ok */ }
     }));
     if (key) {
       if (key.indexOf('g:') === 0) {
         const grp = root.querySelector('.gl-group[data-group="' + key.slice(2).replace(/"/g, '') + '"]');
-        if (grp) setTimeout(() => grp.scrollIntoView({ block: 'start' }), 0);
+        if (grp) { grp.open = true; setTimeout(() => grp.scrollIntoView({ block: 'start' }), 0); }
       } else {
         const e = document.getElementById('gl-' + key);
-        if (e) { e.classList.add('hit'); setTimeout(() => e.scrollIntoView({ block: 'center' }), 50); setTimeout(() => e.scrollIntoView({ block: 'center' }), 400); }
+        if (e) { if (e.closest('details')) e.closest('details').open = true; e.classList.add('hit'); setTimeout(() => e.scrollIntoView({ block: 'center' }), 50); setTimeout(() => e.scrollIntoView({ block: 'center' }), 400); }
         else { input.value = key.replace(/_/g, ' '); filter(); }
       }
     }
@@ -407,7 +397,7 @@ function renderMethodology(el, params) {
     return { id: s.id.replace(/^m-/, ''), title: title, html: s.innerHTML };
   });
   const toc = '<div class="doc-toc"><div class="doc-toc-head">Methodology</div><ol>' + secs.map(s => '<li><a href="#/methodology/' + esc(s.id) + '" data-target="method-' + esc(s.id) + '">' + esc(s.title) + '</a></li>').join('') +
-    '</ol><div class="doc-toc-head" style="margin-top:10px">See also</div><ol class="plain"><li><a href="#/glossary">Glossary</a></li><li><a href="#/calibration">Calibration</a></li><li><a href="#/lab">Lab</a></li><li><a href="#/disclaimer">Disclaimer and terms</a></li></ol></div>';
+    '</ol><div class="doc-toc-head" style="margin-top:10px">See also</div><ol class="plain"><li><a href="#/glossary">Glossary</a></li><li><a href="#/calibration">Calibration</a></li><li><a href="#/scout?view=chart">Scouting Room charts</a></li><li><a href="#/disclaimer">Disclaimer and terms</a></li></ol></div>';
   const intro = '<div class="card"><div class="card-header">Methodology <span class="card-sub">Where the data comes from, how every model works, and where it is wrong. Every constant is the one in the code on 1 October 2026, and each section names its file under <code>oddsmarkets/nhl/</code>.</span></div>' +
     '<div class="doc-meta">' + secs.length + ' sections · fitted values (the xG model, ridge penalties, stabilisation constants, the game model\'s coefficients) are refitted with the models and shown on the pages and the <a href="#/calibration">calibration page</a></div></div>';
   el.innerHTML = '<div class="doc gq-doc">' + toc + '<div class="doc-body">' + intro + secs.map((s, i) => '<div class="card" id="method-' + esc(s.id) + '"><div class="card-header">' + (i + 1) + '. ' + esc(s.title) +

@@ -99,7 +99,7 @@ a.fb-ent:hover .fb-ent-n { color: var(--signal); text-decoration: underline; tex
 .fb-fx-h .fb-ent { flex-direction: row-reverse; }
 .fb-fx-a { min-width: 0; }
 .fb-fx-s { text-align: center; font: 700 var(--fs-md) var(--font-num); color: var(--ink-1); border-radius: 0; padding: 2px 0; }
-a.fb-fx-s:hover { background: var(--s-2); color: var(--accent); }
+a.fb-fx-s:hover { background: var(--s-2); color: var(--signal); }
 .fb-fx-s .v { color: var(--ink-3); font-weight: 500; font-size: var(--fs-sm); }
 .fb-fx-x { display: flex; justify-content: flex-end; }
 .fb-fx-xg { font: 500 var(--fs-xs) var(--font-num); color: var(--ink-3); white-space: nowrap; }
@@ -125,7 +125,7 @@ a.fb-fx-s:hover { background: var(--s-2); color: var(--accent); }
 .fb-xi-dot { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font: 700 10px var(--font-num); color: var(--ink-1); background: var(--s-4); border: 2px solid var(--s-1); }
 .fb-xi-l { font-size: 10.5px; font-weight: 600; line-height: 1.15; color: var(--ink-1); max-width: 76px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-shadow: 0 1px 2px var(--bg); }
 .fb-xi-s { font: 500 9.5px var(--font-num); color: var(--ink-3); }
-a.fb-xi-p:hover .fb-xi-l { color: var(--accent); }
+a.fb-xi-p:hover .fb-xi-l { color: var(--signal); }
 @media (max-width: 720px) { .fb-xi-p { width: 54px; } .fb-xi-l { font-size: 9px; max-width: 54px; } .fb-xi-dot { width: 20px; height: 20px; font-size: 8.5px; } .fb-xi-s { display: none; } }
 
 /* heat cells and generic table bits */
@@ -136,14 +136,14 @@ a.fb-xi-p:hover .fb-xi-l { color: var(--accent); }
 /* first-visit notice */
 .fb-notice { position: fixed; left: 12px; right: 12px; bottom: 12px; z-index: var(--z-pop); max-width: 920px; margin: 0 auto; display: flex; gap: 14px; align-items: center; padding: 12px 14px; border-radius: 0; border: 1px solid var(--line-2); background: var(--s-2); box-shadow: var(--sh-3); font-size: var(--fs-xs); color: var(--ink-2); }
 .fb-notice[hidden] { display: none; }
-.fb-notice a { color: var(--accent); }
+.fb-notice a { color: var(--signal); }
 .fb-notice .qk-btn { flex: none; }
 @media (max-width: 720px) { .fb-notice { flex-direction: column; align-items: stretch; } }
 
 /* the disclaimer and prose */
 .fb-prose { max-width: 80ch; color: var(--ink-2); font-size: var(--fs-sm); line-height: 1.6; }
 .fb-prose h3, .fb-prose h4 { color: var(--ink-1); margin: var(--sp-5) 0 var(--sp-2); }
-.fb-prose a { color: var(--accent); }
+.fb-prose a { color: var(--signal); }
 .fb-prose p { margin: 0 0 var(--sp-3); }
 
 /* kit v4 pieces shared by the pages: the page crumb in condensed capitals (as the Rink's) */
@@ -154,3 +154,16 @@ a.fb-xi-p:hover .fb-xi-l { color: var(--accent); }
 .fb-cmp-wrap { max-width: 100%; min-width: 0; }
 /* the kit's cards set their own display: a card or section a page hides stays hidden */
 .fb-page .qk-card[hidden], .fb-page .qk-section[hidden], .fb-page section[hidden] { display: none; }
+/* round 9: the Scouting Room (scout-room.js) and the Teams pages (teams.js, clubs.js) */
+.sc-floor { margin: 8px 0 10px; font: 600 var(--fs-xs)/1.4 var(--font-ui); color: var(--ink-3); }
+.sc-top { margin-top: var(--sp-6); }
+.sc-top:empty { display: none; }
+.sc-tabs { margin-top: var(--sp-6); }
+.sc-view { margin-top: var(--sp-4); }
+.sc-min { display: inline-flex; align-items: center; gap: 8px; }
+.sc-ctl .qk-within .qk-seg { flex-wrap: wrap; }
+.tm-jump { position: sticky; top: 0; z-index: 3; background: var(--bg); padding: 8px 0; margin-bottom: 8px; }
+.tm-sec { scroll-margin-top: 120px; }
+.tm-sec:empty { display: none; }
+.tm-clubs { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.tm-clubs .qk-chips { flex-wrap: wrap; }

@@ -40,11 +40,13 @@ function aggregate(rows) {
   });
 }
 
-GI.route('coaches', function (el, params) {
+/* round 9: the Coaches tab of "Fourth-down calls" (#/fourth-downs?tab=coaches; #/coaches redirects there): fourth.js
+   renders the page head and the tabs, this the body (GI.coachesPage) */
+function page(el, params, head0) {
   const S = Number(params.season);
   return GI.loadAll(['coaches.json', GI.ypath('fourth_downs.json', S)]).then(res => {
     if (!el.isConnected) return;
-    const head = GI.pageHead('Lab · ' + S, 'Coaches', 'Who goes for it on fourth down, against the league and against our model.') + GI.sectionNav('lab', 'coaches') + QK.note('<b>Go rate over expected</b> compares how often a coach went for it with how often the league goes in the same spots. Above zero is bolder than the league; the win chance given up says whether the boldness paid.');
+    const head = (head0 || GI.pageHead('Teams · ' + S, 'Coaches', 'Who goes for it on fourth down, against the league and against our model.') + GI.sectionNav('teams', 'fourth')) + QK.note('<b>Go rate over expected</b> compares how often a coach went for it with how often the league goes in the same spots. Above zero is bolder than the league; the win chance given up says whether the boldness paid.');
     const C = readCoaches(res[0]);
     const rows = C.rows;
     if (!rows.some(r => r.season === S) && GI.ok(res[1])) GI.F.coachesOf(res[1], GI.F.playsOf(res[1])).filter(r => r.coach).forEach(r => rows.push(Object.assign({}, r, { season: S })));
@@ -93,7 +95,9 @@ GI.route('coaches', function (el, params) {
     $('co-min').addEventListener('change', draw);
     draw();
   });
-});
+}
+GI.route('coaches', page);
+GI.coachesPage = page;
 
 GI.route('coach', function (el, params) {
   const name = String(params.id || '');
@@ -105,8 +109,8 @@ GI.route('coach', function (el, params) {
     let mine = C.rows.filter(r => GI.fold(r.coach) === nk);
     const plays = GI.F.playsOf(res[1]).filter(p => GI.fold(p.coach || '') === nk);
     if (!mine.some(r => r.season === S) && plays.length) GI.F.coachesOf({}, plays).forEach(r => mine.push(Object.assign({}, r, { season: S, coach: name })));
-    const nav = GI.sectionNav('lab', 'coaches');
-    if (!mine.length && !plays.length) { el.innerHTML = GI.pageHead('Lab · coaches', name || 'Coach', 'No fourth-down record for this coach. <a href="#/coaches">All coaches →</a>') + nav; return; }
+    const nav = GI.sectionNav('teams', 'fourth');
+    if (!mine.length && !plays.length) { el.innerHTML = GI.pageHead('Teams · coaches', name || 'Coach', 'No fourth-down record for this coach. <a href="#/fourth-downs?tab=coaches">All coaches →</a>') + nav; return; }
     mine = mine.sort((a, b) => (a.season || 0) - (b.season || 0));
     const car = aggregate(mine)[0] || {};
     const inf = C.info[Object.keys(C.info).find(n => GI.fold(n) === nk)] || {};

@@ -144,9 +144,33 @@ function performers(host, T) {
   });
 }
 
+/* A finished season (round 9): the season-end official ranking and the season-end Elo from that year's catalogue
+   (ta-past.js); the race, the points to defend and the profiles belong to the season in play. */
+function renderPast(el, T, Y, view) {
+  const PV = [{ key: 'official', label: 'Official, season’s end' }, { key: 'elo', label: 'Elo, season’s end' }];
+  if (!PV.some(v => v.key === view)) view = 'official';
+  el.innerHTML = '<div id="rk-body">' + QK.skeleton('lines', 8) + '</div>';
+  return TA.past.cat(T, Y).then(cat => {
+    if (!el.isConnected) return;
+    const body = document.getElementById('rk-body');
+    if (!cat) { body.innerHTML = TA.card('Rankings ' + Y, '', TA.muted('The ' + Y + ' season file is not on the site.')); return; }
+    body.innerHTML = TA.past.band(T, Y, cat) + '<div class="card"><div class="toggle-row" id="rk-tabs">' + TA.toggles(PV, view, 'data-v') + '</div><div id="rk-view"></div></div>' + TA.past.note(Y);
+    const show = k => {
+      const v = document.getElementById('rk-view');
+      v.innerHTML = k === 'elo' ? TA.past.eloTable(T, Y, cat, 'elo') : TA.past.officialTable(T, Y, cat);
+      TA.sortable(v);
+      if (TA.v2 && TA.v2.oursHeads) TA.v2.oursHeads(v, { Elo: 'elo', Hard: 'elo_hard', Clay: 'elo_clay', Grass: 'elo_grass', 'Elo rank': 'elo_rank' });
+    };
+    show(view);
+    TA.wireToggles(document.getElementById('rk-tabs'), 'data-v', show);
+    TA.setMeta(TA.tourName(T) + ' ' + Y + ' · the season’s end');
+  });
+}
+
 function render(el, params) {
   const T = params.tour;
   let view = (params.query || {}).v;
+  if (TA.past && TA.past.is(T, params.year)) return renderPast(el, T, params.year, view);
   if (!VIEWS.some(v => v.key === view)) view = 'official';
   el.innerHTML = '<div id="rk-body">' + QK.skeleton('lines', 8) + '</div>';
   return TA.loadAll([TA.tpath('rankings.json', T), TA.tpath('race.json', T)]).then(arr => {

@@ -19,7 +19,7 @@ const isNum = RK.isNum;
 
 function sideOf(s, keys) { for (let i = 0; i < keys.length; i++) { const v = s[keys[i]]; if (v) return typeof v === 'object' ? v : { team: v }; } return null; }
 /* SEEDS: team -> seed ('C1', 'WC2') for the season on screen, from season.json bracket.seeds_now (set by bracketOf). */
-let SEEDS = {};
+let SEEDS = {}, BSEASON = null;
 const seedRank = sd => { const m = /^([A-Z]+)(\d)$/.exec(String(sd || '')); return m ? (m[1] === 'WC' ? 10 : 0) + Number(m[2]) : 50; };
 function normSeries(s0, rnd) {
   const s = s0 || {};
@@ -42,7 +42,7 @@ function normSeries(s0, rnd) {
 function bracketOf(d) {
   const b = d && d.bracket;
   if (!b) return null;
-  SEEDS = {};
+  SEEDS = {}; BSEASON = RK.toSeason(d.season) || null;
   const sn = b.seeds_now || {}, DV = {};
   (((d.standings || {}).rows) || []).forEach(r => { if (r && r.team && r.division) DV[RK.canonTeam(r.team)] = r.division; });
   Object.keys(sn).forEach(c => {
@@ -87,7 +87,7 @@ function projected(rows, odds, sn) {
 }
 function teamLine(x, won, lost, p, pLabel) {
   if (!x || !x.team) return '<div class="nb-team tbd"><span class="nb-seed"></span><span class="nb-name">TBD</span><span class="nb-s"></span><span class="nb-p"></span></div>';
-  return '<div class="nb-team' + (won ? ' won' : '') + (lost ? ' lost' : '') + '"><span class="nb-seed">' + esc(x.seed || '') + '</span>' +
+  return '<div class="nb-team' + (won ? ' won' : '') + (lost ? ' lost' : '') + '" style="--tc:' + esc(RK.ui && RK.ui.tcol ? RK.ui.tcol(x.team) : RK.teamColour(x.team)) + '"><span class="nb-seed">' + esc(x.seed || '') + '</span>' +
     '<span class="nb-name">' + RK.teamLink(x.team, { abbr: true }) + '<span class="nb-full">' + esc(RK.teamShort(x.team)) + '</span></span>' +
     '<span class="nb-s">' + (isNum(x.wins) ? x.wins : '') + '</span><span class="nb-p">' + (isNum(p) ? RK.pct(p, 0) + (pLabel ? '<small>' + esc(pLabel) + '</small>' : '') : '') + '</span></div>';
 }
@@ -102,6 +102,8 @@ function seriesBox(s, title) {
   const last = (s.games || []).length ? s.games[s.games.length - 1] : null;
   const inner = '<div class="nb-head">' + esc(title || '') + '<span>' + status + '' + '</span></div>' +
     teamLine(s.a, win && win === s.a.team, win && win !== s.a.team, pa, '') + teamLine(s.b, win && win === s.b.team, win && win !== s.b.team, pb, '');
+  /* round 9: a real series opens its own page (rk-extras.js) */
+  if (last && BSEASON && s.n && s.round && RK.seriesHref) return '<a class="nb-game nb-link' + (done ? ' done' : '') + '" href="' + RK.seriesHref(BSEASON, s.round, s.n) + '" title="The series, game by game">' + inner.replace(/<a [^>]*>/g, '').replace(/<\/a>/g, '') + '<span class="nb-last">Series →</span></a>';
   return last ? '<div class="nb-game' + (done ? ' done' : '') + '" title="Latest game: ' + esc(last) + '">' + inner + '<a class="nb-last" href="' + RK.gameHref(last) + '">latest game →</a></div>'
     : '<div class="nb-game' + (done ? ' done' : '') + (s.a.team ? '' : ' proj') + '">' + inner + '</div>';
 }
@@ -190,9 +192,9 @@ RK.route('playoffs', function (el, params) {
     if (Array.isArray(cupF)) cupF.forEach(x => { if (x && x.team && isNum(x.market)) cupMkt[RK.canonTeam(x.team)] = Number(x.market); });
     else if (cupF) cupMkt = cupF.market && (cupF.market.probs || cupF.market.prices || cupF.market.mid) ? RK.titleProbs(cupF.market) : (cupF.market || {});
     const champ = b && b.champion ? b.champion : null;
-    el.innerHTML = RK.pageHead(RK.seasonLabel(S) + ' Stanley Cup playoffs', champ ? 'Champion: ' + RK.teamLink(champ) : (isProj ? 'Projected bracket: if the season ended today' : 'best of seven · the higher seed has home ice'), nav) +
-      RK.card('Bracket', isProj ? 'the first round from today\'s wild-card standings · percentages: our chance to win the series' : 'series score and our chance to win the series',
-        b ? bracketHTML(b) : RK.muted('No bracket for this season yet.')) +
+    el.innerHTML = QK.sectionHead({ kicker: 'Bracket · ' + RK.seasonLabel(S), title: champ ? RK.teamShort(champ) + ' won the Cup' : (isProj ? 'If the season ended today' : 'The road to the Cup'), html: true,
+        sub: champ ? 'Every series of the ' + esc(RK.seasonLabel(S)) + ' playoffs with its seeds and the result in games; the winner of each in bold. The champion: ' + RK.teamLink(champ) + '.' : (isProj ? 'The first round from today’s wild-card standings; the percentage is our chance to win the series. Best of seven, the higher seed has home ice.' : 'The series score and our chance to win each series. Best of seven, the higher seed has home ice.') }) +
+      '<section class="qk-card rk-br"><div class="qk-card-body">' + (b ? bracketHTML(b) : QK.empty('No bracket yet', 'The bracket appears once the playoff picture is set.')) + '</div></section>' +
       (isProj ? likelyBlock(d) : '') +
       (!isProj && !rows.some(r => isNum(r.p_playoffs) || isNum(r.p_cup)) ? RK.card('How far each club went', 'the sixteen clubs, by the round they reached · series results', reachTable(b, S))
         : RK.card('Chances by round', 'our chances from the season simulation', oddsTable(rows, cupMkt, S))) +

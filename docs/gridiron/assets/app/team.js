@@ -135,8 +135,8 @@ GI.route('team', function (el, params) {
         GI.kpi('Make the playoffs', GI.pct(sim.p_playoffs, 0), 'from 20,000 simulated seasons'), GI.kpi('Win the division', GI.pct(sim.p_div, 0), ''), GI.kpi('Win the Super Bowl', GI.pct(sim.p_sb, 1), ''),
         GI.kpi('Projected wins', GI.num(sim.mean_wins, 1), isNum(sim.w_p05) ? 'likely ' + GI.num(sim.w_p05, 0) + ' to ' + GI.num(sim.w_p95, 0) : '')],
       tags: tags, short: shortTxt.trim() || null });
-    h += '<nav class="qk-chips scroll" aria-label="On this page" style="margin-top:12px">' + [['#tp-season', 'How far they go'], ['#tp-top', 'Top performers'], ['#needs', 'Strengths and needs'], ['#tp-moves-host', 'Who moves next'], ['#roster', 'Roster'], ['#moves', 'Moves'], ['#tp-sched', 'Schedule'], ['#tp-profile', 'Profile'], ['#tp-4th', 'Fourth downs']]
-      .map(a => '<button type="button" class="qk-chip" data-jump="' + a[0] + '">' + esc(a[1]) + '</button>').join('') + '<a class="qk-chip" href="' + GI.compareHref('t:' + abbr) + '">Compare</a></nav>';
+    h += '<nav class="qk-chips scroll" aria-label="On this page" style="margin-top:12px">' + [['#tp-season', 'How far they go'], ['#tp-top', 'Top performers'], ['#needs', 'Strengths and needs'], ['#tp-moves-host', 'Who moves next'], ['#roster', 'Roster'], ['#moves', 'Moves'], ['#tp-sched', 'Schedule'], ['#tp-profile', 'Profile'], ['#tp-4th', 'Fourth downs'], ['#tp-since', 'Since 1999']]
+      .map(a => '<button type="button" class="qk-chip" data-jump="' + a[0] + '">' + esc(a[1]) + '</button>').join('') + '<a class="qk-chip" href="' + GI.ghref('teams', GI.state.season, { a: abbr, sec: 'h2h' }) + '">Head to head</a></nav>';
     if (!x) h += GI.notBuilt('The ' + S + ' page for ' + GI.teamName(abbr), res[0]);
     // season path
     const stages = [['p_playoffs', 'Playoffs'], ['p_div', 'Win division'], ['p_bye', 'No. 1 seed'], ['p_conf', 'Win conference'], ['p_sb', 'Win Super Bowl']].filter(s => isNum(sim[s[0]]));
@@ -228,7 +228,33 @@ GI.route('team', function (el, params) {
     if (plays.length) GI.F.table(document.getElementById('tp-4th-t'), plays, S, { team: false, max: 80, maxHeight: 420 });
     else GI.set('tp-4th-t', GI.muted('No fourth downs for this team yet.'));
     GI.sortable(el);
+    since(el, abbr, S);
   });
 });
+
+/* Since 1999 (round 9, phase 4): the franchise's every season in our data (history.json champions.teams): the win %
+   season by season coloured by how far it went, the titles and trips, the best and worst seasons, the coach today. */
+const FAR_COL = ['#8a93a3', '#7fa6e6', '#7d93ff', '#46b9c9', '#f59a72', '#d4ff3a'];
+function since(el, abbr, S) {
+  GI.load('history.json').then(h => {
+    if (!el.isConnected || !GI.ok(h) || !h.champions) return;
+    const C = h.champions, cols = C.cols || ['season', 'w', 'l', 't', 'pf', 'pa', 'far', 'as'], far = C.far || {};
+    const rows = (C.teams[abbr] || []).map(r => { const o = {}; cols.forEach((c, i) => { o[c] = r[i]; }); return o; }).sort((a, b) => a.season - b.season);
+    if (!rows.length) return;
+    const done = rows.filter(r => (C.seasons || []).some(x => x.season === r.season && x.sb));
+    const pctOf = r => (r.w + 0.5 * (r.t || 0)) / Math.max(1, r.w + r.l + (r.t || 0));
+    const titles = done.filter(r => r.far === 5).map(r => r.season), trips = done.filter(r => r.far >= 4).length, ins = done.filter(r => r.far >= 1).length;
+    const best = done.slice().sort((a, b) => pctOf(b) - pctOf(a) || (b.pf - b.pa) - (a.pf - a.pa))[0], worst = done.slice().sort((a, b) => pctOf(a) - pctOf(b))[0];
+    const moved = rows.filter(r => r.as).map(r => r.as).filter((x, i, a) => a.indexOf(x) === i);
+    el.insertAdjacentHTML('beforeend', '<section class="qk-section" id="tp-since">' + QK.sectionHead({ kicker: 'Since 1999', title: 'The franchise, season by season', sub: 'Every season in our play-by-play era: the regular-season win %, coloured by how far the season went.' + (moved.length ? ' Played as ' + moved.join(', ') + ' in earlier seasons.' : '') }) +
+      GI.kpis([GI.kpi('Super Bowls', String(titles.length), titles.length ? 'won in ' + titles.join(', ') : 'none since ' + rows[0].season, { signal: true }), GI.kpi('Trips to the Super Bowl', String(trips), 'in ' + done.length + ' seasons'),
+        GI.kpi('Playoff seasons', String(ins), Math.round(100 * ins / Math.max(1, done.length)) + '% of seasons'),
+        best ? GI.kpi('Best season', best.season + ' · ' + GI.record(best.w, best.l, best.t), esc(far[best.far] || '')) : '', worst ? GI.kpi('Worst season', worst.season + ' · ' + GI.record(worst.w, worst.l, worst.t), esc(far[worst.far] || '')) : '']) +
+      GI.card('Win % by season', 'Colour: how far the season went (volt: won the Super Bowl)', GI.chartBox('tp-since-c', 300, 'Win percentage by season') +
+        '<div class="gi-legend" style="margin-top:8px">' + [0, 1, 2, 3, 4, 5].map(k => '<span><i style="background:' + FAR_COL[k] + '"></i>' + esc(far[k] || far[String(k)] || '') + '</span>').join('') + '</div>') + '</section>');
+    GI.ch.bar('tp-since-c', { cats: rows.map(r => String(r.season)), series: [{ name: 'Win %', data: rows.map(r => Math.round(1000 * pctOf(r)) / 10) }], colors: rows.map(r => FAR_COL[r.far] || FAR_COL[0]), labels: false,
+      hrefs: rows.map(r => GI.teamHref(abbr, r.season)), fmt: x => GI.num(x, 0) + '%', catName: 'Season', valName: 'Win % (regular season)', max: 100 });
+  });
+}
 
 })(window.GI);

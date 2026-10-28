@@ -1,11 +1,14 @@
-/* The Quant Paddock — the Lab (#/lab): scatter any two metrics of the driver catalogue against each
- * other for one season (or every season since 2018), with presets, size and colour by any metric
- * (or team / season), medians splitting the chart into quadrants, the drivers furthest into the good
- * corner labelled, a search highlight, and the whole group ranked underneath. Small samples can be
- * shrunk towards the group median (3 races of prior). Shareable axes: ?x=&y=, and ?q= highlights. Reads lab.json.
- * F1 has one peer group (the spec's "drivers"), so this Lab has no "Compare within" control; a highlighted driver gets
- * the other Labs' "Most like" strip: the five nearest driver-seasons on the group's headline metrics
- * (QK.within.similar), each a link to Compare. */
+/* The Quant Paddock — the Lab, now the Scouting Room's Chart view (round 9: #/lab redirects to #/scout?view=chart with
+ * its ?x=&y=&q= kept). PD.lab.mount(host, o) draws it inside the room: scatter any two metrics of the driver catalogue
+ * against each other for the room's season (or every season since 2018), with presets, size and colour by any metric
+ * (or team / season), medians splitting the chart into quadrants, the drivers furthest into the good corner labelled,
+ * the room's search highlighted, and the group ranked underneath. Small samples can be shrunk towards the group median
+ * (3 races of prior). The room's bar drives the season, the minimum starts, the team and age filters and the search;
+ * a point or a name opens the room's profile drawer. Reads lab.json.
+ *   PD.lab.mount(host, { year (number | 'all'), min, q, x, y, color, keep(rowObj) -> bool (the room's team / age
+ *     filters; rowObj = { driver, team, year, age, races }), onPick(driverId, year), onAxes({ x, y, color }) })
+ * A highlighted driver gets the "Most like" strip: the five nearest driver-seasons on the group's headline metrics
+ * (QK.within.similar). */
 (function (PD) {
 'use strict';
 
@@ -25,9 +28,7 @@ var PRESETS = [
 var SHRINK_K = 3;
 var LAB = null, MU = {};
 var S = { year: null, min: 3, shrink: true, preset: 0, x: '', y: '', size: 'races', color: 'team', q: '' };
-
-function labNav(active) { return PD.subnav([['#/lab', 'Driver lab', 'lab'], ['#/compare/drivers', 'Compare drivers', 'drivers'], ['#/compare/teams', 'Compare teams', 'teams']], active, 'Lab views'); }
-PD.labNav = labNav;
+var O = {};   /* the room's options for the mounted chart */
 
 function prep(raw) {
   var idx = {};
@@ -75,13 +76,13 @@ function options(sel, scope) {
 }
 function sync() {
   var P = presets();
-  PD.set('lab-year', LAB.years.map(function (y) { return '<option value="' + y + '"' + (y === S.year ? ' selected' : '') + '>' + y + '</option>'; }).join('') + '<option value="all"' + (S.year === 'all' ? ' selected' : '') + '>Every season since ' + (LAB.years[LAB.years.length - 1] || 2018) + '</option>');
   PD.set('lab-preset', P.map(function (p, i) { return '<option value="' + i + '"' + (i === S.preset ? ' selected' : '') + '>' + esc(p.title) + '</option>'; }).join('') + '<option value="-1"' + (S.preset < 0 ? ' selected' : '') + '>Custom axes</option>');
   PD.set('lab-x', options(S.x)); PD.set('lab-y', options(S.y));
   PD.set('lab-size', options(S.size, 'size')); document.getElementById('lab-size').value = S.size;
   PD.set('lab-color', options(S.color, 'color')); document.getElementById('lab-color').value = S.color;
-  document.getElementById('lab-min').value = S.min; PD.set('lab-min-v', String(S.min));
-  document.getElementById('lab-shrink').checked = S.shrink; document.getElementById('lab-q').value = S.q;
+  document.getElementById('lab-shrink').checked = S.shrink;
+  var sc = document.getElementById('lab-scope');
+  if (sc) sc.value = S.year === 'all' ? 'all' : 'season';
 }
 function applyPreset() {
   var P = presets();
@@ -93,11 +94,13 @@ function applyPreset() {
 
 function draw() {
   var I = LAB.idx;
-  var base0 = LAB.rows.filter(function (r) { return (S.year === 'all' || r[I.year] === S.year) && (r[I.races] || 0) >= S.min; });
+  var keep = O.keep || function () { return true; };
+  var base0 = LAB.rows.filter(function (r) { return (S.year === 'all' || r[I.year] === S.year) && (r[I.races] || 0) >= S.min &&
+    keep({ driver: r[I.driver], team: r[I.team], year: r[I.year], age: I.age !== undefined ? r[I.age] : null, races: r[I.races] }); });
   Object.keys(MU).forEach(function (k) { delete MU[k]; });
   [S.x, S.y, S.size, S.color].forEach(function (k) { if (k && I[k] !== undefined && k !== 'races' && k !== 'year' && k !== 'team') { var a = base0.map(function (r) { return raw(r, k); }).filter(function (v) { return v !== null; }); if (a.length) MU[k] = PD.median(a); } });
   var rows = base0.filter(function (r) { return val(r, S.x) !== null && val(r, S.y) !== null; });
-  PD.setHashQuiet('#/lab' + PD.qs({ x: S.x, y: S.y, q: S.q.trim() || null }));
+  if (O.onAxes) O.onAxes({ x: S.x, y: S.y, color: S.color });
   PD.set('lab-sub', rows.length + ' driver-seasons' + (S.year === 'all' ? ' since ' + (LAB.years[LAB.years.length - 1] || '') : ' in ' + S.year) + ' with ' + S.min + '+ races');
   if (rows.length < 3) { PD.ch.none('lab-chart', 'Too few drivers for this view; lower the race minimum or pick another season.'); PD.set('lab-table', ''); PD.set('lab-sim', ''); return; }
   var xs = rows.map(function (r) { return val(r, S.x); }), ys = rows.map(function (r) { return val(r, S.y); });
@@ -126,12 +129,13 @@ function draw() {
   PD.ch.scatter('lab-chart', rows.map(function (r) {
     var vx = val(r, S.x), vy = val(r, S.y);
     return { x: vx, y: vy, name: nm(r) + (S.year === 'all' ? ' ' + r[I.year] : ''), short: String(nm(r)).split(' ').slice(-1)[0] + (S.year === 'all' ? ' ' + String(r[I.year]).slice(2) : ''), colour: colourOf(r), size: sizeOf(r),
-      href: PD.driverHref(r[I.driver]), label: top10.indexOf(r) >= 0, hit: hit(r), sub: PD.teamName(r[I.team]) + ' · ' + r[I.year] + ' · ' + (r[I.races] || 0) + ' races',
+      href: PD.driverHref(r[I.driver], r[I.year]), id: r[I.driver], year: r[I.year], label: top10.indexOf(r) >= 0, hit: hit(r), sub: PD.teamName(r[I.team]) + ' · ' + r[I.year] + ' · ' + (r[I.races] || 0) + ' races',
       extra: window.QKC.tipRow(PD.col('grey'), 'Percentiles', Math.round(pOf(sortedX, vx, dx)) + ' / ' + Math.round(pOf(sortedY, vy, dy))) + (S.shrink ? window.QKC.tipRow(PD.col('grey'), 'Unshrunk', fmt(S.x, raw(r, S.x)) + ' · ' + fmt(S.y, raw(r, S.y))) : '') };
-  }), { xName: label(S.x), yName: label(S.y), invX: lower(S.x), invY: lower(S.y), refX: mx, refY: my, xFmt: function (v) { return fmt(S.x, v); }, yFmt: function (v) { return fmt(S.y, v); }, label: 'Driver lab scatter' });
+  }), { xName: label(S.x), yName: label(S.y), invX: lower(S.x), invY: lower(S.y), refX: mx, refY: my, xFmt: function (v) { return fmt(S.x, v); }, yFmt: function (v) { return fmt(S.y, v); }, label: 'Driver lab scatter',
+    onClick: O.onPick ? function (pt) { O.onPick(pt.id, pt.year); } : null });
   var mX = LAB.meta[S.x] || {}, mY = LAB.meta[S.y] || {};
   PD.set('lab-note', 'Dashed lines are the medians of this group. ' + (lower(S.x) || lower(S.y) ? 'Axes where less is better are reversed, so better is always up and to the right. ' : 'Better is up and to the right. ') +
-    'Labelled: the ten drivers furthest into that corner (sum of standard scores)' + (q ? ', and your search (outlined)' : '') + '. Click a dot to open the driver.' +
+    'Labelled: the ten drivers furthest into that corner (sum of standard scores)' + (q ? ', and your search (outlined)' : '') + '. Tap a dot for the driver’s profile.' +
     (S.shrink ? ' Shrunk values are pulled towards the group median by ' + SHRINK_K + ' races of prior, (races × value + ' + SHRINK_K + ' × median) / (races + ' + SHRINK_K + ').' : '') +
     (mX.desc ? '<br><b>' + esc(mX.label) + '</b>' + PD.v2.oursTag(S.x) + ': ' + esc(mX.desc) : '') + (mY.desc ? '<br><b>' + esc(mY.label) + '</b>' + PD.v2.oursTag(S.y) + ': ' + esc(mY.desc) : ''));
   var models = [];
@@ -139,13 +143,13 @@ function draw() {
   PD.set('lab-ours', models.length ? QK.oursExplain(models.map(function (o) { return '<b>' + esc(o.name) + '.</b> ' + esc(o.about); }).join(' '), { title: models.length > 1 ? 'Our models.' : 'Our model.' })
     : QK.explain('Neither axis comes from our models. The driver ratings (race and qualifying pace v the team-mate), race and qualifying pace v the field, Elo and points against our forecast are ours: they lead every metric list, tagged ' + QK.ours({ short: true }) + '.'));
   PD.table('lab-table', [
-    { key: 'name', label: 'Driver', sticky: true, fmt: function (v, r) { return PD.driverLink(r.id, { name: v, team: r.team }); } },
+    { key: 'name', label: 'Driver', sticky: true, fmt: function (v, r) { return PD.driverLink(r.id, { name: v, team: r.team, y: r.year }); } },
     { key: 'team', label: 'Team', fmt: function (v) { return esc(PD.teamName(v)); } },
     { key: 'year', label: 'Season', num: true, fmt: String }, { key: 'races', label: 'Races', num: true },
     { key: 'vx', label: label(S.x), num: true, pctl: 'px', fmt: function (v) { return fmt(S.x, v); } },
     { key: 'vy', label: label(S.y), num: true, pctl: 'py', fmt: function (v) { return fmt(S.y, v); } },
     { key: 'z', label: 'Combined', num: true, tip: 'Sum of standard scores in the better direction', fmt: function (v) { return '<b>' + PD.num(v, 2) + '</b>'; } }
-  ], ranked.map(function (o) { var r = o.r, vx = val(r, S.x), vy = val(r, S.y); return { id: r[I.driver], name: nm(r), team: r[I.team], year: r[I.year], races: r[I.races] || 0, vx: vx, vy: vy, px: pOf(sortedX, vx, dx), py: pOf(sortedY, vy, dy), z: o.z }; }),
+  ], ranked.slice(0, 50).map(function (o) { var r = o.r, vx = val(r, S.x), vy = val(r, S.y); return { id: r[I.driver], name: nm(r), team: r[I.team], year: r[I.year], races: r[I.races] || 0, vx: vx, vy: vy, px: pOf(sortedX, vx, dx), py: pOf(sortedY, vy, dy), z: o.z }; }),
   { sort: { key: 'z', dir: 'desc' }, rank: true, maxHeight: 560 });
   PD.v2.oursHeads(document.getElementById('lab-table'), { vx: S.x, vy: S.y });
 }
@@ -161,52 +165,46 @@ function simStrip(rows, q, nm) {
   var near = QK.within.similar(rows, who, keys, function (r, k) { return raw(r, k); }, 5);
   return QK.within.simHtml('Most like ' + nm(who) + yr(who) + ' · drivers', near.map(function (o) {
     var r = o.row;
-    return { name: nm(r) + yr(r), href: '#/compare/drivers/' + encodeURIComponent(who[I.driver]) + '/' + encodeURIComponent(r[I.driver]), sub: PD.teamName(r[I.team]) + ' · ' + r[I.year] + ' · ' + (r[I.races] || 0) + ' races · compare' };
+    return { name: nm(r) + yr(r), href: '#/compare/drivers/' + encodeURIComponent(who[I.driver]) + '/' + encodeURIComponent(r[I.driver]) + (r[I.year] !== PD.currentSeason() ? '?y=' + r[I.year] : ''), sub: PD.teamName(r[I.team]) + ' · ' + r[I.year] + ' · ' + (r[I.races] || 0) + ' races · compare' };
   })) || '<p class="pd-cap pd-lab-simhint">Too few drivers share the headline metrics with ' + esc(nm(who)) + ' here.</p>';
 }
 
-function render(el, params, state) {
-  el.innerHTML = PD.pageHead('Lab', 'Build your own chart', '<span id="lab-sub">Loading…</span>') + labNav('lab') +
-    PD.card('', '', '<div class="pd-toolbar pd-lab-ctl">' +
-      '<label>Season<select class="qk-select" id="lab-year"></select></label>' +
+function mount(host, o) {
+  O = o || {};
+  host.innerHTML = PD.card('Build your own chart', '<span id="lab-sub">Loading…</span>', '<div class="pd-toolbar pd-lab-ctl">' +
       '<label class="pd-wide">Preset<select class="qk-select" id="lab-preset"></select></label>' +
       '<label>X axis<select class="qk-select" id="lab-x"></select></label><label>Y axis<select class="qk-select" id="lab-y"></select></label>' +
       '<button type="button" class="qk-btn" id="lab-swap" title="Swap the axes">⇄ Swap</button>' +
       '<label>Size<select class="qk-select" id="lab-size"></select></label><label>Colour<select class="qk-select" id="lab-color"></select></label>' +
-      '<label>Min races <b id="lab-min-v"></b><input id="lab-min" type="range" min="1" max="20" step="1"></label>' +
-      '<label class="pd-check"><input id="lab-shrink" type="checkbox"> Shrink small samples</label>' +
-      '<label>Highlight<input class="qk-input" id="lab-q" type="search" placeholder="Driver or team…"></label></div>' +
+      '<label>Seasons<select class="qk-select" id="lab-scope"><option value="season">The room’s season</option><option value="all">Every season since 2018</option></select></label>' +
+      '<label class="pd-check"><input id="lab-shrink" type="checkbox"> Shrink small samples</label></div>' +
       PD.chartBox('lab-chart', 600) + '<div id="lab-sim" class="pd-lab-sim"></div><p class="pd-cap" id="lab-note"></p><div id="lab-ours" class="pd-lab-ours"></div>') +
-    PD.card('Ranked', 'The whole group by the combined standard score on both axes.', '<div id="lab-table"></div>', { flush: true, cls: 'pd-mt' });
+    PD.card('Ranked', 'The top 50 by the combined standard score on both axes (the Board has everyone).', '<div id="lab-table"></div>', { flush: true, cls: 'pd-mt' });
   return Promise.all([PD.load('lab.json'), PD.v2.specP]).then(function (got) {
     var rawLab = got[0];
-    if (!PD.alive(el)) return;
+    if (!host.isConnected) return;
     if (!rawLab || rawLab.ok === false || !(rawLab.rows || []).length) { PD.ch.none('lab-chart', 'The lab file is not built yet.'); PD.set('lab-sub', ''); return; }
     LAB = prep(rawLab);
-    if (S.year === null || (S.year !== 'all' && LAB.years.indexOf(S.year) < 0)) { var want = (rawLab.windows || {}).season || state.year; S.year = LAB.years.indexOf(want) >= 0 ? want : LAB.years[0]; }
-    var q = params.query || {};
-    if (typeof q.q === 'string') S.q = q.q;
-    if (q.x && LAB.idx[q.x] !== undefined) { S.x = q.x; S.preset = -1; }
-    if (q.y && LAB.idx[q.y] !== undefined) { S.y = q.y; S.preset = -1; }
+    var y0 = O.year === 'all' ? 'all' : (LAB.years.indexOf(O.year) >= 0 ? O.year : LAB.years[0]);
+    S.year = y0; S.min = isNum(O.min) ? O.min : 3; S.q = O.q || '';
+    if (O.x && LAB.idx[O.x] !== undefined) { S.x = O.x; S.preset = -1; }
+    if (O.y && LAB.idx[O.y] !== undefined) { S.y = O.y; S.preset = -1; }
+    if (O.color && (LAB.idx[O.color] !== undefined || O.color === 'year')) S.color = O.color;
     if (!S.x || LAB.idx[S.x] === undefined || !S.y || LAB.idx[S.y] === undefined) { if (S.preset < 0) S.preset = 0; applyPreset(); }
     if (!S.x || !S.y) { S.x = (LAB.metrics[0] || {}).key || 'races'; S.y = (LAB.metrics[1] || {}).key || 'races'; S.preset = -1; }
     sync();
     var $ = function (id) { return document.getElementById(id); };
-    $('lab-year').onchange = function (e) { S.year = e.target.value === 'all' ? 'all' : parseInt(e.target.value, 10); if (S.year === 'all' && S.color === 'team') S.color = 'year'; sync(); draw(); };
     $('lab-preset').onchange = function (e) { S.preset = parseInt(e.target.value, 10); applyPreset(); sync(); draw(); };
     $('lab-x').onchange = function (e) { S.x = e.target.value; S.preset = -1; sync(); draw(); };
     $('lab-y').onchange = function (e) { S.y = e.target.value; S.preset = -1; sync(); draw(); };
     $('lab-swap').onclick = function () { var t = S.x; S.x = S.y; S.y = t; S.preset = -1; sync(); draw(); };
     $('lab-size').onchange = function (e) { S.size = e.target.value; draw(); };
     $('lab-color').onchange = function (e) { S.color = e.target.value; draw(); };
-    $('lab-min').oninput = function (e) { S.min = parseInt(e.target.value, 10); PD.set('lab-min-v', String(S.min)); };
-    $('lab-min').onchange = function () { draw(); };
+    $('lab-scope').onchange = function (e) { S.year = e.target.value === 'all' ? 'all' : (y0 === 'all' ? LAB.years[0] : y0); if (S.year === 'all' && S.color === 'team') S.color = 'year'; sync(); draw(); };
     $('lab-shrink').onchange = function (e) { S.shrink = e.target.checked; draw(); };
-    var timer = null;
-    $('lab-q').oninput = function (e) { S.q = e.target.value; clearTimeout(timer); timer = setTimeout(draw, 250); };
     draw();
   });
 }
 
-PD.route('lab', render);
+PD.lab = { mount: mount };
 })(window.PD);

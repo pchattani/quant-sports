@@ -74,8 +74,8 @@ function wire(kind, a, b) {
 function render(el, params, state) {
   var kind = params.kind === 'teams' ? 'teams' : 'drivers';
   var a = params.a || '', b = params.b || '';
-  var y = state.year || PD.currentSeason();
-  el.innerHTML = PD.pageHead('Lab · side by side', kind === 'teams' ? 'Compare constructors' : 'Compare drivers', kind === 'teams' ? 'Two constructors on the metrics that best describe and predict a team, ranked against the season’s constructors. The address updates so a comparison can be shared.' : 'Two drivers on the metrics that best describe and predict a driver, the car taken out where it can be, ranked against the season’s drivers. The address updates so a comparison can be shared.') + PD.labNav(kind) + '<div id="cmp-pick"></div><div id="cmp-body"></div>';
+  var yq = parseInt((params.query || {}).y, 10), y = isNaN(yq) ? PD.currentSeason() : yq;
+  el.innerHTML = PD.pageHead('Scouting Room · side by side', kind === 'teams' ? 'Compare constructors' : 'Compare drivers', kind === 'teams' ? 'Two constructors on the metrics that best describe and predict a team, ranked against the season’s constructors. The address updates so a comparison can be shared.' : 'Two drivers on the metrics that best describe and predict a driver, the car taken out where it can be, ranked against the season’s drivers. The address updates so a comparison can be shared.') + PD.labNav(kind) + '<div id="cmp-pick"></div><div id="cmp-body"></div>';
   return kind === 'teams' ? teams(el, a, b, y) : drivers(el, a, b, y);
 }
 
@@ -211,7 +211,7 @@ function teams(el, a, b, y) {
     var card = function (i) {
       var id = [a, b][i], t = T[id] || {}, s = stand[id] || {}, c = champ[id], pit = t.pit || {};
       var col = PD.teamColourRaw(id) ? QK.color.team(PD.teamColourRaw(id)) : (i ? CB : CA);
-      var facts = [['Position', s.pos ? PD.ordinal(s.pos) : '—'], ['Points', PD.pts(s.points)], ['Wins', s.wins || 0], ['Title', c ? PD.pct(c.p_title) : '—'], ['Median stop', isNum(pit.median_ms) ? PD.num(pit.median_ms / 1000, 2) + 's' : '—'], ['DNFs', (t.log || []).reduce(function (x, r) { return x + (r.dnfs || 0); }, 0)]];
+      var facts = [['Position', s.pos ? PD.ordinal(s.pos) : '—'], ['Points', PD.pts(s.points)], ['Wins', s.wins || 0], ['Title', c ? PD.titlePct(c) : '—'], ['Median stop', isNum(pit.median_ms) ? PD.num(pit.median_ms / 1000, 2) + 's' : '—'], ['DNFs', (t.log || []).reduce(function (x, r) { return x + (r.dnfs || 0); }, 0)]];
       return '<div class="qk-card pd-cmp-id" style="--tc:' + col + '"><div class="pd-cmp-id-top">' + PD.mark(id, 'lg') + '<div><b>' + PD.teamLink(id, { name: names[i], dot: false }) + '</b><div class="qk-sub">' + lineup(id).map(function (d) { return PD.driverLink(d, { dot: false }); }).join(' · ') + '</div></div></div>' +
         '<div class="pd-facts">' + facts.map(function (f) { return '<div><span>' + f[0] + '</span><b>' + f[1] + '</b></div>'; }).join('') + '</div></div>';
     };

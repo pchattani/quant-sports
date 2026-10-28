@@ -86,6 +86,11 @@ def _columns(cat: dict | None) -> dict | None:
 
 def lab(ctx, sk: dict | None, gk: dict | None, teams_payload: dict | None, lines_payload: dict | None) -> dict | None:
     out = {"ok": True, "season": ctx.season, "updated_at": an.now(), "skaters": _columns(sk), "goalies": _columns(gk)}
+    # the Scouting Room's hand filter (round 9): shoots (skaters) or catches (goalies) from the store's player info
+    for kind in ("skaters", "goalies"):
+        X = out.get(kind)
+        if X:
+            X["hand"] = [((getattr(ctx, "players", None) or {}).get(an.sid(p)) or {}).get("shoots") or None for p in X["ids"]]
     tp = (teams_payload or {}).get("teams") or {}
     if tp:
         keys = sorted({k for v in tp.values() for k, x in ((v.get("units") or {}).items()) if isinstance(x, (int, float)) and not isinstance(x, bool)})

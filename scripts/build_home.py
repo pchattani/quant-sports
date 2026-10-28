@@ -1138,9 +1138,16 @@ def build_college(ctx: Ctx, base: str, out: dict):
         if lg.get("phase") not in (None, "offseason"):
             stages.append(f"{LU} {phase_lab.get(lg.get('phase'), lg.get('phase') or '')}".strip())
     srch = load(d / "search.json") or []
-    for r in srch if isinstance(srch, list) else []:
-        if r.get("t") and r.get("href"):
-            out["search"].append(["college", r["t"], r.get("s") or "", base + r["href"]])
+    # Teams all, players only the top of each level (by the site's own weight): the hub's search balances the sports
+    # (the full 32k-player list lives on Campus's own search, not on every visitor's home page).
+    rows = [r for r in (srch if isinstance(srch, list) else []) if r.get("t") and r.get("href")]
+    players = [r for r in rows if "/player/" in r["href"]]
+    top: list = []
+    for lv in sorted({r["href"].split("/")[1] for r in players}):
+        lvl = sorted((r for r in players if r["href"].split("/")[1] == lv), key=lambda r: -(r.get("w") or 0))
+        top += lvl[:SEARCH_TOP_PLAYERS]
+    for r in [r for r in rows if "/player/" not in r["href"]] + top:
+        out["search"].append(["college", r["t"], r.get("s") or "", base + r["href"]])
     return {"phase": " · ".join(status), "status": " · ".join(status), "kpis": kpis[:3],
             "stage": " · ".join(stages) or " · ".join(status), "updated_at": idx.get("updated_at")}
 
@@ -1414,6 +1421,19 @@ BUILDERS = {"football": build_football, "f1": build_f1, "basketball": build_bask
             "baseball": build_baseball, "nfl": build_nfl, "hockey": build_hockey, "college": build_college}
 
 
+SEARCH_TOP_PLAYERS = 40      # players per site (per level on Campus) in the hub's search
+
+
+def leader_search(sport: str, leaders: dict, out: dict) -> None:
+    """Every sport's top players in the hub's search: the names on its leader boards (home.json `leaders`)."""
+    seen = {s[3] for s in out["search"]}
+    for key, lb in (leaders or {}).items():
+        for r in (lb or {}).get("rows") or []:
+            if r.get("name") and r.get("href") and r["href"] not in seen:
+                seen.add(r["href"])
+                out["search"].append([sport, r["name"], "Player · " + str((lb or {}).get("title") or "leader"), r["href"]])
+
+
 def football_search(base: str, out: dict):
     d = DOCS / "site" / "data"
     ci = load(d / "clubs_index.json") or {}
@@ -1427,6 +1447,15 @@ def football_search(base: str, out: dict):
     for c in comps.get("competitions", []):
         out["search"].append(["football", c.get("name"), "Competition · " + (c.get("country") or ""),
                               base + "#/" + c["slug"]])
+    # the best-known players: the highest market values on record (people_index.json; Sofascore's, a reference only)
+    pn = load(d / "people_index.json") or {}
+    pf = pn.get("fields") or []
+    ppl = [dict(zip(pf, row)) for row in (pn.get("rows") or [])]
+    ppl = sorted((r for r in ppl if r.get("mv")), key=lambda r: -r["mv"])
+    for r in ppl[:SEARCH_TOP_PLAYERS * 2]:
+        if r.get("name") and r.get("id"):
+            out["search"].append(["football", r["name"], "Player" + (" · " + r["club"] if r.get("club") else ""),
+                                  base + "#/player/" + str(r["id"])])
 
 
 def copy_kit():
@@ -1500,6 +1529,7 @@ def main(argv=None):
             entry.update(BUILDERS[key](ctx, base, part))
             if key == "football":
                 football_search(base, part)
+            leader_search(key, part.get("leaders"), part)
         except Exception as exc:  # one sport failing never takes the others down
             log(f"{key}: skipped ({exc!r})")
         else:

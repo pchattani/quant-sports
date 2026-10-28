@@ -212,12 +212,19 @@ def il_days(stints: dict[str, list[dict]], bounds: dict[int, tuple[date, date]],
     return out
 
 
+STALE_DAYS = 400   # an open stint older than this lost its activation (a death, a retirement, an unrecorded release)
+
+
 def on_il(stints: dict[str, list[dict]], when: date) -> dict[str, dict]:
-    """Players on the injured list on `when`: {pid: stint}."""
+    """Players on the injured list on `when`: {pid: stint}. A placement never followed by an activation, release or trade
+    is open for at most STALE_DAYS (no stint outlives a season and its winter: the 60-day list empties after the World
+    Series), so a 2015 placement with no recorded end is not "on the list" in 2026 (round 9)."""
     out = {}
     for pid, sts in stints.items():
         for x in sts:
             a, b = _d(x["start"]), _d(x["end"]) if x.get("end") else None
+            if a and b is None and (when - a).days > STALE_DAYS:
+                continue
             if a and a <= when and (b is None or b >= when):
                 out[pid] = x
     return out

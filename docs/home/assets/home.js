@@ -77,7 +77,7 @@ function renderAll() {
   var jobs = [renderTicker, renderSportNav, renderFeature, renderToplines, renderAround, renderWatch, renderHot, renderSurprises, renderStats, renderReal, renderRoll, renderRaces, renderChips, renderGames, renderCharts, renderHow];
   jobs.forEach(function (f) { try { f(); } catch (e) { if (window.console) console.error(e); } });
   $('#updated').textContent = 'Data built ' + fmt.ago(D.updated_at) + ' (' + fmt.date(D.updated_at) + ' ' + fmt.time(D.updated_at) + '). Live scores refresh every minute while games are on.';
-  QK.seg($('#when'), function (v) { state.when = v; state.shown = PAGE; renderGames(); });
+  QK.seg($('#when'), function (v) { state.when = v; state.shown = PAGE; renderChips(); renderGames(); });
 }
 
 function sportCount() { var n = D.sports.length; return (NUMS[n] || String(n)) + (n === 1 ? ' sport' : ' sports'); }
@@ -160,6 +160,7 @@ function eventCard(g, tag, chip) {
     (field.length ? QK.chances(field.map(function (d) { return { label: d.code || d.name, p: d.p || 0, color: d.colour }; }), { key: false }) + '<div class="qk-caption">Our chance of winning the race, each driver out of 100%.</div>' : '') + '</a>';
 }
 /* nothing scheduled that matters: the tightest title race instead of a minor game */
+var FEATURE_RACE = null;
 function raceFallback() {
   var F = D.futures || {}, best = null;
   Object.keys(F).forEach(function (k) {
@@ -168,9 +169,10 @@ function raceFallback() {
     var gap = rows[0].p - rows[1].p;
     if (!best || gap < best.gap) best = { k: k, f: F[k], rows: rows, gap: gap };
   });
-  if (!best) return QK.explain('<b>Nothing on right now.</b> The next big games appear here as soon as they are scheduled.', { html: true });
+  FEATURE_RACE = best ? best.k : null;
+  if (!best) return QK.explain('<b>No big game today.</b> The next big games appear here as soon as they are scheduled.', { html: true });
   var sp = best.k.split('_')[0];
-  return '<div class="qk-card hm-event"><div class="hm-event-top"><span class="qk-bchip volt">Title race</span></div><div class="hm-event-name">' + esc(question(best.k, best.f.title)) + '</div>' +
+  return '<div class="qk-card hm-event"><div class="hm-event-top"><span class="qk-bchip volt">Title race</span><span class="qk-bchip">' + esc(sportOf(sp).label + ' · ' + raceLabel(best.k, best.f.title)) + '</span></div><div class="hm-event-name">' + esc(question(best.k, best.f.title)) + '</div>' +
     QK.chances(chanceRows(best.rows.slice(0, 5), sp), { key: false }) + '<div class="qk-caption">No big game today, so here is the closest race we simulate: ' + esc(raceLede(best.rows.map(function (r) { return { name: r.name, p: r.p }; }))) + '</div></div>';
 }
 
@@ -238,10 +240,18 @@ function renderWatch() {
   var per = {}, first = [], rest = [];
   pool.forEach(function (g) { per[g.sport] = (per[g.sport] || 0) + 1; (per[g.sport] <= 2 ? first : rest).push(g); });
   pool = first.concat(rest);
+  var later = false;
+  if (!pool.length) {
+    /* nothing big in the next day and a half: the next games on the calendar instead, said as such */
+    pool = playable().filter(function (g) { return keyOf(g) !== featureId && stillOn(g); }).sort(function (a, b) { return a.start > b.start ? 1 : -1; }).slice(0, 6);
+    later = pool.length > 0;
+  }
   var n = Math.min(6, pool.length);
-  $('#h-watch').innerHTML = QK.sectionHead({ kicker: 'What to watch next', title: n ? cap(NUMS[n]) + ' game' + (n === 1 ? '' : 's') + '. Our calls.' : 'Nothing on right now',
-    sub: 'The biggest games of the next day and a half, at most two per sport. Our chance for each side, the favourite in blue.',
-    actions: '<a class="qk-more" href="#games">All ' + playable().length + ' games</a>' });
+  var upcoming = playable().filter(function (g) { return g.status !== 'final'; }).length;
+  $('#h-watch').innerHTML = QK.sectionHead({ kicker: 'What to watch next', title: n ? cap(NUMS[n]) + ' game' + (n === 1 ? '' : 's') + '. Our calls.' : 'Nothing scheduled yet',
+    sub: later ? 'Nothing big starts in the next day and a half, so these are the next games on the calendar. Our chance for each side, the favourite in blue.'
+      : n ? 'The biggest games of the next day and a half, at most two per sport. Our chance for each side, the favourite in blue.' : 'The next games appear here as soon as the sports publish them.',
+    actions: upcoming ? '<a class="qk-more" href="#games">All ' + upcoming + ' upcoming</a>' : '' });
   $('#watch-grid').innerHTML = QK.watchGrid(pool, { limit: 6, pick: false, card: { why: true, market: 'quiet' } });
 }
 
@@ -343,7 +353,7 @@ function chanceRows(rows, sport) {
     return { label: sport ? nick(r.name, sport) : r.name, p: r.p, href: r.href, color: r.colour, mark: r.abbr ? { abbr: r.abbr, colour: r.colour } : null };
   });
 }
-var QUESTION = { hockey: 'Who lifts the Cup?', nfl: 'Who wins the Super Bowl?', baseball: 'Who wins the World Series?', f1: 'Who wins the drivers’ title?' };
+var QUESTION = { hockey: 'Who lifts the Stanley Cup?', nfl: 'Who wins the Super Bowl?', baseball: 'Who wins the World Series?', f1: 'Who wins the F1 drivers’ title?' };
 function question(id, title) {
   if (QUESTION[id]) return QUESTION[id];
   return 'Who wins the ' + String(title || 'title').replace(/^College football national title$/i, 'college football title') + '?';
@@ -355,7 +365,8 @@ function raceLabel(id, title) {
 var RACE_ORDER = ['hockey', 'basketball_2', 'basketball', 'nfl', 'baseball', 'f1', 'college', 'college_mbb', 'college_wbb'];
 function renderRaces() {
   var F = D.futures || {}, ft = (D.charts || {}).football_titles || [];
-  var tabs = RACE_ORDER.filter(function (k) { return F[k] && F[k].rows && F[k].rows.filter(function (r) { return r.p > 0; }).length > 1; }).map(function (k) {
+  /* the race already leading the page (the fallback hero) is not shown twice */
+  var tabs = RACE_ORDER.filter(function (k) { return k !== FEATURE_RACE && F[k] && F[k].rows && F[k].rows.filter(function (r) { return r.p > 0; }).length > 1; }).map(function (k) {
     return { id: k, sport: k.split('_')[0], label: raceLabel(k, F[k].title), title: F[k].title || k };
   });
   if (ft.length) tabs.push({ id: 'football', sport: 'football', label: 'Football', title: 'League titles' });
@@ -396,8 +407,9 @@ function gamesFor() {
   });
 }
 function renderChips() {
+  /* each chip counts the games the grid shows under the open tab (upcoming and live, or results), never the others */
   var counts = { all: 0 };
-  playable().forEach(function (g) { counts.all++; counts[g.sport] = (counts[g.sport] || 0) + 1; });
+  playable().filter(function (g) { return state.when === 'results' ? g.status === 'final' : g.status !== 'final'; }).forEach(function (g) { counts.all++; counts[g.sport] = (counts[g.sport] || 0) + 1; });
   var chips = [['all', 'All sports', 'var(--signal)', '']].concat(QK.SPORTS.filter(function (s) { return counts[s.key]; }).map(function (s) { return [s.key, s.label, s.accent, QK.ICON[s.key]]; }));
   $('#sport-chips').innerHTML = chips.map(function (c) {
     return '<button type="button" class="qk-chip" data-value="' + c[0] + '" aria-pressed="' + (state.sport === c[0]) + '" style="--ca:' + c[2] + '">' + c[3] + esc(c[1]) + ' <span class="n">' + (counts[c[0]] || 0) + '</span></button>';
@@ -466,8 +478,24 @@ function renderCharts() {
     out.push(card('qk-span-12', 'NBA: power ratings', 'Net rating (points per 100 possessions v average): the top eight and the bottom four', 'basketball', QK.sportUrl('basketball'), '<div id="c-nba" style="--h:280px"></div>'));
     jobs.push(function () { QKC.bar('#c-nba', { cats: r.map(function (x) { return x.abbr; }), series: [{ name: 'Net rating', data: r.map(function (x) { return x.value; }) }], diverging: true, hrefs: r.map(function (x) { return x.href; }), labels: true, catName: 'Team', valName: 'Net rating (pts per 100 poss.)', fmt: function (v) { return fmt.signed(v, 1); } }); });
   }
-  $('#chart-grid').innerHTML = out.join('');
+  $('#chart-grid').innerHTML = pack(out).join('');
   jobs.forEach(function (f) { try { f(); } catch (e) { if (window.console) console.error(e); } });
+}
+
+/* The charts grid in rows of 12 columns: a card that would leave its row part empty (the next one does not fit beside
+   it, or it is the last) widens to fill the row, so no grid cell stays blank. */
+function pack(cards) {
+  var spanOf = function (h) { var m = /qk-span-(\d+)/.exec(h); return m ? +m[1] : 12; };
+  var out = [], used = 0;
+  var widen = function () { if (used > 0 && used < 12 && out.length) { var i = out.length - 1, s = spanOf(out[i]); out[i] = out[i].replace('qk-span-' + s, 'qk-span-' + (s + 12 - used)); } };
+  cards.forEach(function (h) {
+    var s = spanOf(h);
+    if (used + s > 12) { widen(); used = 0; }
+    out.push(h); used += s;
+    if (used === 12) used = 0;
+  });
+  widen();
+  return out;
 }
 
 /* ───────────────────────────── how it works */

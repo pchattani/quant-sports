@@ -280,6 +280,10 @@ function withSchedule(g, sch) {
     if (isNum(row.period)) out.periods = row.period;
     out.clock = null;
   }
+  if (row.status === 'in' && g.status !== 'post') {
+    out.status = 'in';
+    ['hs', 'as', 'period', 'clock', 'wp_home'].forEach(k => { if (row[k] !== null && row[k] !== undefined) out[k] = row[k]; });
+  }
   const pre = Object.assign({}, g.pregame || {});
   if (!pre.market && row.market) pre.market = row.market;
   if (!(pre.model && isNum(pre.model.p_home)) && row.model && isNum(row.model.p_home)) pre.model = Object.assign({}, row.model);
@@ -325,7 +329,18 @@ function renderGame(el, params) {
       h += U.card2('Line score', '', '<div id="gm-ls"></div>', { cls: 'qk-span-' + (parts.length ? '7' : '12'), flush: true });
     }
     if (parts.length) h += U.card2('What goes into our forecast', 'Points of ' + esc(HW.teamAbbr(L, H)) + ' margin from each part', U.chart('gm-parts', 30 * parts.length + 60, 'What goes into our forecast'), { cls: 'qk-span-' + (la.length || lh.length ? '5' : '12') });
-    if (g.wp && (g.wp.model || []).length) h += U.card2('Win chance through the game', 'Our live model for ' + esc(HW.teamName(L, H)) + ' after every possession; the numbered dots are the biggest swings' + ((g.wp.espn || []).length ? ' (ESPN’s own number dotted)' : ''), U.chart('gm-wp', 300, 'Win chance through the game'), { cls: 'qk-span-12' });
+    /* round 9 (Phase 4): while a game is live the page refreshes every minute (the game file and the schedule, fresh), and
+       the chart shows the live chance as it stands, from the schedule card when the game file has no curve yet */
+    const isLive = st === 'live' && !(QK.awaiting && QK.awaiting({ start: g.date, status: 'live' }));
+    if (isLive) {
+      HW.interval(() => { if (!U.alive(el)) return; HW.forget(L + '/' + S + '/games/' + gid + '.json'); HW.forget(HW.path('schedule.json', L, S)); HW.render({ keep: true }); }, 60000);
+    }
+    if (isLive && !(g.wp && (g.wp.model || []).length) && isNum(g.wp_home)) {
+      const pre = ((g.pregame || {}).model || {}).p_home;
+      const tNow = Math.min(4 * PERIOD_S(L), (Math.max(1, Number(g.period) || 1) - 1) * PERIOD_S(L) + PERIOD_S(L) / 2);
+      g.wp = { model: (isNum(pre) ? [[0, pre]] : []).concat([[tNow, g.wp_home]]), espn: [] };
+    }
+    if (g.wp && (g.wp.model || []).length) h += U.card2(isLive ? 'Live: win chance so far' : 'Win chance through the game', 'Our live model for ' + esc(HW.teamName(L, H)) + ' after every possession; the numbered dots are the biggest swings' + ((g.wp.espn || []).length ? ' (ESPN’s own number dotted)' : ''), U.chart('gm-wp', 300, 'Win chance through the game'), { cls: 'qk-span-12' });
     if (g.flow && g.flow.length) h += U.card2('Margin', esc(HW.teamAbbr(L, H)) + ' lead through the game', U.chart('gm-flow', 220, 'Margin flow'), { cls: 'qk-span-7' });
     const ff = g.four_factors || {};
     if (ff[A] && ff[H]) h += U.card2('Four factors', 'Shooting, turnovers (lower is better), offensive rebounds, free throws', U.chart('gm-ff', 220, 'Four factors'), { cls: 'qk-span-5' });

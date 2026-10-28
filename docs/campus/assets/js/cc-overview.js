@@ -145,9 +145,8 @@ function featHero(L, S, feat, titleRows) {
     g.home.record = CC.rec(L, S, feat.c.home); g.away.record = CC.rec(L, S, feat.c.away);
     return QK.featureCard(g, { scribble: lab + (feat.week ? ' · The big one this week' : ' · The one to watch'), note: heroNote(g, feat.why) });
   }
-  if (!titleRows.length) return '';
-  return '<div class="ql-race">' + QK.sectionHead({ kicker: CC.fb(L) ? 'No big game today' : 'The season starts soon', title: 'So here’s the title race', sub: 'Our chance of winning the national title, from our simulated seasons.', tag: 'h3' }) +
-    QK.chances(titleRows.slice(0, 6).map(function (r) { return { label: CC.tshort(L, r.team), p: r.p, href: CC.teamHref(L, r.team, S), color: CC.traw(L, r.team), mark: U.mark(L, r.team) }; }), { key: false }) + '</div>';
+  /* round 9: nothing big on: no second title race here (the "Title race" section below has it) */
+  return '';
 }
 
 function tiles(L, S, d, nSims) {
@@ -304,21 +303,24 @@ CC.route('overview', function (el, p) {
         lede: fb ? 'Our chance for this week’s games, who’s for real, and the race for the 12-team playoff and the national title, in plain English.'
           : 'Our chance for tonight’s games, who’s for real, and the road to March, in plain English.',
         links: [{ label: 'Games', sub: 'Every game, our chance', href: CC.href(L, 'games', null, S) }, { label: 'Standings', sub: fb ? 'The playoff picture' : 'Bracketology', href: CC.href(L, 'standings', null, S) },
-          { label: 'Players', sub: 'Value and percentiles', href: CC.href(L, 'players', null, S) }] });
+          { label: 'Scouting Room', sub: 'Every player, every metric', href: CC.scoutHref(L, S) }] });
       var T = weekTiles(L, S, info, dig, feat, sim);
       var kick = 'This week in ' + lw;
       html += '<section class="qk-section ql-week">' + QK.sectionHead({ kicker: kick, title: T.length >= 3 ? 'The week in ' + WORDS[T.length].toLowerCase() + ' lines' : 'The week so far', sub: stageLine(L, dig.stage, info.phase || season.phase) }) +
         (T.length ? QK.stats(T) : '') + '<div class="ql-feat">' + featHero(L, S, feat, titleRows) + '</div></section>';
     } else {
       /* a past season: the "looking back" greeting over the last result, and the champion tiles */
-      var featC = G.last.length ? G.last.slice().sort(function (x, y) { return String(y.date).localeCompare(String(x.date)); })[0] : null;
+      /* the hero is the title game (the schedule's championship), else the season's last result */
+      var fin = ((a[3] && a[3].games) || []).filter(function (c) { return c.status === 'post' && /championship/i.test(String(c.round || '')) && (c.stype === 'cfp' || c.stype === 'ncaa'); })
+        .sort(function (x, y) { return String(y.date).localeCompare(String(x.date)); })[0];
+      var featC = fin || (((a[3] && a[3].games) || []).filter(function (c) { return c.status === 'post'; }).sort(function (x, y) { return String(y.date).localeCompare(String(x.date)); })[0]) || null;
       var fg = featC ? CC.game(featC, L) : null;
       html = QK.greeting({ date: U.kicker(L, S), title: esc(CC.LNAME[L] + ' ' + CC.seasonLabel(L, S)) + ', ' + QK.mark('looking back') + '.', lede: (hl ? hl.replace(/\.?$/, '. ') : '') + sub0,
         ctas: [{ label: 'All games', href: CC.href(L, 'games', null, S) }, { label: 'Standings', href: CC.href(L, 'standings', null, S), ghost: true }],
-        side: fg ? QK.featureCard(fg, { scribble: 'The latest result' }) : '' }) +
+        side: fg ? QK.featureCard(fg, { scribble: fin ? 'The title game' : 'The last game' }) : '' }) +
         '<div style="margin-top:var(--sp-10)">' + tiles(L, S, d, nSims) + '</div>';
     }
-    html += isCur ? W.html : pastGames(L, S, a[3]);
+    html += isCur ? W.html : recap(L, S, season, post, hist, a[3]) + pastGames(L, S, a[3]);
     html += '<div id="ov-hot"></div>';
     /* round 6: the fan stories (filled after the page draws), then "Who's for real?" (rating against win %) and "What's
        that number?" */
@@ -342,9 +344,8 @@ CC.route('overview', function (el, p) {
         dataTable(['AP', 'Team', { label: 'Prev', align: 'right' }, { label: 'Ours', align: 'right' }, { label: 'Record', align: 'right' }], ap.slice(0, 25).map(function (r) { return [r.rank, { html: U.teamEnt(L, r.team, { season: S }), v: CC.tname(L, r.team) }, isNum(r.prev) ? r.prev : '—', isNum(mrank[String(r.team)]) ? mrank[String(r.team)] : '—', rec[String(r.team)] || '—']; }))) + '</div>';
       d.apPts = pts; d.mrank = mrank;
     }
-    grid += '<div class="qk-span-' + (ap.length ? 6 : 12) + '" id="ov-post"></div></div>';
+    grid += isCur || !ap.length ? '<div class="qk-span-' + (ap.length ? 6 : 12) + '" id="ov-post"></div></div>' : '</div>';
     html += U.section(isCur ? (fb ? 'Who wins the national title?' : 'Who cuts down the nets?') : 'The season in numbers', isCur ? '<span id="ov-title-lede">Our chances from simulating the rest of the season, the ratings behind them and how they compare with the polls.</span>' : '', grid, '', isCur ? 'Title race' : 'Season');
-    html += '<div id="ov-leaders"></div>';
     html += '<p class="qk-sub cc-ov-doing" style="margin-top:var(--sp-8)"><a class="qk-link" href="' + esc(CC.href(L, 'model', null, null, 'tab=calibration')) + '">How we’re doing →</a> Our recent record and how often our chances came true.</p>';
     el.innerHTML = html;
     U.wire(el);
@@ -363,43 +364,38 @@ CC.route('overview', function (el, p) {
     if (d.apPts && d.apPts.length) QKC.scatter('#ov-ap', { points: d.apPts.map(function (r) { return { x: r.rank, y: d.mrank[String(r.team)], name: CC.tname(L, r.team), label: CC.tabbr(L, r.team), color: CC.tcol(L, r.team), href: CC.teamHref(L, r.team, S) }; }),
       xName: 'AP rank', yName: 'Our rank', xInverse: false, yInverse: true, diagonal: { label: 'agree' }, labelTop: 10, xMin: 0, yMin: 1 });
     postSnapshot(L, S, post, sim, QK.$('#ov-post', el));
-    leaders(L, S, season, QK.$('#ov-leaders', el), QK.$('#ov-hot', el));
+    if (!isCur) recapValue(L, S, QK.$('#ov-poy', el));
+    leaders(L, S, season, QK.$('#ov-hot', el));
   });
 });
 
 /* Leaders (after the page has drawn): names come from value.json's leaderboard. */
-var LEAD = {
-  cfb: [['value', 'Value (EPA above replacement)', 1], ['pass_yds', 'Passing yards', 0], ['rush_yds', 'Rushing yards', 0], ['rec_yds', 'Receiving yards', 0], ['sacks', 'Sacks', 1], ['tkl', 'Tackles', 0]],
-  bb: [['value', 'Value above replacement', 1], ['pts', 'Points per game', 1], ['reb', 'Rebounds per game', 1], ['ast', 'Assists per game', 1]]
-};
-var HOT_EXPL = { value: 'Our value model: what the player adds over a replacement-level player at the same position.', pass_yds: 'Passing yards this season.', rush_yds: 'Rushing yards this season.',
-  rec_yds: 'Receiving yards this season.', sacks: 'Sacks this season.', tkl: 'Tackles this season: involvement, not quality.', pts: 'Points a game.', reb: 'Rebounds a game.', ast: 'Assists a game.' };
-function leaders(L, S, season, node, hotNode) {
-  var LD = season.leaders || {};
-  var boards = (CC.fb(L) ? LEAD.cfb : LEAD.bb).filter(function (b) { return (LD[b[0]] || []).length; });
-  if (!node || !boards.length) return;
-  CC.load(CC.path(L, S, 'value.json')).then(function (v) {
-    if (!U.alive(node)) return;
-    var names = {};
-    ((CC.ok(v) && v.leaders) || []).forEach(function (r) { if (r && r.id && r.name) names[String(r.id)] = r.name; });
-    var html = boards.map(function (b) {
-      var rows = (LD[b[0]] || []).filter(function (x) { return names[String(x[0])]; }).slice(0, 5);
-      if (!rows.length) return '';
-      return '<div class="qk-span-' + (boards.length > 4 ? 4 : 3) + '">' + U.card(b[1], '', '<ul class="cc-list cc-lead">' + rows.map(function (x, i) {
-        return '<li><span class="n">' + (i + 1) + '</span>' + U.playerEnt(L, x[0], names[String(x[0])], x[1], null, S) + '<span class="v">' + esc(CC.f(x[2], b[2])) + '</span></li>'; }).join('') + '</ul>', { flush: true }) + '</div>';
-    }).join('');
-    if (html) node.innerHTML = U.section('The top five', 'This season’s leaders; open Players for percentiles against each position.', '<div class="qk-grid cc-grid">' + html + '</div>', '<a class="qk-more" href="' + esc(CC.href(L, 'players', null, S)) + '">Players</a>', 'Leaderboards');
-    var hot = boards.slice(0, 5).map(function (b) {
-      var rows = (LD[b[0]] || []).filter(function (x) { return names[String(x[0])]; });
-      var r0 = rows[0], r1 = rows[1];
-      if (!r0) return null;
-      var lab = /^[A-Z][a-z]/.test(b[1]) ? b[1].charAt(0).toLowerCase() + b[1].slice(1) : b[1];
-      var fv = function (v) { return b[2] ? CC.f(v, b[2]) : QK.fmt.num(v); };
-      return { sport: 'college', kicker: (b[0] === 'value' ? 'Most valuable' : 'Most ' + lab.replace(/ per game$/, '')) + ' · ' + CC.tabbr(L, r0[1]), title: lab.charAt(0).toUpperCase() + lab.slice(1), name: names[String(r0[0])], value: fv(r0[2]),
-        href: CC.playerHref(L, r0[0], S), next: r1 ? { name: names[String(r1[0])], value: fv(r1[2]) } : null, expl: HOT_EXPL[b[0]] || '' };
+/* Who's hot (round 9): the leader of each position on the position's predictive metric, not a counting stat, from
+   <L>/<S>/performers.json (20-40 KB; oddsmarkets/college/performers.py: qualified players only, each position on the
+   spec's headline set): football QB / RB / WR / DL / DB, basketball guards / forwards / centres, then our value
+   leader. HOT_PICK names the metric per position; a position without it takes its first non-value metric. */
+var HOT_PICK = { qb: 'epa_play', rb: 'epa_play', wr: 'yptpa', te: 'yptpa', dl: 'havoc_pg', lb: 'havoc_pg', db: 'pd_pg', guards: 'r', forwards: 'r', centers: 'r', all: 'value_pg' };
+var HOT_ORDER = { cfb: ['qb', 'rb', 'wr', 'dl', 'db'], bb: ['guards', 'forwards', 'centers', 'all'] };
+var HOT_POS = { qb: 'Quarterback', rb: 'Running back', wr: 'Wide receiver', te: 'Tight end', dl: 'Defensive line', lb: 'Linebacker', db: 'Defensive back', guards: 'Guard', forwards: 'Forward', centers: 'Centre', all: 'Every player' };
+function leaders(L, S, season, hotNode) {
+  if (!hotNode) return;
+  CC.load(CC.path(L, S, 'performers.json')).then(function (pf) {
+    if (!U.alive(hotNode) || !CC.ok(pf)) return;
+    var views = {}; (pf.views || []).forEach(function (v) { views[v.key] = v; });
+    var hot = (CC.fb(L) ? HOT_ORDER.cfb : HOT_ORDER.bb).map(function (k) {
+      var v = views[k];
+      if (!v) return null;
+      var ms = v.metrics || [];
+      var m = ms.filter(function (x) { return x.key === HOT_PICK[k] && (x.top || []).length; })[0] || ms.filter(function (x) { return x.key !== 'value_pg' && x.key !== 'value' && (x.top || []).length; })[0];
+      if (!m) return null;
+      var r0 = m.top[0], r1 = m.top[1];
+      var dp = /\d/.test(m.fmt || '') ? Number(String(m.fmt).replace(/\D/g, '')) : 2;
+      var fv = function (x) { return /^\+/.test(m.fmt || '') ? CC.signed(x, dp) : /pct|%/.test(m.unit || '') && x <= 1 ? CC.pct(x, 1) : CC.f(x, dp); };
+      return { sport: 'college', kicker: HOT_POS[k] + ' · ' + CC.uk(m.label), title: CC.tabbr(L, r0[2]) + ' · ' + QK.ordinal(Math.round(r0[4])) + ' percentile of ' + v.n + ' ' + (v.peer || ''), name: r0[1], value: fv(r0[3]),
+        href: CC.playerHref(L, r0[0], S), next: r1 ? { name: r1[1], value: fv(r1[3]) } : null, expl: CC.uk(String(m.tip || '').replace(/\s+\S*$/, '').slice(0, 110)) + (m.ours ? ' Ours.' : '') };
     }).filter(Boolean);
     /* v4: the black power list (QK.band + QK.hotRow) */
-    if (hotNode && hot.length) hotNode.innerHTML = QK.band(QK.sectionHead({ kicker: 'Who’s hot', title: 'The leaders, board by board', sub: 'The top name on ' + (hot.length === 1 ? 'one' : ['', 'one', 'two', 'three', 'four', 'five'][hot.length]) + ' of our leaderboards, and a line on what each number means.', actions: '<a class="qk-more" href="' + esc(CC.href(L, 'players', null, S)) + '">Every player</a>' }) + QK.hotRow(hot));
+    if (hot.length) hotNode.innerHTML = QK.band(QK.sectionHead({ kicker: 'Who’s hot', title: 'The best at each position, on what predicts', sub: 'The leader at each position on the number that best predicts how a player there plays, among qualified players, and a line on what it means.', actions: '<a class="qk-more" href="' + esc(CC.scoutHref(L, S, 'view=leaders')) + '">Every position</a>' }) + QK.hotRow(hot));
   });
 }
 
@@ -471,6 +467,86 @@ function realOrNot(L, S, season, ap, node, cap) {
 }
 
 /* The CFP picture (cfb) or the bracket picture (basketball). */
+/* ── round 9: a past season is a recap ─────────────────────────────────────────────────────────────────────────
+   The champion and the final (the greeting's hero), then: our pre-playoff call against what happened (each team in the
+   field: our title chance when the field was set, and how far it went), the bracket with the scores, the final
+   standings (the field's seeds, conference champions flagged; our final top ten against the AP's), our first-weekend and
+   final No. 1, and our player of the season by value (no official awards in our data, so labelled as ours). */
+var CFP_ORDER = { 'First Round': 1, 'Quarterfinal': 2, 'Semifinal': 3, 'National Championship': 4 };
+var CFP_NAME = ['', 'First round', 'Quarter-finals', 'Semi-finals', 'Runner-up', 'Champion'];
+var NCAA_NAME = { R64: 'Round of 64', R32: 'Round of 32', S16: 'Sweet 16', E8: 'Elite 8', F4: 'Final Four', Final: 'Runner-up', Champion: 'Champion' };
+var NCAA_RANK = { R64: 1, R32: 2, S16: 3, E8: 4, F4: 5, Final: 6, Champion: 7 };
+function recap(L, S, season, post, hist, sched) {
+  var fb = CC.fb(L), field = [], champ = null, html = '';
+  var ch = ((hist && hist.champions) || []).filter(function (c) { return Number(c.season) === Number(S); })[0] || null;
+  if (fb && post && post.actual && post.actual.bracket && (post.actual.bracket.seeds || []).length) {
+    var B = post.actual.bracket, reach = {};
+    (B.games || []).forEach(function (g) {
+      var r = CFP_ORDER[g.round] || 0, w = g.winner ? String(g.winner) : null;
+      [g.home, g.away].forEach(function (t) { if (!t) return; t = String(t); var lv = w === t ? (r === 4 ? 5 : r + 1) : (r === 4 ? 4 : r); if (!reach[t] || lv > reach[t]) reach[t] = lv; });
+    });
+    var odds = post.odds || {};
+    field = B.seeds.map(function (x) { var t = String(x.team), o = odds[t] || {}; return { t: t, seed: x.seed, p: o.p_title, reach: reach[t] || 0, txt: CFP_NAME[reach[t] || 0] || 'Played' }; });
+    champ = ch ? String(ch.team) : (field.filter(function (f) { return f.reach === 5; })[0] || {}).t;
+  } else if (!fb && post && post.actual && post.odds) {
+    var od = post.odds;
+    field = Object.keys(od).filter(function (t) { return isNum(od[t].seed) && od[t].p_round; }).map(function (t) { var o = od[t]; return { t: t, seed: o.seed, region: o.region, p: o.p_round.Champion, reach: NCAA_RANK[o.reached] || 0, txt: NCAA_NAME[o.reached] || '—' }; });
+    champ = ch ? String(ch.team) : (post.actual.champion ? String(post.actual.champion) : null);
+  }
+  if (!field.length && !ch) return '';
+  field.sort(function (a, b) { return (b.p || 0) - (a.p || 0); });
+  var fav = field[0], cf = field.filter(function (f) { return f.t === champ; })[0];
+  var cr = cf ? field.indexOf(cf) + 1 : null;
+  /* our first-weekend No. 1 (the first point of the rating paths) and our final No. 1 */
+  var P = season.rating_paths || {}, ids = Object.keys(P).filter(function (t) { return (P[t] || []).length; });
+  var first = ids.slice().sort(function (a, b) { return P[b][0][1] - P[a][0][1]; })[0];
+  var last = ((season.power || [])[0] || {}).team;
+  var tiles = [];
+  if (ch) tiles.push({ label: 'Champion', value: CC.tshort(L, ch.team), text: true, signal: true, href: CC.teamHref(L, ch.team, S), sub: (ch.score ? ch.score + ' over ' : 'over ') + CC.tname(L, ch.runner_up) });
+  if (fav) tiles.push({ label: 'Our favourite when the field was set', value: CC.tabbr(L, fav.t) + ' ' + CC.pct(fav.p), href: CC.teamHref(L, fav.t, S), sub: CC.tname(L, fav.t) + ': ' + fav.txt.toLowerCase() + '.' });
+  if (cf && cf !== fav) tiles.push({ label: 'The champion, by our call', value: CC.pct(cf.p), sub: 'our ' + QK.ordinal(cr) + ' favourite of the ' + field.length + ' in the field' });
+  if (first) tiles.push({ label: 'Our No. 1 after the first weekend', value: CC.tabbr(L, first), text: true, href: CC.teamHref(L, first, S), sub: CC.tname(L, first) + (last ? '; our final No. 1: ' + CC.tname(L, last) : '') + '.' });
+  html += U.section('How we called it', (fb ? 'The ' + field.length + '-team playoff' : 'The NCAA tournament') + ': our chance of winning it all for each team when the field was set, and how far each one went. The champion is marked in volt.',
+    U.stats(tiles) + (field.length ? U.card('Our call against what happened', 'Bars: our title chance when the field was set' + (fb ? '' : ' (the top 16)') + '; the line under each name is how far it went.',
+      QK.chances(field.slice(0, fb ? 12 : 16).map(function (f) { return { label: CC.tshort(L, f.t), p: f.p || 0, sub: (isNum(f.seed) ? (f.region ? f.region + ' ' : '') + f.seed + ' seed · ' : '') + (f.t === champ ? 'CHAMPION' : f.txt), href: CC.teamHref(L, f.t, S), color: CC.traw(L, f.t), mark: U.mark(L, f.t) }; }), { key: false, oursName: 'Our title chance' })) : ''), '', 'Looking back');
+  /* the bracket with the scores */
+  var br = fb && post ? CC.cfpBracket(L, S, post) : (!fb && post ? CC.ncaaFinalFour(L, S, post) : '');
+  if (br) html += U.section(fb ? 'The bracket' : 'The Final Four', fb ? 'Seeds and results as played; tap a team for its season.' : 'The last four and the final as played.', fb ? U.card('', '', '<div class="cc-bscroll" tabindex="0" role="region" aria-label="Playoff bracket">' + br + '</div>') : br,
+    '<a class="qk-btn" href="' + esc(CC.href(L, 'standings', null, S, fb ? 'tab=playoff' : 'tab=bracket')) + '">' + (fb ? 'Every round' : 'The whole bracket') + '</a>', fb ? 'College Football Playoff' : 'March Madness');
+  /* the final standings: the field's seeds with conference champions flagged, our final top ten against the AP's */
+  var cc = ((hist && hist.conference_champions) || {})[String(S)] || {}, champs = {};
+  Object.keys(cc).forEach(function (c) { champs[String(cc[c])] = c; });
+  var rec = {}; Object.keys(season.standings || {}).forEach(function (c) { (season.standings[c] || []).forEach(function (r) { rec[String(r.team)] = r; }); });
+  var seeds = field.slice().sort(function (a, b) { return (a.seed || 99) - (b.seed || 99) || (b.p || 0) - (a.p || 0); }).slice(0, fb ? 12 : 16);
+  var ap = {}; (((season.polls || {}).ap) || []).forEach(function (r) { ap[String(r.team)] = r.rank; });
+  var seedT = seeds.length ? U.table([{ label: 'Seed', align: 'right' }, 'Team', { label: 'Record', align: 'right' }, 'Clinched', 'Finished'], seeds.map(function (f) {
+    var r = rec[f.t] || {};
+    return [isNum(f.seed) ? f.seed : '—', { html: U.teamEnt(L, f.t, { season: S }), v: CC.tname(L, f.t) }, CC.record(r.w, r.l), champs[f.t] ? '<span class="qk-tag">' + esc(CC.cname(L, champs[f.t])) + ' champion</span>' : '<span class="qk-muted">At-large</span>', { html: f.t === champ ? '<b style="color:var(--volt)">Champion</b>' : esc(f.txt), v: f.reach }];
+  }), { sticky: false }) : '';
+  var top10 = (season.power || []).slice(0, 10);
+  var finT = top10.length ? U.table([{ label: 'Ours', align: 'right' }, 'Team', { label: 'Record', align: 'right' }, { label: 'Final rating', align: 'right' }, { label: 'AP', align: 'right' }], top10.map(function (r, i) {
+    var x = rec[String(r.team)] || {};
+    return [r.rank || i + 1, { html: U.teamEnt(L, r.team, { season: S }), v: CC.tname(L, r.team) }, CC.record(x.w, x.l), { v: r.rating, html: CC.signed(r.rating, 1) }, ap[String(r.team)] || '—'];
+  }), { sticky: false }) : '';
+  if (seedT || finT) html += U.section('Final standings', 'The field' + (fb ? ' as seeded, conference champions flagged (the automatic bids)' : ', top seeds, conference regular-season champions flagged') + '; and our final top ten beside the last AP poll.',
+    '<div class="qk-grid cc-grid">' + (seedT ? '<div class="qk-span-7">' + U.card(fb ? 'The playoff field' : 'The top seeds', '', seedT) + '</div>' : '') + (finT ? '<div class="qk-span-' + (seedT ? 5 : 12) + '">' + U.card('Our final top ten', '', finT) + '</div>' : '') + '</div><div id="ov-poy"></div>', '', 'Standings');
+  return html;
+}
+/* our player of the season by the value model (the official awards are not in our data) */
+function recapValue(L, S, node) {
+  if (!node) return;
+  CC.load(CC.path(L, S, 'value.json')).then(function (v) {
+    if (!U.alive(node) || !CC.ok(v)) return;
+    var x = (v.leaders || []).filter(function (r) { return isNum(r.value); })[0];
+    if (!x) return;
+    var tm = CC.team(L, x.team) || {};
+    node.innerHTML = '<div style="margin-top:var(--sp-6)">' + QK.spotlight({ kicker: 'Our player of the season', name: x.name, sub: [CC.tshort(L, x.team), CC.posName(L, x.pos), x['class']].filter(Boolean).join(' · '), team: { colour: tm.colour, abbr: tm.abbr },
+      href: CC.playerHref(L, x.id, S), headline: 'The most valuable player of ' + CC.seasonLabel(L, S) + ' in our value model: ours, not an official award.',
+      stats: [{ label: (v.currency || {}).label || 'Value', value: CC.f(x.value, 1) }, { label: 'Per game', value: CC.f(x.value_pg, 1) }, { label: 'Games', value: String(x.gp || '—') }],
+      text: x.why || '', links: [{ href: CC.playerHref(L, x.id, S), text: 'Player page' }, { href: CC.href(L, 'standings', null, S, 'tab=races'), text: 'The whole race' }] }) + '</div>';
+  });
+}
+
 function postSnapshot(L, S, post, sim, node) {
   if (!node) return;
   var fb = CC.fb(L);

@@ -109,20 +109,18 @@ FB.route('overview', function (el) {
     '<section class="qk-section">' + QK.newHere({ items: [QK.NEW_HERE[0],
       'A <b>percentile</b> ranks a player against others in the same role (centre-backs with centre-backs, strikers with strikers): 90th means better than 90 in 100.',
       '<b>Expected goals (xG)</b> rate every shot by how often that kind of chance goes in. A club that wins far more points than its xG earns is often due a turn.'] }) + '</section>' +
-    '<section class="qk-section">' + QK.sectionHead({ kicker: 'Title race', title: '<span id="ov-race-t">Who wins the league?</span>', html: true, sub: '<span id="ov-race-lede">Our chances from 30,000 simulated seasons.</span>',
+    '<section class="qk-section">' + QK.sectionHead({ kicker: 'Title race', title: '<span id="ov-race-t">Who wins the league?</span>', html: true, sub: '<span id="ov-race-lede">Our chances from the simulated seasons.</span>',
         actions: '<span id="ov-race-pick"></span>' }) +
       FB.grid(
-        FB.card('<span id="ov-tr-h">Title chances</span>', 'Our chance of winning the league, in club colours.', '<div id="ov-title">' + QK.skeleton('lines', 6) + '</div>', { span: 6, foot: '<span>From 30,000 simulated seasons</span><a id="ov-tr-more" href="#/competitions">Every season forecast →</a>' }) +
+        FB.card('<span id="ov-tr-h">Title chances</span>', 'Our chance of winning the league, in club colours.', '<div id="ov-title">' + QK.skeleton('lines', 6) + '</div>', { span: 6, foot: '<span id="ov-tr-sims">From the simulated seasons</span><a id="ov-tr-more" href="#/competitions">Every season forecast →</a>' }) +
         FB.card('The race, run by run', 'Our title chance after each hourly model run, for the top five.', FB.chartBox('ov-race', 340, 'Title chances over time'), { span: 6 })
       ) + '</section>' +
-    '<section class="qk-section">' + QK.sectionHead({ kicker: 'Season simulations', title: 'Every race, one favourite each', sub: 'Each open competition’s favourite and our chance that it wins it.', actions: '<a class="qk-more" href="#/competitions">Every competition</a>' }) +
-      FB.card('Favourites', 'Our chance that each open competition’s favourite wins it.', '<div id="ov-races"></div>', { foot: '<span>Up to fourteen open races</span><a href="#/competitions">Every competition →</a>' }) + '</section>' +
-    '<section class="qk-section">' + QK.sectionHead({ kicker: 'Leaderboards', title: 'Goals, chances and the strongest sides', sub: 'Across every competition this season, and every club and national team on one scale.', actions: '<a class="qk-more" href="#/players/leaders">Players</a>' }) +
+    /* round 9: one module each. The title race above is the only race module (the favourites list was a second), the
+       leaders are Who's hot (the goals-against-xG chart was a second leaders module); the strongest sides tease Teams */
+    '<section class="qk-section">' + QK.sectionHead({ kicker: 'Power', title: 'The strongest sides anywhere', sub: 'Every club and national team on one scale: our rating, the points a game we expect against an average side.', actions: '<a class="qk-more" href="#/clubs">Teams</a>' }) +
       FB.grid(
-        FB.card('Goals against expected', 'The leading scorers across every competition: goals scored and the expected goals (xG) of their shots.', FB.chartBox('ov-goals', 360, 'Goals and xG of the top scorers') +
-          QK.explain('<b>What’s that number?</b> <b>xG</b> is how many goals an average finisher would score from the same shots. Well above it is great finishing or good luck; one season rarely tells the two apart.'), { span: 6 }) +
-        '<div class="qk-span-3">' + FB.card('Strongest clubs', 'Our rating: expected points a game against an average side.', '<div id="ov-pool"></div>', { flush: true, foot: '<span></span><a href="#/clubs">All clubs →</a>' }) + '</div>' +
-        '<div class="qk-span-3">' + FB.card('Strongest national teams', 'Our international rating, the same scale.', '<div id="ov-nations"></div>', { flush: true, foot: '<span></span><a href="#/clubs/nations">All national teams →</a>' }) + '</div>'
+        '<div class="qk-span-6">' + FB.card('Strongest clubs', 'Our rating: expected points a game against an average side.', '<div id="ov-pool"></div>', { flush: true, foot: '<span></span><a href="#/clubs">The power board →</a>' }) + '</div>' +
+        '<div class="qk-span-6">' + FB.card('Strongest national teams', 'Our international rating, the same scale.', '<div id="ov-nations"></div>', { flush: true, foot: '<span></span><a href="#/clubs/nations">All national teams →</a>' }) + '</div>'
       ) + '</section>' +
     '<section class="qk-section">' + QK.sectionHead({ kicker: 'Leagues', title: 'Every league at a glance', sub: 'How far each league has gone, who leads, our title favourite and the top scorer.', actions: '<a class="qk-more" href="#/competitions">Competitions</a>' }) +
       FB.card('', '', '<div id="ov-leagues"></div>', { flush: true }) + '</section>' +
@@ -141,7 +139,6 @@ FB.route('overview', function (el) {
     drawWeek(el, HUB);
     drawCards(el, HUB);
     drawTicker(el, HUB);
-    drawLeaders(el, HUB);
     drawPool(el, POOL);
     FB.load('lab/leaders.json').then(function (board) { if (FB.alive(el)) drawHot(el, board, HUB, POOL); });
     drawRecords(el, HUB);
@@ -152,7 +149,6 @@ FB.route('overview', function (el) {
     allHub(HUB).forEach(function (m) { if (m.status !== 'finished') slugs[m.comp] = 1; });
     FB.loadMarkets(Object.keys(slugs)).then(function () { if (FB.alive(el)) { drawCards(el, HUB); drawTicker(el, HUB); } });
   });
-  drawRaces(el);
   drawTitle(el);
   drawReal(el);
   drawLeagues(el);
@@ -204,10 +200,10 @@ function whenLabel(m) {
 function dayOf(iso) { return QK.fmt.date(String(iso || '').length === 10 ? iso + 'T12:00:00' : iso); }
 function introHTML() {
   var n = FB.comps().filter(function (x) { return x.ok; }).length, live = FB.comps().filter(inSeason).length;
-  var links = [{ label: 'Matches', sub: 'Every match, our chance', href: '#/matches' }, { label: 'Competitions', sub: 'Tables and title races', href: '#/competitions' }, { label: 'Players', sub: 'Leaders and percentiles', href: '#/players' }];
+  var links = [{ label: 'Matches', sub: 'Every match, our chance', href: '#/matches' }, { label: 'Competitions', sub: 'Tables and title races', href: '#/competitions' }, { label: 'Scouting Room', sub: 'Every player, every metric', href: '#/scout' }];
   return '<section class="ql-intro" aria-label="About this site"><div class="ql-intro-l"><div class="qk-greet-date">Football · ' + esc(String(live)) + ' competitions in season</div>' +
     '<h1>Every match in ' + esc(String(n)) + ' competitions, by the numbers.</h1>' +
-    '<p>Our chance for today’s matches, who’s for real, and the title races from 30,000 simulated seasons, with a page for every club and player. Every number explained.</p></div>' +
+    '<p>Our chance for today’s matches, who’s for real, and the title races from thousands of simulated seasons, with a page for every club and player. Every number explained.</p></div>' +
     '<nav class="ql-links" aria-label="Start here">' + links.map(function (l) { return '<a href="' + esc(l.href) + '"><b>' + esc(l.label) + '</b><span>' + esc(l.sub) + '</span></a>'; }).join('') + '</nav></section>';
 }
 function hubById(h) {
@@ -270,7 +266,7 @@ function drawWeek(el, h) {
     var c = FB.comp(s);
     if (!c || !inSeason(c) || !c.favourite || !isNum(c.p_favourite)) return;
     T.push({ label: (c.short_name || c.name) + ' favourite', value: c.favourite + ' ' + pct(c.p_favourite), text: String(c.favourite).length > 10, href: FB.href.comp(s, 'odds'),
-      sub: 'Our chance to ' + (c.kind === 'league' ? 'win the league' : 'lift the trophy') + ', from 30,000 simulated seasons.' });
+      sub: 'Our chance to ' + (c.kind === 'league' ? 'win the league' : 'lift the trophy') + ', from our season simulation.' });
   });
   var rest = feat ? feat.rest.filter(Boolean).slice(0, 2) : [];
   if (rest.length) T.push({ label: 'Also worth a look', value: rest.map(function (m) { return FB.clubCode(m.home, m.away) + '–' + FB.clubCode(m.away, m.home); }).join(' · '), text: rest.length > 1, href: '#/matches',
@@ -409,7 +405,7 @@ function drawHot(el, board, hub, pool) {
     expl: 'What we’d expect it to take from a game against an average side anywhere. ' + (clubs[0].comp_name ? clubs[0].comp_name + '.' : '') });
   items.forEach(function (x) { x.kicker = 'Football' + (x._where ? ' · ' + x._where : ''); });
   box.innerHTML = QK.band(QK.sectionHead({ kicker: 'Who’s hot', title: 'The leaders, board by board', sub: 'One name on each board, across every competition this season, and a line on what the number means.',
-    actions: '<a class="qk-more" href="#/players/leaders">Every leader</a>' }) + (items.length ? QK.hotRow(items) : FB.empty('No leaders yet', 'The leaders appear once the season’s first matches are in.')));
+    actions: '<a class="qk-more" href="#/scout?view=leaders">Every leader</a>' }) + (items.length ? QK.hotRow(items) : FB.empty('No leaders yet', 'The leaders appear once the season’s first matches are in.')));
 }
 
 /* The match model's walk-forward record (data/calibration.json) is on the Model page's "How we're doing" tab; FB.calibOf
@@ -420,16 +416,6 @@ function calibOf(j) {
 }
 FB.calibOf = calibOf;
 
-/* ── title races: our chance only (no market on the overview) */
-function drawRaces(el) {
-  var rows = FB.comps().filter(function (c) { return inSeason(c) && c.favourite && isNum(c.p_favourite) && !c.complete && c.p_favourite < 0.995; })
-    .sort(function (a, b) { return b.p_favourite - a.p_favourite; }).slice(0, 14);
-  var box = el.querySelector('#ov-races');
-  if (!rows.length) { box.innerHTML = FB.empty('No open races', 'Every competition followed is decided or between editions.'); return; }
-  box.innerHTML = FB.chances(rows.map(function (c) {
-    return { label: c.favourite, sub: c.short_name || c.name, p: c.p_favourite, href: FB.href.comp(c.slug, 'odds'), mark: { name: c.favourite } };
-  }), { max: 1, key: false }) + FB.note('Even a 70% favourite misses about 3 times in 10. The bars are our chances only.');
-}
 /* ── "Who wins the league?": one big league at a time, our title chances as club-colour bars (QK.chances: a club with no
    colour in clubs_index.json is ours in blue) beside the race run by run; the league seg drives both. Ours only. */
 function teamIds(teams) {
@@ -448,7 +434,7 @@ function drawTitle(el) {
   function draw() {
     var slug = view.race;
     var c = FB.comp(slug) || {};
-    var files = ['probs', 'teams'].concat(FB.hasFile(slug, 'history') ? ['history'] : []);
+    var files = ['probs', 'teams', 'meta'].concat(FB.hasFile(slug, 'history') ? ['history'] : []);
     FB.compFiles(slug, files).then(function (d) {
       if (!FB.alive(el) || view.race !== slug) return;
       var ids = teamIds(d.teams);
@@ -461,7 +447,10 @@ function drawTitle(el) {
       FB.set('ov-tr-h', esc(c.name || FB.compName(slug)) + ': title chances');
       var more = el.querySelector('#ov-tr-more'); if (more) more.setAttribute('href', FB.href.comp(slug, 'odds'));
       var r0 = rows[0];
-      FB.set('ov-race-lede', r0 ? esc((r0.p < 0.2 ? 'Nobody’s better than 1 in 5. ' + r0.label + ' lead our board at ' + pct(r0.p) + '.' : r0.label + ' lead at ' + pct(r0.p) + (rows[1] ? ', ' + rows[1].label + ' next at ' + pct(rows[1].p) : '') + '.') + ' From 30,000 simulated seasons.') : 'Our chances from 30,000 simulated seasons.');
+      /* the number of simulated seasons is the competition's own (meta.n_sims), never a constant */
+      var ns = (d.meta || {}).n_sims, sims = isNum(ns) && ns > 0 ? FB.int(ns) + ' simulated seasons' : 'the simulated seasons';
+      FB.set('ov-tr-sims', 'From ' + sims);
+      FB.set('ov-race-lede', r0 ? esc((r0.p < 0.2 ? 'Nobody’s better than 1 in 5. ' + r0.label + ' lead our board at ' + pct(r0.p) + '.' : r0.label + ' lead at ' + pct(r0.p) + (rows[1] ? ', ' + rows[1].label + ' next at ' + pct(rows[1].p) : '') + '.') + ' From ' + sims + '.') : 'Our chances from ' + sims + '.');
       FB.set('ov-title', rows.length ? QK.chances(rows, { limit: 8, key: false }) : FB.empty('No title chances yet', 'They arrive with the first simulation of the season.'));
       // the race, run by run
       var box = el.querySelector('#ov-race');
@@ -526,20 +515,6 @@ function shortName(t, all) {
   return shared ? w[w.length - 1] : first;
 }
 
-/* ── leaders: goals v xG */
-function drawLeaders(el, h) {
-  var L = ((h || {}).leaders || {}).goals || [];
-  var box = el.querySelector('#ov-goals');
-  if (!box) return;
-  var top = L.slice(0, 10);
-  if (!top.length) { box.style.height = 'auto'; box.innerHTML = FB.empty('No player data yet'); return; }
-  QKC.bar(box, {
-    horizontal: true, legend: true, labelWidth: 150, fmt: function (v) { return num(v, 0); }, valName: 'Goals and xG this season', catName: 'Player',
-    cats: top.map(function (p) { return p.name + ' (' + (p.comp_name || FB.compName(p.comp, true)) + ')'; }),
-    series: [{ name: 'Goals', data: top.map(function (p) { return p.value; }), color: QK.cssVar('--c-1') }, { name: 'xG', data: top.map(function (p) { return isNum(p.xg) ? Math.round(p.xg * 10) / 10 : null; }), color: QK.cssVar('--c-3') }],
-    hrefs: top.map(function (p) { return FB.href.player(p.id); }), label: 'Top scorers: goals and xG'
-  });
-}
 
 /* ── leagues at a glance (leaderboard) */
 function drawLeagues(el) {
@@ -673,7 +648,7 @@ function drawFan(el) {
         href: FB.href.player(idu),
         headline: 'Top ' + top + '% of the ' + lg + '’s ' + GROUP_NAME[gk] + ' in our value model, with ' + goals + ' goal' + (goals === 1 ? '' : 's') + ' and ' + assists + ' assist' + (assists === 1 ? '' : 's') + ': the kind of season the scoring charts miss.',
         stats: stats, text: 'Percentiles against the ' + lg + '’s ' + GROUP_NAME[gk] + ' with ' + FB.int(floor) + '+ minutes this season; ▼ is last season. ' + FB.int(un.minutes) + ' minutes so far.',
-        links: [{ href: FB.href.player(idu), text: 'Player page' }, { href: FB.href.player(idu, { view: 'progression' }), text: 'Progression' }, { href: '#/players/leaders', text: 'Every leader' }] });
+        links: [{ href: FB.href.player(idu), text: 'Player page' }, { href: FB.href.player(idu, { view: 'progression' }), text: 'Progression' }, { href: '#/scout?view=leaders', text: 'Every leader' }] });
     });
   }
   draw();

@@ -70,8 +70,8 @@ function raceCard(y, c) {
 
 // ── circuits ──────────────────────────────────────────────────────────────
 
-function renderCircuits(el, params, state) {
-  var y = state.year || PD.currentSeason();
+function renderCircuits(el, params) {
+  var y = PD.currentSeason();
   el.innerHTML = PD.pageHead('Circuits', 'Every circuit since 1950', 'Profiles from the circuit model (pit loss, safety-car hazards, overtaking) shrunk to the global profile, with winners and records.') + racesNav('circuits') +
     PD.grid(PD.card('Circuit character', 'Overtaking difficulty against the chance of a safety car, ' + y + ' calendar; size = pit-stop time loss.', PD.chartBox('ci-char', 380), { span: 12 })) +
     PD.card('All circuits', '', '<div class="pd-toolbar">' + PD.seg('ci-scope', [['cal', y + ' calendar'], ['all', 'All circuits']], 'cal', 'Scope') + '<input id="ci-q" class="qk-input" type="search" placeholder="Filter circuits…" aria-label="Filter circuits"></div><div id="ci-table"></div>', { flush: true, cls: 'pd-mt' });

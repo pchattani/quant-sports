@@ -1,4 +1,4 @@
-/* The Quant Paddock — Constructors: the list (#/constructors[/<y>]) and a team (#/team/<id>).
+/* The Quant Paddock — a constructor's page (#/team/<id>[/<y>]); the list is the Teams page (pd-teams.js, round 9).
  * Team page: the current line-up, car pace through the season (race and qualifying, ±1 se, the field
  * faint), points and retirements by round, the run-in (expected points per remaining round), the title
  * (our chance and where the simulations finish), the car/driver split, the pit crew, straight-line v cornering, the two drivers
@@ -75,71 +75,11 @@ function pairColours(a, b) {
 }
 PD.pairColours = pairColours;
 
-// ── list ──────────────────────────────────────────────────────────────────
-
-function renderList(el, params) {
-  var y = isNum(params.year) ? params.year : PD.currentSeason();
-  el.innerHTML = PD.pageHead('Constructors · ' + y, 'Every team, ' + y, 'Line-ups, points, our title chances, car pace and pit crews.', PD.yearPager('constructors', y)) + '<div id="cl-body">' + PD.empty('Loading', '') + '</div>';
-  return seasonData(y).then(function (res) {
-    if (!PD.alive(el)) return;
-    var drivers = res[0], teams = res[1], season = res[2];
-    var T = (PD.ok(teams) && teams.teams) || {};
-    var stand = ((season || {}).standings || {}).constructors || [];
-    var champ = (((season || {}).championship) || {}).constructors || {};
-    var pos = {};
-    stand.forEach(function (s) { pos[s.team] = s; });
-    var ids = Object.keys(T).concat(stand.map(function (s) { return s.team; })).concat(Object.keys((season || {}).teams || {}))
-      .filter(function (v, i, a) { return a.indexOf(v) === i; }).sort(function (a, b) { return ((pos[a] || {}).pos || 99) - ((pos[b] || {}).pos || 99); });
-    if (!ids.length) { PD.set('cl-body', PD.notBuilt('The ' + y + ' team catalogue', teams)); return; }
-    var lineup = function (id) {
-      var s = (((season || {}).teams || {})[id] || {}).drivers;
-      if (s && s.length) return s;
-      var D = (drivers || {}).drivers || {};
-      return Object.keys(D).filter(function (k) { return D[k].team === id; });
-    };
-    var cards = ids.map(function (id) {
-      var t = T[id] || {}, s = pos[id] || {}, c = champ[id];
-      var rp = series(season, 'race', id);
-      var last = rp.length ? rp[rp.length - 1] : null;
-      return '<a class="qk-card is-link pd-tcard" href="' + PD.teamHref(id) + '" style="--tc:' + esc(PD.tc(id)) + '"><div class="pd-tcard-top">' + PD.mark(id) + '<div class="pd-tcard-n"><b>' + esc(t.name || PD.teamName(id)) + '</b><span class="qk-sub">' +
-        lineup(id).map(function (d) { return esc(PD.driverSurname(d)); }).join(' · ') + '</span></div>' + (s.pos ? '<span class="pd-tcard-pos">P' + s.pos + '</span>' : '') + '</div>' +
-        '<div class="pd-tcard-stats"><div><span>Points</span><b>' + PD.pts(s.points) + '</b></div><div><span>Wins</span><b>' + (s.wins || 0) + '</b></div>' + (c ? '<div><span>Title</span><b>' + PD.pct(c.p_title, c.p_title > 0.99 ? 2 : 1) + '</b></div>' : '') +
-        '<div><span>Car pace</span><b>' + (last ? PD.signed(-last.effect, 2) + '%' : '—') + '</b></div></div>' +
-        (rp.length > 1 ? window.QK.spark(rp.map(function (e) { return -e.effect; }), { color: PD.tc(id), w: 220, h: 34, label: 'Car pace through the season' }) : '') + '</a>';
-    }).join('');
-    var metrics = (teams && teams.metrics) || [];
-    var tmeta = PD.v2.metaMap(teams);
-    var tP = PD.ok(teams) ? PD.v2.peer(teams, 'teams', season) : null;
-    var heads = ['car_race_pace', 'points_per_race', 'dnf_rate', 'pit_lane_v_field', 'pit_under_2500', 'strategy_gain'].map(function (k) { return tmeta[k]; }).filter(function (m) { return m && Object.keys(T).some(function (k) { return isNum(((T[k] || {}).values || {})[m.key]); }); });
-    PD.set('cl-body', '<div class="qk-auto pd-tcards" style="--min:250px">' + cards + '</div>' +
-      PD.grid(PD.card('Car pace through the season', 'Each team’s race-pace car effect by round from the decomposition, % of a lap faster than the field.', PD.chartBox('cl-pace', 400), { span: 12, right: PD.seg('cl-pk', [['race', 'Race'], ['quali', 'Qualifying']], 'race', 'Session') }) +
-        PD.card('Team metrics', 'The headline constructor metrics; heat cells are percentiles against ' + (tP ? esc(tP.label) : 'the field') + '. Every metric is on each team page.', '<div id="cl-t"></div>', { span: 12, flush: true }), 'pd-mt'));
-    var drawPace = function (kind) {
-      PD.ch.lines('cl-pace', ids.map(function (id) { return { name: PD.teamName(id), short: PD.teamAbbr(id), colour: PD.teamColour(id), data: series(season, kind, id).map(function (e) { return [e.round, -e.effect]; }) }; }),
-        { xName: 'Round', yName: 'Car pace (% of a lap)', endLabels: true, legend: false, yFmt: function (v) { return PD.signed(v, 2); }, xFmt: function (v) { return 'R' + v; }, xLabel: function (v) { return 'Round ' + v; }, emptyText: 'No car-pace series for this season.', label: 'Car pace by team' });
-    };
-    drawPace('race');
-    PD.wireSeg(document, 'cl-pk', drawPace);
-    if (!Object.keys(T).length) { PD.set('cl-t', PD.muted('No team catalogue for this season.')); return; }
-    QK.leaderboard(document.getElementById('cl-t'), { dense: true, sort: { key: 'pos', dir: 'asc' }, rowHref: function (r) { return PD.teamHref(r.id); }, columns: [
-      { key: 'pos', label: 'Pos', num: true, fmt: function (v) { return v < 99 ? String(v) : '—'; } },
-      { key: 'name', label: 'Team', type: 'entity', mark: function (r) { return { name: PD.teamName(r.id), abbr: PD.teamAbbr(r.id), colour: PD.teamColourRaw(r.id) }; }, href: function (r) { return PD.teamHref(r.id); } },
-      { key: 'points', label: 'Pts', num: true, fmt: function (v) { return PD.pts(v); } }
-    ].concat(heads.map(function (m) { return { key: m.key, label: PD.v2.label(tmeta, m.key), type: 'pctl', pctl: 'p_' + m.key, tip: PD.v2.tip(tmeta, m.key) + (m.lower ? ' (lower is better)' : ''), fmt: function (v) { return PD.v2.fmt(tmeta, m.key, v); } }; })),
-    rows: ids.filter(function (id) { return T[id]; }).map(function (id) {
-      var r = { id: id, name: PD.teamName(id), pos: (pos[id] || {}).pos || 99, points: (pos[id] || {}).points };
-      heads.forEach(function (m) { r[m.key] = (T[id].values || {})[m.key]; r['p_' + m.key] = tP && tP.pct[id] ? tP.pct[id][m.key] : null; });
-      return r;
-    }) });
-    PD.v2.oursHeads(document.getElementById('cl-t'), null, 'constructor');
-  });
-}
-
 // ── team page ─────────────────────────────────────────────────────────────
 
 function renderTeam(el, params, state) {
   var id = params.id;
-  var y = state.year || PD.currentSeason();
+  var y = isNum(params.year) ? params.year : PD.currentSeason();
   el.innerHTML = PD.empty('Loading ' + PD.teamName(id), '');
   return Promise.all([seasonData(y), Promise.resolve(null), y === PD.currentSeason() ? PD.load(y + '/needs.json') : Promise.resolve(null)]).then(function (res) {
     if (!PD.alive(el)) return;
@@ -169,7 +109,7 @@ function renderTeam(el, params, state) {
     /* v4: the constructor colour as the full-bleed hero, the six numbers in the black strip under it */
     var strip = [
       PD.kpi('Constructors', s.pos ? PD.ordinal(s.pos) : '—', isNum(s.points) ? PD.pts(s.points) + ' points · ' + (s.wins || 0) + ' wins' : ''),
-      PD.kpi('Title chance', ch ? PD.pct(ch.p_title, ch.p_title > 0.99 ? 2 : 1) : '—', ch ? 'expected ' + PD.num(ch.exp_points, 0) + ' pts (90%: ' + PD.num(ch.p05, 0) + '–' + PD.num(ch.p95, 0) + ')' + (ch.clinched ? ' · clinched' : ch.eliminated ? ' · eliminated' : '') : '', { signal: true, tip: 'Our chance of the constructors’ title' }),
+      PD.kpi('Title chance', ch ? PD.titlePct(ch, 1) : '—', ch ? 'expected ' + PD.num(ch.exp_points, 0) + ' pts (90%: ' + PD.num(ch.p05, 0) + '–' + PD.num(ch.p95, 0) + ')' + (ch.clinched ? ' · clinched' : ch.eliminated ? ' · eliminated' : '') : '', { signal: true, tip: 'Our chance of the constructors’ title' }),
       PD.kpi('Race car pace', last ? PD.signed(-last.effect, 2) + '%' : '—', last ? 'faster than the field · R' + last.round + ' ± ' + PD.num(last.se, 2) : '', { pctl: tpc.car_race_pace }),
       PD.kpi('Quali car pace', lastQ ? PD.signed(-lastQ.effect, 2) + '%' : '—', lastQ ? 'R' + lastQ.round + ' ± ' + PD.num(lastQ.se, 2) : ''),
       PD.kpi('Median stop', isNum(pit.median_ms) ? PD.num(pit.median_ms / 1000, 2) + 's' : '—', isNum(pit.best_ms) ? 'best ' + PD.num(pit.best_ms / 1000, 2) + 's' + (isNum(pit.p_under_2500) ? ' · ' + PD.pct(pit.p_under_2500, 0) + ' under 2.5 s' : '') : ''),
@@ -177,8 +117,8 @@ function renderTeam(el, params, state) {
     ];
     var h = '<nav class="pd-crumb" aria-label="Breadcrumb"><a href="#/constructors">F1</a><span aria-hidden="true">›</span><a href="#/constructors">Constructors</a><span aria-hidden="true">›</span>' + esc(name) + '</nav>' + QK.playerHeader({ name: name, split: false, pos: 'Constructor', kicker: y + ' season' + (s.pos ? ' · P' + s.pos + ' in the constructors’ championship' : ''),
         team: { colour: PD.teamColourRaw(id), alt: PD.teamAlt(id) }, face: PD.teamAbbr(id), meta: lineup.map(function (d) { return PD.driverLink(d, { dot: false }); }), strip: strip, tags: tP && tP.qualified(id) ? [QK.tag('In the ' + y + ' peer group', 'signal')] : [] }) +
-      '<div class="pd-links pd-mt">' + (lineup.length >= 2 ? '<a class="qk-btn" href="#/compare/drivers/' + encodeURIComponent(lineup[0]) + '/' + encodeURIComponent(lineup[1]) + '">Compare the drivers</a>' : '') +
-      '<a class="qk-btn" href="#/compare/teams/' + encodeURIComponent(id) + '">Compare with another team</a><a class="qk-btn" href="#/value?tab=needs">Every team’s needs</a></div>';
+      '<div class="pd-links pd-mt">' + (lineup.length >= 2 ? '<a class="qk-btn" href="#/compare/drivers/' + encodeURIComponent(lineup[0]) + '/' + encodeURIComponent(lineup[1]) + (y !== PD.currentSeason() ? '?y=' + y : '') + '">Compare the drivers</a>' : '') +
+      '<a class="qk-btn" href="#/constructors' + (y !== PD.currentSeason() ? '/' + y : '') + '?a=' + encodeURIComponent(id) + '&sec=h2h">Compare with another team</a><a class="qk-btn" href="#/value?tab=needs">Every team’s needs</a></div>';
     if (!t && !s.team && !lineup.length) { el.innerHTML = h + PD.empty(name + ' is not in the ' + y + ' data', PD.ok(teams) ? 'Pick another season.' : 'The team catalogue is not built yet.'); return; }
     h += PD.grid('<div class="qk-span-5">' + (tP ? PD.v2.pctCard(tP, id, PD.v2.TEAM_SET, { foot: '<span>Metrics chosen for year-to-year stability and what they predict</span><a href="#/glossary">Glossary →</a>' }) : '') + '</div>' +
       PD.card('Where the team sits', tP ? 'Every constructor in the ' + y + ' peer group; bars coloured by percentile, ' + esc(name) + ' and the median marked.' : '', (tP ? PD.v2.distSeg('tm-dist-m', [['car_race_pace', 'Car pace'], ['points_per_race', 'Points / race'], ['dnf_rate', 'DNF rate'], ['pit_lane_v_field', 'Pit lane'], ['strategy_gain', 'Strategy']]) : '') + PD.chartBox('tm-dist', 260, 'Peer distribution'), { span: 7 }), 'pd-mt');
@@ -227,7 +167,7 @@ function renderTeam(el, params, state) {
 
     // title
     PD.set('tm-title', PD.kpis([
-      PD.kpi('Our chance', ch ? PD.pct(ch.p_title, ch.p_title > 0.99 ? 2 : 1) : '—', ch ? PD.int((season.championship || {}).n_sims) + ' simulated seasons' : 'season over', { signal: true }),
+      PD.kpi('Our chance', ch ? PD.titlePct(ch, 1) : '—', ch ? PD.int((season.championship || {}).n_sims) + ' simulated seasons' : 'season over', { signal: true }),
       PD.kpi('Expected', ch ? PD.num(ch.exp_points, 0) : '—', ch ? 'final points' : ''),
       PD.kpi('Magic number', ch && isNum(magicOf(ch)) ? PD.num(magicOf(ch), 0) : '—', 'points to clinch')
     ], 'pd-kpis-3'));
@@ -373,6 +313,5 @@ function topPerformers(drivers, season, lineup, id) {
   }).join('') + '</div><p class="pd-cap">Peers: ' + esc(P.label) + '. Percentile 100 is the best on the grid; the rank after each value is among the qualified drivers. Metrics marked "Our model" come from our driver model (the car taken out).</p>';
 }
 
-PD.route('constructors', renderList);
 PD.route('team', renderTeam);
 })(window.PD);

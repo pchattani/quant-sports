@@ -68,7 +68,7 @@ const MODEL_TERMS = [
   ]],
   ['Games and markets', [
     ['p_home', 'Our win chance', 'The share of 20,000 simulated games the home team wins, from a plate-appearance Monte Carlo with projected lineups, the starter\'s exit, bullpen availability, park, weather and umpire.'],
-    ['devig', 'De-vig', 'Removing the bookmaker\'s margin: implied probabilities 1/odds are scaled so they sum to one (multiplicative).'],
+    ['devig', 'De-vig', 'Taking the margin out of a quoted line: its implied chances are scaled so they add to 100% (multiplicative).'],
     ['market_ref', 'Market (reference)', 'The de-vigged prediction-market number for the same question, shown in grey beside ours on game pages and the Model pages. It is a reference, not a recommendation.'],
     ['log_loss', 'Log-loss', '−mean(y ln p + (1 − y) ln(1 − p)); lower is better; a coin scores ln 2 = 0.693.']
   ]]
@@ -138,10 +138,26 @@ function entryHTML(e, isModel) {
   if (USED_IDS[e.key]) { id = e.key + '-' + (e.kind || 'x') + '-' + USED_IDS[e.key]; USED_IDS[e.key] += 1; } else USED_IDS[e.key] = 1;
   return '<div class="gl-entry" id="gl-' + esc(id) + '" data-q="' + esc(fold(q)) + '" data-scope="' + esc(isModel ? 'model' : 'metric') + '">' +
     '<dt><span>' + esc(e.label || e.key) + ' <a class="doc-anchor" href="#/glossary/' + encodeURIComponent(e.key) + '" title="Link to this entry">#</a></span>' +
-    '<span class="gl-tags"><span class="gl-key">' + esc(e.key) + '</span>' + (isModel ? '<span class="gl-tag model">model term</span>' : tagsOf(e)) + '</span></dt>' +
+    '<span class="gl-tags">' + (isModel ? '<span class="gl-tag model">model term</span>' : tagsOf(e)) + '</span></dt>' +
     '<dd>' + (e.desc ? esc(e.desc) : '<span class="muted-inline">No definition yet.</span>') + '</dd></div>';
 }
 
+/* The stabilisation table (Methodology > Technical detail, round 9: moved off the glossary) */
+function stabTable(host) {
+  if (!host) return;
+  loadGlossary().then(g => {
+    const k = K();
+    if (!host.isConnected || !k) return;
+    const rows = [];
+    (g.groups || []).forEach(x => (x.entries || []).forEach(e => { if (stabOf(e) !== null) rows.push(e); }));
+    if (!rows.length) return;
+    rows.sort((a, b) => a.stabilises_at - b.stabilises_at);
+    host.innerHTML = '<h4 class="bp-h4" style="margin-top:14px">Stabilisation points</h4><p class="bp-note">The sample at which a metric is as much signal as noise times 7/3: r(n) = n/(n + k), so n₀.₇ = 7k/3. Before it, treat the number as mostly noise.</p>' +
+      k.table([{ label: 'Metric' }, { label: 'Group' }, { label: 'Stabilises at', align: 'right' }, { label: 'Unit' }],
+        rows.map(e => [{ v: e.label, html: '<a href="#/glossary/' + encodeURIComponent(e.key) + '">' + esc(e.label || e.key) + '</a>' }, { v: e.group || '', html: esc(e.group || '') }, { v: e.stabilises_at, html: '<strong>' + k.int(e.stabilises_at) + '</strong>' }, { v: unitWord(e), html: esc(unitWord(e)) }]), { compact: true });
+    k.sortable(host);
+  });
+}
 function renderGlossary(el, params) {
   const key = params.id || (params.rest || [])[0] || (params.query || {}).k || '';
   el.innerHTML = '<div id="glossary-root">' + muted('Loading the glossary…') + '</div>';
@@ -158,27 +174,19 @@ function renderGlossary(el, params) {
     const nStab = groups.reduce((s, x) => s + (x.entries || []).filter(e => stabOf(e) !== null).length, 0);
     const index = groups.map(x => '<a href="#/glossary/g:' + esc(slug(x.name)) + '" data-group="' + esc(slug(x.name)) + '">' + esc(x.name) + '</a>').join('') +
       MT.map(x => '<a href="#/glossary/g:model-' + esc(slug(x[0])) + '" data-group="model-' + esc(slug(x[0])) + '">' + esc(x[0]) + '</a>').join('');
-    const cardOf = (name, sl, entries, isModel) => '<div class="card gl-group" data-group="' + esc(sl) + '"><div class="card-header">' + esc(name) + ' <span class="card-sub">' + entries.length + '</span></div><dl class="gl-list">' + entries.map(e => entryHTML(e, isModel)).join('') + '</dl></div>';
-    root.innerHTML =
-      '<div class="card"><div class="card-header">Glossary <span class="card-sub">Every metric the site computes for hitters, pitchers and teams, with the sample at which it stabilises, and the model terms the pages use. How each is computed is in the <a href="#/methodology">methodology</a>.</span></div>' +
-      '<div class="gl-top"><input id="gl-search" type="search" placeholder="Filter the glossary…" autocomplete="off" spellcheck="false">' +
+    /* round 9: a group longer than three entries folds to its first three until opened (or while searching) */
+    const cardOf = (name, sl, entries, isModel) => '<div class="card gl-group' + (entries.length > 3 ? ' folded' : '') + '" data-group="' + esc(sl) + '"><div class="card-header">' + esc(name) + ' <span class="card-sub">' + entries.length + '</span></div><dl class="gl-list">' + entries.map(e => entryHTML(e, isModel)).join('') + '</dl>' + (entries.length > 3 ? '<button type="button" class="qk-btn gl-more">Show all ' + entries.length + '</button>' : '') + '</div>';
+    root.innerHTML = QK.sectionHead({ kicker: 'Glossary', title: 'Every number, defined', sub: 'Search for any metric or model term, or jump to a group. How each one is computed is in <a class="qk-link" href="#/methodology">How it works</a>.', html: true }) +
+      '<div class="card gl-searchcard"><div class="gl-top"><input id="gl-search" type="search" placeholder="Search the glossary: Stuff+, barrel, framing…" autocomplete="off" spellcheck="false" aria-label="Search the glossary">' +
       '<select id="gl-kind"><option value="">metrics and model terms</option><option value="metric">catalogue metrics</option><option value="model">model terms</option></select><span class="gl-count" id="gl-count"></span></div>' +
       '<div class="gl-index">' + index + '</div>' +
       '<div class="doc-meta">' + nMetrics + ' metrics in ' + groups.length + ' groups and ' + nModel + ' model terms' + (nStab ? '; ' + nStab + ' with a stabilisation point (the sample at which split-half reliability reaches 0.7, which also sets how hard the catalogue shrinks small samples)' : '') +
       (g.updated_at ? ' · updated ' + esc(K() ? K().fmtDate(g.updated_at) : g.updated_at) : '') + (g.source === 'catalogue' ? ' · assembled from this season\'s catalogues until data/glossary.json is published' : '') + '</div></div>' +
-      (nStab ? '<div class="card"><div class="card-header">Stabilisation points <span class="card-sub">The sample at which a metric is as much signal as noise times 7/3: r(n) = n/(n + k), so n₀.₇ = 7k/3. Before it, treat the number as mostly noise.</span></div><div id="gl-stab"></div></div>' : '') +
-      groups.map(x => cardOf(x.name, slug(x.name), x.entries || [], false)).join('') +
-      MT.map(x => cardOf('Model terms: ' + x[0], 'model-' + slug(x[0]), x[1].map(t => ({ key: t[0], label: t[1], desc: t[2] })), true)).join('') +
+      (nStab ? '<p class="qk-sub">The sample at which each metric settles is in <a class="qk-link" href="#/methodology/stabilise">How it works › Technical detail</a>.</p>' : '') +
+      '<div class="gl-groups">' + groups.map(x => cardOf(x.name, slug(x.name), x.entries || [], false)).join('') +
+      MT.map(x => cardOf('Model terms: ' + x[0], 'model-' + slug(x[0]), x[1].map(t => ({ key: t[0], label: t[1], desc: t[2] })), true)).join('') + '</div>' +
       '<div class="card gl-empty" id="gl-none" style="display:none">Nothing in the glossary matches that.</div>';
-    if (nStab && K()) {
-      const k = K();
-      const rows = [];
-      groups.forEach(x => (x.entries || []).forEach(e => { if (stabOf(e) !== null) rows.push(e); }));
-      rows.sort((a, b) => a.stabilises_at - b.stabilises_at);
-      document.getElementById('gl-stab').innerHTML = k.table([{ label: 'Metric' }, { label: 'Group' }, { label: 'Stabilises at', align: 'right' }, { label: 'Unit' }],
-        rows.map(e => [{ v: e.label, html: '<a href="#/glossary/' + encodeURIComponent(e.key) + '">' + esc(e.label || e.key) + '</a>' }, { v: e.group || '', html: esc(e.group || '') }, { v: e.stabilises_at, html: '<strong>' + k.int(e.stabilises_at) + '</strong>' }, { v: unitWord(e), html: esc(unitWord(e)) }]), { compact: true });
-      k.sortable(document.getElementById('gl-stab'));
-    }
+
     const input = document.getElementById('gl-search'), kindSel = document.getElementById('gl-kind'), count = document.getElementById('gl-count');
     const entries = Array.prototype.slice.call(root.querySelectorAll('.gl-entry'));
     const cards = Array.prototype.slice.call(root.querySelectorAll('.gl-group'));
@@ -191,9 +199,11 @@ function renderGlossary(el, params) {
         e.classList.toggle('hidden', !hit); if (hit) shown++;
       });
       cards.forEach(c => c.classList.toggle('hidden', !c.querySelector('.gl-entry:not(.hidden)')));
+      root.classList.toggle('gl-searching', !!needle);
       document.getElementById('gl-none').style.display = shown ? 'none' : '';
       count.textContent = needle || kind ? shown + ' of ' + total + ' entries' : total + ' entries';
     };
+    root.querySelectorAll('.gl-more').forEach(b => b.addEventListener('click', () => { const g = b.closest('.gl-group'); g.classList.remove('folded'); b.remove(); }));
     input.addEventListener('input', filter);
     input.addEventListener('keydown', ev => { if (ev.key === 'Escape') { input.value = ''; filter(); } });
     kindSel.addEventListener('change', filter);
@@ -210,7 +220,7 @@ function renderGlossary(el, params) {
         if (grp) setTimeout(() => grp.scrollIntoView({ block: 'start' }), 0);
       } else {
         const e = document.getElementById('gl-' + key);
-        if (e) { e.classList.add('hit'); setTimeout(() => e.scrollIntoView({ block: 'center' }), 50); setTimeout(() => e.scrollIntoView({ block: 'center' }), 400); }
+        if (e) { const g0 = e.closest('.gl-group'); if (g0) { g0.classList.remove('folded'); const b0 = g0.querySelector('.gl-more'); if (b0) b0.remove(); } e.classList.add('hit'); setTimeout(() => e.scrollIntoView({ block: 'center' }), 50); setTimeout(() => e.scrollIntoView({ block: 'center' }), 400); }
         else { input.value = key.replace(/_/g, ' '); filter(); }
       }
     }
@@ -223,7 +233,7 @@ const SRC = f => '<span class="src">oddsmarkets/baseball/' + f + '</span>';
 
 const METHOD_HTML = [
 `<section id="m-overview"><h2>What the site does</h2>
-<p>The Quant Bullpen forecasts every Major League Baseball game, series and award race with its own models, checks those forecasts against the prediction markets and the sportsbook lines ESPN publishes, and backs them with pitch-level analytics for MLB (Statcast from 2015) and Triple-A (Statcast from 2023), plus career and all-time records from Retrosheet play-by-play back to 1908.</p>
+<p>The Quant Bullpen forecasts every Major League Baseball game, series and award race with its own models, checks every forecast against what happened (and, on the Model pages, against the closing line ESPN publishes), and backs them with pitch-level analytics for MLB (Statcast from 2015) and Triple-A (Statcast from 2023), plus career and all-time records from Retrosheet play-by-play back to 1908.</p>
 <p>Four layers carry it. <strong>Pitch models</strong> rebuild every pitch's flight and score what it does: Stuff+ from the ball's physics, Location+ from where it went, Pitching+ from both plus sequencing, tunneling, the hitter's swing decisions and bat tracking. <strong>Batted-ball and value models</strong> turn contact into expected outcomes (xwOBA+), fielding and framing into runs, and runs into wins (Bullpen WAR), with our own park factors and run and win expectancy. <strong>Projections</strong> regress each skill by how fast it stabilises and feed a <strong>plate-appearance simulation</strong> of every game, the season and the postseason. A walk-forward <strong>backtest</strong> scores the game model against ESPN's closing lines and is published on the <a href="#/calibration">calibration page</a>.</p>
 <p>Every constant below is the value in the code on 1 October 2026; each section names its source file. Fitted quantities (the gradient-boosted models, the park factors, the wOBA weights, the stabilisation table) are refitted when the site is built and are shown on the pages themselves.</p></section>`,
 
@@ -412,6 +422,38 @@ P(home wins) = σ(r<sub>home</sub> − r<sub>away</sub> + 0.12)</div>
 <p><strong>The trade simulator</strong> (<code>analytics/trade.py</code>, <code>assets/js/value.js</code>; MLB). Pick two clubs and the players each sends. Each club's depth chart is filled before and after the trade by the same rule: positions in order of scarcity (C, SS, CF, 2B, 3B, RF, LF, 1B, DH, then the rotation and the bullpen), each by the best available eligible player by projected full-season value there, a hitter taking up to 80% of the time at catcher and 95% elsewhere and each player's time used once across positions, a starter up to a fifth of the starts and a reliever a seventh of the relief work, every share scaled by how much of a season the player can be expected to play (Marcel's playing time), anything left to a replacement-level player. The change in wins is after minus before; the players whose time went down are the ones displaced. The odds come from the season simulation: for each club it is re-run with that club's rating moved to seven levels (common random numbers, the other clubs fixed), and the page reads the postseason, division and title odds off that curve at the club's new expected wins. While a regular season is being played the horizon is its rest; otherwise it is next season, the season's schedule replayed with every rating carried forward (by the fitted year-to-year carry of the simulation's ratings). Age and the next three seasons of projected WAR are shown for every player moved, with a verdict for each club. Salary and roster legality are not checked. Two clubs that play each other also move each other's odds through their head-to-head games; the curves hold the other clubs fixed, so that is left out.</p></section>`
 ].join('\n');
 
+/* "How it works" for fans (round 9): what the site does, then one plain-words card per model with its diagram (the
+   inputs flowing into the model and out to the number the pages show) and an example; the developer document (code
+   paths, constants, files) and the stabilisation table fold under "Technical detail". */
+const FLOWS = [
+  ['pitch', 'Pitch models', 'How good is a pitch, before anyone swings?', [['Speed, spin, movement, release', 'every pitch, tracked'], ['Stuff+', 'the pitch itself'], ['Location+', 'where it went'], ['Pitching+', 'both, and the sequence']],
+    '100 is league average, 110 is excellent. A 120 Stuff+ slider misses bats even when it is left over the plate.'],
+  ['contact', 'Expected outcomes', 'What should that ball in play have been?', [['Exit speed, angle, direction, park', 'every batted ball'], ['Chance of each result', 'single to home run'], ['xwOBA+', 'what the contact deserved']],
+    'A hitter whose xwOBA+ is well above his real line has been unlucky: the hits tend to come.'],
+  ['field', 'Fielding and framing', 'Who turns batted balls into outs, and strikes out of thin air?', [['Where the ball went, how fast, the fielder’s start', 'every chance'], ['Catch probability', 'how often an average fielder makes it'], ['Fielding runs', 'outs above that, in runs']],
+    'A shortstop at +10 fielding runs saves about a win a season over an average one. Framing does the same for catchers on borderline pitches.'],
+  ['war', 'Bullpen WAR', 'How many wins is a player worth?', [['Batting', 'from xwOBA+'], ['Running', 'bases and steals'], ['Fielding and position', 'runs saved, a shortstop’s premium'], ['Wins above replacement', 'runs ÷ about ten']],
+    '2 is a solid regular, 5 is an All-Star, 8 is an MVP season.'],
+  ['proj', 'Projections', 'What happens next season?', [['Three seasons, recent ones weighted more', ''], ['Each skill shrunk to average', 'by how fast it settles'], ['Ageing', 'peak in the late twenties'], ['Next season, with a range', '10th to 90th percentile']],
+    'Strikeouts settle within weeks, batting average on balls in play takes seasons: so projections trust the first and doubt the second.'],
+  ['game', 'The game model', 'Who wins tonight?', [['Lineups, starters, bullpens, park, weather, umpire', ''], ['Every plate appearance simulated', '20,000 times'], ['Our win chance', 'and the likely score']],
+    'A 60% favourite still loses four games in ten. Our forecasts are checked every day on How we’re doing.'],
+  ['season', 'Season and bracket', 'Who makes October, and who wins it all?', [['Our team ratings', 'from the game model'], ['Every remaining game and series', '20,000 seasons'], ['Division, postseason and title chances', '']],
+    'Postseason series are short: the best team in baseball wins the World Series about one year in four.'],
+  ['awards', 'Award races', 'Who wins the MVP, Cy Young and Rookie of the Year?', [['Value (WAR)', ''], ['What voters reward', 'home runs, strikeouts, team wins'], ['A chance for each candidate', 'fitted on past winners']],
+    'Checked every year against the real vote: History has every winner against our pre-vote call.'],
+  ['moves', 'Who moves next', 'Who changes clubs this winter?', [['Value, age, years in the majors', ''], ['Club and history', 'how often players like this move'], ['A chance of leaving', 'traded, released or a free agent']],
+    'No contract data: these are on-field estimates, checked against what happened in past winters.']
+];
+function flowHTML(f) {
+  return '<article class="bp-how"><div class="qk-kicker">' + esc(f[1]) + '</div><h3>' + esc(f[2]) + '</h3><ol class="bp-flow" aria-label="' + esc(f[1] + ': ' + f[3].map(x => x[0]).join(' to ')) + '">' +
+    f[3].map((x, i) => '<li class="' + (i === f[3].length - 1 ? 'out' : '') + '"><b>' + esc(x[0]) + '</b>' + (x[1] ? '<span>' + esc(x[1]) + '</span>' : '') + '</li>').join('') + '</ol><p>' + esc(f[4]) + '</p></article>';
+}
+function fanIntro() {
+  return QK.sectionHead({ kicker: 'How it works', title: 'What we do, in plain words', sub: 'The Quant Bullpen turns every pitch of Major League Baseball and Triple-A into numbers fans can use: how good a pitch is, what a hitter deserved, how many wins a player is worth, who wins tonight and who wins it all. Every model in one card each, then the full technical detail.' }) +
+    '<div class="bp-hows">' + FLOWS.map(flowHTML).join('') + '</div>' +
+    QK.explain('Every forecast is made before the event from what was known then, and checked afterwards: <a class="qk-link" href="#/calibration">How we’re doing</a>. Every number on the site is defined in the <a class="qk-link" href="#/glossary">Glossary</a>.', { title: 'How sure are we?' });
+}
 function renderMethodology(el, params) {
   const want = (params.rest || [])[0] || params.id || '';
   const tmp = document.createElement('div');
@@ -424,11 +466,13 @@ function renderMethodology(el, params) {
   });
   const L = (BP.state && BP.state.level) || 'mlb';
   const toc = '<div class="doc-toc"><div class="doc-toc-head">Methodology</div><ol>' + secs.map(s => '<li><a href="#/methodology/' + esc(s.id) + '" data-target="method-' + esc(s.id) + '">' + esc(s.title) + '</a></li>').join('') +
-    '</ol><div class="doc-toc-head" style="margin-top:10px">See also</div><ol class="plain"><li><a href="#/glossary">Glossary</a></li><li><a href="#/calibration">Calibration</a></li><li><a href="#/' + L + '/lab">Lab</a></li><li><a href="#/disclaimer">Disclaimer and terms</a></li></ol></div>';
+    '</ol><div class="doc-toc-head" style="margin-top:10px">See also</div><ol class="plain"><li><a href="#/glossary">Glossary</a></li><li><a href="#/calibration">How we’re doing</a></li><li><a href="#/' + L + '/scout?view=chart">Scouting Room chart</a></li><li><a href="#/disclaimer">Disclaimer and terms</a></li></ol></div>';
   const intro = '<div class="card"><div class="card-header">Methodology <span class="card-sub">Where the data comes from, how every model works, and where it is wrong. Every constant is the one in the code on 1 October 2026, and each section names its file under <code>oddsmarkets/baseball/</code>.</span></div>' +
     '<div class="doc-meta">' + secs.length + ' sections · fitted values (gradient-boosted models, park factors, wOBA weights, stabilisation points) are refitted at build time and shown on the pages</div></div>';
-  el.innerHTML = '<div class="doc gq-doc">' + toc + '<div class="doc-body">' + intro + secs.map((s, i) => '<div class="card" id="method-' + esc(s.id) + '"><div class="card-header">' + (i + 1) + '. ' + esc(s.title) +
-    ' <a class="doc-anchor" href="#/methodology/' + esc(s.id) + '" title="Link to this section">#</a></div><div class="pad">' + s.html + '</div></div>').join('') + '</div></div>';
+  el.innerHTML = fanIntro() + '<details class="bp-tech" id="bp-tech"' + (want ? ' open' : '') + '><summary><span class="qk-kicker">Technical detail</span><b>Every model, constant and file</b><span>' + secs.length + ' sections, the stabilisation points and the code paths under oddsmarkets/baseball/</span></summary>' +
+    '<div class="doc gq-doc">' + toc + '<div class="doc-body">' + intro + secs.map((s, i) => '<div class="card" id="method-' + esc(s.id) + '"><div class="card-header">' + (i + 1) + '. ' + esc(s.title) +
+    ' <a class="doc-anchor" href="#/methodology/' + esc(s.id) + '" title="Link to this section">#</a></div><div class="pad">' + s.html + (s.id === 'stabilise' ? '<div id="m-stab-table"></div>' : '') + '</div></div>').join('') + '</div></div></details>';
+  stabTable(el.querySelector('#m-stab-table'));
   el.querySelectorAll('.doc-toc a[data-target]').forEach(a => a.addEventListener('click', ev => {
     ev.preventDefault();
     const t = document.getElementById(a.dataset.target);

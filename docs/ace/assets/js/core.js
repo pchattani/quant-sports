@@ -170,6 +170,12 @@ const PAGE_HEAD = {
   calibration: ['How we’re doing', 'Our recent record and how often our chances came true, then every score and check, with the closing market as a reference.'],
   glossary: ['Glossary', 'Every metric on the site, defined.'], disclaimer: ['Disclaimer and terms', '']
 };
+/* a finished season (?y= before the current year; ta-past.js): the pages that read that year's own files say so */
+const PAGE_HEAD_PAST = {
+  rankings: ['Rankings', 'How the season ended: the official ranking at each player’s last match of the year, beside our Elo at the season’s end.'],
+  race: ['Race to the Finals', 'How the season ended: the Finals champion and the season-end top ten.'],
+  elo: ['Elo ratings', 'Our strength ratings at the season’s end, overall and by surface, with every player’s Elo over time and the all-time peaks.']
+};
 const DETAIL_OF = { event: 'calendar', match: 'calendar', player: 'players' };
 // Where a page lands when the tour is switched (id pages fall back to their list).
 const SWITCH_TO = { event: 'calendar', match: 'hub', player: 'players', h2h: 'h2h', compare: 'compare' };
@@ -325,7 +331,7 @@ function sectionBar(r) {
     back = '<a class="ta-back" href="' + tabHref(t, T, Y) + '"><span aria-hidden="true">←</span> ' + esc(SECTION_LABEL[sec] + ' · ' + t[1]) + '</a>';
   }
   bar.classList.toggle('is-detail', !!detail);
-  const ph = PAGE_HEAD[r.name] || [SECTION_LABEL[sec], ''];
+  const ph = (Y < currentYear(T) && PAGE_HEAD_PAST[r.name]) || PAGE_HEAD[r.name] || [SECTION_LABEL[sec], ''];
   bar.innerHTML = (detail ? '<div class="ta-secbar-in"><div class="ta-sec-title"><div class="qk-kicker">' + esc(kicker) + '</div>' + back + '</div><div class="ta-meta" id="meta-line"></div></div>'
     : (window.QK && QK.sectionHead ? QK.sectionHead({ kicker: kicker + ' · ' + SECTION_LABEL[sec], title: ph[0], sub: ph[1] || SECTION_BLURB[sec] || '', size: 'lg', tag: 'h1', cls: 'ta-sh' }) + '<div class="ta-meta" id="meta-line"></div>'
       : '<h1>' + esc(ph[0]) + '</h1><div class="ta-meta" id="meta-line"></div>')) +
@@ -620,13 +626,25 @@ function levelRank(level) { const i = LEVELS.indexOf(String(level)); return i < 
 function roundLabel(r, short) { return (short ? ROUND_SHORT : ROUND_LONG)[r] || String(r || '—'); }
 function roundIndex(r) { const i = ROUND_ORDER.indexOf(r); return i < 0 ? (r === 'W' ? 99 : -1) : i; }
 
-/* Status of a MATCH_CARD / match: 'live' | 'pre' | 'done' | 'ret' | 'wo' | 'def' | other. */
-function matchState(m) {
+/* Status of a MATCH_CARD / match: 'live' | 'pre' | 'done' | 'ret' | 'wo' | 'def' | 'awaiting' | other. A match the data
+ * still calls live more than 10 hours after its start, or upcoming 4 hours after a timed start (30 hours after a
+ * date-only one), has been played and waits for the next build: 'awaiting' (the kit's QK.awaiting rule, round 9), so no
+ * page shows a days-old snapshot as "Live" or as still to come. */
+function rawState(m) {
   const s = String((m && m.status) || '').toLowerCase();
   if (s === 'live' || s === 'in') return 'live';
   if (s === 'upcoming' || s === 'pre' || s === 'scheduled' || !s) return 'pre';
   if (s === 'done' || s === 'final' || s === 'post') return 'done';
   return s;
+}
+function matchState(m) {
+  const st = rawState(m);
+  if ((st === 'live' || st === 'pre') && m && m.date && window.QK && QK.awaiting) {
+    const dateOnly = !!m.tba || String(m.date).length <= 10;
+    const d = parseDate(m.date);
+    if (d && QK.awaiting({ status: st, start: dateOnly ? String(m.date).slice(0, 10) : d.toISOString(), tba: dateOnly })) return 'awaiting';
+  }
+  return st;
 }
 function isFinished(m) { const s = matchState(m); return s === 'done' || s === 'ret' || s === 'wo' || s === 'def'; }
 /* Set score of a match from p1's view, or from the winner's view with {winner: true}.
@@ -680,6 +698,7 @@ function statusChip(m) {
     const lv = m.live || {};
     return '<span class="chip st-live"><span class="live-dot"></span> Live' + (lv.set ? ' · set ' + esc(lv.set) : '') + '</span>';
   }
+  if (st === 'awaiting') return '<span class="chip st-ft" title="Played; the result arrives with the next update">Result to come</span>';
   if (st === 'done') return '<span class="chip st-ft">Final</span>';
   if (st === 'ret') return '<span class="chip st-ft">Ret.</span>';
   if (st === 'wo') return '<span class="chip st-ft">Walkover</span>';
@@ -805,8 +824,8 @@ function matchCard(c, opts) {
   if (!c || !window.QK) return '';
   const st = matchState(c);
   const m = c.model || {};
-  const live = st === 'live', fin = isFinished(c), pre = !live && !fin;
-  const sets = c.sets || [];
+  const live = st === 'live', fin = isFinished(c), pre = st === 'pre';
+  const sets = st === 'awaiting' ? [] : (c.sets || []);
   const lv = c.live || null;
   const nSets = Math.max(sets.length + (live && lv && lv.games && sets.length < (lv.set || 0) ? 1 : 0), 0);
   const g = kitGame(c, T, { initials: true });
@@ -864,7 +883,7 @@ function kitGame(c, T0, opts) {
   const w = setsWon(c);
   const ent = pid => { const x = NAMES[T][String(pid)] || {}; return { name: playerShort(T, pid), abbr: ko.initials ? fmtInitials(playerName(T, pid)) : playerSurname(T, pid).slice(0, 12), href: playerHref(T, pid), country: x.country || '' }; };
   const d = parseDate(c.date);
-  return { sport: 'tennis', league: eventName(T, c.event), note: roundLabel(c.round), id: c.id, start: d ? d.toISOString() : c.date, status: live ? 'live' : fin ? 'final' : 'pre',
+  return { sport: 'tennis', league: eventName(T, c.event), note: roundLabel(c.round), id: c.id, start: d ? d.toISOString() : c.date, status: live ? 'live' : fin ? 'final' : st === 'awaiting' ? 'awaiting' : 'pre',
     away: ent(c.p1), home: ent(c.p2), as: fin || live ? w[0] : null, hs: fin || live ? w[1] : null,
     p_home: isNum(m.p1) ? 1 - Number(m.p1) : null, wp_home: live && isNum(c.wp_now) ? 1 - Number(c.wp_now) : undefined,
     pre_only: live && !isNum(c.wp_now) ? true : undefined, href: matchHref(T, c.id), tba: !!c.tba || (c.date && String(c.date).length <= 10),

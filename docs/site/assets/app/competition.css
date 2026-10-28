@@ -109,6 +109,7 @@
 .fb-co-potw { display: flex; gap: 14px; align-items: flex-start; padding-bottom: var(--sp-3); border-bottom: 1px solid var(--line-1); }
 .fb-co-potw-n { font-size: var(--fs-lg); font-weight: 800; display: flex; gap: 8px; align-items: center; }
 .fb-co-rt { flex: none; width: 48px; height: 48px; border-radius: 0; display: grid; place-items: center; font: 800 var(--fs-lg) var(--font-num); color: var(--bg); }
+.fb-co-rt.sm { display: inline-grid; width: auto; height: auto; padding: 0 5px; font-size: var(--fs-xs); }
 .fb-co-aws { display: grid; gap: var(--sp-3); grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); margin-top: var(--sp-3); }
 .fb-co-aw { padding: 10px 12px; border-radius: 0; border: 1px solid var(--line-1); background: var(--s-2); display: grid; gap: 3px; font-size: var(--fs-sm); min-width: 0; }
 .fb-co-aw-n { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -154,3 +155,28 @@
 /* v4: the Broadcast section head that opens each tab */
 .fb-co-tabhead { margin-top: var(--sp-8); }
 .fb-co-tabhead .qk-sh { margin-bottom: var(--sp-4); }
+/* round 9: the overview's "More" links (the Golden Boot, the Scouting Room's leaders, History, the model) */
+.fb-co-more { display: grid; gap: var(--sp-3); grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); }
+.fb-co-morel { display: grid; gap: 6px; padding: 16px 18px; text-decoration: none; color: var(--ink-2); }
+.fb-co-morel b { font: 400 1.5rem/1 var(--font-display); text-transform: uppercase; letter-spacing: 0.02em; color: var(--ink-1); }
+.fb-co-morel span { font-size: var(--fs-sm); line-height: 1.4; }
+/* round 9: the road to the final (an unsimulated or finished knockout): one column a round, scrolling inside its card */
+.fb-co-ladder.road { grid-auto-flow: column; grid-template-columns: none; grid-auto-columns: minmax(176px, 1fr); overflow-x: auto; align-items: stretch; padding-bottom: 6px; }
+.fb-co-ladder.road .fb-co-round { align-content: space-around; grid-template-rows: auto; }
+.fb-co-tsc { font: 400 1.25rem/1 var(--font-display); color: var(--ink-1); text-decoration: none; min-width: 1.4em; text-align: right; }
+.fb-co-side.out .fb-co-tsc { color: var(--ink-3); }
+.fb-co-tsc small { font: 700 10px var(--font-cond); color: var(--volt); }
+/* round 9: how a finished edition finished */
+.fb-co-finhero { margin-bottom: var(--sp-4); }
+.fb-co-podium { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.fb-co-podium li { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto auto; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line-1); }
+.fb-co-podium .qk-outline { font-size: 2.2rem; line-height: 1; }
+.fb-co-podium .nm { display: grid; min-width: 0; }
+.fb-co-podium .nm small { color: var(--ink-3); font-size: var(--fs-xs); }
+.fb-co-podium b { font: 400 1.75rem/1 var(--font-display); }
+/* round 9: the roll of honour */
+.fb-co-roll { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr)); gap: 2px 14px; max-height: 620px; overflow-y: auto; }
+.fb-co-rolli { display: grid; grid-template-columns: 74px auto minmax(0, 1fr) 26px; gap: 8px; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--line-1); font-size: var(--fs-sm); }
+.fb-co-rolli .s { color: var(--ink-3); font-size: var(--fs-xs); }
+.fb-co-rolli .n { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fb-co-rolli .k { text-align: right; color: var(--ink-3); font-size: var(--fs-xs); }

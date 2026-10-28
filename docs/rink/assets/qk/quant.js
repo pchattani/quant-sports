@@ -1418,7 +1418,9 @@ QK.pctSmall = function (p, d) {
 };
 
 /* ─────────────────────────────────────── chance bars (538-style probability bars) */
-/* QK.chanceBar({ label, p, market, color (team hex or CSS colour), href, sub, mark: team }, { max, teamColours })
+/* QK.chanceBar({ label, p, market, color (team hex or CSS colour), href, sub, mark: team, text }, { max, teamColours })
+ * r.text (optional) replaces the printed figure, e.g. ">99.9%" for a title the simulations never lose but that is not
+ * yet clinched (round 9). The bar still draws r.p.
  * QK.chances(rows, { max, sort: false, key: false, marketName: 'Market', limit, teamColours: false }) -> the list with a key.
  * Broadcast colours: a title race shows each bar in its team's colour (r.color, else r.mark.colour; contrast-lifted
  * by QK.color.team); rows without one, or teamColours: false, are ours in blue. The value stays ours. */
@@ -1433,13 +1435,13 @@ QK.chanceBar = function (r, o) {
   var c = bk ? bk.bg : (rc && o.teamColours && !color.parse(rc) ? rc : 'var(--signal-deep)');
   var edge = bk && bk.edge ? ';box-shadow:inset 0 -4px 0 ' + bk.edge : '';
   var mk = isNum(r.market) ? '<i class="qk-chance-mk" style="left:' + Math.min(100, 100 * r.market / max).toFixed(1) + '%"></i>' : '';
-  var aria = r.label + ': our chance ' + fmt.pct(r.p) + (isNum(r.market) ? ', market ' + fmt.pct(r.market) : '');
+  var aria = r.label + ': our chance ' + (r.text || fmt.pct(r.p)) + (isNum(r.market) ? ', market ' + fmt.pct(r.market) : '');
   var tag = r.href ? 'a' : 'div';
   return '<' + tag + ' class="qk-chance' + (r.mark ? '' : ' nomark') + '"' + (r.href ? ' href="' + esc(r.href) + '"' : '') + '>' +
     '<span class="qk-chance-lab">' + (r.mark ? QK.teamMark(r.mark, 'md') : '') + '</span>' +
     '<span class="qk-chance-track" role="img" aria-label="' + esc(aria) + '"><span class="qk-chance-fill" style="width:' + w.toFixed(1) + '%;--cc:' + c + edge + '"></span>' +
     '<span class="qk-chance-nm">' + esc(r.label) + (r.sub ? '<small>' + esc(r.sub) + '</small>' : '') + '</span>' + mk + '</span>' +
-    '<span class="qk-chance-v num">' + fmt.pct(r.p) + '</span></' + tag + '>';
+    '<span class="qk-chance-v num">' + (r.text ? esc(r.text) : fmt.pct(r.p)) + '</span></' + tag + '>';
 };
 QK.chances = function (rows, o) {
   o = o || {};

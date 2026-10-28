@@ -28,6 +28,7 @@ Reference, Spotrac, HoopsHype and OverTheCap contracts are left out for that rea
 | **MoneyPuck** (moneypuck.com) | NHL expected-goals benchmark | free for non-commercial use with credit; credit: *MoneyPuck.com* | nothing raw |
 | **Kalshi**, **Polymarket** | live prediction-market prices shown beside the models | the venues' API terms | prices are read at build time; no recorded market data is published |
 | **football-data.co.uk** | historical football odds for calibration | free download | nothing raw (a local cache only) |
+| **Wikidata** (query.wikidata.org; Wikidata contributors) | every champion of each Footballer competition since it began: season items and their winners, for the History tabs (`scripts/football_champions_wikidata.py`) | **CC0 1.0** (public domain); credited on the History tab all the same | `oddsmarkets/football/analytics/data/champions_wikidata.json` (season, year, winner) |
 
 Retrosheet notice (verbatim, as its terms require):
 

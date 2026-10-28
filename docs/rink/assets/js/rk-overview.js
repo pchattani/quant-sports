@@ -9,8 +9,8 @@
  *      tonight in the reader's time), "Today", "Tomorrow" or the weekday; with nothing big on, the Cup race instead;
  *   4. "N games. Our calls." (the market quiet under our chance); the black power list (Who's hot); Breakout watch;
  *      "Who's for real?" beside the records in reach and the biggest surprise; the best player nobody talks about;
- *      "What's that number?"; "Who lifts the Cup?" with projected points; the playoff race and standings; the leader
- *      boards; a small link to the Model page's "How we're doing" (round 6: our record and calibration live there).
+ *      "What's that number?"; "Who lifts the Cup?" with projected points; the playoff race and standings (round 9:
+ *      the leader boards, a repeat of Who's hot, left for the Scouting Room's Leaders); a small link to the Model page's "How we're doing" (round 6: our record and calibration live there).
  *
  * Reads index.json, <S>/season.json, <S>/markets.json (our Cup chances only); then, lazily, <S>/leaders.json, last
  * season's leaders.json, <S>/performers.json, race_log.json and a few player files (the fan modules). Refreshes
@@ -227,16 +227,16 @@ function fanModules(el, S, rows) {
           link: { text: 'Progression' } };
       });
       const bx = el.querySelector('#ov-break');
-      if (bx) bx.innerHTML = story.length ? '<section class="qk-section">' + QK.sectionHead({ kicker: 'Breakout watch', title: 'Who has found another gear?', sub: 'Skaters on this season’s points-per-60 board who were nowhere near last season’s, ranked by the jump. Every number is points per 60 minutes, all situations.', actions: '<a class="qk-more" href="#/players?tab=leaders">Every leader</a>' }) + QK.storyCards(story) + '</section>' : '';
+      if (bx) bx.innerHTML = story.length ? '<section class="qk-section">' + QK.sectionHead({ kicker: 'Breakout watch', title: 'Who has found another gear?', sub: 'Skaters on this season’s points-per-60 board who were nowhere near last season’s, ranked by the jump. Every number is points per 60 minutes, all situations.', actions: '<a class="qk-more" href="#/scout?view=leaders">Every leader</a>' }) + QK.storyCards(story) + '</section>' : '';
 
       /* Records in reach + Biggest surprise (beside Who's for real?) */
       const side = [];
       ['p', 'g'].forEach(k => {
         const r = ldr[k], R = RECORDS[k], t = r ? team(r[0]) : '', gp = t && rows[t] ? rows[t].gp : null;
         if (!r || !isNum(r[1]) || !isNum(gp) || gp < 1) return;
-        const pace = r[1] / gp * 82;
+        const full = RK.regGames(S), pace = r[1] / gp * full;
         side.push({ kicker: k === 'p' ? 'Records in reach' : 'On pace for', name: RK.playerName(r[0]), sub: RK.teamAbbr(t) + ' · ' + r[1] + ' ' + R.noun + ' through ' + gp + ' club games', colour: RK.teamColourRaw(t), mark: U.team(t), href: RK.playerHref(r[0]),
-          value: Math.round(pace), unit: R.noun + ' over 82 games, on this pace', pace: { now: r[1], pace: pace, target: R.v, label: 'Record' },
+          value: Math.round(pace), unit: R.noun + ' over ' + full + ' games, on this pace', pace: { now: r[1], pace: pace, target: R.v, label: 'Record' },
           text: 'The record is ' + R.v + ' ' + R.noun + ', ' + R.who + ' in ' + R.yr + '. ' + (gp < 20 ? gp + ' games in, a pace this hot usually cools.' : Math.round(pace) >= R.v ? 'On pace to break it.' : 'Short of it on this pace.') });
       });
       const rl = (RL[String(S)] || {}).p_playoffs || {};
@@ -250,7 +250,7 @@ function fanModules(el, S, rows) {
           text: 'No club’s playoff chance has moved more since opening day, in our season simulations: ' + (mv.d > 0 ? 'up' : 'down') + ' from ' + U.pct(mv.a) + ' to ' + U.pct(mv.b) + '.' });
       }
       const sx = el.querySelector('#ov-side');
-      if (sx) sx.innerHTML = side.length ? QK.sectionHead({ kicker: 'Records and surprises', title: 'On pace for history?', sub: 'The leaders’ 82-game pace against the records, and the club our numbers misjudged most.' }) + QK.storyCards(side, { cols: 1 }) : '';
+      if (sx) sx.innerHTML = side.length ? QK.sectionHead({ kicker: 'Records and surprises', title: 'On pace for history?', sub: 'The leaders’ full-season pace against the records, and the club our numbers misjudged most.' }) + QK.storyCards(side, { cols: 1 }) : '';
 
       /* Best player nobody talks about */
       const quiet = quiets.filter(q => { const f = P[q.id], c = seasonRow(f, S); return f && c && f.current && f.current.pct && Object.keys(f.current.pct).length && ((c.values || {}).gp || 0) >= 6; })[0] || null;
@@ -288,7 +288,7 @@ function render(el, params) {
   el.innerHTML = intro({ tag: 'NHL · ' + RK.seasonLabel(S) + (RK.phaseLabel() ? ' · ' + RK.phaseLabel() : ''),
     title: 'Every NHL game, player and team, by the numbers.',
     lede: 'Our chance for tonight’s games, who’s for real, and the race for the Cup, from 20,000 simulated seasons and expected goals, in plain English.',
-    links: [{ label: 'Games', sub: 'Every game, our chance', href: '#/games' }, { label: 'Playoff race', sub: 'Standings and the Cup', href: '#/standings' }, { label: 'Players', sub: 'Ratings and percentiles', href: '#/players' }] }) +
+    links: [{ label: 'Games', sub: 'Every game, our chance', href: '#/games' }, { label: 'Playoff race', sub: 'Standings and the Cup', href: '#/standings' }, { label: 'Scouting Room', sub: 'Every player, every metric', href: '#/scout' }] }) +
     '<section class="qk-section ql-week">' + QK.sectionHead({ kicker: 'This week in the NHL', title: '<span id="ov-wk">The week so far</span>', sub: '<span id="ov-stage">' + esc(stageLine(dig.stage, idx)) + '</span>', html: true }) +
     '<div id="ov-week"></div><div id="ov-feat" class="ql-feat"></div></section>' +
     '<section class="qk-section">' + QK.sectionHead({ kicker: 'What to watch', title: '<span id="ov-gh">Today</span>', html: true, sub: 'Our chance for each side, with a line on why it’s worth your time. Live games update as they go.', actions: seg }) +
@@ -307,8 +307,6 @@ function render(el, params) {
       actions: '<div class="qk-seg" id="ov-conf" role="group" aria-label="Conference"><button type="button" aria-pressed="true" data-value="Eastern">East</button><button type="button" aria-pressed="false" data-value="Western">West</button></div>' }) +
     '<div class="qk-grid"><div class="qk-span-6">' + U.card2('Playoff chances', 'Our chance of making the playoffs', '<div id="ov-po"></div>') + '</div>' +
     '<div class="qk-span-6">' + U.card2('Standings', 'Points, points % and our playoff chance', '<div id="ov-st"></div>', { flush: true, foot: '<span>Wild-card format</span><a href="#/standings">Full standings →</a>' }) + '</div></div></section>' +
-    '<section class="qk-section">' + QK.sectionHead({ kicker: 'Leaderboards', title: 'Leaders', sub: 'Counting stats this season, so everyone ranks. Rates with sample floors are on the Players page.', actions: '<a class="qk-btn" href="#/players">Players →</a>' }) +
-    '<div class="qk-grid" id="ov-leaders"></div></section>' +
     '<p class="qk-sub rk-ov-doing"><a class="qk-link" href="#/model?tab=calibration">How we’re doing →</a> Our record and every forecast checked against the result, on the Model page.</p>';
 
   return Promise.all([RK.load(S + '/season.json'), RK.load(S + '/markets.json')]).then(res => {
@@ -398,13 +396,7 @@ function render(el, params) {
       ['s_gar', 'Rink value (GAR)', v => U.f(v, 1), 'Goals added over a replacement-level player, from our value model.'], ['g_gsax', 'Goals saved above expected', v => U.signed(v, 1), 'Shots faced against how often that kind of shot goes in. Above zero = better than an average goalie.']];
     const hot = HOT.map(b => { const r = (L[b[0]] || [])[0], r1 = (L[b[0]] || [])[1]; return r ? { sport: 'hockey', kicker: 'NHL · ' + RK.teamAbbr(RK.player(r[0]).team), title: b[1], name: RK.playerName(r[0]), value: b[2](r[1]), href: RK.playerHref(r[0]),
       next: r1 ? { name: RK.playerName(r1[0]), value: b[2](r1[1]) } : null, expl: b[3] } : null; }).filter(Boolean);
-    if (hot.length) el.querySelector('#ov-hot').innerHTML = QK.band(QK.sectionHead({ kicker: 'Who’s hot', title: 'The leaders, board by board', sub: 'The top name on four boards, and a line on what the number means. Counting stats, so everyone ranks.' }) + QK.hotRow(hot));
-    const boards = [['s_p', 'Points', v => String(v)], ['s_g', 'Goals', v => String(v)], ['s_gar', 'Rink value (GAR)', v => U.f(v, 1)], ['g_gsax', 'Goals saved above expected', v => U.signed(v, 1)]];
-    el.querySelector('#ov-leaders').innerHTML = boards.map(b => {
-      const r = (L[b[0]] || []).slice(0, 5);
-      return '<div class="qk-span-3">' + U.card2(b[1], '', r.length ? '<ul class="rk-list rk-lead">' + r.map((x, i) => '<li><span class="n">' + (i + 1) + '</span>' + U.playerEnt(x[0], null, RK.player(x[0]).team) + '<span class="v">' + esc(b[2](x[1])) + '</span></li>').join('') + '</ul>' : QK.empty('No leaders yet'), { flush: true }) + '</div>';
-    }).join('');
-
+    if (hot.length) el.querySelector('#ov-hot').innerHTML = QK.band(QK.sectionHead({ kicker: 'Who’s hot', title: 'The leaders, board by board', sub: 'The top name on four boards, and a line on what the number means. Counting stats, so everyone ranks.', actions: '<a class="qk-more" href="#/scout?view=leaders">Every leader</a>' }) + QK.hotRow(hot));
     fanModules(el, S, byTeam);
     RK.setMeta('');
     if ((idx.live || []).length || (idx.today || []).some(g => U.status(g) === 'live')) RK.liveRefresh([S + '/season.json'], 60000);

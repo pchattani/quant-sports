@@ -201,7 +201,7 @@ GI.route('player', function (el, params) {
     const info = GI.player(pid);
     if (!c) {
       el.innerHTML = GI.pageHead('Players', info.name || 'Player', [info.pos, info.team ? GI.teamName(info.team) : '', isNum(info.first) ? info.first + '–' + (info.last || '') : ''].filter(Boolean).map(esc).join(' · ')) +
-        GI.notBuilt('The page for ' + (info.name || pid), res[0]) + GI.muted('Player pages are built for everyone who appears in a season catalogue since 1999. <a href="#/players">All players →</a>');
+        GI.notBuilt('The page for ' + (info.name || pid), res[0]) + GI.muted('Player pages are built for everyone who appears in a season catalogue since 1999. <a href="#/scout">The Scouting Room →</a>');
       return;
     }
     const now = c.current || {};
@@ -268,9 +268,9 @@ GI.route('player', function (el, params) {
         seasons.length > 1 ? 'Seasons ' + seasons[0].season + '–' + last.season : null],
       strip: tl, tags: tags, short: short0 || null });
     const NL = {};   /* the next and the last game, for fillNext / fillLast after the first paint */
-    const crumb = '<nav class="gi-crumb" aria-label="Breadcrumb"><a href="#/players">NFL players</a><span aria-hidden="true">›</span>' + (team ? '<a href="' + esc(GI.teamHref(team, S)) + '">' + esc(GI.teamName(team)) + '</a><span aria-hidden="true">›</span>' : '') + esc(c.name || pid) + '</nav>';
+    const crumb = '<nav class="gi-crumb" aria-label="Breadcrumb"><a href="#/scout">Scouting Room</a><span aria-hidden="true">›</span>' + (team ? '<a href="' + esc(GI.teamHref(team, S)) + '">' + esc(GI.teamName(team)) + '</a><span aria-hidden="true">›</span>' : '') + esc(c.name || pid) + '</nav>';
     let h = crumb + (window.QPV ? window.QPV.tabsNav([['overview', 'Overview', GI.playerHref(pid, S)], ['progression', 'Progression', GI.playerHref(pid) + '?view=progression']], 'overview') : '') + hero;
-    h += '<div class="gi-toolbar" style="margin-top:var(--sp-6)"><a class="qk-btn primary" href="' + GI.compareHref(pid) + '">Compare</a><a class="qk-btn" href="#/compare/progression/' + encodeURIComponent(pid) + '">Compare progression</a><a class="qk-btn" id="pp-all" href="' + GI.ghref('players', S, { g: g0 ? g0.code : group }) + '">All ' + esc(peerShort) + '</a></div>';
+    h += '<div class="gi-toolbar" style="margin-top:var(--sp-6)"><a class="qk-btn primary" href="' + GI.compareHref(pid) + '">Compare</a><a class="qk-btn" href="#/compare/progression/' + encodeURIComponent(pid) + '">Compare progression</a><a class="qk-btn" id="pp-all" href="' + GI.scoutHref(g0 ? g0.code : group, S) + '">All ' + esc(peerShort) + '</a></div>';
     if (group === 'OL') h += GI.note('Offensive linemen have no individual metrics in the public data. The team page carries the line\'s unit ratings.');
 
     /* How sure are we (filled once the metric spec's M50 samples are in) */
@@ -449,7 +449,7 @@ GI.route('player', function (el, params) {
         if (g !== g0) {
           peerShort = g.name.toLowerCase();
           const ab = document.getElementById('pp-all');
-          if (ab) { ab.textContent = 'All ' + peerShort; ab.setAttribute('href', GI.ghref('players', S, { g: g.code })); }
+          if (ab) { ab.textContent = 'All ' + peerShort; ab.setAttribute('href', GI.scoutHref(g.code, S)); }
           el.querySelectorAll('.gi-peer-name').forEach(n => { n.textContent = peerShort; });
         }
         // last season's ring from the player file (careers.add_prev_pct): the pool the rail ranks in this season, so

@@ -35,7 +35,7 @@ var QK = window.QK, QKC = window.QKC;
 var esc = FB.esc, isNum = FB.isNum, num = FB.num, pct = FB.pct, signed = FB.signed;
 
 function subnav(active) {
-  return FB.subnav([['#/lab', 'Player lab', 'lab'], ['#/compare/players', 'Compare players', 'players'], ['#/compare/clubs', 'Compare clubs', 'clubs']], active, 'Lab views');
+  return FB.subnav([['#/scout', 'Scouting Room', 'lab'], ['#/scout?view=chart', 'Chart', 'chart'], ['#/compare/players/_', 'Compare players', 'players'], ['#/clubs/h2h', 'Teams head to head', 'clubs']], active, 'Compare views');
 }
 function mean(a) { return a.length ? a.reduce(function (x, y) { return x + y; }, 0) / a.length : 0; }
 function stats(a) { var n = a.length; if (!n) return { m: 0, s: 1 }; var m = mean(a); var v = a.reduce(function (x, y) { return x + (y - m) * (y - m); }, 0) / n; return { m: m, s: Math.sqrt(v) || 1 }; }
@@ -311,7 +311,15 @@ function stateFromRoute(p) {
 }
 /* the colour the address leaves out: the view's in Position mode (a reload re-applies it), else the default */
 function defColorNow() { return byPos() && S.viewColor ? S.viewColor : S.defColor; }
+/* The Lab mounted inside the Scouting Room (FB.lab.mount): no page head, the room owns the address (onState), and a
+   dot opens the room's profile drawer (onPick). null when the Lab is its own page. */
+var EMBED = null;
 function writeHash() {
+  if (EMBED) {
+    if (EMBED.onState) EMBED.onState({ w: S.win, c: S.scope, pos: S.pos, within: S.within, role: S.role, x: S.preset < 0 ? S.x : '', y: S.preset < 0 ? S.y : '', preset: S.preset > 0 ? S.preset : '',
+      color: S.color === defColorNow() ? '' : (S.color || 'none'), size: S.size === 'minutes' ? '' : (S.size || 'none'), min: S.min === defMin() ? '' : S.min, q: S.q || '' });
+    return;
+  }
   var q = { w: S.win === 'season' ? null : S.win, min: S.min === defMin() ? null : S.min, preset: S.preset >= 0 ? (S.preset ? S.preset : null) : null,
     x: S.preset < 0 ? S.x : null, y: S.preset < 0 ? S.y : null, size: S.size === 'minutes' ? null : (S.size || 'none'), color: S.color === defColorNow() ? null : (S.color || 'none'),
     shrink: S.shrink ? null : '0', adj: S.adj ? null : '0', q: S.q || null };
@@ -321,17 +329,30 @@ function writeHash() {
 }
 
 FB.route('lab', function (el, p) {
+  EMBED = null;
   S = stateFromRoute(p);
   el.innerHTML = FB.pageHead('Lab', 'Player lab', 'Chart any two player metrics for one position group: broad (goalkeepers, or outfield players by line) or a formation role (centre-backs, full-backs, strikers ...). Every player is one dot: matches in the season or window, across every competition, club football only, national-team football only, or one competition. Presets pick the pairs that separate styles of player; medians split the chart into quadrants. Position opens on what makes a player in that role good, their attacking or on-the-ball output, and their overall value.') +
-    subnav('lab') +
-    '<section class="qk-card fb-lb-ctl"><div class="qk-card-body" id="lb-ctl">' + FB.loading('lines', 3) + '</div></section>' +
+    subnav('lab') + labBody();
+  return show(el, true);
+});
+/* The Lab inside the Scouting Room's Chart view (scout-room.js): o = { comp (scope), pos (letter), query (w, x, y,
+   color, size, min, preset, q, within, pos role), onState(state) (the room writes its address), onPick(pid) (a dot or a
+   name opens the profile drawer) }. Renders into el; returns a Promise. */
+FB.lab = { mount: function (el, o) {
+  o = o || {};
+  EMBED = { onState: o.onState || null, onPick: o.onPick || null };
+  S = stateFromRoute({ comp: o.comp, pos: o.pos, query: o.query || {} });
+  el.innerHTML = labBody();
+  return show(el, true);
+} };
+function labBody() {
+  return '<section class="qk-card fb-lb-ctl"><div class="qk-card-body" id="lb-ctl">' + FB.loading('lines', 3) + '</div></section>' +
     '<div id="lb-cover"></div>' +
     FB.card('<span id="lb-title">The chart</span>', '<span id="lb-sub"></span>', FB.chartBox('lb-chart', 640, 'Player lab scatter') + '<div id="lb-sim" class="fb-lb-sim"></div><p class="fb-cap" id="lb-note"></p>', { id: 'lb-chart-card' }) +
     '<div id="lb-ours" class="fb-mt"></div>' +
     QK.explain('<b>What’s that number?</b> Every dot is one player, and the top-right corner is better than the middle of the group on both axes. <b>Shrink small samples</b> pulls a player with few minutes towards the group’s middle, so a hot few hundred minutes does not top the chart; <b>league-adjust</b> multiplies attacking rates by the scoring factor of the leagues they came from.', { cls: 'fb-mt' }) +
     FB.card('Ranked on this view', 'The group ranked by the sum of standard scores on both axes (better direction); percentiles within the group (Broad or Position, as chosen above) shown, and in Position mode the role’s value column with its percentile. Top 60. A standard score is how many spreads above the group’s average a number sits: +1 is better than about five in six.', '<div id="lb-table"></div>', { flush: true, cls: 'fb-mt' });
-  return show(el, true);
-});
+}
 
 function show(el, first) {
   return loadView(S.win, S.scope).then(function (lab) {
@@ -554,7 +575,8 @@ function draw(el) {
       text: [lower(S.color) ? 'worse' : 'better', lower(S.color) ? 'better' : 'worse'], textStyle: { color: T.ink3, fontSize: 10 },
       inRange: { color: lower(S.color) ? [T.pos, T.mid, T.neg] : [T.neg, T.mid, T.pos] } };
     return opt;
-  }, { label: 'Player lab: ' + label(S.y) + ' against ' + label(S.x) });
+  }, { label: 'Player lab: ' + label(S.y) + ' against ' + label(S.x),
+    onClick: EMBED && EMBED.onPick ? function (prm) { var r = (prm.data || {}).r; if (r) EMBED.onPick(String(r[I.player_id])); } : undefined });
 
   FB.set('lb-note', 'One dot per player: minutes and rates over ' + esc(single() ? scopeName : scopeName.toLowerCase()) + ' in the view, however many competitions that spans. Dotted lines are the medians of this group (' + esc(groupNoun()) + '). ' + (lower(S.x) || lower(S.y) ? 'Axes where less is better are reversed, so better is always up and to the right. ' : 'Better is up and to the right. ') +
     'Labelled: the twelve players furthest into that corner (sum of standard scores on both axes)' + (hits.length ? ', and your search (blue rings)' : '') + '. Click a dot to open the player.' +
@@ -639,7 +661,7 @@ FB.route('compare', function (el, p) {
   var viewTabs = kind === 'players' && a && b && a !== '_' ? FB.subnav([['#/compare/players/' + esc(a) + '/' + esc(b) + keep({ view: null }), 'Side by side', 'v2'],
     ['#/compare/players/' + esc(a) + '/' + esc(b) + keep({ view: 'classic', p3: null }), 'Every metric (classic)', 'classic'],
     ['#/compare/progression/' + [a, b, c3].filter(function (x) { return x && x !== '_'; }).map(function (x) { return esc(String(x).split(':').pop()); }).join('/') + (q0.scope === 'intl' ? '?scope=intl' : ''), 'Career progression', 'prog']], classic ? 'classic' : 'v2', 'Comparison view') : '';
-  el.innerHTML = FB.pageHead('Lab', kind === 'players' ? 'Compare players' : 'Compare clubs',
+  el.innerHTML = FB.pageHead(kind === 'players' ? 'Scouting Room' : 'Teams', kind === 'players' ? 'Compare players' : 'Compare clubs',
       kind === 'players' ? 'Two or three players from any competition, side by side on the metrics that best describe and predict their play, ranked against their own position group.' : 'Two clubs from any competition, side by side: our chance if they met, the tale of the tape, style, form, season chances and year by year.') +
     subnav(kind) +
     '<section class="qk-card fb-lb-pick"><div class="qk-card-body">' + FB.toolbar([
@@ -667,6 +689,24 @@ FB.route('compare', function (el, p) {
   return kind === 'players' ? comparePlayers(el, a, b, q0.scope, classic ? null : c3, classic) : compareClubs(el, a, b);
 });
 
+/* Teams › Head to head (clubs.js, #/clubs/h2h?a=&b=): the club compare inside the Teams page, two pickers over every
+   club and national team, "If they met" (the pooled fit for clubs, the international fit for two national teams) and
+   the tale of the tape. go(a, b) changes the address. */
+FB.clubsH2H = function (host, a, b, go) {
+  host.innerHTML = '<section class="qk-card fb-lb-pick"><div class="qk-card-body">' + FB.toolbar([picker('lb-pa', 'First club or team', 0), picker('lb-pb', 'Second club or team', 1),
+    (a && b ? '<button type="button" class="qk-btn" id="lb-swap2" title="Swap the two">⇄ Swap</button>' : '')]) + '<div id="lb-picked" class="fb-lb-picked"></div></div></section><div id="lb-body"></div>';
+  wirePicker(host, 'lb-pa', 'clubs', function (k) { go(k, b); });
+  wirePicker(host, 'lb-pb', 'clubs', function (k) { go(a, k); });
+  var sw = host.querySelector('#lb-swap2'); if (sw) sw.addEventListener('click', function () { go(b, a); });
+  if (!a || !b) {
+    var ex = [['42', '2817', 'Arsenal v Barcelona'], ['42', '44', 'Arsenal v Liverpool'], ['2829', '2672', 'Real Madrid v Bayern'], ['3202', '5981', 'Boca v Flamengo'], ['4698', '4819', 'Spain v Argentina']];
+    FB.set('lb-body', FB.card('Pick two', '', '<p class="qk-sub">Type a name in each box, or try one of these:</p><div class="qk-chips">' +
+      ex.map(function (x) { return '<a class="qk-chip" href="#/clubs/h2h?a=' + x[0] + '&amp;b=' + x[1] + '">' + esc(x[2]) + '</a>'; }).join('') + '</div>'));
+    return null;
+  }
+  FB.set('lb-body', FB.loading('card', 4));
+  return compareClubs(host, a, b);
+};
 function picker(id, placeholder, side) {
   return FB.field(placeholder, '<span class="fb-lb-picker">' + sideDot(side) + '<input class="qk-input" id="' + id + '" type="search" placeholder="Search…" autocomplete="off" spellcheck="false" aria-label="' + esc(placeholder) + '"><span class="fb-lb-res" id="' + id + '-r" hidden></span></span>');
 }
@@ -989,7 +1029,7 @@ function buildCompareV2(el, P) {
     (same && sameComp && distKeys.length ? FB.card('Where they sit', '<span id="lb-dist-sub"></span>', '<div class="fb-lb-distseg">' + FB.seg('lb-dist-m', distKeys.map(function (k) { return [k, meta[k].label || k]; }), distKeys[0], 'Metric') + '</div>' +
       FB.chartBox('lb-dist', 260, 'Peer distribution with the players marked'), { cls: 'fb-mt' }) : '') +
     '<p class="fb-cap">' + P.map(function (x) { return '<a href="' + esc(FB.href.player(x.id)) + '">' + esc(x.doc.name) + ' →</a>'; }).join(' · ') +
-    ' · <a href="#/lab/' + esc(pooled ? P[0].scope : (sameComp && P[0].comp) ? P[0].comp : 'all') + '/' + esc(L) + '">Player lab →</a> · <a href="#/model/glossary">Glossary →</a></p>';
+    ' · <a href="' + esc(FB.legacyRedirect('#/lab/' + (pooled ? P[0].scope : (sameComp && P[0].comp) ? P[0].comp : 'all') + '/' + L)) + '">Chart in the Scouting Room →</a> · <a href="#/model/glossary">Glossary →</a></p>';
   if (!(same && sameComp && distKeys.length)) return;
   var peers;
   if (pooled && P[0].V) {
@@ -1101,7 +1141,7 @@ function buildPlayers(el, P) {
       FB.card(sideDot(1) + esc(B.doc.name) + ': this season, every competition', '', '<div id="lb-ss-b"></div>', { span: 6, flush: true })
     ) + '</div>' +
     '<p class="fb-cap">' + P.map(function (x) { return '<a href="' + esc(FB.href.player(x.id)) + '">' + esc(x.doc.name) + ' →</a>'; }).join(' · ') +
-    ' · <a href="#/lab/' + esc(A.pooled ? A.scope : A.comp && A.comp === B.comp ? A.comp : 'all') + '/' + esc(gk ? 'G' : ({ D: 'D', M: 'M', F: 'F' }[A.doc.pos] || 'M')) + '">Player lab →</a> · <a href="#/model/glossary">Glossary →</a></p>';
+    ' · <a href="' + esc(FB.legacyRedirect('#/lab/' + (A.pooled ? A.scope : A.comp && A.comp === B.comp ? A.comp : 'all') + '/' + (gk ? 'G' : ({ D: 'D', M: 'M', F: 'F' }[A.doc.pos] || 'M')))) + '">Chart in the Scouting Room →</a> · <a href="#/model/glossary">Glossary →</a></p>';
 
   if (both) {
     var axes = gk ? RADAR_GK : RADAR_OUT;
@@ -1276,16 +1316,16 @@ function clubComp(doc, want) {
 }
 
 function compareClubs(el, ka, kb) {
-  return Promise.all([FB.clubsIndex(), FB.load('pool.json')]).then(function (arr) {
+  return Promise.all([FB.clubsIndex(), FB.load('pool.json'), FB.load('nations.json')]).then(function (arr) {
     if (!FB.alive(el)) return;
-    var ci = arr[0], pool = arr[1] || {};
+    var ci = arr[0], pool = arr[1] || {}, nat = arr[2] || {};
     var R = [resolveClub(ka, ci), resolveClub(kb, ci)];
     if (!R[0] || !R[1]) {
       FB.set('lb-picked', [ka, kb].map(function (k, i) { return '<span class="qk-badge">' + sideDot(i) + esc(R[i] ? ci.byId[R[i].tid].name : k + ': not found') + '</span>'; }).join(' v '));
       FB.set('lb-body', FB.empty('Club not found', 'Use the search boxes to pick two clubs.'));
       return;
     }
-    if (splitKey(ka)[0] || splitKey(kb)[0]) FB.setHashQuiet('#/compare/clubs/' + R[0].tid + '/' + R[1].tid);
+    if (splitKey(ka)[0] || splitKey(kb)[0]) FB.setHashQuiet('#/clubs/h2h?a=' + R[0].tid + '&b=' + R[1].tid);
     return Promise.all(R.map(function (r) { return FB.load('clubs/' + r.tid + '.json'); })).then(function (docs) {
       if (!FB.alive(el)) return;
       var K = R.map(function (r, i) {
@@ -1318,6 +1358,11 @@ function compareClubs(el, ka, kb) {
           k.pool = ((pool.clubs || []).filter(function (c) { return String(c.team_id) === k.tid; })[0]) || null;
           k.cobj = FB.comp(k.comp) || {};
         });
+        /* two national teams: "If they met" from the international fit (nations.json), on the same Dixon-Coles maths */
+        if (K[0].doc.national && K[1].doc.national && nat.model) {
+          K.forEach(function (k) { k.pool = ((nat.teams || []).filter(function (t) { return t.team === k.doc.name; })[0]) || null; });
+          pool = { model: nat.model, clubs: [] };
+        }
         buildClubs(el, K, pool);
       });
     });

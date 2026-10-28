@@ -214,9 +214,15 @@ FB.route('match', function (el, p) {
     var jobs = [f.detail ? FB.load(c.slug + '/matches/' + f.id + '.json') : Promise.resolve(null)];
     jobs.push(f.status !== 'finished' && FB.hasFile(c.slug, 'market_odds') ? FB.compFile(c.slug, 'market_odds') : Promise.resolve(null));
     jobs.push(!hit.past ? FB.compFiles(c.slug, ['strength', 'team_stats', 'table']) : Promise.resolve(null));
+    /* a finished match whose fixture no longer carries our line: the chance frozen before kick-off (forecast_log.json,
+       id -> [home, draw, away, kick-off, competition]), so the page keeps "Our pre-match call" */
+    var needLog = f.status === 'finished' && !(f.model && isNum(f.model.h));
+    jobs.push(needLog ? FB.load('forecast_log.json') : Promise.resolve(null));
     return Promise.all(jobs).then(function (r) {
       if (!FB.alive(el)) return;
       var m = r[0];
+      var lg = needLog && r[3] ? r[3][String(f.id)] : null;
+      if (lg && isNum(lg[0]) && isNum(lg[1]) && isNum(lg[2])) f = FB.merge(f, { model: { h: lg[0], d: lg[1], a: lg[2], logged: true } });
       var mk = null;
       (((r[1] || {}).matches || {}).fixtures || []).forEach(function (x) { if (String(x.match_id) === String(f.id) && x.market) mk = x; });
       if (mk) { mk._src = (r[1] || {}).sources || []; mk._at = (r[1] || {}).updated_at; }
@@ -291,6 +297,8 @@ function hero(c, f, m, hit, mk, side) {
   var h = st[f.home] || {}, a = st[f.away] || {};
   var fx = [];
   var add = function (label, av, bv, fm, low) { if (isNum(av) && isNum(bv)) fx.push({ label: label, a: fm(av), b: fm(bv), better: Math.abs(av - bv) < 1e-9 ? null : ((av > bv) !== !!low ? 'a' : 'b') }); };
+  /* before kick-off the tale of the tape below carries these: the hero keeps them only after it */
+  if (f.status !== 'finished' && !live) add = function () {};
   add('Our rating (points a game)', a.strength_ppg, h.strength_ppg, function (v) { return num(v, 2); });
   add('Points a game', a.ppg, h.ppg, function (v) { return num(v, 2); });
   add('xG for a match', isNum(ta.xg) ? ta.xg : null, isNum(th.xg) ? th.xg : null, function (v) { return num(v, 2); });
@@ -321,8 +329,7 @@ function hero(c, f, m, hit, mk, side) {
 function kpiStrip(f) {
   var md = f.model || {};
   var out = [];
-  var k = [['h', f.home], ['d', 'Draw'], ['a', f.away]].sort(function (x, y) { return (md[y[0]] || 0) - (md[x[0]] || 0); })[0];
-  out.push(FB.kpi(k[0] === 'd' ? 'Most likely result' : 'Our win chance', esc(k[1]) + ' ' + pct(md[k[0]]), { signal: true, text: true, sub: 'draw ' + pct(md.d) + (md.lineups ? ' · with the confirmed line-ups' : ''), tip: 'Our chance of each result: Dixon-Coles on goals and xG' }));
+  /* the home / draw / away chance is the hero's: it is not repeated here */
   if (isNum(md.lh)) out.push(FB.kpi('Expected goals', num(md.lh, 2) + '–' + num(md.la, 2), { sub: esc(f.home) + ' – ' + esc(f.away), tip: 'The goals our model expects each side to score' }));
   if (md.score) out.push(FB.kpi('Most likely score', esc(md.score), { sub: isNum(md.p_score) ? pct(md.p_score) + ' chance, home first' : 'home first' }));
   if (isNum(md.o25)) out.push(FB.kpi('3 or more goals', pct(md.o25), { sub: '2 or fewer: ' + pct(1 - md.o25) }));
@@ -333,18 +340,27 @@ function kpiStrip(f) {
 /* Our forecast, with the market as a quiet reference column named by its source (never a gap or a headline). */
 function forecastCard(f, mk, done) {
   var md = f.model;
+  if (!done) mk = null;
   var src = mk ? (mk._src || []).map(function (k) { return k === 'kalshi' ? 'Kalshi' : k === 'polymarket' ? 'Polymarket' : k; }) : [];
   var mlab = 'Market' + (src.length ? ' (' + src.join(' / ') + ')' : '');
   var mv = function (k) { return mk && mk.market && isNum(mk.market[k]) ? pct(mk.market[k], 0) : ''; };
-  var rows = [
+  /* before kick-off the hero carries the home / draw / away chance (and the market's, quietly): the table keeps the
+     other questions; after the whistle it is the record of our call */
+  var rows = done ? [
     [esc(f.home) + ' win', pct(md.h, 0), mv('home')],
     ['Draw', pct(md.d, 0), mv('draw')],
     [esc(f.away) + ' win', pct(md.a, 0), mv('away')]
-  ];
+  ] : [];
   if (isNum(md.lh)) rows.push(['Expected goals', esc(f.home) + ' ' + num(md.lh, 2) + ' – ' + num(md.la, 2) + ' ' + esc(f.away), '']);
   if (md.score) rows.push(['Most likely score', esc(md.score) + (isNum(md.p_score) ? ' (' + pct(md.p_score) + ')' : ''), '']);
   if (isNum(md.o25)) rows.push(['3 or more goals', pct(md.o25), '']);
   if (isNum(md.btts)) rows.push(['Both sides score', pct(md.btts), '']);
+  if (done && isNum(f.hs) && isNum(f.as) && f.status === 'finished') {
+    var res = f.hs > f.as ? 'h' : f.hs < f.as ? 'a' : 'd';
+    var said = [['h', md.h], ['d', md.d], ['a', md.a]].sort(function (x, y) { return y[1] - x[1]; })[0][0];
+    rows.push(['What happened', esc(res === 'd' ? 'A draw, ' + f.hs + '–' + f.as : (res === 'h' ? f.home : f.away) + ' won ' + Math.max(f.hs, f.as) + '–' + Math.min(f.hs, f.as)) +
+      ' · we gave that ' + pct(md[res], 0) + (said === res ? ' (our likeliest result)' : ''), '']);
+  }
   var table = '<div class="qk-table-wrap"><table class="qk-table dense fb-mx-fc"><thead><tr><th scope="col">Question</th><th scope="col">Our forecast' + (md.lineups ? ' (with the XIs)' : '') + '</th>' +
     (mk ? '<th scope="col" class="mk"><span data-tip="The prediction markets’ probability with the margin removed, shown as a reference next to ours">' + esc(mlab) + '</span></th>' : '') + '</tr></thead><tbody>' +
     rows.map(function (r) { return '<tr><td>' + r[0] + '</td><td class="ours">' + r[1] + '</td>' + (mk ? '<td class="mk">' + (r[2] || '') + '</td>' : '') + '</tr>'; }).join('') + '</tbody></table></div>';
@@ -361,7 +377,7 @@ function forecastCard(f, mk, done) {
   var cap = '<p class="fb-cap">Ours: Dixon-Coles on goals and xG, with past closing lines as an input' + (md.lineups ? ' and the confirmed line-ups' : '') + '. ' +
     (mk ? esc(mlab) + ': the margin removed' + (mk.books > 1 ? ', the average of ' + mk.books + ' venues' : '') + (mk._at ? ', read ' + esc(FB.fmtStamp(mk._at)) : '') + '; shown for reference, it is not part of our forecast. ' : '') +
     '<a href="#/model/calibration">How our forecasts score →</a></p>';
-  return FB.card(done ? 'Our pre-match forecast' : 'Our forecast', done ? 'What we said before kick-off.' : 'Our chance of each result; the market column is a reference, not our forecast.', table + shift + cap, { flush: false });
+  return FB.card(done ? 'Our pre-match call' : 'Our forecast', done ? 'What we said before kick-off, against what happened.' : 'Goals, the likeliest score and both sides scoring; the win chances are in the hero.', table + shift + cap, { flush: false });
 }
 
 /* The tale of the tape: our rating, Elo and the season's xG for both clubs (strength.json, team_stats.json). */
@@ -406,7 +422,9 @@ function xiCard(f) {
     var out = (s.out || []).map(function (p) {
       return '<li>' + FB.playerLink(p.id, p.n || ('#' + p.id)) + ' <span class="qk-muted">started ' + Math.round(p.share * 100) + '% of the last ' + (s.n_usual || x.n_usual) + '</span></li>';
     }).join('');
-    var miss = (s.missing || []).map(function (p) { return esc(p.n); }).join(', ');
+    var inXi = {};
+    (s.xi || []).forEach(function (p) { if (p.id) inXi[String(p.id)] = 1; });
+    var miss = (s.missing || []).filter(function (p) { return !(p.id && inXi[String(p.id)]); }).map(function (p) { return esc(p.n); }).join(', ');
     var head = isNum(s.delta)
       ? FB.kpi('Against the usual XI', FB.signed(s.delta, 2), { sub: 'goals of expected goal difference a match', tip: 'The XI\'s player values minus the club\'s usual XI (its last ' + (s.n_usual || x.n_usual) + ' line-ups), both at today\'s values.' })
       : FB.kpi('Against the usual XI', '—', { sub: 'too few earlier line-ups to compare' });
@@ -655,12 +673,12 @@ function drawGoalMouth(box, m, side) {
   var shots = (m.shots || []).filter(function (s) { return sideOf(s, m) === side && isNum(s.gm_y) && isNum(s.gm_z) && s.gm_z <= 75 && s.gm_y >= 36 && s.gm_y <= 64; });
   if (!shots.length) { box.style.height = 'auto'; box.innerHTML = FB.muted((m.shots || []).length ? 'No goal-mouth data (older match format).' : 'No shots.'); return; }
   QKC.mount(box, function (T) {
-    var col = { goal: T.cat[1], save: T.cat[0], post: T.cat[3], block: T.ink3, miss: T.ink4 };
+    var col = FB.charts.outcomeColours(T);
     var frame = { type: 'line', data: [[44.6, 0], [44.6, 38], [55.4, 38], [55.4, 0]], symbol: 'none', silent: true, lineStyle: { color: T.ink1, width: 3 }, tooltip: { show: false }, z: 1 };
     var ground = { type: 'line', data: [[37, 0], [63, 0]], symbol: 'none', silent: true, lineStyle: { color: T.axis, width: 1 }, tooltip: { show: false } };
     var series = FB.charts.OUTCOMES.map(function (o) {
       var pts = shots.filter(function (s) { return outcomeOf(s) === o[0]; });
-      return { type: 'scatter', name: o[1], z: 3, data: pts.map(function (s) {
+      return { type: 'scatter', name: o[1], z: 3, itemStyle: { color: col[o[0]] }, data: pts.map(function (s) {
         return { value: [100 - s.gm_y, s.gm_z, s.xgot || s.xg || 0], name: s.player_name + ' ' + minuteText(s), itemStyle: { color: col[o[0]], borderColor: T.s1, borderWidth: 1 } };
       }), symbolSize: function (v) { return 8 + Math.sqrt(Math.max(v[2], 0.01)) * 24; } };
     }).filter(function (s) { return s.data.length; });
@@ -751,12 +769,15 @@ function drawBench(el, m) {
   var box = el.querySelector('#mx-bench');
   function row(e) {
     return '<li><span class="fb-mx-no">' + esc(e.no || '') + '</span>' + FB.posBadge(e.pos) + '<span class="fb-mx-pn">' + FB.playerLink(e.id, e.n) + (e.cap ? ' <span class="qk-muted">(c)</span>' : '') + '</span><span class="fb-num qk-muted">' + (e.min ? e.min + '\'' : '') + '</span>' +
-      (isNum(e.rt) ? '<span class="fb-mx-rt" style="background:' + FB.charts.ratingColor(e.rt) + '">' + num(e.rt, 1) + '</span>' : '<span></span>') + '</li>';
+      (isNum(e.rt) ? '<span class="fb-mx-rt" style="background:' + FB.charts.ratingColor(e.rt) + ';color:' + FB.charts.ratingInk(e.rt) + '">' + num(e.rt, 1) + '</span>' : '<span></span>') + '</li>';
   }
   function side(s, name) {
     var list = (m.lineups || {})[s] || [];
     var starters = list.filter(function (e) { return e.start; }), subs = list.filter(function (e) { return !e.start && (e.min || 0) > 0; }), unused = list.filter(function (e) { return !e.start && !(e.min > 0); });
-    var missing = (m.missing || {})[s] || [];
+    /* a player in the match squad is never also "Missing" (Sofascore can list a late fitness test as both) */
+    var inSquad = {};
+    list.forEach(function (e) { if (e.id) inSquad['i' + e.id] = 1; if (e.n) inSquad['n' + String(e.n).toLowerCase()] = 1; });
+    var missing = ((m.missing || {})[s] || []).filter(function (x) { return !(x.id && inSquad['i' + x.id]) && !(x.n && inSquad['n' + String(x.n).toLowerCase()]); });
     var out = '<div class="qk-span-6"><div class="qk-kicker fb-mx-bh">' + esc(name) + '</div>';
     if (starters.length) out += '<div class="fb-mx-bt">Starting XI</div><ul class="fb-mx-list">' + starters.map(row).join('') + '</ul>';
     if (subs.length) out += '<div class="fb-mx-bt">Came on</div><ul class="fb-mx-list">' + subs.map(row).join('') + '</ul>';
@@ -846,7 +867,7 @@ function drawPlayers(el, m, which) {
     { key: 'n', label: 'Player', sticky: true, fmt: function (v, r) { return '<span class="fb-mx-dot" style="background:' + sideVar(r.side) + '"></span>' + FB.playerLink(r.id, v) + (r.start ? '' : ' <span class="qk-muted">sub</span>'); } },
     { key: 'pos', label: 'Pos', fmt: function (v) { return FB.posBadge(v); } },
     { key: 'min', label: 'Min', num: true },
-    { key: 'rt', label: 'Rating', num: true, fmt: function (v) { return isNum(v) ? '<span class="fb-mx-rt" style="background:' + FB.charts.ratingColor(v) + '">' + num(v, 1) + '</span>' : ''; } },
+    { key: 'rt', label: 'Rating', num: true, fmt: function (v) { return isNum(v) ? '<span class="fb-mx-rt" style="background:' + FB.charts.ratingColor(v) + ';color:' + FB.charts.ratingInk(v) + '">' + num(v, 1) + '</span>' : ''; } },
     { key: 'g', label: 'G', num: true, fmt: function (v) { return blank(v); } },
     { key: 'a', label: 'A', num: true, fmt: function (v) { return blank(v); } },
     { key: 'xg', label: 'xG', num: true, fmt: function (v) { return blank(v, 2); } },

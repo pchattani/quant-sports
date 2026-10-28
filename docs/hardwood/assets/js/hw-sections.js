@@ -87,6 +87,11 @@ function standingsTable(node, L, S, rows, sim, fmt, league, lo) {
     cols.push({ key: 'pt', label: 'Title', num: true, fmt: v => '<b>' + U.pct(v) + '</b>' });
     cols.push({ key: 'mg', label: 'Clinch', sort: false, fmt: (v, r) => magic(r.s) });
   }
+  /* round 9: a finished season (no simulation) carries its final flags: z top seed, x playoffs, p play-in, e out */
+  if (!live && HW.recap && HW.recap.flagSeason) {
+    const fl = HW.recap.flags(HW.recap.flagSeason);
+    if (Object.keys(fl).length) cols.push({ key: 'team', label: 'Finish', sort: false, fmt: v => HW.recap.flagHTML(fl[String(v)]), tip: 'z top seed, x playoffs, p out in the play-in, e missed the postseason' });
+  }
   if (lo) cols.push({ key: 'team', label: 'Profile', sort: false, tip: 'What stands out about the team; press + for its full card (strengths, weaknesses and the race)',
     fmt: (v, r) => QKL.chip(lo, String(r.team)) || '<span class="qk-muted">—</span>' });
   QK.leaderboard(node, { columns: cols, rows: data, dense: true, rowHref: r => HW.teamHref(L, r.team, S) });
@@ -105,6 +110,7 @@ function standingsTab(node, L, S, params) {
     const sim = HW.simTeams(season), st = season.standings || {}, fmt = season.format || {};
     const confs = Object.keys(st).filter(c => (st[c] || []).length).sort();
     const leagueWide = fmt.seeding === 'league';
+    if (HW.recap) HW.recap.flagSeason = season;
     const all = () => { const list = []; confs.forEach(c => (st[c] || []).forEach(r => list.push(r)));
       return list.sort((a, b) => (leagueWide && isNum(a.seed) && isNum(b.seed) ? a.seed - b.seed : 0) || (b.pct || 0) - (a.pct || 0) || (b.w || 0) - (a.w || 0)).map((r, i) => Object.assign({}, r, { seed: leagueWide ? r.seed : i + 1 })); };
     const views = confs.map(c => [c, c]).concat(confs.length > 1 ? [['__all', 'League']] : []);
@@ -122,27 +128,17 @@ function standingsTab(node, L, S, params) {
     h += U.card2(open ? 'Standings and our chances' : 'Standings', open && season.sim ? Number(season.sim.n_sims).toLocaleString('en-GB') + ' simulations of the rest of the season. Dashed lines: the playoff' + (fmt.playin ? ' and play-in' : '') + ' cuts.' : 'Records and seeds.',
       (views.length > 1 ? '<div class="qk-seg" id="st-seg" role="group" aria-label="Group" style="margin:0 16px 12px">' + views.map(v => '<button type="button" data-value="' + esc(v[0]) + '" aria-pressed="' + (v[0] === first) + '">' + esc(v[1]) + '</button>').join('') + '</div>' : '') + '<div id="st-table"></div>' +
       (open ? '<div style="padding:12px 16px 16px">' + QK.note('<b>Playoffs 60%</b> means the team made the playoffs in about 6 of every 10 simulated seasons. <b>Proj W</b> is the average win total across them; hover it for the range that holds nine seasons in ten.' + (season.league && window.QKL ? ' <b>+</b> opens a team’s card: its strengths and weaknesses against the rest of the league and where its race stands.' : '')) + '</div>' : ''), { flush: true });
-    if (open) {
-      h += '<div class="qk-grid hw-sec">' + confs.map((c, i) => U.card2(c + ': who makes the playoffs', fmt.playin ? 'Our chance: a top-six seed goes straight through; seeds 7-10 play in' : 'Our chance of a playoff place', U.chart('st-odds-' + i, 22 * (st[c] || []).length + 70, c + ' playoff chances'), { cls: confs.length > 1 ? 'qk-span-6' : 'qk-span-12' })).join('') + '</div>';
-    }
+    /* round 9: the playoff bars and the race chart moved to Chances; the player leaders to the Scouting Room */
+    if (open) h += '<p class="hw-flex" style="margin-top:12px">' + U.link(HW.href(L, 'standings', S) + (HW.sq(L, S) ? '&' : '?') + 'tab=chances', 'Every chance: the title race, the playoff picture, seeds and win totals') + '</p>';
     const lo = leagueOpts(season, L, S);
-    if (lo) h += '<div id="st-race"></div>';
-    if (window.QKL && QKL.leaders) h += '<div id="st-perf"></div>';
     if (lo) h += '<div id="st-shape"></div>';
+    h += QK.explain('The leaders and the bottom five on every number, by role, are in the <a class="qk-link" href="' + esc(HW.href(L, 'scout', S) + (HW.sq(L, S) ? '&' : '?') + 'view=leaders') + '">Scouting Room ▸ Leaders</a>.', { title: 'Looking for the player leaders?' });
     node.innerHTML = h;
     const draw = k => standingsTable(document.getElementById('st-table'), L, S, k === '__all' ? all() : (st[k] || []), sim, fmt, k === '__all', lo);
     draw(first);
     const seg = document.getElementById('st-seg');
     if (seg) QK.seg(seg, draw);
-    if (open) confs.forEach((c, i) => {
-      const ids = (st[c] || []).map(r => r.team).sort((a, b) => ((sim[b] || {}).p_playoffs || 0) - ((sim[a] || {}).p_playoffs || 0));
-      const series = fmt.playin
-        ? [{ name: 'Top-six seed', data: ids.map(t => r3((sim[t] || {}).p_top6)) }, { name: 'Via the play-in', data: ids.map(t => r3(Math.max(0, ((sim[t] || {}).p_playoffs || 0) - ((sim[t] || {}).p_top6 || 0)))) }]
-        : [{ name: 'Playoffs', data: ids.map(t => r3((sim[t] || {}).p_playoffs)) }];
-      QKC.bar('#st-odds-' + i, { cats: ids.map(t => HW.teamAbbr(L, t)), series: series, horizontal: true, stack: true, legend: series.length > 1, fmt: v => U.pct(v), max: 1, hrefs: ids.map(t => HW.teamHref(L, t, S)), labelWidth: 46, valName: 'Our playoff chance', catName: 'Team' });
-    });
-    if (lo) { QKL.race(document.getElementById('st-race'), lo); QKL.shape(document.getElementById('st-shape'), lo); }
-    if (window.QKL && QKL.leaders) performers(document.getElementById('st-perf'), season, L, S);
+    if (lo) QKL.shape(document.getElementById('st-shape'), lo);
     if (!live) HW.setMeta('');
   });
 }
@@ -189,74 +185,36 @@ function historyTab(node, L) {
   });
 }
 
+/* Races (round 9: the award races moved here from Players): our chance for each award; before the season's first
+   games, last season's final races, said so. */
+function racesTab(body, L, S, params) {
+  return HW.load(HW.path('awards.json', L, S)).then(d => {
+    if (!U.alive(body)) return null;
+    const has = x => !!x && Object.keys(x).some(k => x[k] && x[k].model && Object.keys(x[k].model).length);
+    const prev = HW.seasons(L).filter(x => x < S)[0];
+    if (has(U.ok(d) ? d : null) || !prev) return U.legacy('awards', body, params);
+    body.innerHTML = '<div class="qk-note" style="margin-bottom:14px">No ' + esc(HW.seasonLabel(L, S)) + ' award races until the season starts: these are the final ' + esc(HW.seasonLabel(L, prev)) + ' races.</div><div></div>';
+    return U.legacy('awards', body.lastChild, Object.assign({}, params, { season: prev }));
+  });
+}
+
 function renderStandings(el, params) {
   const L = U.L(params), S = U.S(params);
   // the market comparison lives on the Model page now; old links land there
   if (((params.query || {}).tab) === 'markets') { HW.go(HW.href(L, 'model', S) + (HW.sq(L, S) ? '&' : '?') + 'tab=markets'); return null; }
-  const tab = U.tab(params, ['table', 'odds', 'bracket', 'history'], 'table');
+  const q = params.query || {};
+  const tab = q.tab === 'odds' ? 'chances' : U.tab(params, ['table', 'chances', 'bracket', 'history', 'races'], 'table');
   const body = U.section(el, { title: 'Standings', kicker: U.kicker(L, S), sub: 'Where every team stands, our playoff and title chances from the season simulation, and the bracket.',
-    tabs: U.tabs(L, 'standings', [['table', 'Table'], ['odds', 'Chances & ratings'], ['bracket', 'Bracket'], ['history', 'History', false]], S), active: tab });
+    tabs: U.tabs(L, 'standings', [['table', 'Table'], ['chances', 'Chances'], ['bracket', 'Bracket'], ['history', 'History', false], ['races', 'Races']], S), active: tab });
+  if (tab === 'chances') return HW.chances.tab(body, L, S);
   if (tab === 'table') return standingsTab(body, L, S, params);
-  if (tab === 'history') return historyTab(body, L);
-  const v = { odds: 'season', bracket: 'playoffs' }[tab];
+  if (tab === 'races') return racesTab(body, L, S, params);
+  if (tab === 'history') return (HW.historyTab || historyTab)(body, L);
+  const v = { bracket: 'playoffs' }[tab];
   return U.legacy(v, body, params);
 }
 
-// ── Teams ──────────────────────────────────────────────────────────────────
-
-function renderTeams(el, params) {
-  const L = U.L(params), S = U.S(params);
-  const tab = U.tab(params, ['teams', 'stats'], 'teams');
-  const body = U.section(el, { title: 'Teams', kicker: U.kicker(L, S), sub: 'Every team’s record, rating and our chances. Open a team for its ratings over time, strengths and needs, current roster, schedule and moves.',
-    tabs: U.tabs(L, 'teams', [['teams', 'Teams'], ['stats', 'Team stats']], S), active: tab });
-  if (tab === 'stats') return U.legacy('teams', body, params);
-  return HW.load(HW.path('season.json', L, S)).then(season => {
-    if (!U.alive(body)) return;
-    if (!U.ok(season)) { body.innerHTML = U.empty('Not built yet', 'The season payload is not available.'); return; }
-    const sim = HW.simTeams(season), R = season.ratings || {}, st = season.standings || {};
-    const confs = Object.keys(st).filter(c => (st[c] || []).length).sort();
-    const ids = Object.keys(R).length ? Object.keys(R) : Object.keys(season.teams || {});
-    const rec = {}; confs.forEach(c => (st[c] || []).forEach(r => { rec[r.team] = Object.assign({ conf: c }, r); }));
-    const maxNet = Math.max.apply(null, ids.map(t => Math.abs((R[t] || {}).net || 0)).concat([1]));
-    const tile = t => {
-      const r = R[t] || {}, s = sim[t] || {}, x = rec[t] || {};
-      const net = isNum(r.net) ? r.net : null;
-      return '<a class="hw-teamtile" href="' + esc(HW.teamHref(L, t, S)) + '" style="--tc:' + esc(U.tcol(L, t)) + '"><div class="top">' + QK.teamMark(U.team(L, t), 'sm') + '<span class="nm">' + esc(HW.teamName(L, t)) + '</span><span class="rec">' + (isNum(x.w) ? HW.record(x.w, x.l) : '') + '</span></div>' +
-        '<div class="row"><span>Net rating' + (isNum(r.rank) ? ' · ' + HW.ordinal(r.rank) : '') + '</span><b>' + U.signed(net, 1) + '</b></div><div class="hw-bar"><span style="width:' + (net === null ? 0 : Math.max(2, 50 + 50 * net / maxNet)).toFixed(1) + '%"></span></div>' +
-        (isNum(s.p_playoffs) ? '<div class="row"><span>' + (isNum(s.exp_w) && s.w_p95 > s.w_p05 ? 'Proj ' + U.f(s.exp_w, 1) + ' W · ' : '') + 'Playoffs</span><b>' + U.pct(s.p_playoffs) + '</b></div><div class="row"><span>Title chance</span><b>' + U.pct(s.p_title) + '</b></div>' : '') + '</a>';
-    };
-    const groups = confs.length ? confs.map(c => [c, (st[c] || []).map(r => r.team).filter(t => ids.indexOf(t) >= 0).sort((a, b) => ((R[b] || {}).net || -99) - ((R[a] || {}).net || -99))]) : [['', ids]];
-    const withR = ids.filter(t => isNum((R[t] || {}).off) && isNum((R[t] || {}).def));
-    let h = groups.map(g => (g[0] ? '<div class="hw-day"><b>' + esc(g[0]) + '</b> · by net rating</div>' : '') + '<div class="hw-mini-grid">' + g[1].map(tile).join('') + '</div>').join('');
-    if (withR.length) {
-      h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'Team strength', title: 'Who is good at what', sub: 'Every team’s offence against its defence, and how its rating has moved.' }) +
-        '<div class="qk-grid">' + U.card2('Offence against defence', 'Opponent-adjusted points per 100 possessions. Up and right is better (defence axis reversed); the dashed lines are the league average.', U.chart('tm-od', 460, 'Offence against defence') +
-        QK.note('A team <b>+5</b> on net rating scores five more points than it allows for every 100 trips down the floor: over a 100-possession game that is about a five-point favourite on a neutral floor.'), { cls: 'qk-span-7' }) +
-        U.card2('Net rating through the season', 'Our rating after each game: the top five and the bottom three', U.chart('tm-paths', 460, 'Rating paths'), { cls: 'qk-span-5' }) + '</div></section>';
-    }
-    body.innerHTML = h;
-    if (withR.length) {
-      const mx = withR.reduce((s, t) => s + R[t].off, 0) / withR.length, my = withR.reduce((s, t) => s + R[t].def, 0) / withR.length;
-      QKC.mount('#tm-od', T => ({
-        grid: { left: 8, right: 24, top: 34, bottom: 30, containLabel: true },
-        xAxis: QKC.axis(T, { name: 'Offensive rating (points per 100)', nameLocation: 'middle', nameGap: 28, scale: true }),
-        yAxis: QKC.axis(T, { name: 'Defensive rating (allowed per 100, reversed)', scale: true, inverse: true, nameLocation: 'start', nameAlign: 'left' }),
-        tooltip: QKC.tooltip(T, { formatter: p => { const t = withR[p.dataIndex]; return '<div style="font-weight:600;margin-bottom:4px">' + esc(HW.teamName(L, t)) + '</div>' + QKC.tipRow(p.color, 'Offence', U.f(R[t].off, 1)) + QKC.tipRow(p.color, 'Defence', U.f(R[t].def, 1)) + QKC.tipRow(p.color, 'Net', U.signed(R[t].net, 1) + (isNum(R[t].se_net) ? ' ± ' + U.f(R[t].se_net, 1) : '')); } }),
-        series: [{ type: 'scatter', symbolSize: 13, data: withR.map(t => ({ value: [R[t].off, R[t].def], href: HW.teamHref(L, t, S), itemStyle: { color: U.tcol(L, t), borderColor: T.s1, borderWidth: 1.5 },
-          label: { show: true, formatter: HW.teamAbbr(L, t), position: 'top', color: T.ink2, fontSize: 10, fontWeight: 600, fontFamily: T.fontUI } })), labelLayout: { hideOverlap: true },
-          markLine: { silent: true, symbol: 'none', lineStyle: { color: T.axis, type: [4, 4] }, label: { show: false }, data: [{ xAxis: mx }, { yAxis: my }] } }]
-      }), { label: 'Offence against defence' });
-      const paths = season.rating_paths || {};
-      const top = ids.filter(t => (paths[t] || []).length > 1).sort((a, b) => ((R[b] || {}).net || 0) - ((R[a] || {}).net || 0));
-      if (top.length) {
-        const dates = Array.from(new Set([].concat.apply([], top.map(t => paths[t].map(p => p.date))))).sort();
-        const show = top.slice(0, 5).concat(top.slice(-3));
-        QKC.line('#tm-paths', { x: dates.map(d => HW.fmtDate(d, { year: false, weekday: false })), series: show.map(t => { const m = {}; paths[t].forEach(p => { m[p.date] = p.net; });
-          let last = null; return { name: HW.teamAbbr(L, t), color: U.tcol(L, t), data: dates.map(d => { if (isNum(m[d])) last = Math.round(m[d] * 10) / 10; return last; }) }; }), yFmt: v => U.signed(v, 1), ref: { y: 0 }, xName: 'Date', yName: 'Net rating (points per 100 possessions)', label: 'Net rating through the season' });
-      } else document.getElementById('tm-paths').innerHTML = U.empty('No games yet', 'Rating paths start with the first games.');
-    }
-  });
-}
+// ── Teams: hw-teams.js (round 9: the power board, profile grid, style map, strengths, head to head, through the season)
 
 // ── Players ────────────────────────────────────────────────────────────────
 
@@ -488,17 +446,22 @@ function renderModel(el, params, state) {
   const L = U.L(params);
   const r = state.route;
   let tab = r === 'glossary' ? 'glossary' : r === 'methodology' ? 'methodology' : r === 'disclaimer' ? 'terms' : U.tab(params, ['methodology', 'calibration', 'markets', 'moves', 'glossary', 'terms'], 'methodology');
+  /* round 9: the standing order on every site: How it works, How we're doing, Our forecasts v the market, Who moves next
+     (the validation; the fan board is Value ▸ Who moves next), Glossary, Terms */
   const body = U.section(el, { title: 'Model', kicker: HW.leagueName(L) + ' · how it works', sub: 'How the models are built, how well they have done, and what every number means.',
-    tabs: U.tabs(L, 'model', [['methodology', 'Methodology'], ['calibration', 'How we’re doing'], ['markets', 'Our forecasts v the market'], ['moves', 'Who moves next'], ['glossary', 'Glossary'], ['terms', 'Terms']], null), active: tab });
+    tabs: U.tabs(L, 'model', [['methodology', 'How it works'], ['calibration', 'How we’re doing'], ['markets', 'Our forecasts v the market'], ['moves', 'Who moves next'], ['glossary', 'Glossary'], ['terms', 'Terms']], null), active: tab });
   if (tab === 'moves') return movesModel(body, L);
   const v = { methodology: 'methodology', calibration: 'calibration', markets: 'markets', glossary: 'glossary', terms: 'disclaimer' }[tab];
   if (tab !== 'methodology' && tab !== 'calibration') return U.legacy(v, body, params);
   /* Round 6: "How we're doing" (the calibration tab, id kept so ?tab=calibration still works): our favourites' record
      over the last week (index.json digest.record) as tiles, then the game model's record from <L>/calibration.json
      (QK.doing -> QK.howSure). The methodology tab links it; the overview no longer carries either. */
+  /* round 9: How it works opens for fans (hw-method.js: what the site does, one diagram per model); the technical
+     document (sources, endpoints, code paths, constants) is folded under "Technical detail" */
   if (tab === 'methodology') {
-    body.innerHTML = QK.explain('<b>How we’re doing.</b> Our recent record and every forecast checked against what happened are on <a class="qk-link" href="' + esc(HW.href(L, 'model') + '?tab=calibration') + '">the How we’re doing tab</a>.') + '<div></div>';
-    return U.legacy(v, body.lastChild, params);
+    const deep = !!((params.rest || [])[0]);
+    body.innerHTML = (HW.method ? HW.method.html(L) : '') + '<details class="hw-fold hw-tech"' + (deep ? ' open' : '') + '><summary>Technical detail: data sources, formulas, code paths and every constant</summary><div></div></details>';
+    return U.legacy(v, body.querySelector('.hw-tech > div'), params);
   }
   body.innerHTML = '<section class="qk-section hw-sure" id="md-sure" hidden></section><div></div>';
   HW.load(L + '/calibration.json').then(cj => {
@@ -516,7 +479,6 @@ function renderModel(el, params, state) {
 }
 
 HW.page('standings', renderStandings);
-HW.page('teams', renderTeams);
 HW.page('players', renderPlayers);
 HW.page('lab', renderLab);
 ['compare', 'compare-players', 'compare-teams'].forEach(n => HW.page(n, renderLab));

@@ -108,54 +108,78 @@ function reading(d) {
   return out.join('') || '<p>Not enough scored games for a reading yet.</p>';
 }
 
-function render(el, params, state) {
-  const k = K();
+/* Round 9: the Model section's two pages.
+ *   #/calibration  "How we're doing": our record and the calibration line (QK.doing), then the model checks (xwOBA+
+ *                   against Savant, Stuff+ validity, projections against a Marcel-style baseline, framing and fielding
+ *                   against Savant), each a headline number, a chart or table, and what it shows.
+ *   #/versus       "Our forecasts v the market": the one closing-line reference (ESPN's de-vigged close) for the game,
+ *                   over/under and run-line forecasts: scores, reliability, log-loss by season. Nothing else on the
+ *                   site is built around the market. */
+const CHECKS = /^(xwOBA\+|Stuff validity|Projections|Fielding runs|Framing runs)/;
+function paras(html, keep) {
+  return String(html || '').split('</p>').filter(x => x.trim()).filter(x => { const m = /<strong>([^<]+)<\/strong>/.exec(x); return keep(m ? m[1] : ''); }).map(x => x + '</p>').join('');
+}
+function render(el, params, state, mode) {
+  const k = K(), U = BP.ui;
   const L = k.L(params, state);
+  const versus = mode === 'versus';
   el.innerHTML = k.muted('Loading the backtest…');
   return k.ready().then(() => BP.load(L + '/calibration.json')).then(d => {
     if (!k.alive(el)) return;
     const G = (d && d.games) || {};
-    if (!d || d.ok === false || (!G.pooled && !d.checks)) { el.innerHTML = k.card('Calibration · ' + k.LN(L), '', k.notBuilt('The ' + k.LN(L) + ' backtest', d)); return; }
+    if (!d || d.ok === false || (!G.pooled && !d.checks)) { el.innerHTML = U.card2(versus ? 'Our forecasts v the market' : 'How we’re doing', '', k.notBuilt('The ' + k.LN(L) + ' backtest', d)); return; }
     const P = G.pooled || {}, V = P.vs_market || {};
     const seasons = Object.keys(G.seasons || {}).sort();
-    let h = '<div class="card"><div class="card-header">Calibration · ' + k.LN(L) + ' <span class="card-sub">Walk-forward backtest' + (seasons.length ? ' ' + seasons[0] + '–' + seasons[seasons.length - 1] : '') + ' against ESPN\'s closing lines, and the checks on xwOBA+, stuff, projections, framing and fielding.' + (d.generated_at ? ' Generated ' + k.esc(k.fmtDate(d.generated_at, { year: true })) + '.' : '') + '</span></div>' +
-      k.tiles([k.tile('Games scored', k.int(P.n_games), seasons.length + ' season' + (seasons.length === 1 ? '' : 's')),
-        k.tile('With a closing line', k.int((V.market || {}).n), P.n_games ? k.num(100 * ((V.market || {}).n || 0) / P.n_games, 0) + '% of games' : ''),
-        k.tile('Model log-loss', k.num((P.model || {}).logloss, 4), 'ratings ' + k.num((P.ratings || {}).logloss, 4) + ' · starter ' + k.num((P.starter_record || {}).logloss, 4)),
-        k.tile('Closing-line log-loss', k.num((V.market || {}).logloss, 4), 'model ' + k.num((V.model || {}).logloss, 4) + ' on the same games'),
-        k.tile('Runs per game', k.num((P.runs || {}).model_mean_total, 2), 'forecast · ' + k.num((P.runs || {}).actual_mean_total, 2) + ' scored'),
-        k.tile('Series', k.isNum((G.series || {}).n) ? k.int(G.series.n) : '—', k.isNum((G.series || {}).logloss) ? 'log-loss ' + k.num(G.series.logloss, 4) : 'postseason series at game 1')]) + '</div>';
-    h += '<div class="card"><div class="card-header">What it shows <span class="card-sub">Written from the numbers below.</span></div><div class="gq-read">' + reading(d) + '</div></div>';
-    h += '<div class="card"><div class="card-header">Scores <span class="card-sub">Log-loss −mean(y ln p + (1−y) ln(1−p)), p clipped to [0.0001, 0.9999]; Brier mean((p−y)²); lower is better, green is best. y = 1 when the home team wins.</span>' +
-      '<span class="gq-ctl"><select id="cal-scope"><option value="all">all scored games</option><option value="mkt">games with a closing line</option>' + seasons.slice().reverse().map(s => '<option value="s' + s + '">' + s + '</option><option value="m' + s + '">' + s + ', with a closing line</option>').join('') + '</select></span></div><div id="cal-table"></div>' +
-      '<div class="pg-note gq-note">Team ratings: run differential regressed to a prior of 50 games, 0.40 logit per run, plus 0.12 logit home field. Starter and record: a logistic regression on the log5 of regressed win percentages, the starters\' regressed RA9 difference and home field, refitted as games accumulate. The closing line is ESPN\'s DraftKings close (else the current line), de-vigged multiplicatively.</div></div>';
-    h += '<div class="grid-2"><div class="card"><div class="card-header">Reliability: who wins <span class="card-sub">Ten equal-width bins of P(home win); marker size by games.</span>' + k.toggle('cal-rel', [['all', 'All games'], ['mkt', 'v closing line']], 'mkt') + '</div><div id="cal-rel-c" style="height:420px"></div></div>' +
-      '<div class="card"><div class="card-header">Log-loss by season</div><div id="cal-years" style="height:420px"></div></div></div>';
-    h += '<div class="grid-2"><div class="card"><div class="card-header">Totals <span class="card-sub">P(over the closing total), pushes excluded: the model\'s simulated distribution against the market\'s de-vigged over probability.</span></div><div id="cal-tot" style="height:340px"></div><div id="cal-tot-t"></div></div>' +
-      '<div class="card"><div class="card-header">Run line <span class="card-sub">P(home covers the closing run line).</span></div><div id="cal-rl" style="height:340px"></div><div id="cal-rl-t"></div></div></div>';
-    h += '<div class="grid-2"><div class="card"><div class="card-header">xwOBA+ against Savant\'s xwOBA <span class="card-sub">Pearson r with the next period\'s wOBA (first half → second half, and second half → next first half), hitters with 200+ PA then 100+ PA.</span></div><div id="cal-xw" style="height:300px"></div><div id="cal-xw-t"></div></div>' +
-      '<div class="card"><div class="card-header">Stuff validity <span class="card-sub">Does this season\'s Stuff+ predict next season? Pitchers with 300+ batters faced in both.</span></div><div id="cal-stuff"></div></div></div>';
-    h += '<div class="grid-2"><div class="card"><div class="card-header">Projection error <span class="card-sub">Weighted RMSE of next-season projections against a Marcel-style baseline; gain = 1 − ours/baseline.</span></div><div id="cal-proj"></div></div>' +
-      '<div class="card"><div class="card-header">Framing and fielding against Savant <span class="card-sub">Our framing runs and fielding runs against Savant\'s published leaderboards.</span></div><div id="cal-ext"></div></div></div>';
+    const span = seasons.length ? seasons[0] + '–' + seasons[seasons.length - 1] : '';
+    const all = reading(d);
+    let h = '';
+    if (!versus) {
+      /* QK.doing (our record, then the calibration line) goes on top through howSureTop; then the model checks */
+      h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'Our models, checked', title: 'Do the numbers predict?', sub: 'Each of our player models against the obvious alternative: does it predict next month or next season better? Every check is out of sample.' }) +
+        QK.explain(paras(all, t => CHECKS.test(t)) || 'The model checks are not in this build yet.', { title: 'What the checks show' }) + '</section>' +
+        '<section class="qk-section"><div class="qk-grid"><div class="qk-span-7">' + U.card2('xwOBA+ against Savant’s xwOBA', 'Correlation with the next period’s wOBA (first half to second half, and across the winter); hitters with 200+ PA then 100+', '<div id="cal-xw" style="height:320px"></div><div id="cal-xw-t"></div>') +
+        '</div><div class="qk-span-5"><div class="bp-stack">' + U.card2('Stuff validity', 'Does this season’s Stuff+ predict next season? Pitchers with 300+ batters faced in both', '<div id="cal-stuff"></div>') +
+        U.card2('Projection error', 'Next-season projections against a Marcel-style baseline; gain = 1 − ours / baseline', '<div id="cal-proj"></div>') + '</div></div></div></section>' +
+        '<section class="qk-section">' + U.card2('Framing and fielding against Savant', 'Our framing runs and fielding runs against Savant’s published leaderboards', '<div id="cal-ext"></div>') + '</section>' +
+        '<p class="qk-sub">How our game forecasts compare with the closing line is on <a class="qk-link" href="#/versus">Our forecasts v the market</a>.</p>';
+      el.innerHTML = h;
+      BP.ui.howSureTop(el, L, { doing: true });
+      xwoba((d.checks || {}).xwoba);
+      stuff((d.checks || {}).stuff);
+      proj((d.checks || {}).projections);
+      ext(d);
+      return;
+    }
+    const gap = k.isNum((V.model || {}).logloss) && k.isNum((V.market || {}).logloss) ? (V.model.logloss - V.market.logloss) : null;
+    h += QK.sectionHead({ kicker: 'Our forecasts v the market · ' + k.LN(L), title: 'Our numbers against the closing line', sub: 'Every game forecast walk-forward' + (span ? ' from ' + span : '') + ', scored against what happened and set beside ESPN’s de-vigged closing moneyline, the sharpest public number. The close knows lineups, injuries and late news; it is the bar, not the goal.' }) +
+      '<div class="bp-kpis">' + QK.stats([
+        { label: 'Games scored', value: k.int(P.n_games), sub: seasons.length + ' season' + (seasons.length === 1 ? '' : 's') + ', walk-forward' },
+        { label: 'Our log-loss', value: k.num((P.model || {}).logloss, 4), signal: true, sub: 'lower is better; a coin scores ' + k.num(Math.LN2, 3) },
+        { label: 'The close, same games', value: k.num((V.market || {}).logloss, 4), sub: k.int((V.market || {}).n) + ' games with a closing line' + (gap !== null ? ' · ours ' + k.num(V.model.logloss, 4) : '') },
+        { label: 'Runs a game', value: k.num((P.runs || {}).model_mean_total, 2), sub: 'we forecast · ' + k.num((P.runs || {}).actual_mean_total, 2) + ' were scored' }
+      ]) + '</div>' +
+      QK.explain(paras(all, t => !CHECKS.test(t)) || 'Not enough scored games for a reading yet.', { title: 'What it shows' }) +
+      '<section class="qk-section"><div class="qk-grid"><div class="qk-span-6">' + U.card2('Who wins: our forecast v what happened', 'Ten bins of the home side’s chance; the dashed line is spot on', '<div id="cal-rel-c" style="height:380px"></div>', { right: k.toggle('cal-rel', [['all', 'All games'], ['mkt', 'With a closing line']], 'mkt') }) + '</div>' +
+      '<div class="qk-span-6">' + U.card2('Log-loss by season', 'Lower is better; the dotted line is a coin', '<div id="cal-years" style="height:380px"></div>') + '</div></div></section>' +
+      '<section class="qk-section">' + U.card2('The scores', 'Log-loss and Brier score (lower is better) for our game model, two simple baselines and the close; skill is the gain over a coin and over the home side’s base rate', '<div class="bp-flexrow" style="margin-bottom:10px"><select id="cal-scope" class="qk-select"><option value="all">All scored games</option><option value="mkt">Games with a closing line</option>' +
+        seasons.slice().reverse().map(x => '<option value="s' + x + '">' + x + '</option><option value="m' + x + '">' + x + ', with a closing line</option>').join('') + '</select></div><div id="cal-table"></div>',
+        { foot: '<span class="bp-fn">Team ratings: run differential regressed to a prior of 50 games, 0.40 logit a run, plus 0.12 logit home field. Starter and record: a logistic regression on the log5 of regressed win percentages and the starters’ regressed run prevention. y = 1 when the home team wins; p clipped to [0.0001, 0.9999].</span>' }) + '</section>' +
+      '<section class="qk-section"><div class="qk-grid"><div class="qk-span-6">' + U.card2('Totals', 'Our chance of the over at the closing total against the market’s; pushes left out', '<div id="cal-tot" style="height:320px"></div><div id="cal-tot-t"></div>') + '</div>' +
+      '<div class="qk-span-6">' + U.card2('Run line', 'Our chance that the home side covers the closing run line against the market’s', '<div id="cal-rl" style="height:320px"></div><div id="cal-rl-t"></div>') + '</div></div></section>';
     el.innerHTML = h;
-    BP.ui.howSureTop(el, L, { doing: true });
-    const pick = v => { if (v === 'all') return P; if (v === 'mkt') return V; const s = (G.seasons || {})[v.slice(1)] || {}; return v.charAt(0) === 'm' ? (s.vs_market || {}) : s; };
+    const pick = v => { if (v === 'all') return P; if (v === 'mkt') return V; const x = (G.seasons || {})[v.slice(1)] || {}; return v.charAt(0) === 'm' ? (x.vs_market || {}) : x; };
     const drawT = v => { const src = pick(v); document.getElementById('cal-table').innerHTML = scoreTable(src, ORDER.filter(m => src[m])); };
     drawT('all');
     document.getElementById('cal-scope').onchange = e => drawT(e.target.value);
-    const rel = v => { const src = v === 'mkt' ? V : P; k.reliability('cal-rel-c', ORDER.filter(m => src[m] && (src[m].reliability || []).length && m !== 'blend_50').map(m => ({ name: lab(m), colour: COL[m], bins: src[m].reliability })), { xt: 'Forecast P(home win)', yt: 'Home win rate', minN: 20, min: 0.1, max: 0.9 }); };
+    const rel = v => { const src = v === 'mkt' ? V : P; k.reliability('cal-rel-c', ORDER.filter(m => src[m] && (src[m].reliability || []).length && m !== 'blend_50').map(m => ({ name: lab(m), colour: COL[m], bins: src[m].reliability })), { xt: 'Our chance for the home side', yt: 'How often the home side won', minN: 20, min: 0.1, max: 0.9 }); };
     rel('mkt');
     k.wireToggle(el, 'cal-rel', rel);
     if (seasons.length) {
-      k.plot('cal-years', ORDER.filter(m => m !== 'blend_50').map(m => ({ type: 'scatter', mode: 'lines+markers', name: lab(m), x: seasons, y: seasons.map(s => { const x = (G.seasons[s] || {}); return m === 'market' ? ((x.vs_market || {}).market || {}).logloss : (x[m] || {}).logloss; }), line: { color: COL[m], width: 2 }, connectgaps: false }))
+      k.plot('cal-years', ORDER.filter(m => m !== 'blend_50').map(m => ({ type: 'scatter', mode: 'lines+markers', name: lab(m), x: seasons, y: seasons.map(x => { const z = (G.seasons[x] || {}); return m === 'market' ? ((z.vs_market || {}).market || {}).logloss : (z[m] || {}).logloss; }), line: { color: COL[m], width: 2 }, connectgaps: false }))
         .concat([{ type: 'scatter', mode: 'lines', name: 'Coin', x: seasons, y: seasons.map(() => Math.LN2), line: { color: '#8a93a3', dash: 'dot', width: 1 } }]), k.layout(Object.assign({ margin: { l: 56, r: 10, t: 30, b: 36 }, yaxis: { title: 'Log-loss', tickformat: '.3f' }, xaxis: { type: 'category', title: 'Season' } }, k.legendTop())));
     } else document.getElementById('cal-years').innerHTML = k.muted('One season only.');
     lineCal('cal-tot', P.totals, P.totals_market);
     lineCal('cal-rl', P.runline, P.runline_market);
-    xwoba((d.checks || {}).xwoba);
-    stuff((d.checks || {}).stuff);
-    proj((d.checks || {}).projections);
-    ext(d);
   });
 }
 
@@ -232,5 +256,8 @@ function ext(d) {
     : k.muted('The comparisons with Savant\'s framing and OAA leaderboards are not in this build yet.');
 }
 
-if (typeof BP.route === 'function') { BP.route('calibration', render); try { BP.route('#/calibration', render); } catch (e) { /* bound */ } }
+if (typeof BP.route === 'function') {
+  BP.route('calibration', (el, params, state) => render(el, params, state, 'doing'));
+  BP.route('versus', (el, params, state) => render(el, params, state, 'versus'));
+}
 })(window.BP || (window.BP = {}));

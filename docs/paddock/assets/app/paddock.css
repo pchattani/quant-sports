@@ -372,3 +372,15 @@
 .pd-ov-spot { margin-top: 18px; }
 .pd-ov-spot:empty { display: none; }
 .pd-ov-doing { text-align: center; margin-top: 32px; }
+/* round 9: the Scouting Room (pd-scout.js) and the Teams page (pd-teams.js) */
+.sc-floor { margin: 8px 0 10px; font: 600 var(--fs-xs)/1.4 var(--font-ui); color: var(--ink-3); }
+.sc-top { margin-top: var(--sp-6); }
+.sc-top:empty { display: none; }
+.sc-tabs { margin-top: var(--sp-6); }
+.sc-view { margin-top: var(--sp-4); }
+.sc-min { display: inline-flex; align-items: center; gap: 8px; }
+.sc .pd-ours { margin-top: var(--sp-4); }
+.tm-jump { position: sticky; top: 0; z-index: 3; background: var(--bg); padding: 8px 0; margin-bottom: 8px; }
+.tm-sec { scroll-margin-top: 120px; }
+.tm-clubs { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.tm-clubs .qk-chips { flex-wrap: wrap; }

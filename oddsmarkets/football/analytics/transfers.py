@@ -140,7 +140,30 @@ def normalise(store: dict, today: date | None = None) -> list[dict]:
                     "kind": kind, "fee": float(r["fee"]) if kind == "fee" else (0.0 if kind == "free" else None),
                     "fee_text": r.get("d"), "window": wk, "window_label": wl})
     out.sort(key=lambda t: (t["day"], t["key"]))
-    return out
+    return dedupe(out)
+
+
+DEDUPE_DAYS = 14
+
+
+def dedupe(moves: list[dict]) -> list[dict]:
+    """
+    One row per move. Sofascore can list the same move twice under two ids (an announcement and the registration, a
+    day or a week apart): the same player, from the same club to the same club, of the same kind, within 14 days is
+    one move. The first is kept (its date is the announcement) and takes a published fee the other carries.
+    """
+    kept: list[dict] = []
+    last: dict[tuple, dict] = {}
+    for t in moves:                                   # in date order
+        k = (t["pid"], t["from"], t["to"], t["kind"])
+        prev = last.get(k)
+        if prev is not None and t["day"] - prev["day"] <= DEDUPE_DAYS:
+            if prev.get("fee") is None and t.get("fee") is not None:
+                prev["fee"], prev["fee_text"] = t["fee"], t.get("fee_text")
+            continue
+        last[k] = t
+        kept.append(t)
+    return kept
 
 
 # ── a player's lines around a date ───────────────────────────────────────────

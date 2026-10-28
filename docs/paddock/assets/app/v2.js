@@ -304,7 +304,7 @@ V.rangeChart = function (el, season, kind, n) {
   var isD = kind === 'drivers';
   var ids = Object.keys(ch).filter(function (id) { return isNum(ch[id].p05) && isNum(ch[id].p95); }).sort(function (a, b) { return ch[b].exp_points - ch[a].exp_points; }).slice(0, n || 10);
   QKC.range(node, { rows: ids.map(function (id) { return { label: isD ? PD.driverName(id) : PD.teamName(id), lo: ch[id].p05, hi: ch[id].p95, mid: ch[id].exp_points, href: isD ? PD.driverHref(id) : PD.teamHref(id),
-    color: PD.teamColour(isD ? (ch[id].team || PD.driverTeam(id)) : id), sub: 'Our title chance ' + PD.pct(ch[id].p_title, ch[id].p_title > 0.99 ? 2 : 1) }; }),
+    color: PD.teamColour(isD ? (ch[id].team || PD.driverTeam(id)) : id), sub: 'Our title chance ' + PD.titlePct(ch[id], 1) }; }),
     fmt: function (v) { return PD.num(v, 0); }, loName: '5th', hiName: '95th percentile', midName: 'Expected points', valName: 'Points at the season end', labelWidth: 130, label: 'Season-end points range' });
 };
 
@@ -405,10 +405,11 @@ V.copy = function (t) {
     .replace(/\bpace edge\b/g, 'pace advantage').replace(/\bedge\b/g, 'advantage');
 };
 /* Our chance rows for QK.chances (team colours; the market only where a page passes one: race detail). */
-V.chanceRows = function (ids, pOf, isD, mk) {
+/* cOf(id) -> the championship row: the figure reads ">99.9%" until a title is clinched (PD.titlePct; the kit's r.text) */
+V.chanceRows = function (ids, pOf, isD, mk, cOf) {
   return ids.map(function (id) {
-    var t = isD ? PD.driverTeam(id) : id;
-    return { label: isD ? PD.driverName(id) : PD.teamName(id), p: pOf(id), market: mk && isNum(mk[id]) ? mk[id] : null, color: PD.teamColourRaw(t), href: isD ? PD.driverHref(id) : PD.teamHref(id),
+    var t = isD ? PD.driverTeam(id) : id, c = cOf ? cOf(id) : null, p = pOf(id);
+    return { label: isD ? PD.driverName(id) : PD.teamName(id), p: p, text: isNum(p) && p >= 0.9995 && !(c && c.clinched) ? PD.chance(p, c) : null, market: mk && isNum(mk[id]) ? mk[id] : null, color: PD.teamColourRaw(t), href: isD ? PD.driverHref(id) : PD.teamHref(id),
       mark: { name: PD.teamName(t), abbr: PD.teamAbbr(t), colour: PD.teamColourRaw(t) } };
   });
 };

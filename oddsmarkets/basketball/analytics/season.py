@@ -405,14 +405,15 @@ def lab_payload(league: str, catalogues: dict[int, dict], value: dict[int, dict[
     """Column-oriented: every player-season with at least half the season's qualifying minutes. `value`: {season:
     {player id: {"war": ...}}} (value_columns of each season's value.json) adds the value model's columns. `role` is
     the spec's peer group (G / W / B: the catalogue's `role`, else value.classify_roles on that season's catalogue,
-    the same rule), for the Lab's "Compare within: Position"."""
+    the same rule), for the Lab's "Compare within: Position". `age` (the catalogue's age at the season, from the date of
+    birth; null where ESPN has none) drives the Scouting Room's age band (round 9)."""
     from oddsmarkets.basketball.analytics.players import METRICS
     from oddsmarkets.basketball.analytics import value as VAL
     value = value or {}
     vmetrics = [m for m in LAB_VALUE_METRICS if any(m["key"] in row for rows in value.values() for row in rows.values())]
     keys = [m["key"] for m in METRICS]
     vkeys = [m["key"] for m in vmetrics]
-    fields = ["id", "name", "team", "season", "pool", "gp", "min", "qualified", "role"] + keys + vkeys
+    fields = ["id", "name", "team", "season", "pool", "gp", "min", "qualified", "role", "age"] + keys + vkeys
     rows = []
     years = []
     for s in sorted(catalogues):
@@ -429,7 +430,7 @@ def lab_payload(league: str, catalogues: dict[int, dict], value: dict[int, dict[
             v = r.get("values") or {}
             vv = (value.get(int(s)) or value.get(s) or {}).get(str(pid)) or {}
             rows.append([pid, r.get("name"), r.get("team"), int(s), r.get("pool"), r.get("gp"), r.get("min"), bool(r.get("qualified")),
-                         r.get("role") or roles.get(pid)]
+                         r.get("role") or roles.get(pid), an.rnd(r.get("age"), 1) if r.get("age") is not None else None]
                         + [v.get(k) for k in keys] + [vv.get(k) for k in vkeys])
     return {"ok": True, "league": league, "updated_at": an.now(), "fields": fields, "metrics": METRICS + vmetrics, "rows": rows, "years": years}
 

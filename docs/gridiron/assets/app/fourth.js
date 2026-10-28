@@ -128,15 +128,21 @@ GI.F = F;
 
 const ST = { team: '', week: '', choice: '', rec: '', grade: '', season: null, sel: null };
 
+/* round 9: "Fourth-down calls", one page with two tabs: every decision (this file) and the coaches (coaches.js) */
+function headOf(S, tab) {
+  return GI.pageHead('Teams · ' + S, 'Fourth-down calls', 'Every fourth down graded by our decision model (go, punt or kick, valued with our own win-probability model), and the coaches behind the calls.') +
+    GI.sectionNav('teams', 'fourth') + GI.subnav([[GI.ghref('fourth-downs', S), 'Every decision', 'dec'], [GI.ghref('fourth-downs', S, { tab: 'coaches' }), 'Coaches', 'co']], tab, 'Fourth-down views');
+}
 GI.route('fourth', function (el, params) {
   const S = Number(params.season);
   const qy = params.query || {};
+  if (qy.tab === 'coaches' && GI.coachesPage) return GI.coachesPage(el, params, headOf(S, 'co'));
   if (qy.team) ST.team = String(qy.team).toUpperCase();
   return GI.loadAll([GI.ypath('fourth_downs.json', S)]).then(res => {
     if (!el.isConnected) return;
     const d = res[0];
     const plays = F.playsOf(d), model = F.hasModel(plays);
-    const head = GI.pageHead('Lab · ' + S, 'Fourth downs', 'Every fourth down graded by our decision model: go, punt or kick, valued with our own win-probability model.') + GI.sectionNav('lab', 'fourth') + QK.note('<b>How the grades work:</b> for every fourth down our model works out the win chance after going for it, punting and kicking. The grade is how much win chance the call gave up against the best option: under 1.5 points is the right call.');
+    const head = headOf(S, 'dec') + QK.note('<b>How the grades work:</b> for every fourth down our model works out the win chance after going for it, punting and kicking. The grade is how much win chance the call gave up against the best option: under 1.5 points is the right call.');
     if (!plays.length) { el.innerHTML = head + GI.notBuilt('The ' + S + ' fourth-down file', d); return; }
     if (ST.season !== S) { ST.season = S; ST.week = ''; ST.sel = null; }
     const teams = Array.from(new Set(plays.map(p => p.team).filter(Boolean))).sort();
@@ -152,7 +158,7 @@ GI.route('fourth', function (el, params) {
       GI.grid(GI.card('The field', 'every fourth down by field position and distance · colour: ' + (model ? 'the model\'s call' : 'the choice') + ' · ringed: mistakes', GI.chartBox('fd-map', 380, 'Fourth downs on the field'), { span: 7 }) +
         GI.card('Win probability by option', 'the selected play · ★ the model\'s pick', GI.chartBox('fd-opt', 220, 'Options for the selected play') + '<p class="gi-cap" id="fd-opt-n"></p>', { span: 5 })) +
       GI.card('Every decision', '<span id="fd-tsub"></span>', '<div id="fd-table"></div>', { flush: true }) +
-      '<section class="qk-section">' + GI.secHead({ kicker: 'Coaches', title: 'Who goes for it', sub: 'Go rate against the league (GOE) and against our model.', actions: '<a class="qk-btn" href="' + GI.ghref('coaches', S) + '">Coach pages →</a>' }) + GI.card('', '', '<div id="fd-coaches"></div>', { flush: true }) + '</section>' +
+      '<p class="gi-cap">Who goes for it, coach by coach, against the league and our model: <a href="' + GI.ghref('fourth-downs', S, { tab: 'coaches' }) + '">the Coaches tab →</a></p>' +
       GI.note('<p>For every fourth down (kneels and the last seconds of a half excluded) our model values <b>go for it</b> (conversion probability, then the win probability after a conversion or a turnover on downs), <b>punt</b> (expected net distance) and <b>field goal</b> (our make probability by distance, kicker, weather and roof), each valued with our win-probability model. <b>WP lost</b> is the best option minus the chosen one: up to 1.5 points is a right call, up to 3 a close call (the model\'s own uncertainty is about that size), beyond that a mistake. <a href="#/methodology/fourth">Methodology →</a></p>');
     const filt = () => plays.filter(p => (!ST.team || p.team === ST.team) && (!ST.week || String(p.week) === ST.week) && (!ST.choice || p.choice === ST.choice) && (!ST.rec || p.rec === ST.rec) &&
       (!ST.grade || (ST.grade === 'disagree' ? p.rec && p.choice !== p.rec : F.grade(p).key === ST.grade)));
@@ -191,7 +197,6 @@ GI.route('fourth', function (el, params) {
     };
     ['team', 'week', 'choice', 'rec', 'grade'].forEach(x => { const n = document.getElementById('fd-' + x); if (n) n.addEventListener('change', () => { ST[x] = n.value; draw(); }); });
     draw();
-    F.coachTable(document.getElementById('fd-coaches'), F.coachesOf(d, plays), S);
   });
 });
 

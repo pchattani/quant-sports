@@ -1,4 +1,4 @@
-/* The Quant Bullpen — history (#/history): all-time leaderboards from 1908, era-adjusted.
+/* The Quant Bullpen — the all-time player boards (the Scouting Room's "All-time" view, #/mlb/scout?view=alltime), era-adjusted.
  *
  * Player seasons come from Retrosheet play-by-play (event files from 1908; Retrosheet's 1901–1907
  * box-score files are not read, so there are no player seasons before 1908; the first season shown is
@@ -101,6 +101,7 @@ function render(el, params) {
     $('hi-scope').innerHTML = scopes.map(s => '<option value="' + k.esc(s) + '"' + (s === ST.scope ? ' selected' : '') + '>' + k.esc(SL[s] || k.titleCase(s)) + '</option>').join('');
     const qy = params.query || {};
     if (qy.m) ST.metric = qy.m;
+    if (qy.scope && scopes.indexOf(qy.scope) >= 0) { ST.scope = qy.scope; $('hi-scope').value = qy.scope; }
     const syncM = () => {
       const ms = Object.keys(B[ST.scope] || {});
       if (ms.indexOf(ST.metric) < 0) ST.metric = ms.indexOf('war') >= 0 ? 'war' : ms.indexOf('wrc_plus') >= 0 ? 'wrc_plus' : ms[0];
@@ -168,5 +169,7 @@ function envChart(env) {
     yFmt: v => Math.round(v * 100) + '%', xFmt: v => String(Math.round(v)), yName: 'Share of plate appearances', xName: 'Season', endLabels: true, label: 'League strikeout and home-run rates' });
 }
 
-if (typeof BP.route === 'function') { BP.route('history', render); try { BP.route('#/history', render); } catch (e) { /* bound */ } }
+/* round 9: the Scouting Room's "All-time" view mounts these boards (bp-scout.js); #/history is the team history now
+   (bp-history.js), and #/alltime and the old #/history?m=... boards redirect into the room (core.js redirectOf). */
+BP.allTime = render;
 })(window.BP || (window.BP = {}));

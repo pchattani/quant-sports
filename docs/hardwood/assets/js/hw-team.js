@@ -107,7 +107,9 @@ function render(el, params) {
     h += '<div style="margin-top:var(--sp-4)"></div>' + U.tabsHTML([{ key: 'overview', label: 'Overview', href: base }, { key: 'detail', label: 'Shots, lineups and the full catalogue', href: base + (base.indexOf('?') >= 0 ? '&' : '?') + 'tab=detail' }], tab);
     if (tab === 'detail') {
       el.innerHTML = h + '<div class="hw-sub"></div>';
-      return U.legacy('team', el.querySelector('.hw-sub'), params, null, { embed: 'detail' });
+      const sub = el.querySelector('.hw-sub'), out = U.legacy('team', sub, params, null, { embed: 'detail' });
+      U.foldTables(sub, 2, out);
+      return out;
     }
     if (!season && !teams) { el.innerHTML = h + U.empty('Not in this season', name + ' has no data for ' + HW.seasonLabel(L, S) + '.'); return; }
     const path = ((season && season.rating_paths) || {})[tid] || [];

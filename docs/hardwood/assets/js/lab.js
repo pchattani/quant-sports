@@ -44,6 +44,13 @@ const SHRINK_K = 300;   // minutes of prior: a player with 300 minutes sits half
 const NO_SHRINK = /^(gp|min|age|season|games|minutes)$/;
 
 let LAB = null, LABL = null;
+/* Round 9 (28 Oct 2026): the Lab is the Scouting Room's Chart view (hw-scout.js). HW.lab.mount(host, L, S, ext) draws the
+   same chart, presets, colour, shrink, medians, labels, ranked table and "Most like" inside the room, without its own
+   group, season, minimum, qualified and highlight controls: those come from the room's one bar. ext = { within
+   ('broad' | 'pos'), role ('G' | 'W' | 'B'), min (minutes; null: the season's qualified players), q, x, y, color,
+   keep(get) -> bool (the room's team and age filters; get(field) reads the row), onPick(pid, season) (a point opens the
+   room's profile drawer), onAxes({ x, y, color }) }. #/<L>/lab redirects to #/<L>/scout?view=chart (core.js). */
+let EXT = null;
 let S = { win: null, pool: 'all', min: 250, shrink: true, preset: 0, x: '', y: '', color: 'team', q: '', within: 'broad', role: 'G', qual: false };
 /* "Compare within: Position": [address code, spec group suffix, fallback display] */
 const RGROUPS = [['G', 'guards', 'Guards'], ['W', 'wings', 'Wings'], ['B', 'bigs', 'Bigs']];
@@ -74,6 +81,7 @@ function headOrder() {
 function groupNoun() { return byPos() ? rgroup(S.role).name.toLowerCase() : ({ G: 'guards', F: 'forwards', C: 'centres' })[S.pool] || 'players'; }
 /* the address: the within choice (or the Broad pool), the axes and the highlight; other keys kept */
 function writeHash() {
+  if (EXT) { if (EXT.onAxes) EXT.onAxes({ x: S.x, y: S.y, color: S.color }); return; }
   try {
     const h = String(location.hash || ''), qi = h.indexOf('?');
     const path = qi >= 0 ? h.slice(0, qi) : h, keep = [];
@@ -178,8 +186,9 @@ function inWindow(r) {
   return y === S.win;
 }
 function pool() {
+  const keep = EXT && EXT.keep ? r => EXT.keep(f => raw(r, f)) : null;
   return LAB.rows.filter(r => inWindow(r) && (raw(r, 'min') || 0) >= S.min && (!S.qual || raw(r, 'qualified') !== false) &&
-    (byPos() ? roleOf(r) === S.role : (S.pool === 'all' || raw(r, 'pool') === S.pool)));
+    (byPos() ? roleOf(r) === S.role : (S.pool === 'all' || raw(r, 'pool') === S.pool)) && (!keep || keep(r)));
 }
 
 /* "Our models", then the peer group's spec headline metrics ("Key numbers · <group>", in the spec's order), then the
@@ -325,7 +334,7 @@ function draw() {
       tooltip: QKC.tooltip(T, { formatter: p => (p.data && p.data.r ? hover(p.data.r) : '') }),
       series: series
     };
-  }, { label: label(S.y) + ' against ' + label(S.x), onClick: p => { const r = p.data && p.data.r; if (r) location.hash = fx.playerHref(L, raw(r, 'id'), Number(raw(r, 'season'))); } });
+  }, { label: label(S.y) + ' against ' + label(S.x), onClick: p => { const r = p.data && p.data.r; if (!r) return; if (EXT && EXT.onPick) EXT.onPick(String(raw(r, 'id')), Number(raw(r, 'season'))); else location.hash = fx.playerHref(L, raw(r, 'id'), Number(raw(r, 'season'))); } });
   set('lab-sim', simStrip(base0, hits, nm, v));
   const mX = LAB.meta[S.x] || {}, mY = LAB.meta[S.y] || {};
   set('lab-note', 'Dotted lines are the medians of the ' + groupNoun() + ' on screen' + (byPos() ? ' (compared within the role group)' : '') + '. ' + (lower(S.x) || lower(S.y) ? 'Axes where less is better are reversed, so better is always up and to the right. ' : 'Better is up and to the right. ') +
@@ -334,14 +343,14 @@ function draw() {
     (mX.desc ? '<br><strong>' + fx.esc(mX.label) + '</strong>: ' + fx.esc(mX.desc) : '') + (mY.desc ? '<br><strong>' + fx.esc(mY.label) + '</strong>: ' + fx.esc(mY.desc) : ''));
   set('lab-ours', HW.ours ? HW.ours.explain([S.x, S.y], { label: k => (LAB.meta[k] || {}).label || k }) : '');
   const oth = k => (HW.ours && HW.ours.of(k) ? 'qk-ours-th' : '');
-  set('lab-rank-sub', 'The group by the combined standard score on both axes (top 300)' + (vk ? ', with each player’s ' + fx.esc((LAB.meta[vk] || {}).label || vk) + ' and its percentile among the ' + fx.esc(groupNoun()) + ' on screen' : '') + '. Click a row for the player.');
+  set('lab-rank-sub', 'The group by the combined standard score on both axes (top ' + (EXT ? '50: the Board has everyone' : '300') + ')' + (vk ? ', with each player’s ' + fx.esc((LAB.meta[vk] || {}).label || vk) + ' and its percentile among the ' + fx.esc(groupNoun()) + ' on screen' : '') + '. Click a row for the player.');
   const host = document.getElementById('lab-table');
   host.innerHTML = HW.tableHTML([
     { label: '#', sortable: false }, { label: 'Player' }, { label: 'Team' }, { label: 'Season', align: 'right' }, { label: 'Pool' }, { label: 'Role', title: 'The spec’s role group: G guard, W wing, B big' }, { label: 'Min', align: 'right' },
     { label: label(S.x), align: 'right', cls: oth(S.x) }, { label: 'Pct', align: 'right' }, { label: label(S.y), align: 'right', cls: oth(S.y) }, { label: 'Pct', align: 'right' }]
     .concat(vk ? [{ label: label(vk), align: 'right', cls: oth(vk), title: 'Overall value: the position view’s value metric' }, { label: 'Pct', align: 'right', title: 'Percentile within the ' + groupNoun() + ' on screen' }] : [])
     .concat([{ label: 'Combined', align: 'right', title: 'Sum of standard scores in the better direction (X and Y)' }
-  ]), ranked.slice(0, 300).map((o, i) => {
+  ]), ranked.slice(0, EXT ? 50 : 300).map((o, i) => {
     const r = o.r, vx = val(r, S.x), vy = val(r, S.y), vv = vk ? val(r, vk) : null, pv = fx.isNum(vv) ? pOf(sortedV, vv, dirv) : null;
     return { _href: fx.playerHref(L, raw(r, 'id'), raw(r, 'season')), cells: [
       { v: i + 1, cls: 'pos-cell' }, { v: nm(r), html: fx.playerLink(L, raw(r, 'id'), nm(r), raw(r, 'team'), raw(r, 'season')) }, { v: fx.teamAbbr(L, raw(r, 'team')), html: fx.esc(fx.teamAbbr(L, raw(r, 'team'))) },
@@ -374,23 +383,43 @@ function simStrip(rows, hits, nm, v) {
     sub: [fx.teamAbbr(L, raw(o.row, 'team')), fx.seasonLabel(L, raw(o.row, 'season')), roleOf(o.row)].filter(Boolean).join(' · ') + ' · compare' })));
 }
 
-function renderLab(el, params, state) {
-  const fx = FX(), L = fx.L(params, state);
-  el.innerHTML = '<div class="card"><div class="card-header">Player lab <span class="card-sub" id="lab-sub">Loading…</span></div>' +
-    '<div id="lab-within" class="hw-lab-within-wrap"></div><div class="lab-controls hf-controls">' +
-    '<label>Seasons<select id="lab-win"></select></label>' +
+function markup(room) {
+  const hide = room ? ' style="display:none"' : '';
+  return '<div class="card"><div class="card-header">' + (room ? 'The chart' : 'Player lab') + ' <span class="card-sub" id="lab-sub">Loading…</span></div>' +
+    '<div id="lab-within" class="hw-lab-within-wrap"' + hide + '></div><div class="lab-controls hf-controls">' +
+    '<label' + hide + '>Seasons<select id="lab-win"></select></label>' +
     '<label>Preset<select id="lab-preset" class="hf-wide"></select></label>' +
     '<label>X axis<select id="lab-x"></select></label>' +
     '<label>Y axis<select id="lab-y"></select></label>' +
     '<label>&nbsp;<button type="button" id="lab-swap" title="Swap the axes">⇄ swap</button></label>' +
-    '<label>Position pool<select id="lab-pool"><option value="all">All</option><option value="G">Guards</option><option value="F">Forwards</option><option value="C">Centres</option></select></label>' +
+    '<label' + hide + '>Position pool<select id="lab-pool"><option value="all">All</option><option value="G">Guards</option><option value="F">Forwards</option><option value="C">Centres</option></select></label>' +
     '<label>Colour<select id="lab-color"></select></label>' +
-    '<label>Min minutes <span id="lab-min-v"></span><input id="lab-min" type="range" min="0" max="2000" step="25"></label>' +
-    '<label class="inline"><input id="lab-qual" type="checkbox"> qualified only</label>' +
+    '<label' + hide + '>Min minutes <span id="lab-min-v"></span><input id="lab-min" type="range" min="0" max="2000" step="25"></label>' +
+    '<label class="inline"' + hide + '><input id="lab-qual" type="checkbox"> qualified only</label>' +
     '<label class="inline"><input id="lab-shrink" type="checkbox"> shrink small samples</label>' +
-    '<label>Highlight<input id="lab-q" class="pg-search" type="search" placeholder="player or team…"></label>' +
+    '<label' + hide + '>Highlight<input id="lab-q" class="pg-search" type="search" placeholder="player or team…"></label>' +
     '</div><div id="lab-ours" class="hw-lab-ours"></div><div id="lab-chart" class="hf-lab-chart"></div><div id="lab-sim" class="hw-lab-sim"></div><div class="pg-note" id="lab-note"></div></div>' +
     '<div class="card"><div class="card-header">Ranked <span class="card-sub" id="lab-rank-sub">The group by the combined standard score on both axes (top 300). Click a row for the player.</span></div><div id="lab-table"></div></div>';
+}
+function renderLab(el, params, state) {
+  const fx = FX(), L = fx.L(params, state);
+  EXT = null;
+  el.innerHTML = markup(false);
+  return boot(el, L, params, state, null);
+}
+/* the Scouting Room's Chart view (ext above) */
+function mount(host, L, S0, ext) {
+  EXT = ext || {};
+  host.innerHTML = markup(true);
+  const q = {};
+  if (EXT.within === 'pos') { q.within = 'pos'; q.pos = EXT.role; } else q.within = 'broad';
+  if (EXT.x) q.x = EXT.x;
+  if (EXT.y) q.y = EXT.y;
+  q.q = EXT.q || '';
+  return boot(host, L, { season: S0, league: L, query: q }, { league: L, season: S0 }, EXT);
+}
+function boot(el, L, params, state, ext) {
+  const fx = FX();
   return fx.ready().then(() => {
     const Sx = fx.S(params, state, L);
     return Promise.all([fx.first([L + '/lab.json', fx.path(L, Sx, 'lab.json')]), HW.ours ? HW.ours.load() : null]).then(both => {
@@ -405,11 +434,17 @@ function renderLab(el, params, state) {
       if (S.min > maxMin * 0.5) S.min = Math.max(0, Math.round(maxMin * 0.25 / 25) * 25);
       document.getElementById('lab-min').max = String(Math.max(500, Math.ceil(maxMin / 100) * 100));
       const qy = params.query || {};
+      if (ext) {
+        /* the room: its season, group and floor; Broad is every player (no pool), the floor its qualified players */
+        S.win = LAB.years.indexOf(Sx) >= 0 ? Sx : LAB.years[0]; S.pool = 'all'; S.x = ''; S.y = ''; S.preset = 0;
+        S.qual = !fx.isNum(ext.min); S.min = fx.isNum(ext.min) ? ext.min : 0; S.color = 'team';
+      }
       const wq = QK.within.read(qy, RCODES);
       if (wq.within === 'pos') { if (S.within !== 'pos') S.qual = true; S.within = 'pos'; S.role = wq.pos; }
       else if (qy.within !== undefined || qy.pool !== undefined) { S.within = 'broad'; S.qual = false; }
       if (/^(G|F|C|all)$/.test(qy.pool || '')) S.pool = qy.pool;
       if (qy.q !== undefined) S.q = String(qy.q);
+      if (ext && wq.within !== 'pos') S.within = 'broad';
       if (qy.x && LAB.idx[qy.x] !== undefined) { S.x = qy.x; S.preset = -1; }
       if (qy.y && LAB.idx[qy.y] !== undefined) { S.y = qy.y; S.preset = -1; }
       if (!S.x || LAB.idx[S.x] === undefined || !S.y || LAB.idx[S.y] === undefined) { if (S.preset < 0) S.preset = 0; applyPreset(); }
@@ -421,6 +456,7 @@ function renderLab(el, params, state) {
         if (qx) { S.x = qy.x; S.preset = -1; }
         if (qyy) { S.y = qy.y; S.preset = -1; }
       }
+      if (ext && ext.color && (ext.color === 'team' || ext.color === 'pool' || ext.color === 'season' || LAB.idx[ext.color] !== undefined)) S.color = ext.color;
       sync();
       const $ = id => document.getElementById(id);
       $('lab-win').onchange = e => { const v = e.target.value; S.win = /^\d+$/.test(v) ? parseInt(v, 10) : v; if (S.win === 'all' && S.color === 'team') S.color = 'season'; sync(); draw(); };
@@ -442,4 +478,5 @@ function renderLab(el, params, state) {
 }
 
 HW.route('lab', renderLab);
+HW.lab = { mount: mount, render: renderLab };
 })(window.HW);

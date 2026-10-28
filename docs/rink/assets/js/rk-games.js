@@ -90,10 +90,12 @@ function gamesPage(el, params) {
     else {
       h += '<div class="rk-games rk-gc">' + list.map(g => U.gc(g, { league: QK.fmt.time(g.start) || 'NHL' })).join('') + '</div>';
       if (pre.length) h += '<section class="qk-section">' + U.card2('Our chance for every home side', 'Blue: our win chance (overtime and shootout included). Grey ring: the market, for reference', U.chart('gd-mvm', Math.max(200, 34 * pre.length + 50), 'Our home win chance, with the market for reference')) + '</section>';
+      h += '<div id="gd-goalies"></div>';
       h += review(list);
     }
     el.innerHTML = h;
     if (pre.length) QKC.dumbbell('#gd-mvm', { rows: pre.map(g => ({ label: RK.teamAbbr(g.away) + ' @ ' + RK.teamAbbr(g.home), a: g.model.p_home, b: g.market.p_home, href: RK.gameHref(g.game_id), sub: QK.fmt.time(g.start) })), labelWidth: 90, valName: 'Home win chance' });
+    if (RK.goalieStrip) RK.goalieStrip(el.querySelector('#gd-goalies'), list);
     const jump = el.querySelector('#gd-jump');
     if (jump) jump.addEventListener('change', () => { if (/^\d{4}-\d\d-\d\d$/.test(jump.value)) RK.go(RK.gamesHref(jump.value)); });
     const cur = el.querySelector('.rk-strip [aria-current]');

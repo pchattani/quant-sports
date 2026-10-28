@@ -34,6 +34,7 @@ function rankHeat(sel, T, race, ids) {
 function render(el, params) {
   const T = params.tour, V = TA.v2, SH = TA.shape;
   const fin = T === 'atp' ? 'ATP Finals (Turin)' : 'WTA Finals (Riyadh)';
+  if (TA.past && TA.past.is(T, params.year)) return TA.past.race(el, T, params.year);
   el.innerHTML = '<div id="rc-body">' + QK.skeleton('lines', 6) + '</div>';
   return TA.loadAll([TA.tpath('race.json', T), TA.tpath('rankings.json', T)]).then(arr => {
     if (!el.isConnected) return;

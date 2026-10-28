@@ -84,7 +84,9 @@ def build(ctx: SeasonContext, aaa_hitters: dict | None, aaa_pitchers: dict | Non
                             "mlb_eq": mlb_eq, "n": int(pa),
                             "mlb_proj": {"woba": pj.get("wOBA"), "rates": (pj.get("rates") or {}).get("all"), "components": pj.get("components"),
                                          "age": pj.get("age")} if pj else None,
-                            "mlb_this_season": (mrow.get(pid) or {}).get(nkey)}
+                            "mlb_this_season": (mrow.get(pid) or {}).get(nkey),
+                            # the MLB debut season (people.json): a debut this season with big-league time is a call-up
+                            "debut": an.inum((ctx.people.get(pid) or {}).get("debut")) if isinstance(ctx.people, dict) else None}
     if not players:
         return {"ok": False, "reason": "no Triple-A aggregates for this season", "level": ctx.level, "season": ctx.season}
     hit = sorted((p for p, r in players.items() if r["kind"] == "hitter" and r["n"] >= 100), key=lambda p: -(players[p]["mlb_eq"]["woba"] or 0))
@@ -94,6 +96,9 @@ def build(ctx: SeasonContext, aaa_hitters: dict | None, aaa_pitchers: dict | Non
         players[p]["rank"] = i + 1
     for i, p in enumerate(pit):
         players[p]["rank"] = i + 1
+    # call-ups (round 9): Triple-A players this season whose major-league debut came this season, most big-league time first
+    callups = sorted((p for p, r in players.items() if r.get("debut") == ctx.season and (r.get("mlb_this_season") or 0) > 0),
+                     key=lambda p: -(players[p].get("mlb_this_season") or 0))
     return {"ok": True, "level": ctx.level, "season": ctx.season, "updated_at": an.now(), "players": players,
-            "ranked": {"hitters": hit[:100], "pitchers": pit[:100]}, "translation": an.clean(trans), "woba_weights": ww,
+            "ranked": {"hitters": hit[:100], "pitchers": pit[:100]}, "callups": callups, "translation": an.clean(trans), "woba_weights": ww,
             "rules": {"min_pa": MIN_PA, "rank_min": 100}}

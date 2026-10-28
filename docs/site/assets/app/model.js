@@ -493,22 +493,35 @@ ${formula('per club match:  npxG difference (home − away)  ≈  h + Σ_actions
   return S;
 }
 
-var TABS = [['', 'Overview'], ['methodology', 'Methodology'], ['glossary', 'Glossary'], ['calibration', 'How we’re doing'], ['coverage', 'Data coverage'], ['disclaimer', 'Disclaimer']];
+/* Round 9: the Model sub-nav in the standing order of every site: How it works (the methodology, opening with what
+   each model does), How we're doing, the other Model tabs (Who moves next: the validation), Data coverage, Glossary,
+   Terms. #/model opens How it works. */
+var TABS = [['methodology', 'How it works'], ['calibration', 'How we’re doing'], ['moves', 'Who moves next'], ['coverage', 'Data coverage'], ['glossary', 'Glossary'], ['disclaimer', 'Terms']];
 
 function head(tab, sub) {
-  return FB.pageHead('Model', tab === 'glossary' ? 'Glossary' : tab === 'methodology' ? 'Methodology' : tab === 'calibration' ? 'How we’re doing' : tab === 'coverage' ? 'Data coverage' : tab === 'disclaimer' ? 'Disclaimer and terms' : 'How the numbers are made', sub) +
-    FB.subnav(TABS.map(function (t) { return ['#/model' + (t[0] ? '/' + t[0] : ''), t[1], t[0]]; }), tab, 'Model sections');
+  return FB.pageHead('Model', tab === 'glossary' ? 'Glossary' : tab === 'methodology' ? 'How it works' : tab === 'calibration' ? 'How we’re doing' : tab === 'moves' ? 'Who moves next: the checks' : tab === 'coverage' ? 'Data coverage' : tab === 'disclaimer' ? 'Disclaimer and terms' : 'How the numbers are made', sub) +
+    FB.subnav(TABS.map(function (t) { return ['#/model/' + t[0], t[1], t[0]]; }), tab, 'Model sections');
 }
 
 FB.route('model', function (el, p) {
-  var tab = p.tab || '';
-  if (tab === 'methodology') return methodology(el, p);
+  var tab = p.tab || 'methodology';
   if (tab === 'glossary') return glossary(el, p);
   if (tab === 'calibration') return calibration(el);
   if (tab === 'coverage') return coverage(el);
   if (tab === 'disclaimer') return disclaimer(el);
-  return overview(el);
+  if (tab === 'moves') return movesTab(el);
+  return methodology(el, p);
 });
+function movesTab(el) {
+  el.innerHTML = head('moves', 'How the “who moves next” views on club and player pages are made, and which parts passed their pre-registered test on a held-out window.') + '<div id="md-moves">' + FB.loading('lines', 6) + '</div>';
+  return FB.load('value/meta.json').then(function (vm) {
+    if (!FB.alive(el)) return;
+    var box = el.querySelector('#md-moves');
+    box.innerHTML = '';
+    movesBlock(el, (vm || {}).moves);
+    if (!box.innerHTML) box.innerHTML = FB.empty('Not in this build', 'The movement model’s method and checks arrive with the value payload.');
+  });
+}
 
 // ── overview ────────────────────────────────────────────────────────────────
 
@@ -530,11 +543,10 @@ function howSure(el) {
   });
 }
 
+/* The opening of How it works: what each model does, in plain words, with one number each, and where the models are
+   wrong (the old Model overview). */
 function overview(el) {
   var live = FB.comps().filter(function (c) { return c.ok; }).length;
-  el.innerHTML = head('', 'Every chance, rating and value on the site comes from a model fitted to match data. Here is what each one does, how well it checks out, and where it is wrong.') +
-    '<div id="md-ov" class="fb-md-ov">' + FB.loading('card', 6) + '</div>' +
-    '<p class="qk-caption"><a class="qk-link" href="#/model/calibration">How we’re doing →</a> Our record this week and how often our chances came true.</p>';
   return Promise.all([FB.load('value/meta.json'), FB.load('fantasy/meta.json')]).then(function (arr) {
     if (!FB.alive(el)) return;
     var vm = arr[0] || {}, fm = arr[1] || {};
@@ -563,8 +575,7 @@ function overview(el) {
           '<li>Clubs from different continents meet rarely, so the one-scale ratings across continents are the least certain numbers on the site.</li>' +
           '<li>Some past seasons are incomplete; a row marked <span class="fb-cov partial">Partial</span> is a lower bound. See <a href="#/model/coverage">data coverage</a>.</li></ul>', { span: 7 }) +
         FB.card('Look something up', 'Every metric and model term, in plain words.', '<p class="qk-sub">' + G('npxg_90', 'npxG per 90') + ', ' + G('strength_ppg', 'strength') + ', ' + G('gar', 'GAR/90') + ', ' + G('xpts', 'expected points') + ', ' + G('luck', 'luck') + ' and 200 more.</p><a class="qk-btn" href="#/model/glossary">Open the glossary →</a>', { span: 5 })
-      ) + '</div>' + '<div id="md-moves"></div>');
-    movesBlock(el, vm.moves);
+      ) + '</div>');
   });
 }
 
@@ -618,10 +629,10 @@ function competitionCard(c, m, t, b) {
   var played = isNum(m.games_played) ? m.games_played : c.games_played, total = isNum(m.games_total) ? m.games_total : c.games_total;
   var tiles = [
     FB.kpi('Season', esc(k === 'liga' ? 'Torneo ' + (m.phase === 'clausura' ? 'Clausura' : 'Apertura') : (FB.currentSeason(c).season || m.season || c.season || '—')), { text: true, sub: (played || 0) + ' of ' + (total || 0) + ' matches played' }),
-    FB.kpi('Simulations', m.unsimulated ? 'none' : FB.int(m.n_sims || 0), { sub: m.unsimulated ? 'national teams are not simulated' : isNum(m.runtime_s) ? 'run in ' + num(m.runtime_s, 1) + ' s' : '' }),
+    FB.kpi('Simulations', m.unsimulated || !(m.n_sims > 0) ? 'none' : FB.int(m.n_sims), { sub: m.unsimulated ? 'national teams are not simulated' : !(m.n_sims > 0) ? 'nothing to simulate yet' : isNum(m.runtime_s) ? 'run in ' + num(m.runtime_s, 1) + ' s' : '' }),
     FB.kpi('Training matches', isNum(m.training_matches) ? FB.int(m.training_matches) : '—', { sub: model.params_method ? 'parameters: ' + esc(model.params_method) : '' }),
-    FB.kpi('Store', m.store_fresh === false ? '<span class="fb-down">stale</span>' : m.store_fresh === true ? 'fresh' : '—', { text: true, sub: (isNum(m.store_age_hours) ? num(m.store_age_hours, 1) + ' h since the last refresh' : '') + (m.updated_at ? ' · built ' + esc(FB.fmtStamp(m.updated_at)) : '') }),
-    FB.kpi('Match detail', isNum(m.detail_matches) ? FB.int(m.detail_matches) : '—', { sub: 'matches with line-ups' + (isNum(m.sheet_matches) ? ' · ' + m.sheet_matches + ' with the team sheet' : '') })
+    FB.dataTile(m, 'Store'),
+    FB.kpi('Match detail', isNum(FB.detailNow(m, played)) ? FB.int(FB.detailNow(m, played)) : '—', { sub: 'matches with line-ups this season' + (isNum(m.detail_matches) ? ' · ' + FB.int(m.detail_matches) + ' in the store' : '') })
   ];
   var params = [];
   if (model.params_method) params.push(['Parameter set', esc(METHOD_LABELS[model.params_method] || model.params_method), 'model_params.json']);
@@ -682,9 +693,14 @@ function methodology(el, p) {
     return '<section class="qk-card fb-md-sec" id="method-' + esc(s.id) + '"><div class="qk-card-head"><div class="fb-card-titles"><h3 class="qk-card-title">' + (i + 1) + '. ' + esc(s.title) +
       ' <a class="fb-md-anchor" href="#/model/methodology/' + esc(s.id) + '" aria-label="Link to this section">#</a></h3></div></div><div class="qk-card-body fb-md-doc">' + FB.fixLinks(s.html) + '</div></section>';
   }).join('');
-  el.innerHTML = head('methodology', 'How The Quant Footballer gets its data, forecasts a match, simulates a season, ranks clubs and players, and where it is wrong. Written for a numerate fan; every constant is the one in the code.' +
+  el.innerHTML = head('methodology', 'What the site does: our chance for every match, every season played out thousands of times, every club and player on one scale. Each model in plain words first, then the technical detail.' +
     (c ? '' : ' Each competition\'s own settings: pick one in <a href="#/competitions">Competitions</a>, or add <code>?c=</code> here.')) +
-    '<div class="fb-md-layout">' + toc + '<div class="fb-md-body"><div id="md-this"></div>' + body + '</div></div>';
+    '<div id="md-ov" class="fb-md-ov">' + FB.loading('card', 6) + '</div>' +
+    '<section class="qk-section">' + QK.sectionHead({ kicker: 'In pictures', title: 'Each model, one chart', sub: 'What each model actually produces, on today’s data.' }) + '<div id="md-pics" class="fb-md-pics"></div></section>' +
+    '<section class="qk-section"><details class="fb-md-tech"' + (p.key || c ? ' open' : '') + '><summary>' + QK.sectionHead({ kicker: 'Technical detail', title: 'Every model, step by step', sub: 'The data, the constants and the code paths, for the numerate fan who wants them. Open to read.' }) + '</summary>' +
+    '<div class="fb-md-layout">' + toc + '<div class="fb-md-body"><div id="md-this"></div>' + body + '</div></div></details></section>';
+  overview(el);
+  pictures(el);
   Array.prototype.forEach.call(el.querySelectorAll('.fb-md-toc a[data-target]'), function (a) {
     a.addEventListener('click', function (ev) {
       var t = document.getElementById(a.getAttribute('data-target'));
@@ -710,6 +726,66 @@ function methodology(el, p) {
     if (!p.key) { var t = document.getElementById('method-this'); if (t && window.scrollY < 10) { /* the card is first in the body */ } }
     scrollTo();
   });
+}
+
+/* "Each model, one chart" (round 9, How it works for fans): the match model's score grid for the next big match, the
+   season simulation's finishing positions for a league leader, the one scale's league strengths and the player value
+   model's held-out check, each from today's payloads with one plain sentence. */
+function pictures(el) {
+  var host = el.querySelector('#md-pics');
+  if (!host) return;
+  host.innerHTML = FB.grid(
+    FB.card('The match model', 'Our chance of every score for one match.', FB.chartBox('md-p1', 300, 'Score chances') + '<p class="fb-cap" id="md-p1c"></p>', { span: 6 }) +
+    FB.card('Season simulations', 'Where one club finishes in thousands of simulated seasons.', FB.chartBox('md-p2', 300, 'Finishing positions') + '<p class="fb-cap" id="md-p2c"></p>', { span: 6 }) +
+    FB.card('One scale for every club', 'Each league’s average club on the pooled scale.', FB.chartBox('md-p3', 340, 'League strength') + '<p class="fb-cap">Points a game the league’s average club would take against the average club of the whole pool. Cup matches between leagues are what connect them.</p>', { span: 6 }) +
+    FB.card('Player value', 'Does it predict? How much of the next matches’ xG difference each measure explains.', '<div id="md-p4"></div>', { span: 6 })
+  );
+  var slug = ['premier-league', 'la-liga', 'serie-a', 'bundesliga'].filter(function (s) { return FB.hasFile(s, 'probs'); })[0];
+  if (slug) FB.compFiles(slug, ['fixtures', 'probs']).then(function (d) {
+    if (!FB.alive(el)) return;
+    var f = ((d.fixtures || {}).matches || []).filter(function (x) { return x.status === 'scheduled' && x.model && isNum(x.model.lh) && isNum(x.model.la); })[0];
+    var box1 = el.querySelector('#md-p1');
+    if (f && box1) {
+      var pois = function (k, l) { var p = Math.exp(-l); for (var i = 1; i <= k; i++) p *= l / i; return p; };
+      var data = [];
+      for (var i = 0; i < 6; i++) for (var j = 0; j < 6; j++) data.push([j, i, Math.round(1000 * pois(i, f.model.lh) * pois(j, f.model.la)) / 10]);
+      QKC.heatmap(box1, { x: ['0', '1', '2', '3', '4', '5'], y: ['0', '1', '2', '3', '4', '5'], data: data, min: 0, fmt: function (v) { return num(v, 1) + '%'; }, xName: f.away + ' goals', yName: f.home + ' goals', label: 'Score chances' });
+      FB.set('md-p1c', esc(f.home + ' v ' + f.away) + ': we expect ' + num(f.model.lh, 2) + ' goals to ' + num(f.model.la, 2) + ', so ' + pct(f.model.h) + ' home win, ' + pct(f.model.d) + ' draw, ' + pct(f.model.a) + ' away win. (The grid treats the two goal counts as independent; the full model adds a small correction for low scores.)');
+    } else if (box1) { box1.style.height = 'auto'; box1.innerHTML = FB.muted('No match to show right now.'); }
+    var t = ((d.probs || {}).teams || []).slice().sort(function (a, b) { return (b.p_title || 0) - (a.p_title || 0); })[0];
+    var box2 = el.querySelector('#md-p2');
+    var pp = t && (t.p_pos || []).length ? t.p_pos : null;
+    if (pp && box2) {
+      QKC.bar(box2, { cats: pp.map(function (x, k) { return String(k + 1); }), series: [{ name: 'Chance', data: pp.map(function (x) { return Math.round(1000 * x) / 10; }) }], fmt: function (v) { return v + '%'; }, valName: 'Chance (%)', catName: 'Final position', label: 'Finishing positions' });
+      FB.set('md-p2c', esc(t.team) + ' finish top in ' + pct(t.p_title) + ' of the simulated seasons. Every remaining match is drawn from our score chances, again and again.');
+    } else if (box2) {
+      FB.compFile(slug, 'table').then(function (tb) {
+        if (!FB.alive(el)) return;
+        var r = (((tb || {}).standings) || []).filter(function (x) { return (x.p_pos || []).length; })[0];
+        if (!r) { box2.style.height = 'auto'; box2.innerHTML = FB.muted('No simulation to show right now.'); return; }
+        QKC.bar(box2, { cats: r.p_pos.map(function (x, k) { return String(k + 1); }), series: [{ name: 'Chance', data: r.p_pos.map(function (x) { return Math.round(1000 * x) / 10; }) }], fmt: function (v) { return v + '%'; }, valName: 'Chance (%)', catName: 'Final position', label: 'Finishing positions' });
+        FB.set('md-p2c', esc(r.team) + ', ' + FB.ordinal(r.pos) + ' now: their final position in every simulated season. Every remaining match is drawn from our score chances, again and again.');
+      });
+    }
+  });
+  FB.load('pool.json').then(function (pool) {
+    if (!FB.alive(el)) return;
+    var L = (pool || {}).leagues || {}, rows = Object.keys(L).map(function (s) { return FB.merge(L[s], { slug: s }); }).filter(function (r) { return isNum(r.strength); }).sort(function (a, b) { return b.strength - a.strength; }).slice(0, 14);
+    var box3 = el.querySelector('#md-p3');
+    if (!rows.length) { box3.style.height = 'auto'; box3.innerHTML = FB.muted('No pooled fit this run.'); return; }
+    QKC.bar(box3, { horizontal: true, labels: true, labelWidth: 130, cats: rows.map(function (r) { return r.name; }), series: [{ name: 'Rating', data: rows.map(function (r) { return Math.round(r.strength * 100) / 100; }) }],
+      fmt: function (v) { return num(v, 2); }, min: Math.max(0, Math.floor(Math.min.apply(null, rows.map(function (r) { return r.strength; })) * 5) / 5 - 0.2), valName: 'Points a game v the pool average', catName: 'League', label: 'League strength' });
+  });
+  if (FB.valueMethod) {
+    var p4 = el.querySelector('#md-p4');
+    FB.valueMethod(el, p4).then(function () {
+      if (!FB.alive(el) || !p4) return;
+      /* keep the held-out check; the weights and the fee model stay in the technical detail */
+      QK.$$('.qk-card', p4).forEach(function (cd) { if (!cd.querySelector('#me-r2')) cd.remove(); });
+      QK.$$('.qk-grid', p4).forEach(function (g) { if (!g.querySelector('#me-r2')) g.remove(); });
+      if (!p4.innerHTML) p4.innerHTML = FB.muted('The value payload is not built yet.');
+    });
+  }
 }
 
 // ── glossary ────────────────────────────────────────────────────────────────
@@ -751,11 +827,11 @@ function glossary(el, p) {
     var total = all.reduce(function (s, x) { return s + x.entries.length; }, 0);
     var entry = function (e, isModel) {
       return '<div class="fb-md-entry" id="gl-' + esc(e.key) + '" data-q="' + esc(norm([e.label, e.key, e.desc, e.group].join(' '))) + '"><dt><span class="fb-md-term">' + esc(e.label || e.key) +
-        ' <a class="fb-md-anchor" href="#/model/glossary/' + esc(e.key) + '" aria-label="Link to ' + esc(e.label || e.key) + '">#</a></span><span class="fb-md-tags"><code>' + esc(e.key) + '</code>' +
+        ' <a class="fb-md-anchor" href="#/model/glossary/' + esc(e.key) + '" aria-label="Link to ' + esc(e.label || e.key) + '">#</a></span><span class="fb-md-tags">' +
         (isModel ? '<span class="fb-md-tag model">model</span>' : tags(e)) + '</span></dt><dd>' + (e.desc ? esc(e.desc) : '<span class="qk-muted">No definition yet.</span>') + '</dd></div>';
     };
     FB.set('md-gl',
-      '<div class="fb-md-glbar">' + FB.toolbar([FB.field('Filter', '<input class="qk-input" id="md-gl-q" type="search" placeholder="xG, pressing, expected points…" autocomplete="off" spellcheck="false">'),
+      '<div class="fb-md-glbar">' + FB.toolbar([FB.field('Filter', '<input class="qk-input" id="md-gl-q" type="search" placeholder="Search: xG, pressing, expected points…" autocomplete="off" spellcheck="false" aria-label="Search the glossary">'),
         '<span class="fb-cap" id="md-gl-n">' + total + ' entries' + (g.updated_at ? ' · updated ' + esc(FB.fmtStamp(g.updated_at)) : '') + '</span>']) +
       '<div class="qk-chips fb-md-glidx">' + all.map(function (x) { return '<a class="qk-chip" href="#md-g-' + esc(x.slug) + '" data-group="' + esc(x.slug) + '"' + (x.model ? ' style="--ca:var(--c-1)"' : '') + '>' + esc(x.name) + ' <span class="n">' + x.entries.length + '</span></a>'; }).join('') + '</div></div>' +
       '<div class="fb-md-glgrid">' + all.map(function (x) {
@@ -892,7 +968,8 @@ function coverage(el) {
     var rows = list.map(function (c, i) {
       var m = metas[i] || {};
       var played = isNum(m.games_played) ? m.games_played : c.games_played;
-      return { slug: c.slug, name: c.name, fam: FB.familyOf(c), season: FB.currentSeason(c).season, played: played, detail: m.detail_matches, share: isNum(m.detail_matches) && played ? Math.min(1, m.detail_matches / played) : null };
+      var dn = FB.detailNow(m, played);
+      return { slug: c.slug, name: c.name, fam: FB.familyOf(c), season: FB.currentSeason(c).season, played: played, detail: dn, share: isNum(dn) && played ? Math.min(1, dn / played) : null };
     }).filter(function (r) { return isNum(r.played) && r.played > 0; });
     var famLabel = {}; FB.FAMILIES.forEach(function (f) { famLabel[f.key] = f.label; });
     FB.table(el.querySelector('#md-cov'), [

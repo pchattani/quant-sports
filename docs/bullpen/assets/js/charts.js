@@ -617,7 +617,8 @@ function seriesBox(slot, title, o, seeds) {
     if (!t) return '<div class="bk-team tbd"><span class="bk-seed"></span><span class="bk-name">TBD</span><span class="bk-w"></span><span class="bk-p"></span></div>';
     const won = done && done === t, lost = done && done !== t;
     const p = s && s.p && isNum(s.p[i]) ? Number(s.p[i]) : null;
-    const mk = s && s.market && isNum(s.market[i]) ? Number(s.market[i]) : null;
+    /* round 9: the market is not shown on the bracket (overview, Bracket tab) unless a caller asks (o.market: true) */
+    const mk = o.market === true && s && s.market && isNum(s.market[i]) ? Number(s.market[i]) : null;
     return '<div class="bk-team' + (won ? ' won' : '') + (lost ? ' lost' : '') + '">' +
       '<span class="bk-seed">' + (seeds[t] || '') + '</span>' +
       '<span class="bk-name">' + BP.teamLink(t, { abbr: true, level: L }) + '<span class="bk-full">' + esc(BP.teamShort(t)) + '</span></span>' +

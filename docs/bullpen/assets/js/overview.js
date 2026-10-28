@@ -28,11 +28,6 @@ const isNum = BP.isNum;
 const U = BP.ui;
 
 const PHASE = { preseason: 'Preseason', regular: 'Regular season', postseason: 'Postseason', offseason: 'Off-season', complete: 'Season complete' };
-const BOARDS = [
-  ['h_war', 'Hitters: Bullpen WAR', v => BP.num(v, 1)], ['h_xwoba_plus', 'Hitters: xwOBA+', v => BP.fmtAvg(v)],
-  ['p_war', 'Pitchers: Bullpen WAR', v => BP.num(v, 1)], ['p_stuff_plus', 'Pitchers: Stuff+', v => String(Math.round(v))]
-];
-
 /* World Series chances: ours only (the postseason paths, else index teams); no market on the overview. */
 function titleRows(idx, post) {
   const pt = (post && post.teams) || {};
@@ -137,6 +132,141 @@ function pickFeatured(idx, cards, post) {
   const sc = cards.filter(c => ok(c, 48)).map(c => [QK.watchScore(BP.kitGame(c, 'mlb')), c]).filter(x => x[0] > -1e8).sort((a, b) => b[0] - a[0]);
   return sc.length ? { c: sc[0][1], why: reasonsWhy([], sc[0][1], idx, post), rest: sc.slice(1).map(x => x[1]) } : null;
 }
+/* On pace for history (round 9, Phase 4): data/mlb/<S>/chases.json (analytics/records.py): each stat's season leader
+   against the single-season record and the top 15 since 1901; the four closest to the record, as story cards with the
+   pace bar. In season "on pace for" (162 games at the same rate); once the regular season is over, "how close they came". */
+function chaseFill(host, L, S) {
+  if (!host) return;
+  BP.loadYear('chases.json', L, S).then(c => {
+    if (!host.isConnected || !BP.ok(c) || !c.stats) return;
+    const items = Object.keys(c.stats).map(k => { const x = c.stats[k], ld = (x.leaders || [])[0]; return ld ? { k: k, x: x, ld: ld, r: ld.pace / x.record[2] } : null; })
+      .filter(Boolean).sort((a, b) => (a.ld.rank || 99) - (b.ld.rank || 99) || b.r - a.r).slice(0, 4);
+    if (!items.length) return;
+    const fin = !!c.final;
+    host.innerHTML = QK.sectionHead({ kicker: fin ? 'Record watch' : 'On pace for history', title: fin ? 'How close they came' : 'Chasing the record books',
+      sub: (fin ? 'The season’s leaders against the single-season records since 1901 (American and National League).' : 'The season’s leaders at their pace over 162 games, against the single-season records since 1901.') + ' Records from the Lahman Baseball Database.' }) +
+      QK.storyCards(items.map(it => {
+        const ld = it.ld, rec = it.x.record, nm = BP.playerName(ld.pid) || ld.name;
+        const where = ld.rank ? (fin ? 'The ' + ordinal(ld.rank) + '-best total since 1901. ' : 'That pace would be the ' + ordinal(ld.rank) + '-best since 1901. ') : (fin ? 'Short of the top 15 since 1901 (' + it.x.list_min + '). ' : 'Off the top-15 pace (' + it.x.list_min + '). ');
+        return { kicker: it.x.label, name: nm, sub: BP.teamAbbr(ld.team), value: fin ? ld.value : Math.round(ld.pace), unit: fin ? it.x.label.toLowerCase() : 'on pace', colour: U.raw(ld.team),
+          href: BP.playerHref(ld.pid, { level: L, role: it.x.kind === 'pitcher' ? 'pitcher' : 'hitter' }),
+          pace: { now: ld.value, pace: ld.pace, target: rec[2], max: Math.max(rec[2], ld.pace) * 1.05, label: 'Record ' + rec[2] + ' · ' + rec[0] + ', ' + rec[1], fmt: v => String(Math.round(v)) },
+          text: where + (ld.behind > 0 ? Math.round(ld.behind) + ' short of ' + rec[0] + '’s ' + rec[2] + '.' : 'A new record.') };
+      }), { cols: 4 });
+  });
+}
+/* Hot and cold (round 9, Phase 4): data/<L>/<S>/form.json (analytics/form.py): each player's last 100 plate appearances
+   (xwOBA+) or last 500 pitches (Pitching+) against their own season; the two ends of each list with the run as a spark. */
+function formFill(host, L, S) {
+  if (!host) return;
+  BP.loadYear('form.json', L, S).then(f => {
+    if (!host.isConnected || !BP.ok(f)) return;
+    const H = f.hitters || {}, P = f.pitchers || {};
+    if (!(H.hot || []).length && !(P.hot || []).length) return;
+    const lb = (id, rows, pit) => {
+      const node = host.querySelector('#' + id);
+      if (!node || !rows.length) return;
+      QK.leaderboard(node, { dense: true, columns: [{ key: 'name', label: pit ? 'Pitcher' : 'Hitter', type: 'entity', sub: 'sub', mark: r => U.team(r.team, L, S), href: r => BP.playerHref(r.pid, { level: L, role: pit ? 'pitcher' : 'hitter' }) },
+        { key: 'spark', label: 'Recent run', type: 'spark' },
+        { key: 'recent', label: pit ? 'Last 500 pitches' : 'Last 100 PA', num: true, fmt: v => (pit ? String(Math.round(v)) : BP.fmtAvg(v)) },
+        { key: 'delta', label: 'v season', num: true, fmt: v => '<span class="' + (v > 0 ? 'edge-pos' : 'edge-neg') + '">' + (pit ? U.signed(v, 0) : (v >= 0 ? '+' : '−') + BP.fmtAvg(Math.abs(v)).replace(/^0/, '')) + '</span>' }],
+      rows: rows.slice(0, 5).map(r => Object.assign({}, r, { sub: (r.pos || '') + ' · ' + BP.teamAbbr(r.team) + ' · season ' + (pit ? Math.round(r.season) : BP.fmtAvg(r.season)) })) });
+    };
+    host.innerHTML = QK.sectionHead({ kicker: 'Hot and cold', title: 'Who’s on a run, and who’s in a slump', sub: 'Each player against their own season: hitters on what their contact deserved over the last 100 plate appearances (xwOBA+), pitchers on Pitching+ over the last 500 pitches' + (f.asof ? ', to ' + BP.fmtDate(f.asof, { year: false }) : '') + '.' }) +
+      '<div class="qk-grid"><div class="qk-span-6">' + U.card2('Hot bats', 'xwOBA+, last 100 PA', '<div id="fm-hh"></div>', { flush: true }) + '</div><div class="qk-span-6">' + U.card2('Hot arms', 'Pitching+, last 500 pitches', '<div id="fm-ph"></div>', { flush: true }) + '</div>' +
+      '<div class="qk-span-6">' + U.card2('Cold bats', 'the biggest drops from the season', '<div id="fm-hc"></div>', { flush: true }) + '</div><div class="qk-span-6">' + U.card2('Cold arms', 'the biggest drops from the season', '<div id="fm-pc"></div>', { flush: true }) + '</div></div>';
+    lb('fm-hh', H.hot || [], false); lb('fm-ph', P.hot || [], true); lb('fm-hc', H.cold || [], false); lb('fm-pc', P.cold || [], true);
+  });
+}
+/* Triple-A's lead (round 9): the finals (season.json postseason as played: the IL and PCL championship series and the
+   national championship game) and the call-ups and top prospects (prospects.json: callups, ranked, mlb_eq). */
+function aaaFill(el, post, L, S) {
+  const fin = el.querySelector('#ov-aaa-fin'), up = el.querySelector('#ov-aaa-up');
+  if (fin && post && (post.series || []).length) {
+    const list = post.series || [];
+    const ch = list.find(x => x.round === 'CH');
+    const champ = post.champion;
+    const line = x => { const w = x.winner, i = x.teams.indexOf(w), o = x.teams[1 - i]; return w ? { w: w, o: o, sc: x.wins[i] + '–' + x.wins[1 - i] } : null; };
+    const g = ch && (ch.games || [])[0];
+    const card = (x, big) => {
+      const r = line(x);
+      if (!r) return '';
+      const last = x.games && x.games.length ? x.games[x.games.length - 1] : null;
+      return '<div class="ov-fin' + (big ? ' big' : '') + '"><span class="qk-kicker">' + esc(x.round_name || '') + '</span>' +
+        '<span class="ov-fin-w">' + U.teamEnt(r.w, L, S) + '</span><span class="ov-fin-sc num">' + esc(x.best_of > 1 ? r.sc : (isNum((x.score || [])[0]) ? x.score.join('–') : 'Won')) + '</span>' +
+        '<span class="ov-fin-o">' + (x.best_of > 1 ? 'Series win' : 'One game') + ' over the ' + esc(BP.teamShort(r.o)) + (last ? ' · <a href="' + BP.gameHref(last, L, S) + '">' + (x.best_of > 1 ? 'Last game' : 'The game') + ' →</a>' : '') + '</span></div>';
+    };
+    fin.innerHTML = QK.sectionHead({ kicker: 'How it finished', title: champ ? 'The ' + BP.teamShort(champ) + ' are Triple-A champions' : 'The finals', sub: 'The International League and Pacific Coast League finals, then one game for the national title.', actions: g ? '<a class="qk-more" href="' + BP.gameHref(g, L, S) + '">The championship game</a>' : '' }) +
+      '<div class="ov-fins">' + (ch ? card(ch, true) : '') + list.filter(x => x.round !== 'CH').map(x => card(x)).join('') + '</div>';
+  }
+  if (!up) return;
+  BP.loadYear('prospects.json', L, S).then(d => {
+    if (!up.isConnected || !BP.ok(d)) return;
+    const P = d.players || {};
+    const ups = (d.callups || Object.keys(P).filter(pid => (P[pid].mlb_this_season || 0) > 0 && isNum(P[pid].age) && P[pid].age < 25).sort((a, b) => P[b].mlb_this_season - P[a].mlb_this_season)).slice(0, 8);
+    const hit = ((d.ranked || {}).hitters || []).slice(0, 5), pit = ((d.ranked || {}).pitchers || []).slice(0, 5);
+    const ent = (pid, sub) => { const x = P[pid] || {}; return '<li>' + BP.playerLink(pid, { level: 'aaa', season: S, name: x.name, role: x.kind === 'pitcher' ? 'pitcher' : 'hitter' }) + '<span class="sb">' + esc(sub) + '</span></li>'; };
+    const org = x => (x.parent ? BP.teamAbbr(x.parent) + ' · ' : '');
+    let h = '';
+    if (ups.length) h += QK.sectionHead({ kicker: 'Called up', title: 'Who made the jump', sub: 'Triple-A players who made their major-league debut this season, the most big-league time first.', actions: '<a class="qk-more" href="#/prospects">Every prospect</a>' }) +
+      QK.storyCards(ups.map(pid => { const x = P[pid]; const pit = x.kind === 'pitcher'; return { kicker: (x.parent ? BP.teamShort(x.parent) : 'MLB') + ' · ' + (x.pos || (pit ? 'P' : '')), name: x.name, sub: 'age ' + Math.floor(x.age || 0),
+        value: x.mlb_this_season, unit: pit ? 'MLB batters faced' : 'MLB plate appearances', href: BP.playerHref(pid, { level: 'mlb', role: pit ? 'pitcher' : 'hitter' }),
+        text: pit ? 'Triple-A: ' + (isNum((x.aaa || {}).k_pct) ? U.pct(x.aaa.k_pct) + ' strikeouts, ' : '') + (isNum((x.aaa || {}).ra9) ? BP.num(x.aaa.ra9, 2) + ' runs a nine' : '') : 'Triple-A: ' + (isNum((x.aaa || {}).woba) ? 'wOBA ' + BP.fmtAvg(x.aaa.woba) : '') + (isNum((x.aaa || {}).hr) ? ', ' + x.aaa.hr + ' home runs' : '') }; }));
+    if (hit.length || pit.length) h += '<div style="margin-top:var(--sp-5)">' + QK.sectionHead({ kicker: 'Top prospects', title: 'Ready for the majors?', sub: 'The best Triple-A lines translated to the major leagues: hitters by their MLB-equivalent wOBA, pitchers by strikeouts minus walks; 100 PA or batters faced or more.', tag: 'h3' }) +
+      '<div class="qk-grid"><div class="qk-span-6">' + U.card2('Hitters', 'MLB-equivalent wOBA', '<ol class="bp-list bp-lead ov-pros">' + hit.map(pid => ent(pid, org(P[pid]) + 'wOBA ' + BP.fmtAvg((P[pid].mlb_eq || {}).woba))).join('') + '</ol>') + '</div>' +
+      '<div class="qk-span-6">' + U.card2('Pitchers', 'MLB-equivalent strikeouts minus walks', '<ol class="bp-list bp-lead ov-pros">' + pit.map(pid => ent(pid, org(P[pid]) + 'K−BB ' + U.pct((P[pid].mlb_eq || {}).k_bb_pct))).join('') + '</ol>') + '</div></div></div>';
+    up.innerHTML = h;
+  });
+}
+/* The recap of a finished season (round 9): the champion as the spotlight (our calls for them, the World Series), our
+   favourite and how it went, and the award winners against our pre-vote calls (data/mlb/award_history.json). */
+function recapFill(host, post, season, L, S) {
+  if (!host) return;
+  const champ = post.champion;
+  const calls = (season && season.calls) || {};
+  const pre = (calls.preplayoff || {}).p_ws || {}, first = (calls.first || {}).p_ws || {};
+  const ranked = Object.keys(pre).sort((a, b) => pre[b] - pre[a]);
+  const list = BP.charts.seriesList(post);
+  const ws = list.find(x => x.rk === 'WS');
+  const runner = ws ? ws.teams.find(t => t !== champ) : null;
+  const wsW = ws ? (ws.teams[0] === champ ? ws.wins : [ws.wins[1], ws.wins[0]]) : null;
+  const pt = (post.teams || {})[champ] || {};
+  let h = QK.sectionHead({ kicker: 'The ' + S + ' season', title: champ ? 'The ' + BP.teamShort(champ) + ' won it all' : 'How it finished',
+    sub: 'The champion, the calls we made along the way against what happened, and who won the awards.', actions: '<a class="qk-more" href="' + BP.ghref('postseason', S) + '">The bracket as played</a>' });
+  if (champ) {
+    const t = U.team(champ, L, S);
+    const fav = ranked[0];
+    h += QK.spotlight({ kicker: S + ' World Series champions', name: BP.teamName(champ), sub: [BP.teamInfo(champ).division, isNum(pt.seed) ? 'seed ' + pt.seed : '', (BP.RECORDS || {})[champ] || ''].filter(Boolean).join(' · '),
+      team: { name: t.name, abbr: t.abbr, colour: t.colour, alt: t.alt }, href: BP.teamHref(champ, L, S),
+      headline: wsW ? 'Beat the ' + BP.teamShort(runner) + ' ' + wsW[0] + '–' + wsW[1] + ' in the World Series.' : '',
+      text: isNum(pre[champ]) ? 'We gave them ' + U.pct(pre[champ]) + ' on the eve of the postseason, ' + ordinal(ranked.indexOf(champ) + 1) + ' of the ' + ranked.length + ' clubs' +
+        (fav && fav !== champ ? '; our favourite, the ' + BP.teamShort(fav) + ' at ' + U.pct(pre[fav]) + ', ' + (reachText(post, fav) || 'fell short') + '.' : '.') : '',
+      stats: [isNum(first[champ]) ? { label: 'Our chance after week one', value: U.pct(first[champ]) } : null, isNum(pre[champ]) ? { label: 'Our chance before October', value: U.pct(pre[champ]) } : null,
+        { label: 'Series won', value: String(list.filter(x => BP.charts.winnerOf(x) === champ).length) }].filter(Boolean),
+      links: [{ href: BP.ghref('postseason', S), text: 'The bracket' }, { href: BP.teamHref(champ, L, S), text: 'Team page' }, { href: '#/history', text: 'Every champion' }] });
+  }
+  h += '<div id="ov-recap-aw"></div>';
+  host.innerHTML = h;
+  BP.load('mlb/award_history.json').then(ah => {
+    const box = host.querySelector('#ov-recap-aw');
+    const recs = ah && ah.ok !== false ? (ah.seasons || {})[String(S)] : null;
+    if (!box || !recs) return;
+    const keys = Object.keys(ah.labels || {}).filter(k => recs[k]);
+    box.innerHTML = '<div style="margin-top:var(--sp-5)">' + QK.sectionHead({ kicker: 'The awards', title: 'Who won, and what we said', sub: 'The winners against our pre-vote calls, made from the full regular season with a model fitted only on earlier seasons.', tag: 'h3',
+      actions: '<a class="qk-more" href="#/awards?s=' + S + '">Every race</a>' }) +
+      '<div class="ov-aw">' + keys.map(k => {
+        const r = recs[k], w = r.winner || {}, pk = r.pick || {};
+        const hit = w.rank === 1;
+        return '<div class="ov-aw-c' + (hit ? ' hit' : '') + '"><div class="qk-kicker">' + esc(ah.labels[k]) + '</div><div class="ov-aw-n">' + (w.pid ? BP.playerLink(w.pid, { level: L, season: S, name: w.name }) : esc(w.name || '—')) + '</div>' +
+          '<div class="ov-aw-v num">' + (isNum(w.p) ? U.pct(w.p) : '—') + '</div><div class="ov-aw-s">' + (hit ? 'Our top pick' : 'Our pick: ' + esc(pk.name || '—') + (isNum(pk.p) ? ' (' + U.pct(pk.p) + ')' : '') + (w.rank ? '; the winner was our ' + ordinal(w.rank) : '')) + '</div></div>';
+      }).join('') + '</div></div>';
+  });
+}
+function reachText(post, t) {
+  const r = ((post.teams || {})[t] || {}).reached;
+  return r === 'WS' ? 'lost the World Series' : r === 'CS' ? 'lost the LCS' : r === 'DS' ? 'went out in the Division Series' : r === 'WC' ? 'went out in the Wild Card round' : '';
+}
+function ordinal(n) { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
 /* Under the hero: why we picked it (round 6: the "How sure are we?" line lives on the Model page now). */
 function heroNote(g, why) {
   return why ? '<b>Why this game?</b> ' + esc(why) : false;
@@ -199,7 +329,8 @@ function render(el, params) {
     if (sp) post = Object.assign({}, sp, post || {}, { teams: sp.teams || (post && post.teams), seeds: sp.seeds || (post && post.seeds), series: (post && post.series) || sp.series });
     const rows = BP.standingsRows ? BP.standingsRows(season || {}) : {};
     BP.setRecords(U.records(season || {}));
-    const hasSim = Object.keys(rows).some(t => rows[t].sim && isNum(rows[t].sim.p_postseason)) || Object.keys(rows).some(t => isNum(rows[t].p_postseason));
+    /* Triple-A has no simulation: its rows carry 1 / 0 for the clubs that played in September, never a chance column */
+    const hasSim = BP.levelInfo(L).sim !== false && (Object.keys(rows).some(t => rows[t].sim && isNum(rows[t].sim.p_postseason)) || Object.keys(rows).some(t => isNum(rows[t].p_postseason)));
     const titles = L === 'mlb' ? titleRows(idx, post) : [];
     const inPost = phase === 'postseason' && post && post.series && post.series.length;
     const round = inPost && post.round ? BP.roundLabel(post.round) : '';
@@ -231,7 +362,7 @@ function render(el, params) {
           : 'Our chance for every game from a plate-appearance simulation with the lineups and starters, the race for October from 20,000 simulated seasons, and Statcast percentiles for every player, in plain English.',
         links: [{ label: 'Games', sub: 'Every game, our chance', href: BP.href('games', L, S) },
           inPost ? { label: 'Bracket', sub: 'Every series and path', href: BP.ghref('postseason') } : { label: 'Standings', sub: 'The race for October', href: BP.href('standings', L, S) },
-          { label: 'Players', sub: 'Statcast percentiles', href: BP.href('hitters', L, S) }] });
+          { label: 'Scouting Room', sub: 'Every player, every metric', href: BP.href('scout', L, S) }] });
       h += '<section class="qk-section ql-week">' + QK.sectionHead({ kicker: 'This week in MLB', title: '<span id="ov-wk">The week so far</span>', html: true, sub: esc(stageLine(dig.stage, phase)) }) +
         '<div id="ov-week"></div><div id="ov-feat" class="ql-feat"></div></section>';
     } else if (isCurrent && today.length + next.length > 0) {
@@ -242,15 +373,21 @@ function render(el, params) {
         actions: '<a class="qk-btn primary" href="' + BP.href('games', L, S) + '">' + (isCurrent ? 'All games' : 'Every game') + '</a><a class="qk-btn ghost" href="' + BP.href('standings', L, S) + '">Standings</a>' });
     }
 
+    /* round 9: a finished MLB season opens with its recap (the champion, our calls against what happened, the awards) */
+    const recapOn = !isCurrent && L === 'mlb' && sp && sp.actual;
+    if (recapOn) h += '<section class="qk-section" id="ov-recap"></section>';
+    /* round 9: Triple-A leads with its own story: how the season finished (the league finals and the national
+       championship), the players it sent up, and the best prospects by our major-league translation */
+    if (L === 'aaa') h += '<section class="qk-section" id="ov-aaa-fin"></section><section class="qk-section" id="ov-aaa-up"></section>';
     if (hasGames) h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'What to watch', title: '<span id="ov-gh">Today</span>', html: true, sub: 'Our chance for each side, with a line on why it’s worth your time. Live games update as they go.',
       actions: U.seg('ov-when', 'Games', [['today', 'Today'], ['next', 'Next'], ['results', 'Results']], first) }) + '<div class="qk-watch" id="ov-games"></div></section>';
     const hot = hotItems(src.leaders || {}, L);
     /* Who's hot: the black power list, the top name on five boards */
     if (hot.length) h += QK.band(QK.sectionHead({ kicker: isCurrent ? 'Who’s hot' : 'The season’s best', title: isCurrent ? 'The leaders, board by board' : 'Who led the way', sub: 'The top name on five boards, the next best behind, and a line on what the number means.',
-      actions: '<a class="qk-more" href="' + BP.href('leaders', L, S) + '">Every leaderboard</a>' }) + QK.hotRow(hot));
+      actions: '<a class="qk-more" href="' + BP.href('scout', L, S) + '?view=leaders">Every position’s leaders</a>' }) + QK.hotRow(hot));
     /* round 6: the fan modules (MLB, this season): breakout watch, then the spotlight; Who's for real? (win % against
        run differential) beside the biggest climb and fall from last season. Filled lazily by fanModules. */
-    if (landing) h += '<section class="qk-section" id="ov-break"></section><section class="qk-section" id="ov-spot"></section>';
+    if (landing) h += '<section class="qk-section" id="ov-chase"></section><section class="qk-section" id="ov-form"></section><section class="qk-section" id="ov-break"></section><section class="qk-section" id="ov-spot"></section>';
     const realHTML = '<div class="bp-ov-real">' + QK.sectionHead({ kicker: 'Who’s for real?', title: 'Results v chances', sub: 'Clubs top-left are winning more than their runs suggest; bottom-right, the reverse. Luck in close games, or something real?' }) +
       '<div class="qk-card"><div class="qk-card-body"><div id="ov-real" class="qk-chart" role="img" aria-label="Win percentage against run differential a game"></div><p class="qk-caption" id="ov-real-cap"></p></div></div></div>';
     h += landing ? '<section class="qk-section qk-g75">' + realHTML + '<div id="ov-climb"></div></section>' : '<section class="qk-section">' + realHTML + '</section>';
@@ -260,18 +397,25 @@ function render(el, params) {
 
     // season simulation
     if (titles.length || inPost) {
-      h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'Title race', title: 'Who wins the World Series?', html: true, sub: '<span id="ov-ws-lede">Our chances from simulating every remaining game and the bracket, each series played out in the model.</span>',
+      h += '<section class="qk-section" id="ov-title">' + QK.sectionHead({ kicker: 'Title race', title: 'Who wins the World Series?', html: true, sub: '<span id="ov-ws-lede">Our chances from simulating every remaining game and the bracket, each series played out in the model.</span>',
         actions: '<a class="qk-more" href="' + BP.ghref('postseason') + '">Every series and path</a>' }) +
         '<div class="qk-grid">' + (titles.length ? '<div class="qk-span-' + (inPost ? 5 : 12) + '">' + U.card2('World Series chances', 'Our chance from 20,000 simulated brackets, in team colours', '<div id="ov-ws"></div>', { foot: '<span>Clubs still alive</span>' + U.more(BP.ghref('postseason'), 'Every series and path') }) + '</div>' : '') +
         (inPost ? '<div class="qk-span-' + (titles.length ? 7 : 12) + '">' + U.card2('The bracket', 'Series wins and our chance to win each series', '<div id="ov-bk"></div>', { foot: '<span>' + (post.sims ? BP.int(post.sims) + ' simulated brackets' : '') + '</span>' + U.more(BP.ghref('postseason'), 'Postseason') }) + '</div>' : '') + '</div></section>';
     }
 
-    // team strength: where each club's strength comes from (the luck and power-rating charts repeat "Who's for real?")
+    // team strength (round 9): the offence-v-run-prevention map is the Teams page's style map; here a teaser with the
+    // clubs that stand out on each side
     const haveRatings = Object.keys(rows).some(t => rows[t].rating && isNum(rows[t].rating.net));
     if (haveRatings) {
-      h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'Team strength', title: 'Bats or arms?', sub: 'Offence against run prevention (pitching and defence), in runs a game above an average club. Up and right is better.',
-        actions: '<a class="qk-more" href="' + BP.href('teams', L, S) + '">Every team</a>' }) +
-        U.card2('Team strength map', 'Runs a game above average, from our team ratings', U.chart('ov-map', 520, 'Offence against run prevention')) + '</section>';
+      const rr = Object.keys(rows).map(t => rows[t]).filter(r => r.rating && isNum(r.rating.off) && isNum(r.rating.net));
+      const prev = r => (isNum(r.rating.def) ? r.rating.def : 0) + (isNum(r.rating.pitch) ? r.rating.pitch : 0);
+      const top = (f, n) => rr.slice().sort((a, b) => f(b) - f(a)).slice(0, n);
+      const both = top(r => Math.min(r.rating.off, prev(r)), 1)[0], bats = top(r => r.rating.off, 1)[0], arms = top(r => prev(r), 1)[0];
+      h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'Team strength', title: 'Bats or arms?', sub: 'Where each club’s strength comes from, in runs a game above an average club, from our team ratings.',
+        actions: '<a class="qk-more" href="' + BP.href('teams', L, S) + '?map=0">The style map</a>' }) +
+        QK.stats([bats ? { label: 'Best offence', value: BP.teamAbbr(bats.tid) + ' ' + U.signed(bats.rating.off, 2), sub: 'runs a game above average, batting and running', href: BP.teamHref(bats.tid, L, S) } : null,
+          arms ? { label: 'Best run prevention', value: BP.teamAbbr(arms.tid) + ' ' + U.signed(prev(arms), 2), sub: 'runs a game saved, pitching and fielding', href: BP.teamHref(arms.tid, L, S) } : null,
+          both ? { label: 'Best on both', value: BP.teamAbbr(both.tid), signal: true, sub: 'offence ' + U.signed(both.rating.off, 2) + ', run prevention ' + U.signed(prev(both), 2), href: BP.teamHref(both.tid, L, S) } : null].filter(Boolean)) + '</section>';
     }
 
     // standings
@@ -282,16 +426,14 @@ function render(el, params) {
       actions: leagues.length > 1 ? U.seg('ov-lg', 'League', leagues.map(x => [x, x]), leagues[0]) : '' }) +
       U.card2(isCurrent && inPost ? 'Final regular season' : 'Standings', '', '<div id="ov-st"></div>', { flush: true, foot: '<span>' + esc(BP.levelName(L) + ' ' + S) + '</span>' + U.more(BP.href('standings', L, S), 'Full standings') }) + '</section>';
 
-    // leaders
-    const lead = src.leaders || {};
-    const boards = BOARDS.filter(b => (lead[b[0]] || []).length);
-    if (boards.length) h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'Leaderboards', title: 'Leaders', sub: 'This season. Rates with sample floors and percentiles against each position are on the Players pages.', actions: '<a class="qk-btn" href="' + BP.href('leaders', L, S) + '">Every leaderboard</a>' }) +
-      '<div class="qk-grid">' + boards.map(b => '<div class="qk-span-3">' + U.card2(b[1], '', '<ul class="bp-list bp-lead">' + lead[b[0]].slice(0, 5).map((x, i) =>
-        '<li><span class="n">' + (i + 1) + '</span>' + U.playerEnt(x[0], L, BP.teamAbbr(BP.player(x[0]).team), b[0].charAt(0) === 'p' ? 'pitcher' : 'hitter') + '<span class="v">' + esc(b[2](x[1])) + '</span></li>').join('') + '</ul>', { flush: true }) + '</div>').join('') + '</div></section>';
+    // round 9: one leaders module (Who's hot, above); the boards for every position are the Scouting Room's Leaders
     /* our record and calibration live on the Model page ("How we're doing"): one small link here */
     if (L === 'mlb') h += '<p class="qk-sub bp-ov-doing">Every forecast is checked against the result: <a class="qk-link" href="#/calibration">How we’re doing →</a></p>';
 
     el.innerHTML = h;
+    if (recapOn) recapFill(el.querySelector('#ov-recap'), sp, season, L, S);
+    if (landing) { formFill(el.querySelector('#ov-form'), L, S); chaseFill(el.querySelector('#ov-chase'), L, S); }
+    if (L === 'aaa') aaaFill(el, sp, L, S);
 
     // this week: the top lines, then the game that matters most (or the World Series race when nothing big is on)
     if (landing) {
@@ -303,9 +445,8 @@ function render(el, params) {
         const g = Object.assign(BP.kitGame(feat.c, L), { league: 'MLB' }), lab = whenLabel(g);
         const occ = feat.c.series ? BP.seriesText(feat.c.series, true) : (feat.week && !/^(Today|Tonight|Live now|Under way)$/.test(lab) ? 'The big one this week' : 'The one to watch');
         fe.innerHTML = QK.featureCard(g, { scribble: lab + ' · ' + occ, nick: t => t.short || t.name, note: heroNote(g, feat.why) });
-      } else if (titles.length) {  /* nothing big on: lead with the race */
-        fe.innerHTML = '<div class="ql-race">' + QK.sectionHead({ kicker: feat ? 'Nothing big on today' : 'No games soon', title: 'So here’s the race for the World Series', sub: 'Our chance of winning it all, from 20,000 simulated brackets.', tag: 'h3' }) +
-          QK.chances(titles.slice(0, 6).map(r => ({ label: BP.teamShort(r.t), p: r.p, href: BP.teamHref(r.t, L, S), mark: U.team(r.t, L, S), color: U.raw(r.t) })), { key: false }) + '</div>';
+      } else if (titles.length) {  /* nothing big on: one line to the title race below (round 9: the race is shown once) */
+        fe.innerHTML = '<p class="qk-sub bp-ov-quiet">' + (feat ? 'Nothing big on today.' : 'No games in the next few days.') + ' The race for the World Series follows below, and every chance is on <a class="qk-link" href="' + BP.href('chances', L, S) + '">Chances</a>.</p>';
       }
     }
 
@@ -342,13 +483,6 @@ function render(el, params) {
       } else el.querySelector('#ov-real').innerHTML = QK.empty('Not yet', 'The chart fills in after the first games.');
     }
     if (inPost && BP.charts && BP.charts.mlbBracket && el.querySelector('#ov-bk')) BP.charts.mlbBracket(el.querySelector('#ov-bk'), post, { level: L, narrow: true });
-    // the strength map
-    if (haveRatings) {
-      const pw = Object.keys(rows).map(t => rows[t]).filter(r => r.rating && isNum(r.rating.net) && isNum(r.rating.off));
-      const pts = pw.map(r => ({ x: r.rating.off, y: (isNum(r.rating.def) ? r.rating.def : 0) + (isNum(r.rating.pitch) ? r.rating.pitch : 0), name: BP.teamName(r.tid), label: BP.teamAbbr(r.tid), color: BP.teamInfo(r.tid).colour, href: BP.teamHref(r.tid, L, S), size: 13 }));
-      QKC.scatter('#ov-map', { points: pts, xName: 'Offence (runs a game above average)', yName: 'Run prevention (runs a game)', xFmt: v => U.signed(v, 1), yFmt: v => U.signed(v, 1), refX: 0, refY: 0, labelAll: true, pad: '12%',
-        quadrants: ['Pitching and defence', 'Complete teams', 'Rebuilding', 'Bats carry them'], label: 'Team strength map' });
-    }
     // standings by league
     if (leagues.length) {
       const drawLg = lg => {
@@ -362,6 +496,7 @@ function render(el, params) {
           { key: 'gb', label: 'GB', num: true, fmt: v => { const x = Number(v); return isNum(v) && isFinite(x) && x > 0 ? (x % 1 ? x.toFixed(1) : String(x)) : '—'; } },
           { key: 'rd', label: 'RD', num: true, fmt: v => (isNum(v) ? U.signed(v, 0) : '—') }
         ];
+        if (!isCurrent && rs.some(r => isNum(r.seed))) cols.splice(1, 0, { key: 'seed', label: 'Seed', num: true, fmt: (v, r) => (isNum(v) ? String(v) + (r.clinched ? ' <span class="clinch" title="' + esc({ z: 'Division and a bye', y: 'Division', w: 'Wild card' }[r.clinched] || 'Clinched') + '">' + esc(r.clinched) + '</span>' : '') : '—'), tip: 'Postseason seed; z: division and a bye, y: division, w: wild card' });
         if (hasSim) cols.push({ key: 'pp', label: 'Postseason', type: 'bar', max: 1, fmt: v => (isNum(v) ? (v >= 0.9995 ? 'In' : v <= 0.0005 ? 'Out' : U.pct(v)) : '—'), tip: 'Our chance of a postseason place from the season simulation' });
         QK.leaderboard(el.querySelector('#ov-st'), { dense: true, rank: true, rowHref: r => BP.teamHref(r.tid, L, S), columns: cols,
           rows: rs.map(r => Object.assign({}, r, { name: BP.teamShort(r.tid), div: String(r.division || '').replace(/^(AL|NL)\s/, ''), gb: isNum(r.gb) ? r.gb : (lead0[r.division || ''] ? ((lead0[r.division || ''].w - r.w) + (r.l - lead0[r.division || ''].l)) / 2 : null),
@@ -467,7 +602,7 @@ function fanModules(el, idx, L, S, rows) {
     const bh = el.querySelector('#ov-break');
     if (bh && br.length) {
       bh.innerHTML = QK.sectionHead({ kicker: 'Breakout watch', title: 'Who took the leap', sub: 'The biggest jumps in Bullpen WAR from last season, among the top eight hitters and pitchers this season. Last season had to be a real one: 200 plate appearances or 150 batters faced.',
-        actions: '<a class="qk-more" href="' + BP.href('leaders', L, S) + '">Every leaderboard</a>' }) + QK.storyCards(br.map((b, i) => breakoutCard(b, L, S, i)));
+        actions: '<a class="qk-more" href="' + BP.href('scout', L, S) + '?view=leaders">Every position’s leaders</a>' }) + QK.storyCards(br.map((b, i) => breakoutCard(b, L, S, i)));
     }
     /* the best player nobody talks about: the highest-WAR hitter outside the top three and off the home-run board */
     const sp = el.querySelector('#ov-spot');

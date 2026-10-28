@@ -86,8 +86,14 @@ def build_global(data_dir: Path, entries: list[dict], pooled, connections: dict[
             logger.error("pool failed: %s", exc)
     if pool is not None:
         _write(data_dir, "pool.json", {**pool, "updated_at": _now()})
-    else:
-        _write(data_dir, "pool.json", {"model": None, "leagues": {}, "clubs": [], "note": "No pooled fit this run.", "updated_at": _now()})
+        return pool
+    # No pooled fit this run: never publish an empty pool over the last good one (the clubs scale, the overview's
+    # surprises and the Lab's pooled chances read it). The previous file stays; only a first build writes the stub.
+    prev = _read(data_dir / "pool.json", None)
+    if isinstance(prev, dict) and prev.get("model") and prev.get("clubs"):
+        logger.warning("pool: no pooled fit this run; keeping the previous pool.json (%s)", prev.get("updated_at"))
+        return None
+    _write(data_dir, "pool.json", {"model": None, "leagues": {}, "clubs": [], "note": "No pooled fit this run.", "updated_at": _now()})
     return pool
 
 
@@ -116,4 +122,24 @@ def build_archive_pages(data_dir: Path, archive: dict) -> dict:
         if tables:
             _write(hist_dir, f"{slug}.json", {"seasons": tables, "updated_at": _now()})
             n_seasons += len(tables)
+    write_champions(data_dir)
     return {"careers": len(index), "seasons": n_seasons}
+
+
+CHAMPIONS_REF = Path(__file__).resolve().parents[1] / "oddsmarkets" / "football" / "analytics" / "data" / "champions_wikidata.json"
+
+
+def write_champions(data_dir: Path) -> int:
+    """
+    data/champions.json for the History tabs: every champion of each competition since it began, from Wikidata (CC0;
+    scripts/football_champions_wikidata.py writes the committed reference file). Rows are [season, year, winner],
+    oldest first. Returns the number of competitions written (0 when the reference file is missing).
+    """
+    ref = _read(CHAMPIONS_REF, None)
+    if not isinstance(ref, dict) or not ref.get("competitions"):
+        return 0
+    comps = {slug: {"label": c.get("label"), "editions": [[e.get("season"), e.get("year"), e.get("winner")] for e in c.get("editions") or []]}
+             for slug, c in ref["competitions"].items() if c.get("editions")}
+    _write(data_dir, "champions.json", {"source": ref.get("source"), "licence": ref.get("licence"), "fetched_at": ref.get("fetched_at"),
+                                        "competitions": comps, "updated_at": _now()})
+    return len(comps)

@@ -44,6 +44,8 @@ function movesPage(el, params) {
   const U = BP.ui;
   const qy = params.query || {};
   M.tab = qy.tab || M.tab || 'trades';
+  /* round 9: the Method tab is Model > Who moves next now (the validation lives with the model) */
+  if (M.tab === 'method') { M.tab = 'trades'; }
   M.team = qy.team !== undefined ? qy.team : M.team;
   M.kind = qy.kind !== undefined ? qy.kind : M.kind;
   el.innerHTML = QK.skeleton('card', 2);
@@ -67,15 +69,16 @@ function movesPage(el, params) {
       tr ? { label: 'Trades rated', value: BP.int((tr.trades || []).length), sub: 'the last twelve months' } : null,
       tw.length ? { label: 'Best trader', value: BP.teamAbbr(tw[0]) + ' ' + s2(T[tw[0]].net), signal: true, sub: 'expected WAR in minus out, at the time', href: BP.teamHref(tw[0], 'mlb') } : null,
       tw.length ? { label: 'Gave the most away', value: BP.teamAbbr(tw[tw.length - 1]) + ' ' + s2(T[tw[tw.length - 1]].net), sub: 'expected WAR in minus out', href: BP.teamHref(tw[tw.length - 1], 'mlb') } : null,
-      mv ? { label: 'On the injured list', value: BP.int((mv.il_now || []).length), sub: 'players right now' } : null,
+      mv ? { label: 'On the injured list', value: BP.int((mv.il_now || []).filter(r => !(r[5] > 400)).length), sub: 'players right now' } : null,
       big && big.winner ? { label: 'Most lopsided trade', value: BP.teamAbbr(big.winner) + ' ' + s2((big.clubs[big.winner] || {}).net), sub: BP.fmtDate(big.date) } : null
     ]);
-    const tabs = [['trades', 'Trades'], ['clubs', 'Clubs']].concat(mn ? [['next', 'Who leaves next']] : []).concat([['feed', 'Feed'], ['il', 'Injured list'], ['method', 'Method']]);
+    const tabs = [['trades', 'Trades'], ['clubs', 'Clubs']].concat(mn ? [['next', 'Who leaves next']] : []).concat([['feed', 'Feed'], ['il', 'Injured list']]);
     el.innerHTML = head + '<div class="bp-kpis">' + tiles + '</div>' +
       '<nav class="qk-tabs bp-tabs2" id="mv-tab" aria-label="Moves views">' + tabs.map(t => '<a class="qk-tab" href="javascript:void(0)" data-k="' + t[0] + '" aria-selected="' + (t[0] === M.tab) + '">' + esc(t[1]) + '</a>').join('') + '</nav>' +
       '<section class="qk-card"><div class="qk-card-body"><div class="bp-ctl"><label>Club<select id="mv-team"><option value="">All</option>' + teams.map(t => '<option value="' + esc(t) + '"' + (t === M.team ? ' selected' : '') + '>' + esc(BP.teamName(t)) + '</option>').join('') + '</select></label>' +
       '<label id="mv-kind-w">Kind<select id="mv-kind"><option value="">All</option>' + Object.keys((mv && mv.kinds) || {}).map(k => '<option value="' + esc(k) + '"' + (k === M.kind ? ' selected' : '') + '>' + esc(mv.kinds[k]) + '</option>').join('') + '</select></label>' +
-      '<label id="mv-q-w">Find<input id="mv-q" type="search" placeholder="player…" value="' + esc(M.q) + '"></label><span id="mv-sort-w"></span></div></div></section><div id="mv-body" style="margin-top:var(--sp-4)"></div>';
+      '<label id="mv-q-w">Find<input id="mv-q" type="search" placeholder="player…" value="' + esc(M.q) + '"></label><span id="mv-sort-w"></span></div></div></section><div id="mv-body" style="margin-top:var(--sp-4)"></div>' +
+      '<p class="qk-sub bp-moved">How trades are rated, and how well the ratings have held up: <a class="qk-link" href="#/who-moves-next">Model › Who moves next</a>.</p>';
     const $ = id => document.getElementById(id);
     const draw = () => {
       $('mv-kind-w').style.display = M.tab === 'feed' ? '' : 'none';
@@ -89,7 +92,6 @@ function movesPage(el, params) {
       else if (M.tab === 'next') body.innerHTML = nextHTML(mn);
       else if (M.tab === 'feed') body.innerHTML = mv ? feedHTML(mv) : QK.empty('Not built yet', 'The transactions are not available.');
       else if (M.tab === 'il') body.innerHTML = mv ? ilHTML(mv) : '';
-      else body.innerHTML = methodHTML(tr, mv);
       AFTER.forEach(f => f());
       BP.sortable(body);
     };
@@ -128,7 +130,10 @@ function tradesHTML(tr) {
     }).join('');
     const verdict = t.winner ? BP.teamShort(t.winner) + ' won it at the time' : 'about even at the time';
     const rv = t.r_winner ? '; ' + BP.teamShort(t.r_winner) + ' ahead on what has happened since' : '; even on what has happened since';
-    return card(BP.fmtDate(t.date) + ' · ' + t.teams.map(c => BP.teamAbbr(c)).join(' – '), esc(verdict + rv), '<div class="bp-trd-clubs">' + clubs + '</div>' +
+    const names = t.pieces.map(p => nameOf(p[F.pid], p[F.name])).slice(0, 4);
+    const sum = '<summary class="bp-trd-sum"><span class="d">' + esc(BP.fmtDate(t.date, { year: false })) + '</span><span class="c">' + t.teams.map(c => esc(BP.teamAbbr(c)) + ' ' + gradeChip((t.clubs[c] || {}).grade)).join(' <span class="qk-muted">·</span> ') + '</span>' +
+      '<span class="w">' + esc(names.join(', ') + (t.pieces.length > 4 ? ' and ' + (t.pieces.length - 4) + ' more' : '')) + '</span><span class="v">' + esc(verdict) + '</span></summary>';
+    return '<details class="bp-trd"' + (i < 3 ? ' open' : '') + '>' + sum + card(BP.fmtDate(t.date) + ' · ' + t.teams.map(c => BP.teamAbbr(c)).join(' – '), esc(verdict + rv), '<div class="bp-trd-clubs">' + clubs + '</div>' +
       board('mv-tp' + i, { dense: true, columns: [ENT(), { key: 'move', label: 'Move', sort: false }, { key: 'age', label: 'Age', num: true, fmt: v => n1(v) },
         { key: 'svc', label: 'MLB yrs', num: true, tip: 'Seasons since MLB debut (stands in for club control)' }, { key: 'typ', label: 'Valued by', sort: false, fmt: v => '<span class="qk-muted">' + esc(v) + '</span>' },
         { key: 'rest', label: 'Rest', num: true, fmt: v => s2(v), tip: 'Expected WAR for the club over the rest of the season (in-season trades)' },
@@ -136,9 +141,9 @@ function tradesHTML(tr) {
         { key: 'value', label: 'Value', type: 'bar', fmt: v => s2(v), tip: 'Expected WAR for the club over five seasons, each weighted by the chance the player is still there, discounted 8% a year' },
         { key: 'real', label: 'Realised', num: true, fmt: v => s2(v), tip: 'WAR produced for the club since the trade' }],
         rows: t.pieces.map(p => ({ pid: p[F.pid], name: nameOf(p[F.pid], p[F.name]), team: p[F.to], sub: p[F.detail] || '', move: BP.teamAbbr(p[F.from]) + ' → ' + BP.teamAbbr(p[F.to]), age: p[F.age], svc: p[F.service] || '—',
-          typ: TYPE[p[F.type]] || p[F.type] || '', rest: p[F.rest], next: p[F.next], value: p[F.value], real: p[F.realised] })) }), { flush: false });
+          typ: TYPE[p[F.type]] || p[F.type] || '', rest: p[F.rest], next: p[F.next], value: p[F.value], real: p[F.realised] })) }), { flush: false }) + '</details>';
   });
-  return '<p class="bp-note">' + list.length + ' trades' + (list.length > 60 ? ', the first 60 shown' : '') + '. ' + esc((tr.notes || []).join(' ')) + '</p><div class="bp-stack">' + cards.join('') + '</div>';
+  return '<p class="bp-note">' + list.length + ' trades' + (list.length > 60 ? ', the first 60 shown' : '') + '; the first three open, a click opens any other. ' + esc((tr.notes || []).join(' ')) + '</p><div class="bp-stack bp-trds">' + cards.join('') + '</div>';
 }
 
 function clubsHTML(tr, mv) {
@@ -178,7 +183,7 @@ function nextHTML(m) {
   return card('Who leaves next', 'The chance each rostered player is not with the club by ' + esc((d.horizons || {}).next) + ', split by how; ranked from the most likely' + (rows.length === 300 ? ' (the first 300)' : ''),
     col.legend + (rows.length ? board('mv-next', { dense: true, rank: true, maxHeight: 680, columns: [ENT(), { key: 'age', label: 'Age', num: true, fmt: v => n1(v) }, { key: 'value', label: (d.unit || 'WAR'), num: true, fmt: v => s2(v), tip: 'Value, the last two seasons blended 3:2' }, col.col],
       rows: rows.map(r => ({ pid: r[F.pid], name: nameOf(r[F.pid], r[F.name]), team: r[F.team], sub: (r[F.pos] || '') + ' · ' + BP.teamAbbr(r[F.team]), age: r[F.age], value: r[F.value], _mv: r, p_move: r[F.p_next] })) }) : QK.empty('Nobody here')),
-    { foot: '<span class="bp-fn">' + esc((d.notes || []).slice(0, 2).join(' ')) + '</span><a href="#/methodology#who-moves-next">How →</a>' });
+    { foot: '<span class="bp-fn">' + esc((d.notes || []).slice(0, 2).join(' ')) + '</span><a href="#/who-moves-next">How →</a>' });
 }
 
 function feedHTML(mv) {
@@ -199,15 +204,75 @@ function ilHTML(mv) {
   const F = {};
   (mv.il_fields || []).forEach((f, i) => { F[f] = i; });
   const N = mv.names || {};
-  const list = (mv.il_now || []).filter(r => !M.team || r[F.club] === M.team);
+  /* a placement open for more than 400 days lost its activation (older payloads; the builder drops them since round 9) */
+  const list = (mv.il_now || []).filter(r => (!M.team || r[F.club] === M.team) && !(r[F.days] > 400));
   const parts = {};
   list.forEach(r => { const p = PART[r[F.part]] || r[F.part] || 'other'; parts[p] = (parts[p] || 0) + 1; });
   const pk = Object.keys(parts).sort((a, b) => parts[b] - parts[a]);
-  return '<div class="qk-grid"><div class="qk-span-4">' + card('Where it hurts', 'Players on the list now, by body part', pk.length ? BP.ui.chart('mv-parts', Math.max(240, 22 * pk.length + 60), 'Injured list by body part') : QK.empty('Nobody')) + '</div>' +
+  AFTER.push(() => warLost(mv));
+  return '<section class="qk-section" id="mv-lost"></section><div class="qk-grid"><div class="qk-span-4">' + card('Where it hurts', 'Players on the list now, by body part', pk.length ? BP.ui.chart('mv-parts', Math.max(240, 22 * pk.length + 60), 'Injured list by body part') : QK.empty('Nobody')) + '</div>' +
     '<div class="qk-span-8">' + card('On the injured list now', list.length + ' players · placements not yet followed by an activation, release or trade', list.length ? board('mv-il', { dense: true, maxHeight: 640, sort: { key: 'days', dir: 'desc' }, columns: [ENT(),
       { key: 'list', label: 'List', num: true, fmt: v => v + '-day' }, { key: 'start', label: 'Since', fmt: v => esc(BP.fmtDate(v)) }, { key: 'part', label: 'Body part' }, { key: 'days', label: 'Days', type: 'bar', fmt: v => BP.int(v) }],
       rows: list.map(r => ({ pid: r[F.pid], name: nameOf(r[F.pid], N[r[F.pid]]), team: r[F.club], sub: BP.teamAbbr(r[F.club]), list: r[F.list], start: r[F.start], part: PART[r[F.part]] || r[F.part] || '—', days: r[F.days] })) }) : QK.empty('Nobody'), { flush: true }) + '</div></div>' +
     (pk.length ? partsAfter(pk, parts) : '');
+}
+/* WAR lost to the injured list, by club (round 9, Phase 4): every stint of the regular season rebuilt from the feed
+   (a placement to the next activation, else the season's end), each day valued at the player's projected full-season WAR
+   (value.json: "e1" from the five-season projections, else "proj") spread over the regular season's 186 days. What a
+   healthy player is worth to the club, not what the stand-in cost. */
+const SEASON_DAYS = 186;
+function warLost(mv) {
+  const host = document.getElementById('mv-lost');
+  if (!host) return;
+  const S = BP.currentSeason('mlb');
+  BP.loadYear('value.json', 'mlb', S).then(v => {
+    if (!host.isConnected || !BP.ok(v) || !Array.isArray(v.rows)) return;
+    const VF = {}; (v.fields || []).forEach((f, i) => { VF[f] = i; });
+    const worth = {};
+    v.rows.forEach(r => { const x = VF.e1 !== undefined && isNum(r[VF.e1]) ? r[VF.e1] : r[VF.proj]; if (isNum(x) && x > 0) worth[String(r[VF.pid])] = x; });
+    const F = {}; (mv.fields || []).forEach((f, i) => { F[f] = i; });
+    const N = mv.names || {};
+    const lo = S + '-03-20', hi = S + '-09-30';
+    const rows = (mv.rows || []).filter(r => /^il_(place|activate)$/.test(r[F.kind])).sort((a, b) => String(a[F.date]).localeCompare(String(b[F.date])));
+    const open = {}, stints = [];
+    rows.forEach(r => {
+      const pid = String(r[F.pid]), d = String(r[F.date]).slice(0, 10), club = r[F.to] || r[F.from];
+      if (r[F.kind] === 'il_place') { if (!open[pid]) open[pid] = { pid: pid, club: club, from: d, part: String(r[F.detail] || '') }; }
+      else if (open[pid]) { stints.push(Object.assign(open[pid], { to: d })); delete open[pid]; }
+    });
+    Object.keys(open).forEach(pid => stints.push(Object.assign(open[pid], { to: hi })));
+    const day = x => Date.parse(x + 'T12:00:00Z');
+    const club = {}, worst = [];
+    stints.forEach(st => {
+      const a = st.from > lo ? st.from : lo, b = st.to < hi ? st.to : hi;
+      if (b <= a || !worth[st.pid] || !st.club) return;
+      const days = Math.round((day(b) - day(a)) / 864e5);
+      const lost = worth[st.pid] * days / SEASON_DAYS;
+      const c = club[st.club] = club[st.club] || { war: 0, days: 0, n: 0 };
+      c.war += lost; c.days += days; c.n += 1;
+      worst.push({ pid: st.pid, club: st.club, days: days, lost: lost, from: st.from, part: st.part.replace(/^\d+-day\s*[^\w]*\s*/, '') });
+    });
+    const ids = Object.keys(club).filter(t => !M.team || t === M.team).sort((a, b) => club[b].war - club[a].war);
+    if (!ids.length) return;
+    const top = worst.filter(x => !M.team || x.club === M.team).sort((a, b) => b.lost - a.lost).slice(0, 12);
+    const tot = ids.reduce((a, t) => a + club[t].war, 0);
+    host.innerHTML = QK.sectionHead({ kicker: 'Injury impact', title: 'The wins the injured list took', sub: 'Every stint on the injured list this regular season, each day valued at what the player is worth over a healthy season by our projections: the WAR each club lost to injuries.' }) +
+      '<div class="bp-kpis">' + QK.stats([
+        { label: 'Hit hardest', value: BP.teamAbbr(ids[0]) + ' ' + BP.ui.signed(-club[ids[0]].war, 1), signal: true, sub: 'WAR lost, ' + BP.int(club[ids[0]].n) + ' stints, ' + BP.int(club[ids[0]].days) + ' player-days', href: BP.teamHref(ids[0], 'mlb') },
+        { label: 'Most fortunate', value: BP.teamAbbr(ids[ids.length - 1]) + ' ' + BP.ui.signed(-club[ids[ids.length - 1]].war, 1), sub: 'WAR lost', href: BP.teamHref(ids[ids.length - 1], 'mlb') },
+        { label: 'Across the majors', value: BP.num(tot, 0), sub: 'WAR lost to the injured list' },
+        top[0] ? { label: 'Costliest absence', value: BP.num(top[0].lost, 1), sub: nameOf(top[0].pid, N[top[0].pid]) + ' (' + BP.teamAbbr(top[0].club) + '), ' + top[0].days + ' days', href: BP.playerHref(top[0].pid, { level: 'mlb' }) } : null
+      ].filter(Boolean)) + '</div>' +
+      '<div class="qk-grid"><div class="qk-span-5">' + card('WAR lost by club', 'Projected WAR of the days spent on the injured list', BP.ui.chart('mv-lost-c', Math.max(300, 18 * ids.length + 60), 'WAR lost to the injured list by club')) + '</div>' +
+      '<div class="qk-span-7">' + card('The costliest absences', 'Stints this regular season, by the WAR they cost', '<div id="mv-lost-t"></div>', { flush: true }) + '</div></div>';
+    QK.leaderboard(document.getElementById('mv-lost-t'), { dense: true, rank: true, columns: [ENT(),
+        { key: 'from', label: 'From', fmt: x => esc(BP.fmtDate(x, { year: false })) }, { key: 'days', label: 'Days', num: true }, { key: 'part', label: 'Injury', sort: false, fmt: x => '<span class="qk-muted">' + esc(x) + '</span>' },
+        { key: 'lost', label: 'WAR lost', type: 'bar', fmt: x => BP.num(x, 1) }],
+      rows: top.map(x => ({ pid: x.pid, name: nameOf(x.pid, N[x.pid]), team: x.club, sub: BP.teamAbbr(x.club), from: x.from, days: x.days, part: x.part, lost: x.lost })) });
+    QKC.bar('#mv-lost-c', { cats: ids.map(t => BP.teamAbbr(t)), series: [{ name: 'WAR lost', data: ids.map(t => club[t].war) }], colors: ids.map(t => QK.color.ensure(BP.ui.raw(t) || '#7d93ff', '#14171d', 3)),
+      horizontal: true, labels: true, fmt: x => BP.num(x, 1), labelWidth: 44, hrefs: ids.map(t => BP.teamHref(t, 'mlb')), valName: 'WAR lost to the injured list', catName: 'Club', label: 'WAR lost to the injured list by club' });
+    BP.sortable(host);
+  });
 }
 function partsAfter(pk, parts) {
   AFTER.push(() => { if (document.getElementById('mv-parts')) QKC.bar('#mv-parts', { cats: pk, series: [{ name: 'Players', data: pk.map(p => parts[p]), color: 'model' }], horizontal: true, labels: true, fmt: v => String(v), labelWidth: 110, valName: 'Players on the list', catName: 'Body part', label: 'Injured list by body part' }); });
@@ -296,5 +361,13 @@ function movesTeam(host, L, S, tid) {
 }
 
 BP.movesTeam = movesTeam;
+/* Model > Who moves next (bp-moves.js) shows the trade ratings' validation, retention and prospect model here */
+BP.tradeMethod = host => Promise.all([BP.load('mlb/moves.json'), BP.load('mlb/trades.json')]).then(res => {
+  if (!host || !host.isConnected) return;
+  const mv = BP.ok(res[0]) ? res[0] : null, tr = BP.ok(res[1]) ? res[1] : null;
+  if (!mv && !tr) return;
+  host.innerHTML = QK.sectionHead({ kicker: 'Trade ratings', title: 'How trades are rated, and how well', sub: 'Each trade valued at the time from what was known that day, then checked against what the players went on to do for their new clubs.' }) + methodHTML(tr, mv);
+  BP.sortable(host);
+});
 if (typeof BP.route === 'function') BP.route('moves', movesPage);
 })(window.BP || (window.BP = {}));

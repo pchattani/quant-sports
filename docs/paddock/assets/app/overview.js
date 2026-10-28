@@ -116,7 +116,7 @@ function weekTiles(dig, season, wk, next) {
     var ids = Object.keys(ch).filter(function (d) { return isNum(ch[d].p_title); }).sort(function (a, b) { return ch[b].p_title - ch[a].p_title; });
     if (ids[0]) {
       var st = dig.stage || {};
-      out.push({ label: 'Title favourite', value: PD.driverCode(ids[0]) + ' ' + PD.pct(ch[ids[0]].p_title, ch[ids[0]].p_title > 0.99 ? 1 : 0), href: '#/standings?tab=odds', signal: true,
+      out.push({ label: 'Title favourite', value: PD.driverCode(ids[0]) + ' ' + PD.titlePct(ch[ids[0]], 0), href: '#/standings?tab=odds', signal: true,
         sub: PD.driverName(ids[0]) + (st.leader === ids[0] && isNum(st.gap) ? ', ' + PD.pts(st.gap) + ' points clear with up to ' + st.points_left + ' left' : '') + ': our chance from 20,000 simulated seasons.' });
     }
   }
@@ -163,7 +163,7 @@ function render(el) {
     title: 'Every F1 race, driver and team, by the numbers.',
     lede: 'Our chance for this weekend’s Grand Prix, who’s fast right now, and the fight for both titles, from 20,000 simulated seasons, in plain English.',
     links: [{ label: 'Races', sub: next ? PD.shortRace(next.name) + ' next' : 'Every race centre', href: next ? PD.raceHref(next.year, next.round) : '#/races' },
-      { label: 'Standings', sub: 'And the title race', href: '#/standings' }, { label: 'Drivers', sub: 'Pace and percentiles', href: '#/drivers' }] }) +
+      { label: 'Standings', sub: 'And the title race', href: '#/standings' }, { label: 'Scouting Room', sub: 'Every driver, every number', href: '#/scout' }] }) +
     '<section class="qk-section ql-week">' + QK.sectionHead({ kicker: 'This week in F1', title: '<span id="ov-wkh">The week so far</span>', html: true, sub: esc(stageLine(dig.stage)) }) +
     '<div id="ov-week"></div><div class="ql-feat" id="ov-feat">' + QK.skeleton('card', 1) + '</div></section>' +
     '<section class="qk-section">' + QK.sectionHead({ kicker: 'What to watch ' + when, title: '<span id="ov-wh">' + (next ? 'Our calls for ' + esc(where) : 'What the numbers say') + '</span>', html: true,
@@ -251,7 +251,7 @@ function feature(next, race, season, wk, dig) {
 function raceLead(season, next) {
   var rows = titleRows(season, 'drivers').slice(0, 6);
   if (!rows.length) return next ? feature(next, null, season, null, null) : '';
-  var cr = PD.v2.chanceRows(rows.map(function (r) { return r.id; }), function (id) { return season.championship.drivers[id].p_title; }, true, null);
+  var cr = PD.v2.chanceRows(rows.map(function (r) { return r.id; }), function (id) { return season.championship.drivers[id].p_title; }, true, null, function (id) { return season.championship.drivers[id]; });
   return '<div class="ql-race">' + QK.sectionHead({ kicker: next ? 'No race this weekend' : 'Season complete', title: 'So here’s the title fight', tag: 'h3',
     sub: 'Our chance of the drivers’ title from 20,000 simulated seasons.' + (next ? ' Next up: the ' + next.name + ', ' + day(next.date) + '.' : '') }) + QK.chances(cr, { max: 1, key: false, oursName: 'Our title chance' }) + '</div>';
 }
@@ -389,7 +389,7 @@ function title(season) {
     var rows = titleRows(season, kind).slice(0, 8);
     var isD = kind === 'drivers';
     PD.set('ov-odds-s', 'Our chance of the ' + (isD ? 'drivers’' : 'constructors’') + ' title' + (rows[0] && rows[0].model > 0.995 ? ': ' + esc(isD ? PD.driverName(rows[0].id) : PD.teamName(rows[0].id)) + ' wins ' + PD.pct(rows[0].model, 2) + ' of simulated seasons' : ''));
-    var cr = PD.v2.chanceRows(rows.map(function (r) { return r.id; }), function (id) { return season.championship[kind][id].p_title; }, isD, null);
+    var cr = PD.v2.chanceRows(rows.map(function (r) { return r.id; }), function (id) { return season.championship[kind][id].p_title; }, isD, null, function (id) { return season.championship[kind][id]; });
     cr.forEach(function (r, i) { r.sub = 'exp. ' + PD.num(rows[i].c.exp_points, 0) + ' pts'; });
     host.innerHTML = QK.chances(cr, { max: 1, oursName: 'Our title chance' });
   };

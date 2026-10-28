@@ -9,7 +9,10 @@
  *
  * The depth chart (applyMoves) follows analytics/value.py apply_moves exactly. State in the URL hash:
  *   #/trade?t=<abbr>,<abbr>[,<abbr>]&m=<pid>-<to abbr>.<pid>-<to abbr>
- * No salaries: the cap is not checked. Uses RK.fk (skaters.js). */
+ * No salaries: the cap is not checked. Uses RK.fk (skaters.js).
+ * Round 9 (28 Oct 2026): with no clubs or players in the address the page opens on a real example, the most lopsided
+ * trade of the last twelve months in deals.json whose players are still with the clubs that got them, played backwards
+ * (each player returns to the club that traded them), and the result carries a before / after chart. */
 (function (RK) {
 'use strict';
 
@@ -173,16 +176,37 @@ function render(el, params, state) {
   el.innerHTML = k.muted('Loading…');
   return k.ready().then(() => {
     const S = k.curSeason();
-    return Promise.all([k.loadY(S, 'trade.json'), k.loadNames()]).then(res => {
+    const q0 = (params && params.query) || {};
+    return Promise.all([k.loadY(S, 'trade.json'), k.loadNames(), q0.t || q0.m ? Promise.resolve(null) : k.loadY(S, 'deals.json')]).then(res => {
       if (!k.alive(el)) return;
       const d = res[0];
       if (!k.ok(d) || !d.players) { el.innerHTML = k.card('Trade simulator', '', '<div class="pad">' + k.notBuilt('The trade simulator for ' + k.sLabel(S), d) + '</div>'); return; }
-      page(el, S, d, (params && params.query) || {}, k.S(params, state));
+      const ex = q0.t || q0.m ? null : example(d, res[2]);
+      page(el, S, d, ex ? Object.assign({}, q0, { t: ex.teams.join(','), m: ex.m }) : q0, k.S(params, state), ex);
     });
   });
 }
 
-function page(el, S, d, query, shown) {
+/* The most lopsided trade of the last twelve months (deals.json: the largest net value now to one side) between two
+   clubs, every player in it still with the club that got him (trade.json), played backwards. */
+function example(d, dl) {
+  if (!dl || dl.ok === false || !Array.isArray(dl.deals)) return null;
+  const team = {};
+  (d.players.rows || []).forEach(r => { team[String(r[(d.players.cols || []).indexOf('id')])] = r[(d.players.cols || []).indexOf('team')]; });
+  let best = null;
+  dl.deals.forEach(x => {
+    const ps = (x.assets || []).filter(a => a.k === 'player' && a.pid);
+    if ((x.teams || []).length !== 2 || x.minor || !ps.length || !ps.every(a => team[String(a.pid)] === a.to)) return;
+    const net = Math.max.apply(null, x.teams.map(t => Math.abs(((x.sides || {})[t] || {}).net_now || 0)));
+    if (!best || net > best.net) best = { net: net, deal: x, ps: ps };
+  });
+  if (!best || best.net < 0.5) return null;
+  const x = best.deal, w = x.teams.slice().sort((a, b) => (((x.sides || {})[b] || {}).net_now || 0) - (((x.sides || {})[a] || {}).net_now || 0))[0];
+  return { teams: x.teams.slice(), m: best.ps.map(a => a.pid + '-' + a.from).join('.'), deal: x, winner: w, net: best.net,
+    names: best.ps.map(a => a.name), picks: (x.assets || []).filter(a => a.k !== 'player').length };
+}
+
+function page(el, S, d, query, shown, ex) {
   const k = K();
   const P = d.params || {};
   const cols = d.players.cols || [];
@@ -203,7 +227,13 @@ function page(el, S, d, query, shown) {
     '<div class="card"><div class="card-header">Trade simulator ' + k.esc(k.sLabel(S)) + ' <span class="card-sub">Pick the clubs and the players moving. Each player carries a rest-of-season Rink value rate (GAR per 60: this season\'s and last season\'s at 0.7, minute-weighted) and projected ice time; incoming players take minutes from the lowest-rated players at their position (a better goalie takes the starts), outgoing minutes go to the next players up. Chances come from re-running the season simulation with each club\'s rating shifted' + (curves ? ' (' + k.int(curves.n_sims) + ' runs a point, shifts ' + curves.shifts.map(x => k.signed(x, 2)).join(', ') + ' goals a game)' : '') + '. <strong>Cap not checked</strong>: there is no free, legitimate salary source we use.</span></div>';
   if (shown && Number(shown) !== Number(S)) h += '<div class="pad">' + k.muted('The trade simulator always uses the current season (' + k.esc(k.sLabel(S)) + ').') + '</div>';
   if (noSim) h += '<div class="pad">' + k.muted('No season simulation right now (' + k.esc(d.phase || 'offseason') + '): the page shows the rating change and goals over a full season, without odds.') + '</div>';
-  h += '<div class="tr-pick" id="tr-pick"></div></div><div id="tr-rosters"></div><div id="tr-out"></div>';
+  h += '<div class="tr-pick" id="tr-pick"></div></div>';
+  if (ex) {
+    const dd = ex.deal, w = ex.winner, l = ex.teams.filter(t => t !== w)[0];
+    h += QK.explain('<b>Preloaded: the most lopsided trade of the last twelve months.</b> On ' + k.esc(k.fmtDate(dd.date)) + ' ' + k.esc(k.teamName(w)) + ' and ' + k.esc(k.teamName(l)) + ' traded ' + k.esc(ex.names.join(', ')) + (ex.picks ? ' (and ' + ex.picks + ' pick' + (ex.picks === 1 ? '' : 's') + ' or other assets, which the simulator leaves out)' : '') +
+      '. By our value model ' + k.esc(k.teamName(w)) + ' have come out ' + k.num(ex.net, 1) + ' WAR ahead so far. Here every player goes back to the club that traded them: <b>read each change with the sign flipped for what the trade did</b>. Untick a player or pick other clubs to try your own.', { html: true, cls: 'tr-ex' });
+  }
+  h += '<div id="tr-rosters"></div><div id="tr-out"></div>';
   h += '<div class="card"><div class="pad pg-note gq-note">How to read it: the rating change is the club\'s goals a game above replacement after the depth chart is rebuilt (each player\'s GAR per 60 × ice time; a game has ' + k.num((P.budget || {}).F, 0) + ' forward, ' + k.num((P.budget || {}).D, 0) + ' defence and 60 goalie minutes; caps ' + k.num((P.cap || {}).F, 0) + ' / ' + k.num((P.cap || {}).D, 0) + ' minutes; unfilled minutes at replacement level). It shifts the club\'s net rating in the season simulation; each club\'s odds are read off its own curve with the others at their ratings, so the effect of the trading clubs meeting each other is left out (small). Beyond ±' + k.num(range || 0.5, 2) + ' goals a game the end value is used. Next season applies the delta-method aging curve to each player\'s rate over a full season at current ice time. Model suggestions based on on-field value; not considering the salary cap, contracts, fit or availability.</div></div>';
   el.innerHTML = h;
 
@@ -274,6 +304,7 @@ function page(el, S, d, query, shown) {
     const nowTxt = left > 0 ? (dPts !== null ? (dPts >= 1 ? 'wins now' : dPts <= -1 ? 'weakens now' : 'about even now') : (dGoals >= 3 ? 'wins now' : dGoals <= -3 ? 'weakens now' : 'about even now'))
       : (dCup !== null && Math.abs(dCup) >= 0.005 ? (dCup > 0 ? 'a better Cup chance now' : 'a worse Cup chance now') : 'no change this season');
     const dNext = nextIn - nextOut;
+    RES[t] = { rating: T.rating, rAfter: k.isNum(T.rating) ? T.rating + res.delta : null, pts: T.exp_pts, pAfter: k.isNum(T.exp_pts) && dPts !== null ? T.exp_pts + dPts : null };
     const longTxt = dNext >= 2 ? 'long-term gain' : dNext <= -2 ? 'long-term cost' : 'about even next season';
     const nm = pid => (byId[pid] || {}).name || k.name(pid);
     let o = '<div class="card"><div class="card-header" style="border-left:4px solid ' + k.esc(k.teamColour(t)) + '">' + k.esc(k.teamName(t)) + ' <span class="card-sub tr-verdict"><strong>' + k.esc(nowTxt.charAt(0).toUpperCase() + nowTxt.slice(1)) + ', ' + k.esc(longTxt) + '.</strong></span></div><div class="pad">';
@@ -308,10 +339,19 @@ function page(el, S, d, query, shown) {
       rot.map(x => { const p = byId[x] || {}; return [{ v: p.name, html: k.playerLink(x, p.name) }, POS_ONE[p.pos] || '', { v: res.base[x] || 0, html: k.num(res.base[x] || 0, 1) }, { v: res.minutes[x], html: '<strong>' + k.num(res.minutes[x], 1) + '</strong>' }, { v: p.rate, html: k.num(p.rate, 2) }]; }), { compact: true }) + '</details>';
     return o + '</div></div>';
   }
+  const RES = {};
   function drawResults() {
     const out = document.getElementById('tr-out');
     if (!Object.keys(st.moves).length) { out.innerHTML = k.card('Result', '', '<div class="pad">' + k.muted('Tick the players to move. With three clubs, choose each player\'s new club.') + '</div>'); return; }
-    out.innerHTML = '<div class="grid-' + (st.teams.length === 3 ? '3' : '2') + '">' + st.teams.map(teamResult).join('') + '</div>';
+    out.innerHTML = '<div class="grid-' + (st.teams.length === 3 ? '3' : '2') + '">' + st.teams.map(teamResult).join('') + '</div>' +
+      '<div class="card"><div class="card-header">Before and after <span class="card-sub" id="tr-ba-s"></span></div><div class="pad"><div id="tr-ba" class="qk-chart" style="--h:' + (120 + 70 * st.teams.length) + 'px" role="img" aria-label="Each club before and after the trade"></div></div></div>';
+    /* the chart: projected points now and after (rating when there is no simulation), one pair of bars a club */
+    const pts = st.teams.every(t => RES[t] && k.isNum(RES[t].pts) && k.isNum(RES[t].pAfter));
+    const key = pts ? ['pts', 'pAfter'] : ['rating', 'rAfter'];
+    document.getElementById('tr-ba-s').textContent = pts ? 'projected points over the season, now and after the trade' : 'our rating in goals a game, now and after the trade';
+    QKC.bar('#tr-ba', { cats: st.teams.map(t => k.teamName(t)), horizontal: true, labels: true, fmt: x => (pts ? k.num(x, 1) : k.signed(x, 2)), labelWidth: 150,
+      series: [{ name: 'Now', data: st.teams.map(t => (RES[t] || {})[key[0]]), color: QKC.tokens().other }, { name: 'After the trade', data: st.teams.map(t => (RES[t] || {})[key[1]]), color: 'model' }],
+      valName: pts ? 'Projected points' : 'Our rating (goals a game)', legend: true });
   }
   function redraw(keepRosters) {
     writeState(st);

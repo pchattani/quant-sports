@@ -106,7 +106,7 @@ F.stakesText = function (season, kind) {
     var gap = lead - P[id], n = Mrest - gap + 1, per = gap / gp;
     var line = '<b>' + linkOf(kind, id, { dot: false }) + '</b>: ' + PD.pts(gap) + ' behind, ' + PD.pts(P[id] + M) + ' at most. ';
     line += n <= nx.max ? 'Out at the ' + esc(nxName) + ' if ' + esc(surname(kind, L)) + ' outscore' + (team ? '' : 's') + ' them by ' + PD.pts(Math.max(1, n)) + ' or more there. ' : 'Cannot be knocked out at the ' + esc(nxName) + '. ';
-    line += 'Needs about ' + PD.num(per, per < 10 ? 1 : 0) + ' points a round more than ' + esc(surname(kind, L)) + ' from here' + (isNum((c[id] || {}).p_title) ? ' (our title chance ' + pctTxt(c[id].p_title) + ').' : '.');
+    line += 'Needs about ' + PD.num(per, per < 10 ? 1 : 0) + ' points a round more than ' + esc(surname(kind, L)) + ' from here' + (isNum((c[id] || {}).p_title) ? ' (our title chance ' + PD.titlePct(c[id], c[id].p_title > 0 && c[id].p_title < 0.01 ? 1 : 0) + ').' : '.');
     out.push(line);
   });
   var outN = order.filter(function (id) { return isNum(P[id]) && P[id] + M < lead; }).length;
@@ -226,7 +226,7 @@ function histChart(season, kind, mode) {
   n.innerHTML = '<p class="pd-cap" style="margin:0 0 8px">' + plural(H.length, 'round') + ' on record so far (after round ' + H.map(function (x) { return x.after_round; }).join(', ') + '); the lines draw from the third. The latest:</p>' +
     '<ul class="fx-snap">' + ids.map(function (id) {
       var r = last[id];
-      return '<li><span>' + linkOf(kind, id) + '</span><b class="num">' + (mode === 'pts' ? PD.num(r.exp_points, 0) + ' pts' : PD.pct(r.p_title, 1)) + '</b><small>' + (mode === 'pts' ? PD.num(r.p05, 0) + '–' + PD.num(r.p95, 0) + ' (90% of seasons)' : PD.pts(r.points) + ' pts then') + '</small></li>';
+      return '<li><span>' + linkOf(kind, id) + '</span><b class="num">' + (mode === 'pts' ? PD.num(r.exp_points, 0) + ' pts' : PD.titlePct(r, 1)) + '</b><small>' + (mode === 'pts' ? PD.num(r.p05, 0) + '–' + PD.num(r.p95, 0) + ' (90% of seasons)' : PD.pts(r.points) + ' pts then') + '</small></li>';
     }).join('') + '</ul>';
 }
 

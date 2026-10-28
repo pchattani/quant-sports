@@ -7,7 +7,7 @@
 .cc-rc-why { flex-basis: 100%; color: var(--ink-3); font-size: var(--fs-xs); }
 .cc-rc-game { display: flex; flex-direction: column; gap: 2px; min-width: 180px; }
 .cc-rc-game a { font-weight: 600; color: var(--ink-1); }
-.cc-rc-game a:hover { color: var(--accent); }
+.cc-rc-game a:hover { color: var(--signal); }
 .cc-rc-game .s { color: var(--ink-3); font-size: var(--fs-xs); white-space: normal; }
 .cc-rc-ifs { display: block; color: var(--ink-3); font-size: var(--fs-xs); white-space: nowrap; }
 .cc-rc-ifs b { color: var(--ink-1); }
@@ -31,5 +31,5 @@
 .cc-rc-short { color: var(--ink-2); font-size: var(--fs-sm); margin: 6px 0 10px; }
 .cc-rc-more { margin-top: 8px; }
 .cc-rc-more summary { cursor: pointer; font: 700 var(--fs-xs) var(--font-cond); text-transform: uppercase; color: var(--ink-2); letter-spacing: .04em; padding: 6px 0; }
-.cc-rc-more summary:hover { color: var(--accent); }
+.cc-rc-more summary:hover { color: var(--signal); }
 @media (max-width: 600px) { .cc-rc-rec { font-size: 22px; } .cc-rc-game { min-width: 140px; } }

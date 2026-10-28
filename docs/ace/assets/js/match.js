@@ -201,7 +201,7 @@ function preBoxes(T, d) {
    read "v" and "a match like this"). The market appears only before the first ball, small and grey under the hero
    (market quiet, round 6), its sources on hover. */
 function hero(T, d, p1, ev, surface) {
-  const st = TA.matchState(d), fin = TA.isFinished(d), live = st === 'live', pre = !fin && !live;
+  const st = TA.matchState(d), fin = TA.isFinished(d), live = st === 'live', pre = st === 'pre';
   const mk = (d.pre || {}).market || d.market || null;   /* the index card's market when the match file is not out yet */
   const G = TA.kitGame(d, T, { initials: true });
   G.p_home = isNum(p1) ? 1 - p1 : null;
@@ -229,7 +229,8 @@ function hero(T, d, p1, ev, surface) {
   const kick = [TA.tourName(T), TA.eventName(T, d.event), TA.roundLabel(d.round), TA.surfaceLabel(surface, ev.indoor)].filter(Boolean).join(' · ');
   /* once it is over, the hero's foot already names the pre-match call: the strip under it says what the number meant */
   const miss = isNum(p1) ? Math.max(1, Math.round(10 * (1 - Math.max(p1, 1 - p1)))) : null;
-  const finNote = fin && isNum(p1) ? '<b>What’s that number?</b> ' + TA.pct(Math.max(p1, 1 - p1), 0) + ' was our chance for ' + esc(TA.playerSurname(T, p1 >= 0.5 ? d.p1 : d.p2)) + ' before the first ball. A match like this goes the other way about ' + miss + ' time' + (miss === 1 ? '' : 's') + ' in 10.' : undefined;
+  const finNote = fin && isNum(p1) ? '<b>What’s that number?</b> ' + TA.pct(Math.max(p1, 1 - p1), 0) + ' was our chance for ' + esc(TA.playerSurname(T, p1 >= 0.5 ? d.p1 : d.p2)) + ' before the first ball. A match like this goes the other way about ' + miss + ' time' + (miss === 1 ? '' : 's') + ' in 10.' :
+    st === 'awaiting' ? '<b>Result to come.</b> This match has been played; the score arrives with the next update' + (isNum(p1) ? '. Before the first ball our chance for ' + esc(TA.playerSurname(T, p1 >= 0.5 ? d.p1 : d.p2)) + ' was ' + TA.pct(Math.max(p1, 1 - p1), 0) + '.' : '.') : undefined;
   const card = QK.previewCard(G, { kicker: kick, nick: t => t.name, factors: fx, factorsTitle: 'How they match up', noteExtra: extra, note: finNote,
     market: pre && mk && isNum(mk.p1) ? { p: 1 - mk.p1, src: mk.sources, quiet: true } : null, marketSource: 'prediction markets' });
   const tba = d.tba || String(d.date || '').length <= 10;
@@ -271,17 +272,17 @@ function render(el, params) {
     const fin = TA.isFinished(d);
 
     // ── hero and stat tiles
-    const live0 = TA.matchState(d) === 'live';
+    const live0 = st === 'live', wait = st === 'awaiting';
     const tiles = [];
-    if (isNum(p1)) tiles.push({ label: fin ? 'Our pre-match chance' : 'Our chance', value: TA.playerSurname(T, p1 >= 0.5 ? d.p1 : d.p2) + ' ' + TA.pct(Math.max(p1, 1 - p1), 0), signal: true, sub: isNum(m.mr_p) ? 'Elo, serve and return and the market-rating term, blended' : 'Elo and serve and return, blended' });
+    if (isNum(p1)) tiles.push({ label: fin || wait ? 'Our pre-match chance' : 'Our chance', value: TA.playerSurname(T, p1 >= 0.5 ? d.p1 : d.p2) + ' ' + TA.pct(Math.max(p1, 1 - p1), 0), signal: true, sub: isNum(m.mr_p) ? 'Elo, serve and return and the market-rating term, blended' : 'Elo and serve and return, blended' });
     if (live0 && isNum(d.wp_now)) tiles.push({ label: 'Live chance', value: TA.playerSurname(T, d.wp_now >= 0.5 ? d.p1 : d.p2) + ' ' + TA.pct(Math.max(d.wp_now, 1 - d.wp_now), 0), sub: 'updates after every game' });
     const top = Object.keys(dist.sets || {}).sort((x, y) => dist.sets[y] - dist.sets[x])[0];
     if (top) tiles.push({ label: 'Likeliest score', value: top, sub: TA.pct(dist.sets[top], 0) + ' · sets, ' + TA.playerSurname(T, d.p1) + ' first' });
     if (isNum(dist.exp_games)) tiles.push({ label: 'Expected games', value: TA.num(dist.exp_games, 1), sub: isNum(dist.p_tiebreak) ? 'at least one tiebreak ' + TA.pct(dist.p_tiebreak, 0) : '' });
     if (isNum(dist.p_straight)) tiles.push({ label: 'Straight sets', value: TA.pct(dist.p_straight, 0), sub: 'either player' });
-    const boardH = (d.sets || []).length || live0 ? '<section class="qk-card"><div class="qk-card-body"><div class="qk-kicker" style="margin-bottom:8px">Set by set</div>' + board(T, d, p1) + '</div></section>' : '';
+    const boardH = !wait && ((d.sets || []).length || live0) ? '<section class="qk-card"><div class="qk-card-body"><div class="qk-kicker" style="margin-bottom:8px">Set by set</div>' + board(T, d, p1) + '</div></section>' : '';
     el.innerHTML = '<div class="ta-gtop">' + hero(T, d, p1, ev, surface) + '<div class="ta-gside ta-stack">' + boardH + (tiles.length ? '<div class="ta-kpis">' + QK.stats(tiles) + '</div>' : '') +
-      (d._card ? '' : V2card(fin || st === 'live' ? 'Our forecast before the match' : 'Our forecast', 'Our chance and how it is built. The market and the closing line sit underneath as a reference, not our forecast.', preBoxes(T, d))) + '</div></div>' + '<div id="mt-body" style="margin-top:var(--sp-6)"></div>';
+      (d._card ? '' : V2card(fin || live0 || wait ? 'Our forecast before the match' : 'Our forecast', 'Our chance and how it is built. The market and the closing line sit underneath as a reference, not our forecast.', preBoxes(T, d))) + '</div></div>' + '<div id="mt-body" style="margin-top:var(--sp-6)"></div>';
     const body = document.getElementById('mt-body');
     if (d._card) {
       body.innerHTML = TA.card('Match centre', '', TA.muted('The full match centre for this match is not built yet; the score and our pre-match chance come from the schedule.' +
@@ -293,7 +294,7 @@ function render(el, params) {
     // ── live / after: win probability first
     const wpRows = d.wp || [];
     if (wpRows.length > 1) {
-      html += TA.card('How the match swung', (fin ? 'our win chance after every game' : 'our win chance, updated after every game') + (d.reconstructed ? ' · game order within sets reconstructed from the set scores' : ''),
+      html += TA.card('How the match swung', (fin ? 'our win chance after every game' : wait ? 'our win chance up to the last update' : 'our win chance, updated after every game') + (d.reconstructed ? ' · game order within sets reconstructed from the set scores' : ''),
         '<div id="mt-wp"></div><div class="grid-2" style="padding:0 12px 12px;gap:12px"><div id="mt-tiles" class="kpi-grid three"></div><div id="mt-swings"></div></div>');
     }
     // ── before the match

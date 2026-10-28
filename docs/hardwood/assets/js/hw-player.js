@@ -135,7 +135,7 @@ function draw(el, L, S, pid, career, cat, sv, val, asked, tab, params, mv) {
     if (gpNow < 15) t += ' Early days, so read it lightly.';
     return t;
   }
-  const crumb = '<nav class="hw-crumb" aria-label="Breadcrumb"><a href="' + esc(HW.href(L, 'players', S)) + '">' + esc(HW.leagueName(L)) + '</a><span aria-hidden="true">›</span>' +
+  const crumb = '<nav class="hw-crumb" aria-label="Breadcrumb"><a href="' + esc(HW.href(L, 'scout', S)) + '">' + esc(HW.leagueName(L)) + '</a><span aria-hidden="true">›</span>' +
     (team ? '<a href="' + esc(HW.teamHref(L, team, S)) + '">' + esc(HW.teamName(L, team)) + '</a><span aria-hidden="true">›</span>' : '') + esc(name) + '</nav>';
   /* v4 (Broadcast): the black strip of five numbers under the hero, each with its percentile against the role where
      there is one: the box-score three, then ours (total impact and wins above replacement) */
@@ -161,7 +161,7 @@ function draw(el, L, S, pid, career, cat, sv, val, asked, tab, params, mv) {
   if (best) k.push({ label: 'Our ' + (best === 'mvp' ? 'MVP' : best.toUpperCase()) + ' chance', value: U.pct(isNum(aw[best]) ? aw[best] : aw[best].p), sub: 'from the award model' });
   const base = HW.playerHref(L, pid, S);
   h += '<div style="margin-top:var(--sp-6)">' + U.tabsHTML([{ key: 'overview', label: 'Overview', href: base }, { key: 'progression', label: 'Progression', href: base + (base.indexOf('?') >= 0 ? '&' : '?') + 'tab=progression' }, { key: 'detail', label: 'Detail: the whole catalogue, on/off and lineups', href: base + (base.indexOf('?') >= 0 ? '&' : '?') + 'tab=detail' }], tab) + '</div>';
-  if (tab === 'detail') { el.innerHTML = h + '<div class="hw-sub"></div>'; U.legacy('player', el.querySelector('.hw-sub'), params, null, { embed: 'detail' }); return; }
+  if (tab === 'detail') { el.innerHTML = h + '<div class="hw-sub"></div>'; const sub = el.querySelector('.hw-sub'); U.foldTables(sub, 0, U.legacy('player', sub, params, null, { embed: 'detail' })); return; }
   if (tab === 'progression') { el.innerHTML = h + '<div class="hw-sub"></div>'; if (HW.progression) HW.progression.tab(el.querySelector('.hw-sub'), L, career); return; }
 
   // ── the rail (with last season's ring), how sure, game by game, their type

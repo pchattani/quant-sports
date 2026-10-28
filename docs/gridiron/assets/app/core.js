@@ -7,11 +7,13 @@
  *   #/                                              overview                        [overview]
  *   #/games[/<S>[/<w>]]  #/game/<game_id>           a week of games, game centre    [fixtures]
  *   #/standings[/<S>][?v=table|conf|ratings|wins|draft]  #/playoffs[/<S>]  #/futures   [standings]
- *   #/teams  #/team/<abbr>                                                          [teams]
- *   #/players[?g=]  #/player/<pid>  #/leaders  #/history                            [players]
+ *   #/teams  #/team/<abbr>  #/fourth-downs  #/coaches  #/coach/<name>                [teams]
+ *   #/scout[?view=board|chart|leaders|alltime&...]  #/player/<pid>  #/compare[/<a>[/<b>]]  [scout]
  *   #/value  #/trade  #/transactions                                                [value]
  *   #/fantasy                                                                       [fantasy]
- *   #/lab  #/compare[/<a>[/<b>]]  #/fourth-downs  #/coaches  #/coach/<name>         [lab]
+ * Round 9 (28 Oct 2026): the Scouting Room (gi-scout.js) replaces Players, Leaders, All-time and the Lab; their old
+ * addresses redirect with their parameters mapped (scoutRedirect below); Compare's team mode goes to the Teams page's
+ * head to head. QK.sections('nfl', { scout: true }) puts "Scouting Room" in the nav and hides "Lab".
  *   #/model  #/calibration  #/methodology[/<sec>]  #/glossary[/<key>]  #/disclaimer  [model]
  * Any page takes ?s=<season>. Old routes are redirected through ROUTE_MAP so every shared link lands.
  *
@@ -114,26 +116,32 @@ addRoute('standings', 'standings', 'standings');
 addRoute('standings/:S', 'standings', 'standings');
 addRoute('playoffs', 'playoffs', 'standings');
 addRoute('playoffs/:S', 'playoffs', 'standings');
-addRoute('futures', 'futures', 'standings');
+addRoute('bracket', 'bracket', 'standings');
+addRoute('bracket/:S', 'bracket', 'standings');
+addRoute('markets', 'markets', 'model');
+addRoute('model/moves', 'movesmodel', 'model');
 addRoute('teams', 'teams', 'teams');
 addRoute('team/:id', 'team', 'teams');
-addRoute('players', 'players', 'players');
-addRoute('player/:id', 'player', 'players');
-addRoute('leaders', 'leaders', 'players');
-addRoute('history', 'history', 'players');
+addRoute('scout', 'scout', 'scout');
+addRoute('players', 'players', 'scout');
+addRoute('player/:id', 'player', 'scout');
+addRoute('leaders', 'leaders', 'scout');
+addRoute('history', 'history', 'scout');
 addRoute('value', 'value', 'value');
 addRoute('trade', 'trade', 'value');
 addRoute('transactions', 'transactions', 'value');
 addRoute('fantasy', 'fantasy', 'fantasy');
-addRoute('lab', 'lab', 'lab');
-addRoute('compare', 'compare', 'lab');
-addRoute('compare/:a', 'compare', 'lab');
-addRoute('compare/:a/:b', 'compare', 'lab');
-addRoute('compare/:a/:b/:c', 'compare', 'lab');
-addRoute('fourth-downs', 'fourth', 'lab');
-addRoute('coaches', 'coaches', 'lab');
-addRoute('coach/:id', 'coach', 'lab');
-addRoute('model', 'calibration', 'model');
+addRoute('lab', 'lab', 'scout');
+addRoute('compare', 'compare', 'scout');
+addRoute('compare/:a', 'compare', 'scout');
+addRoute('compare/:a/:b', 'compare', 'scout');
+addRoute('compare/:a/:b/:c', 'compare', 'scout');
+addRoute('fourth-downs', 'fourth', 'teams');
+addRoute('referees', 'referees', 'teams');
+addRoute('prospects', 'prospects', 'scout');
+addRoute('coaches', 'coaches', 'teams');
+addRoute('coach/:id', 'coach', 'teams');
+addRoute('model', 'methodology', 'model');
 addRoute('calibration', 'calibration', 'model');
 addRoute('methodology', 'methodology', 'model');
 addRoute('methodology/:sec', 'methodology', 'model');
@@ -147,19 +155,18 @@ const ROUTE_MAP = [
   ['hub', ''], ['home', ''], ['index', ''],
   ['week', 'games'], ['week/:S', 'games/:S'], ['week/:S/:w', 'games/:S/:w'],
   ['schedule', 'games'], ['scores', 'games'],
-  ['markets', 'futures'],
-  ['bracket', 'playoffs'], ['postseason', 'playoffs'], ['bracket/:S', 'playoffs/:S'], ['postseason/:S', 'playoffs/:S'],
+  ['futures', 'playoffs'], ['chances', 'playoffs'], ['chances/:S', 'playoffs/:S'], ['forecast', 'markets'], ['model-v-market', 'markets'],
+  ['postseason', 'bracket'], ['postseason/:S', 'bracket/:S'], ['howitworks', 'methodology'], ['moves-model', 'model/moves'],
   ['docs', 'methodology'], ['leaderboards', 'leaders'],
-  ['fourth', 'fourth-downs'], ['fourth_downs', 'fourth-downs'], ['fourthdowns', 'fourth-downs'],
-  ['referees', 'coaches']
+  ['fourth', 'fourth-downs'], ['fourth_downs', 'fourth-downs'], ['fourthdowns', 'fourth-downs'], ['scouting', 'scout'], ['scouting-room', 'scout'],
 ];
 
 const TITLES = {
   overview: '', games: 'Games', game: 'Game centre', standings: 'Standings', playoffs: 'Playoff picture', futures: 'Season forecasts',
-  teams: 'Teams', team: 'Team', players: 'Players', player: 'Player', leaders: 'Leaders', history: 'All-time',
+  teams: 'Teams', team: 'Team', scout: 'Scouting Room', players: 'Players', player: 'Player', leaders: 'Leaders', history: 'All-time',
   value: 'Player value', trade: 'Trade simulator', transactions: 'Transactions', fantasy: 'Fantasy',
   lab: 'Lab', compare: 'Compare', fourth: 'Fourth downs', coaches: 'Coaches', coach: 'Coach',
-  calibration: 'How we’re doing', methodology: 'Methodology', glossary: 'Glossary', disclaimer: 'Disclaimer and terms'
+  referees: 'Referees', prospects: 'Draft prospects', calibration: 'How we’re doing', methodology: 'How it works', markets: 'Our forecasts v the market', movesmodel: 'Who moves next: the record', bracket: 'Bracket', glossary: 'Glossary', disclaimer: 'Disclaimer and terms'
 };
 
 function dec(s) { try { return decodeURIComponent(s); } catch (e) { return s; } }
@@ -190,15 +197,60 @@ function matchSegs(segs, parts) {
   }
   return p;
 }
+/* The Scouting Room's old doors (round 9): #/players?g=, #/leaders?g=&m=, #/lab?g=&x=&y=&within=&pos=, #/history and
+ * Compare's team mode (#/compare/t:KC/t:BUF) -> their new address with the parameters mapped, or null. Group codes:
+ * the players page's spec codes (ED, IDL ...), the lab's groups (QB ... P, DEF, TEAM) and Position codes (EDGE, DL). */
+const SPEC_POS = { QB: 'QB', RB: 'RB', WR: 'WR', TE: 'TE', K: 'K', P: 'P', ED: 'EDGE', EDGE: 'EDGE', IDL: 'DL', DL: 'DL', LB: 'LB', CB: 'CB', S: 'S' };
+function scoutRedirect(parts, q) {
+  const name = parts[0];
+  if (name === 'compare' && parts.length >= 2 && /^t:/i.test(parts[1])) {
+    const out = { a: parts[1].slice(2).toUpperCase(), sec: 'h2h' };
+    if (parts[2] && /^t:/i.test(parts[2])) out.b = parts[2].slice(2).toUpperCase();
+    if (q.s) out.s = q.s;
+    return '#/teams' + qs(out);
+  }
+  if (name === 'compare' && q.view === 'all') { const q2 = Object.assign({}, q); delete q2.view; return '#/' + parts.map(encodeURIComponent).join('/') + qs(q2); }
+  if (name === 'standings' && /^(ratings|wins|draft)$/.test(q.v || '')) {
+    const S1 = parts[1] || q.s;
+    if (q.v === 'ratings') return '#/teams' + qs(S1 ? { s: S1 } : {});
+    return '#/playoffs' + (parts[1] ? '/' + parts[1] : '') + qs(Object.assign({ view: q.v }, q.s ? { s: q.s } : {}));
+  }
+  if (name === 'coaches' && parts.length === 1) return '#/fourth-downs' + qs(Object.assign({}, q, { tab: 'coaches' }));
+  if (['players', 'leaders', 'lab', 'history'].indexOf(name) < 0 || parts.length !== 1) return null;
+  const out = {};
+  const g = String(q.g || '').toUpperCase();
+  if (name === 'lab' && g === 'TEAM') {
+    const t = { sec: 'map' };
+    if (q.x) t.mx = q.x;
+    if (q.y) t.my = q.y;
+    if (q.x || q.y) t.map = '-1';
+    if (q.s) t.s = q.s;
+    return '#/teams' + qs(t);
+  }
+  if (name === 'leaders') { out.view = q.m ? 'board' : 'leaders'; if (q.m) { out.add = q.m; out.sort = q.m; } }
+  if (name === 'lab') { out.view = 'chart'; ['x', 'y'].forEach(k => { if (q[k]) out[k] = q[k]; }); if (q.color && q.color !== 'team') out.color = q.color; }
+  if (name === 'history') out.view = 'alltime';
+  const pos = q.within === 'pos' ? String(q.pos || '').toUpperCase() : '';
+  if (pos && SPEC_POS[pos]) { out.within = 'pos'; out.pos = SPEC_POS[pos]; }
+  else if (g === 'DEF') out.kind = 'DEF';
+  else if (/^(QB|RB|WR|TE|K|P)$/.test(g)) out.kind = g;
+  else if (SPEC_POS[g]) { out.within = 'pos'; out.pos = SPEC_POS[g]; }
+  ['team', 'q', 's'].forEach(k => { if (q[k]) out[k] = q[k]; });
+  return '#/scout' + qs(out);
+}
 /* The new hash for an old route, or null when the route is current. */
 function redirectFor(hash) {
   const s = splitHash(hash);
+  const sr = scoutRedirect(s.parts, s.query);
+  if (sr) return sr;
   for (let i = 0; i < ROUTE_MAP.length; i++) {
     const m = ROUTE_MAP[i];
     const p = matchSegs(m[0] ? m[0].split('/') : [], s.parts);
     if (!p) continue;
     const to = m[1].split('/').filter(Boolean).map(seg => (seg.charAt(0) === ':' ? encodeURIComponent(p[seg.slice(1)]) : seg)).join('/');
-    return '#/' + to + qs(Object.assign({}, m[2] || {}, s.query));
+    const h = '#/' + to + qs(Object.assign({}, m[2] || {}, s.query));
+    const s2 = splitHash(h), sr2 = scoutRedirect(s2.parts, s2.query);     /* an alias of an old Scouting Room door */
+    return sr2 || h;
   }
   return null;
 }
@@ -756,6 +808,14 @@ function coachLink(name, S) { return name ? '<a class="gi-link" href="' + coachH
 function weekHref(S, w) { const s = S || state.season || currentSeason(); return '#/games/' + s + '/' + (isNum(w) ? w : (s === currentSeason() ? currentWeek() : 1)); }
 function standingsHref(S, v) { const s = S || state.season; return '#/standings' + (s && Number(s) !== currentSeason() ? '/' + s : '') + (v ? '?v=' + v : ''); }
 function playoffsHref(S) { const s = S || state.season; return '#/playoffs' + (s && Number(s) !== currentSeason() ? '/' + s : ''); }
+function bracketHref(S) { const s = S || state.season; return '#/bracket' + (s && Number(s) !== currentSeason() ? '/' + s : ''); }
+/* The Scouting Room on one group: a spec code (QB, ED, IDL, LB, CB, S ...), a spec id (qb, edge ...) or a lab group. */
+function scoutHref(code, S, extra) {
+  const k = String(code || '').toUpperCase(), q = Object.assign({}, extra || {});
+  const pos = { ED: 'EDGE', EDGE: 'EDGE', IDL: 'DL', DL: 'DL', LB: 'LB', CB: 'CB', S: 'S' }[k];
+  if (pos) { q.within = 'pos'; q.pos = pos; } else if (/^(RB|WR|TE|K|P|DEF)$/.test(k)) q.kind = k;
+  return ghref('scout', S, q);
+}
 function compareHref(a, b, c) { return '#/compare' + (a ? '/' + encodeURIComponent(a) : '') + (b ? '/' + encodeURIComponent(b) : '') + (b && c ? '/' + encodeURIComponent(c) : ''); }
 function glossHref(key) { return '#/glossary' + (key ? '/' + encodeURIComponent(key) : ''); }
 
@@ -919,14 +979,17 @@ function subnav(items, active, label) {
 function sectionNav(key, active) {
   const S = state.season;
   const L = {
-    standings: [[standingsHref(S), 'Standings', 'table'], [standingsHref(S, 'ratings'), 'Power ratings', 'ratings'], [playoffsHref(S), 'Playoff picture', 'playoffs'],
-      [standingsHref(S, 'wins'), 'Win totals', 'wins'], [standingsHref(S, 'draft'), 'Draft order', 'draft'], ['#/futures', 'Season forecasts', 'futures']],
-    players: [[ghref('players', S), 'Players', 'players'], [ghref('leaders', S), 'Leaders', 'leaders'], ['#/history', 'All-time', 'history']],
+    standings: [[standingsHref(S), 'Table', 'table'], [playoffsHref(S), 'Chances', 'playoffs'], [bracketHref(S), 'Bracket', 'bracket'], [standingsHref(S, 'history'), 'History', 'history'], [standingsHref(S, 'races'), 'Races', 'races']],
+    scout: [[ghref('scout', S), 'Scouting Room', 'scout'], ['#/compare', 'Compare', 'compare'], ['#/prospects', 'Draft prospects', 'prospects']],
+    teams: [[ghref('teams', S), 'Teams', 'teams'], [ghref('fourth-downs', S), 'Fourth-down calls', 'fourth'], [ghref('referees', S), 'Referees', 'referees']],
     value: [[ghref('value', S), 'Player value', 'value'], ['#/trade', 'Trade simulator', 'trade'], ['#/transactions', 'Transactions', 'transactions']],
-    lab: [[ghref('lab', S), 'Scatter lab', 'lab'], ['#/compare', 'Compare', 'compare'], [ghref('fourth-downs', S), 'Fourth downs', 'fourth'], [ghref('coaches', S), 'Coaches', 'coaches']],
-    model: [['#/calibration', 'How we’re doing', 'calibration'], ['#/methodology', 'Methodology', 'methodology'], ['#/glossary', 'Glossary', 'glossary'], ['#/disclaimer', 'Terms', 'disclaimer']]
+    /* the standing Model order (round 9): how it works, how we're doing, the other model tabs, glossary, terms */
+    model: [['#/methodology', 'How it works', 'methodology'], ['#/calibration', 'How we’re doing', 'calibration'], ['#/markets', 'Our forecasts v the market', 'markets'], ['#/model/moves', 'Who moves next', 'movesmodel'], ['#/glossary', 'Glossary', 'glossary'], ['#/disclaimer', 'Terms', 'disclaimer']]
   };
-  return L[key] ? subnav(L[key], active, 'Views in this section') : '';
+  /* round 9: Players and the Lab live in the Scouting Room, fourth downs and coaches under Teams */
+  const k = key === 'players' ? 'scout' : key === 'lab' ? (active === 'fourth' || active === 'coaches' ? 'teams' : 'scout') : key;
+  if (active === 'coaches') active = 'fourth';
+  return L[k] ? subnav(L[k], active, 'Views in this section') : '';
 }
 /* Segmented control. opts: [[value, label]]. Wire with wireSeg(root, id, cb). */
 function seg(id, opts, cur, label) {
@@ -1136,6 +1199,7 @@ function setSeason(S0) {
   if (r === 'games' || r === 'game') { go(weekHref(S, S === cur ? currentWeek() : 1)); return; }
   if (r === 'standings') { go(standingsHref(S, (state.params.query || {}).v)); return; }
   if (r === 'playoffs') { go(playoffsHref(S)); return; }
+  if (r === 'bracket') { go(bracketHref(S)); return; }
   if (r === 'overview' || r === 'futures' || r === 'trade' || r === 'transactions' || r === 'history' || r === 'fantasy' || r === 'calibration' || r === 'methodology' || r === 'glossary' || r === 'disclaimer') {
     go(S === cur ? '#/' : standingsHref(S)); return;
   }
@@ -1154,7 +1218,7 @@ function syncShell() {
     sel.value = String(state.season);
   }
   const S = state.season, cur = currentSeason();
-  const map = { fixtures: weekHref(S, S === cur ? currentWeek() : 1), standings: standingsHref(S), teams: ghref('teams', S), players: ghref('players', S), value: ghref('value', S), lab: ghref('lab', S) };
+  const map = { fixtures: weekHref(S, S === cur ? currentWeek() : 1), standings: standingsHref(S), teams: ghref('teams', S), scout: ghref('scout', S), value: ghref('value', S) };
   Array.prototype.forEach.call(document.querySelectorAll('.qk-secnav a[data-sec]'), a => { const k = a.getAttribute('data-sec'); if (map[k]) a.setAttribute('href', map[k]); });
   const live = (INDEX.data && ((INDEX.data.live || []).length || (INDEX.data.games || []).some(isLive))) ? true : false;
   SHELL.setLive({ nfl: live });
@@ -1174,9 +1238,9 @@ function searchRows() {
       rows.push({ sport: 'nfl', t: x.name, s: [x.pos, x.team ? teamAbbr(x.team) : '', isNum(x.first) ? (Number(x.first) === last ? String(last) : x.first + '–' + (last >= cur ? '' : last)) : ''].filter(Boolean).join(' · '), href: playerHref(pid), _o: cur - last });
     });
     rows.sort((a, b) => a._o - b._o);
-    [['Games this week', weekHref(cur, currentWeek())], ['Standings', '#/standings'], ['Power ratings', '#/standings?v=ratings'], ['Playoff picture', '#/playoffs'], ['Season forecasts', '#/futures'],
-      ['Player value', '#/value'], ['Trade simulator', '#/trade'], ['Transactions', '#/transactions'], ['Fantasy', '#/fantasy'], ['Leaders', '#/leaders'], ['All-time leaders', '#/history'],
-      ['Scatter lab', '#/lab'], ['Compare players', '#/compare'], ['Fourth downs', '#/fourth-downs'], ['Coaches', '#/coaches'], ['How we’re doing', '#/calibration'], ['Methodology', '#/methodology'], ['Glossary', '#/glossary']]
+    [['Games this week', weekHref(cur, currentWeek())], ['Standings', '#/standings'], ['Chances: playoffs, divisions, the Super Bowl', '#/playoffs'], ['Bracket', '#/bracket'], ['Champions since 1999', '#/standings?v=history'], ['Award races', '#/standings?v=races'],
+      ['Player value', '#/value'], ['Trade simulator', '#/trade'], ['Transactions', '#/transactions'], ['Fantasy', '#/fantasy'], ['Scouting Room', '#/scout'], ['Leaders', '#/scout?view=leaders'], ['All-time leaders', '#/scout?view=alltime'],
+      ['Scatter chart', '#/scout?view=chart'], ['Compare players', '#/compare'], ['Teams: power board and head to head', '#/teams'], ['Fourth-down calls', '#/fourth-downs'], ['Coaches on fourth down', '#/fourth-downs?tab=coaches'], ['How it works', '#/methodology'], ['How we’re doing', '#/calibration'], ['Our forecasts v the market', '#/markets'], ['Glossary', '#/glossary']]
       .forEach(p => rows.unshift({ sport: 'nfl', t: p[0], s: 'Page', href: p[1] }));
     return rows;
   });
@@ -1184,8 +1248,8 @@ function searchRows() {
 function bootShell() {
   const idx = INDEX.data || {};
   const ctx = '<select class="qk-select" id="gi-season" aria-label="Season">' + seasons().map(y => '<option value="' + y + '">' + y + '</option>').join('') + '</select>';
-  const secs = QK.sections('nfl').map(s => {
-    s.href = { overview: '#/', fixtures: '#/games', standings: '#/standings', teams: '#/teams', players: '#/players', value: '#/value', fantasy: '#/fantasy', lab: '#/lab', model: '#/calibration' }[s.key] || s.href;
+  const secs = QK.sections('nfl', { scout: true }).map(s => {
+    s.href = { overview: '#/', fixtures: '#/games', standings: '#/standings', teams: '#/teams', scout: '#/scout', value: '#/value', fantasy: '#/fantasy', model: '#/methodology' }[s.key] || s.href;
     return s;
   });
   SHELL = QK.shell({ sport: 'nfl', section: 'overview', sections: secs, ctx: ctx, search: { load: searchRows } });
@@ -1193,7 +1257,7 @@ function bootShell() {
   if (sel) { sel.value = String(state.season || currentSeason()); sel.addEventListener('change', () => setSeason(sel.value)); }
   const foot = document.getElementById('qk-footer');
   if (foot) foot.insertAdjacentHTML('beforeend', '<div class="gi-footnote">Data from nflverse (CC BY 4.0), ESPN, Kalshi and Polymarket · our own expected points, win probability and season simulation · ' +
-    (idx.updated_at ? 'updated ' + esc(fmtStamp(idx.updated_at)) + ' · ' : '') + '<a href="#/disclaimer">Disclaimer and terms</a> · <a href="#/methodology">Methodology</a></div>');
+    (idx.updated_at ? 'updated ' + esc(fmtStamp(idx.updated_at)) + ' · ' : '') + '<a href="#/disclaimer">Disclaimer and terms</a> · <a href="#/methodology">How it works</a></div>');
   const fv = document.getElementById('first-visit-notice');
   let seen = false;
   try { seen = window.localStorage.getItem('qg-notice-v1') === '1'; } catch (e) { seen = false; }
@@ -1228,8 +1292,8 @@ return {
   homeLine: homeLine, spreadText: spreadText, surnameOf: surnameOf, qbText: qbText, weatherText: weatherText, titleProbs: titleProbs,
   player: player, playerName: playerName, playerShort: playerShort, playerSurname: playerSurname, playerHref: playerHref, playerLink: playerLink, playerColour: playerColour, canonTeam: canonTeam,
   teamInfo: teamInfo, pair: pair, distinctColours: distinctColours, teamName: teamName, teamShort: teamShort, teamAbbr: teamAbbr, teamColour: teamColour, tc: tc, teamHref: teamHref, teamLink: teamLink, teamChip: teamChip, mark: mark,
-  gameHref: gameHref, matchupLink: matchupLink, coachHref: coachHref, coachLink: coachLink, weekHref: weekHref, standingsHref: standingsHref, playoffsHref: playoffsHref,
-  compareHref: compareHref, glossHref: glossHref, ghref: ghref, sq: sq,
+  gameHref: gameHref, matchupLink: matchupLink, coachHref: coachHref, coachLink: coachLink, weekHref: weekHref, standingsHref: standingsHref, playoffsHref: playoffsHref, bracketHref: bracketHref,
+  compareHref: compareHref, scoutHref: scoutHref, glossHref: glossHref, ghref: ghref, sq: sq,
   GROUPS: GROUPS, GROUP_NAME: GROUP_NAME, GROUP_ONE: GROUP_ONE, groupOf: groupOf, SAMPLE: SAMPLE, sampleKey: sampleKey, sampleOf: sampleOf, scopeOk: scopeOk, metaOf: metaOf,
   metricsFor: metricsFor, allMetrics: allMetrics, metricGroups: metricGroups, colRows: colRows, listOf: listOf, pickKey: pickKey, val: val, headline: headline, PREFS: PREFS,
   shortLabel: shortLabel, cleanDesc: cleanDesc, cleanMetrics: cleanMetrics, catOf: catOf, glossLink: glossLink,

@@ -103,7 +103,7 @@ function render(el, params, state) {
         ht ? ht + (isNum(p.weight) ? ', ' + p.weight + ' lb' : '') : null, mates.length === 2 && !goalie ? 'Lines up with ' + mates[0] + ' and ' + mates[1] : null],
       tags: tagsH, strip: tileList(), short: shortVersion() });
     const tabs = [{ key: 'overview', label: 'Overview', href: RK.playerHref(pid) }, { key: 'progression', label: 'Progression', href: RK.playerHref(pid) + '?view=progression' }, { key: 'detail', label: 'Detail: every metric, shot maps, game log, on-ice, comparisons', href: RK.playerHref(pid) + '?view=detail' }];
-    const crumb = '<nav class="rk-crumb" aria-label="Breadcrumb"><a href="#/players">Hockey</a><span aria-hidden="true">›</span>' + (curTeam ? '<a href="' + esc(RK.teamHref(curTeam)) + '">' + esc(RK.teamName(curTeam)) + '</a><span aria-hidden="true">›</span>' : '') + esc(p.name) + '</nav>';
+    const crumb = '<nav class="rk-crumb" aria-label="Breadcrumb"><a href="#/scout">Scouting Room</a><span aria-hidden="true">›</span>' + (curTeam ? '<a href="' + esc(RK.teamHref(curTeam)) + '">' + esc(RK.teamName(curTeam)) + '</a><span aria-hidden="true">›</span>' : '') + esc(p.name) + '</nav>';
     /* v4 (Broadcast): the hero is the full-bleed team-colour diagonal with the black strip of five numbers and
        "The short version" under it (QK.playerHeader strip / short) */
     el.innerHTML = crumb + hero + '<div style="margin-top:var(--sp-6)">' + U.tabsHTML(tabs, view) + '</div><div id="pp-body"></div>';

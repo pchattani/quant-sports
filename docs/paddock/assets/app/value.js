@@ -75,7 +75,7 @@ function value(el, y) {
       { key: 'quali_car', label: 'Qualifying car', num: true, fmt: function (v) { return pl(v); } },
       { key: 'trend', label: 'Last 5 rounds', num: true, fmt: function (v) { return PD.deltaHTML(v, 3); } },
       { key: 'points', label: 'Points', num: true, fmt: function (v) { return PD.pts(v); } },
-      { key: 'p_title', label: 'Title', num: true, fmt: function (v) { return isNum(v) ? PD.pct(v) : '—'; } }
+      { key: 'p_title', label: 'Title', num: true, fmt: function (v) { return isNum(v) ? PD.chance(v) : '—'; } }
     ], T, { sort: { key: 'rank', dir: 'asc' } });
   });
 }

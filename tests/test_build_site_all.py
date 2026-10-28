@@ -889,3 +889,20 @@ def test_hub_digest_freezes_the_pre_match_chance_and_features_the_big_match(tmp_
     F = dig["featured"]
     assert F["today"][0]["id"] == "3" and F["today"][0]["title"] == [0.4, 0.3]
     assert "9" not in [x["id"] for x in F["today"]]      # a 03:00 New York friendly coin flip never leads
+
+
+def test_derived_groups_split_a_league_phase_into_its_groups() -> None:
+    """The Nations League's store carries no groups: they are the sets of sides that play each other (round 9)."""
+    from types import SimpleNamespace as M
+    import importlib, sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    bsa = importlib.import_module("build_site_all")
+    def m(h, a, hg, ag):
+        return M(stage="league", home_team=h, away_team=a, home_goals=hg, away_goals=ag, is_finished=True)
+    ms = [m("A", "B", 2, 0), m("B", "C", 1, 1), m("C", "A", 0, 3), m("D", "E", 1, 0), m("E", "F", 2, 2), m("F", "D", 0, 1)]
+    g = bsa.derived_groups(ms)
+    assert sorted(len(v) for v in g.values()) == [3, 3]
+    first = g["1"]
+    assert [r["team"] for r in first][0] == "A" and first[0]["pts"] == 6 and first[0]["pos"] == 1
+    assert bsa.derived_groups(ms[:1] + [m("A", "C", 1, 0), m("A", "D", 0, 0), m("A", "E", 0, 0), m("A", "F", 0, 0), m("A", "G", 0, 0), m("A", "H", 0, 0)]) == {}

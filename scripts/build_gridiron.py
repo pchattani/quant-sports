@@ -295,6 +295,13 @@ def value_pages(b: Build, ctx, cfg: dict, cat: dict | None, tms: dict | None, si
     from oddsmarkets.nfl.analytics import performers as PF
     b.write_or_fail(d + "performers.json", f"performers {season}", lambda: PF.build(cat, res.get("value"), season), season=season)
     if full_current:
+        # the Teams page's injury impact board (analytics/injury_board.py): the ESPN injury lists already snapshotted
+        # hourly (injury_log.json.gz), crosswalked to our ids and valued with this season's Gridiron Value
+        from oddsmarkets.nfl import store as _st
+        from oddsmarkets.nfl.analytics import injury_board as IB
+        from oddsmarkets.nfl.analytics import people as _pp
+        b.write_or_fail(d + "injuries.json", f"injuries {season}",
+                        lambda: IB.build(season, _st.load_injury_log(season), res.get("value"), _pp.espn_xwalk(), _pp.people()), season=season)
         b.write_or_fail(d + "trade.json", f"trade {season}", lambda: res.get("trade"), season=season)
         for t, pl in (res.get("needs") or {}).items():
             b.step(f"write needs {t}", lambda t=t, pl=pl: b.write(f"{season}/needs/{t}.json", pl))
@@ -773,7 +780,9 @@ def main(argv: list[str] | None = None) -> int:
         if prog:
             b.step("write progression_ref.json", lambda: b.write(CR.PROG_FILE, prog[0]))
     if not args.no_history and rows_by:
-        b.write_or_fail("history.json", "history", lambda: HS.build(rows_by, {s: r.get("league") for s, r in res.items()}))
+        # the champions and every franchise's seasons (round 9: Standings > History, the team pages) from the stores
+        b.write_or_fail("history.json", "history", lambda: HS.build(rows_by, {s: r.get("league") for s, r in res.items()},
+                                                                    {s: an.load_store(s) for s in seasons}))
     # calibration: builder C's backtest when it has written one; the existing file otherwise; else a placeholder
     from oddsmarkets.nfl.analytics import adapters
     b.step("calibration", lambda: calibration(b, adapters))

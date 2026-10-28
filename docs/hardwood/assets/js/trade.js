@@ -14,7 +14,12 @@
  * (valuation.json) give a long-term "value in − out" in the players' unit; picks do not change this season's rating.
  * State lives in the URL hash:
  *   #/<L>/trade?t=<tid>,<tid>[,<tid>]&m=<pid>-<to tid>.<pid>-<to tid>&pk=<from>-<to>-<year>-<round>-<owner>-<protect>,...
- * No salaries: the cap is not checked. */
+ * No salaries: the cap is not checked.
+ * Round 9 (28 Oct 2026): with no teams or moves in the address, the page opens on a real, topical example: the most
+ * lopsided trade of the last 120 days (deals.json, graded at the time) whose players are all still with the teams that
+ * got them, set up "undone" (each player back to the team that sent him), so the change shows what each side would
+ * lose by reversing it, i.e. what the trade gave it. A before/after chart of every team's rating and title chance sits
+ * on top of the result. */
 (function (HW) {
 'use strict';
 
@@ -185,19 +190,47 @@ function render(el, params, state) {
   el.innerHTML = fx.muted('Loading…');
   return fx.ready().then(() => {
     const S = fx.current(L) || fx.S(params, state, L);
-    return HW.loadAll([fx.path(L, S, 'trade.json'), fx.path(L, S, 'picks.json'), fx.path(L, S, 'valuation.json')]).then(r => {
+    return HW.loadAll([fx.path(L, S, 'trade.json'), fx.path(L, S, 'picks.json'), fx.path(L, S, 'valuation.json'), fx.path(L, S, 'deals.json')]).then(r => {
       const d = r[0];
       if (!fx.alive(el)) return;
       if (!fx.ok(d) || !d.players) { el.innerHTML = fx.card('Trade simulator', '', fx.notBuilt('The trade simulator for ' + fx.seasonLabel(L, S), d)); return; }
       const v4 = {};
       const val = r[2];
       if (fx.ok(val) && val.cols) { const iv = val.cols.indexOf('id'), vv = val.cols.indexOf('v'); (val.rows || []).forEach(x => { v4[String(x[iv])] = x[vv]; }); }
-      page(el, L, S, d, (params && params.query) || {}, fx.S(params, state, L), fx.ok(r[1]) ? r[1] : null, v4);
+      let query = (params && params.query) || {};
+      const pre = !query.t && !query.m && !query.pk ? topical(d, fx.ok(r[3]) ? r[3] : null) : null;
+      if (pre) query = Object.assign({}, query, { t: pre.teams.join(','), m: pre.moves });
+      page(el, L, S, d, query, fx.S(params, state, L), fx.ok(r[1]) ? r[1] : null, v4, pre);
     });
   });
 }
 
-function page(el, L, S, d, query, shown, PKD, V4) {
+/* the topical example: the most lopsided two-team trade of the last 120 days still intact on today's rosters, undone */
+function topical(d, deals) {
+  if (!deals || !Array.isArray(deals.deals) || !d || !d.players) return null;
+  const cols = d.players.cols || [], iId = cols.indexOf('id'), iT = cols.indexOf('team');
+  const teamOf = {}; (d.players.rows || []).forEach(r => { teamOf[String(r[iId])] = String(r[iT]); });
+  const now = Date.parse((d.updated_at || '').slice(0, 10)) || (window.QK ? QK.now() : Date.now());
+  let best = null;
+  deals.deals.forEach(x => {
+    if (!x || (x.teams || []).length !== 2 || !(x.sides || []).length || !isFinite(Date.parse(x.date)) || now - Date.parse(x.date) > 120 * 864e5) return;
+    const moves = [];
+    let ok = true;
+    x.sides.forEach(sd => (sd['in'] || []).forEach(it => {
+      if (it.k !== 'p') return;
+      const from = (x.teams || []).filter(t => String(t) !== String(sd.team))[0];
+      if (teamOf[String(it.id)] !== String(sd.team)) ok = false; else moves.push(String(it.id) + '-' + String(from));
+    }));
+    const sh = x.sides.map(sd => sd.share).filter(v => typeof v === 'number');
+    /* players both ways, so undoing it is the whole deal (picks stay out of the example) */
+    if (!ok || !moves.length || !sh.length || !x.sides.every(sd => (sd['in'] || []).some(it => it.k === 'p'))) return;
+    const lop = Math.abs(Math.max.apply(null, sh) - 0.5) * (x.total || 0);
+    if (!best || lop > best.lop) best = { lop: lop, deal: x, teams: x.teams.map(String), moves: moves.join('.') };
+  });
+  return best;
+}
+
+function page(el, L, S, d, query, shown, PKD, V4, PRE) {
   const fx = FX();
   const P = d.params || {};
   const cols = d.players.cols || [];
@@ -215,6 +248,11 @@ function page(el, L, S, d, query, shown, PKD, V4) {
   const curves = d.curves;
   const noSim = !curves;
   let h = '<div class="card"><div class="card-header">Trade simulator ' + fx.esc(fx.seasonLabel(L, S)) + ' <span class="card-sub">Pick the teams and the players moving. Each player carries a rest-of-season HPM (this season\'s blended with last season\'s projection) and projected minutes; incoming players take minutes from the lowest-rated players at their position, outgoing minutes go to the next players up. Odds come from re-running the season simulation with each team\'s rating shifted' + (curves ? ' (' + fx.num(curves.n_sims, 0) + ' runs a point, shifts ' + (curves.shifts || []).map(x => fx.signed(x, 1)).join(', ') + ' per 100)' : '') + '. <strong>Cap not checked</strong>: there is no free, legitimate salary source we use.</span></div>';
+  if (PRE) {
+    const dl = PRE.deal, win = dl.sides.slice().sort((a, b) => (b.share || 0) - (a.share || 0))[0], lose = dl.sides.filter(x => x !== win)[0];
+    const items = sd => (sd['in'] || []).map(it => it.name || it.label).filter(Boolean).join(', ');
+    h += '<div class="pad"><div class="qk-note"><b>Loaded for you: the most lopsided trade of the last four months, undone.</b> On ' + fx.esc(HW.fmtDate(dl.date, { weekday: false })) + ' ' + fx.esc(fx.teamName(L, win.team)) + ' got ' + fx.esc(items(win) || 'picks') + ' (grade ' + fx.esc(win.grade || '—') + ') and ' + fx.esc(fx.teamName(L, lose.team)) + ' got ' + fx.esc(items(lose) || 'picks') + ' (grade ' + fx.esc(lose.grade || '—') + '). Every player is sent back below, so each team’s change is what reversing the deal would cost it: the opposite is what the trade gave it. Clear the players to build your own.</div></div>';
+  }
   if (shown && shown !== S) h += '<div class="pad">' + fx.muted('The trade simulator always uses the current season (' + fx.esc(fx.seasonLabel(L, S)) + ').') + '</div>';
   if (noSim) h += '<div class="pad">' + fx.muted('No season simulation right now (' + fx.esc(d.phase || 'offseason') + '): the page shows the rating change and wins over a full season from the game model\'s conversion, without odds.') + '</div>';
   h += '<div class="tr-pick" id="tr-pick"></div></div><div class="grid-' + (st.teams.length === 3 ? '3' : '2') + '" id="tr-rosters"></div>' + (PKD ? '<div class="card" id="tr-picks"></div>' : '') + '<div id="tr-out"></div>';
@@ -306,8 +344,28 @@ function page(el, L, S, d, query, shown, PKD, V4) {
     const out = document.getElementById('tr-out');
     const movers = Object.keys(st.moves);
     if (!movers.length && !st.picks.length) { out.innerHTML = fx.card('Result', '', '<div class="pad">' + fx.muted('Tick the players to move. With three teams, choose each player\'s new team.') + '</div>'); return; }
-    out.innerHTML = '<div class="grid-' + (st.teams.length === 3 ? '3' : '2') + '">' + st.teams.map(t => teamResult(t)).join('') + '</div>';
+    out.innerHTML = '<div class="card"><div class="card-header">Before and after <span class="card-sub">Each team’s net rating (points per 100 possessions against an average team) and title chance, now and with the trade</span></div><div class="grid-2"><div id="tr-ba-r" class="qk-chart" style="--h:240px" role="img" aria-label="Rating before and after"></div><div id="tr-ba-t" class="qk-chart" style="--h:240px" role="img" aria-label="Title chance before and after"></div></div></div>' +
+      '<div class="grid-' + (st.teams.length === 3 ? '3' : '2') + '">' + st.teams.map(t => teamResult(t)).join('') + '</div>';
     HW.sortable(out);
+    beforeAfter();
+  }
+  /* the before/after chart: rating and title chance for every team in the deal */
+  function beforeAfter() {
+    const rows = st.teams.map(t => {
+      const team = players.filter(p => p.team === t);
+      const outIds = Object.keys(st.moves).filter(pid => byId[pid].team === t);
+      const incoming = Object.keys(st.moves).filter(pid => st.moves[pid] === t).map(pid => byId[pid]);
+      const res = applyMoves(team, outIds, incoming, P), T = d.teams[t] || {};
+      const dT = curves ? curveDelta(curves, t, 'p_title', res.delta) : null;
+      return { t: t, r0: T.rating, r1: fx.isNum(T.rating) ? T.rating + res.delta : null, p0: T.p_title, p1: fx.isNum(T.p_title) && fx.isNum(dT) ? Math.max(0, Math.min(1, T.p_title + dT)) : null };
+    });
+    const cats = rows.map(r => fx.teamAbbr(L, r.t));
+    if (rows.some(r => fx.isNum(r.r0))) QKC.bar('#tr-ba-r', { cats: cats, series: [{ name: 'Now', data: rows.map(r => fx.isNum(r.r0) ? Math.round(r.r0 * 10) / 10 : null), color: QK.cssVar('--c-other') }, { name: 'After the trade', data: rows.map(r => fx.isNum(r.r1) ? Math.round(r.r1 * 10) / 10 : null), color: 'model' }],
+      labels: true, legend: true, fmt: x => fx.signed(x, 1), valName: 'Net rating (points per 100)', catName: 'Team' });
+    else document.getElementById('tr-ba-r').remove();
+    if (rows.some(r => fx.isNum(r.p1))) QKC.bar('#tr-ba-t', { cats: cats, series: [{ name: 'Now', data: rows.map(r => fx.isNum(r.p0) ? Math.round(r.p0 * 1000) / 10 : null), color: QK.cssVar('--c-other') }, { name: 'After the trade', data: rows.map(r => fx.isNum(r.p1) ? Math.round(r.p1 * 1000) / 10 : null), color: 'model' }],
+      labels: true, legend: true, fmt: x => x + '%', valName: 'Title chance (%)', catName: 'Team' });
+    else { const e = document.getElementById('tr-ba-t'); if (e) e.remove(); }
   }
   function teamResult(t) {
     const team = players.filter(p => p.team === t);

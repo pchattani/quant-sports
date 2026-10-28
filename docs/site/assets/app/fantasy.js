@@ -16,7 +16,8 @@ var POS = ['G', 'D', 'M', 'F'];
 var POS_LABEL = { G: 'Goalkeeper', D: 'Defender', M: 'Midfielder', F: 'Forward' };
 var POS_SHORT = { G: 'GK', D: 'DEF', M: 'MID', F: 'FWD' };
 var POS_SLOT = { G: 4, D: 1, M: 3, F: 8 };
-var VIEWS = [['rank', 'Rankings'], ['gw', 'Next gameweek'], ['fdr', 'Fixtures'], ['picks', 'Picks'], ['squad', 'Suggested squad'], ['method', 'Method and backtest']];
+/* round 9: the next gameweek first (the page opens on it) */
+var VIEWS = [['gw', 'Next gameweek'], ['rank', 'Rankings'], ['fdr', 'Fixtures'], ['picks', 'Picks'], ['squad', 'Suggested squad'], ['method', 'Method and backtest']];
 var PART_LABEL = { app: 'Minutes', goals: 'Goals', assists: 'Assists', cs: 'Clean sheet', gc: 'Conceded', saves: 'Saves', cards: 'Cards', og_pm: 'OG / pen. miss', dc: 'Def. contribution', bonus: 'Bonus' };
 
 function n1(v) { return isNum(v) ? Number(v).toFixed(1) : '—'; }
@@ -61,20 +62,19 @@ function draw(el, meta, doc, q) {
   var rows = FB.rows(doc);
   var byId = {};
   rows.forEach(function (r) { byId[r.id] = r; });
-  var v = q.v || 'rank';
-  if (VIEWS.every(function (x) { return x[0] !== v; })) v = 'rank';
-  var bt = meta.backtest || {}, m = (bt.methods || {}).model || {}, l5 = (bt.methods || {}).last5 || {};
+  var v = q.v || 'gw';
+  if (VIEWS.every(function (x) { return x[0] !== v; })) v = 'gw';
   var gw = (doc.gameweeks || [])[0];
   el.querySelector('#fa-top').innerHTML =
     FB.toolbar([FB.field('League', FB.select('fa-league', meta.leagues.map(function (x) { return [x.slug, x.name]; }), q.l, 'League'))]) +
-    '<div class="fb-mt">' + FB.subnav(VIEWS.map(function (x) { return [href({ l: q.l, v: x[0] === 'rank' ? null : x[0] }), x[1], x[0]]; }), v, 'Fantasy views') + '</div>' +
+    '<div class="fb-mt">' + FB.subnav(VIEWS.map(function (x) { return [href({ l: q.l, v: x[0] === 'gw' ? null : x[0] }), x[1], x[0]]; }), v, 'Fantasy views') + '</div>' +
     '<div class="fb-mt">' + FB.kpis([
       FB.kpi('Next gameweek', gw ? esc(gw.label) : '—', { text: true, sub: gw ? gw.n + ' fixtures' : 'no fixtures with a model line' }),
       FB.kpi('Players projected', String(rows.length), { sub: 'current squads of ' + esc(doc.name || '') }),
-      FB.kpi('Backtest rank corr.', isNum(m.spearman_round_mean) ? num(m.spearman_round_mean, 2) : '—', { sub: 'per round · last-5 form ' + (isNum(l5.spearman_round_mean) ? num(l5.spearman_round_mean, 2) : '—'), tip: 'Spearman correlation of projected and actual points among a round\'s players, averaged over rounds, walk-forward.' }),
-      FB.kpi('Top-20 picks scored', isNum(m.top20_actual_mean) ? n1(m.top20_actual_mean) : '—', { sub: 'points a round · form picks ' + (isNum(l5.top20_actual_mean) ? n1(l5.top20_actual_mean) : '—') })
+      topTile('Top pick, next gameweek', rows, 'next', 'our projected points this gameweek'),
+      topTile('Top pick, next five', rows, 'h5', 'our projected points over five gameweeks')
     ]) + '</div>' +
-    '<div class="fb-mt">' + FB.note('<b>Rank correlation</b> runs from 0 (no better than guessing) to 1 (every player in the right order). A single gameweek is mostly luck, so even a good projection misses often. Costs are our own proxy, not FPL\'s.') + '</div>';
+    '<div class="fb-mt">' + FB.note('A single gameweek is mostly luck, so even a good projection misses often. Costs are our own proxy, not FPL\'s. How well the projections did in past rounds is on <a href="' + esc(href({ l: q.l, v: 'method' })) + '">Method and backtest</a>.') + '</div>';
   var sel = el.querySelector('#fa-league');
   if (sel) sel.addEventListener('change', function () { FB.go(href({ l: sel.value, v: q.v })); });
   var body = el.querySelector('#fa-body');
@@ -84,6 +84,12 @@ function draw(el, meta, doc, q) {
   else if (v === 'squad') drawSquad(el, body, doc, byId);
   else if (v === 'method') drawMethod(el, body, meta);
   else drawRank(el, body, doc, rows, q);
+}
+
+/* A fan tile: the player we project highest on one horizon (next gameweek, next five). */
+function topTile(label, rows, key, sub) {
+  var r = rows.filter(function (x) { return isNum(x[key]); }).sort(function (a, b) { return b[key] - a[key]; })[0];
+  return FB.kpi(label, r ? plink(r) : '—', { text: true, signal: true, sub: r ? n1(r[key]) + ' · ' + sub + ' · ' + esc(r.club || '') : 'no projection yet' });
 }
 
 // ── rankings ────────────────────────────────────────────────────────────────
@@ -120,7 +126,7 @@ function drawRank(el, body, doc, rows, q) {
       { key: 'next', label: 'Next GW', num: true, fmt: function (v) { return n1(v); } },
       { key: 'h5', label: 'Next 5', type: 'bar', fmt: function (v) { return '<b>' + n1(v) + '</b>'; }, tip: 'Our projected points over the next five gameweeks' },
       { key: 'ros', label: 'ROS', num: true, tip: 'Rest of season', fmt: function (v) { return n1(v); } },
-      { key: 'tier', label: 'Tier', num: true, fmt: function (v) { return v ? '<span class="fb-fa-tier t' + Math.min(v, 6) + '">' + v + '</span>' : '—'; } },
+      { key: 'tier', label: 'Tier', num: true, fmt: function (v) { var p = v ? Math.max(0, 100 - (Math.min(v, 6) - 1) * 20) : null; return v ? '<span class="fb-fa-tier" style="background:' + QK.pctColor(p) + ';color:' + QK.pctInk(p) + '">' + v + '</span>' : '—'; } },
       { key: 'e_min', label: 'xMin', num: true, tip: 'Expected minutes a match', fmt: function (v) { return isNum(v) ? Math.round(v) + '\'' : '—'; } },
       { key: 'p_goal', label: 'P(goal)', num: true, tip: 'Chance of scoring in the next gameweek', fmt: function (v) { return pc(v); } },
       { key: 'cs', label: 'CS', num: true, tip: 'Chance of a clean sheet (60+ minutes) next gameweek', fmt: function (v) { return pc(v); } },
@@ -188,13 +194,13 @@ function drawFDR(el, body, doc, q) {
     if (!fx || !fx.length) return '<span class="fb-fa-fdr r0">—</span>';
     return fx.map(function (x) {
       var rating = mode === 'att' ? x[4] : x[5];
-      return '<span class="fb-fa-fdr r' + rating + '" data-tip="' + esc(x[0]) + (x[1] ? ' (home)' : ' (away)') + ': expected goals for ' + num(x[2], 2) + ', against ' + num(x[3], 2) + '">' +
-        esc(String(x[0] || '').slice(0, 3).toUpperCase()) + (x[1] ? '' : '<i>a</i>') + '<b>' + num(mode === 'att' ? x[2] : x[3], 1) + '</b></span>';
+      return '<span class="fb-fa-fdr r' + rating + '"' + fdrStyle(rating) + ' data-tip="' + esc(x[0]) + (x[1] ? ' (home)' : ' (away)') + ': expected goals for ' + num(x[2], 2) + ', against ' + num(x[3], 2) + '">' +
+        esc(FB.clubCode(String(x[0] || ''))) + (x[1] ? '' : '<i>a</i>') + '<b>' + num(mode === 'att' ? x[2] : x[3], 1) + '</b></span>';
     }).join('');
   };
-  body.innerHTML = FB.card('Fixture difficulty', 'The next six gameweeks from the match model\'s expected goals. 1 (green) is the easiest fifth of the league\'s fixtures, 5 (red) the hardest; <i>a</i> is away.',
+  body.innerHTML = FB.card('Fixture difficulty', 'The next six gameweeks from the match model\'s expected goals, on the site\'s cold-to-hot scale: 1 (hot red) is the easiest fifth of the league\'s fixtures, 5 (cold blue) the hardest; <i>a</i> is away.',
     FB.toolbar([FB.seg('fa-fd', [['att', 'Attackers (goals for)'], ['def', 'Defenders (goals against)']], mode, 'Difficulty for')]) +
-    '<div class="fb-fa-legend">' + [1, 2, 3, 4, 5].map(function (r) { return '<span class="fb-fa-fdr r' + r + '">' + r + '</span>'; }).join('') + '<span class="qk-muted">easiest → hardest · sorted by ' + (mode === 'att' ? 'expected goals for' : 'expected clean sheets') + ' over six gameweeks</span></div>' +
+    '<div class="fb-fa-legend">' + [1, 2, 3, 4, 5].map(function (r) { return '<span class="fb-fa-fdr r' + r + '"' + fdrStyle(r) + '>' + r + '</span>'; }).join('') + '<span class="qk-muted">easiest → hardest · sorted by ' + (mode === 'att' ? 'expected goals for' : 'expected clean sheets') + ' over six gameweeks</span></div>' +
     '<div class="qk-table-wrap fb-fa-fdrwrap"><table class="qk-table dense"><thead><tr><th class="sticky-col">Club</th><th class="num">' + (mode === 'att' ? 'xG for' : 'xCS') + '</th>' +
     gws.map(function (g) { return '<th title="' + esc(g.label) + '">GW' + g.gw + '</th>'; }).join('') + '</tr></thead><tbody>' +
     fdr.map(function (c) {
@@ -208,6 +214,14 @@ function drawFDR(el, body, doc, q) {
     cats: fdr.map(function (c) { return c.club; }), series: [{ name: mode === 'att' ? 'xG for' : 'Expected clean sheets', data: fdr.map(function (c) { return Math.round((mode === 'att' ? c.xg_for : c.cs_sum) * 10) / 10; }) }],
     hrefs: fdr.map(function (c) { return c.tid ? FB.href.club(c.tid) : null; }), label: 'Six-gameweek totals'
   });
+}
+
+/* Fixture difficulty on the kit's percentile scale (QK.pctColor, cold to hot: hot is good for the player), so 1, the
+   easiest, is the hot end and 5 the cold end; the number in black or white, whichever reads. */
+function fdrStyle(r) {
+  if (!(r >= 1 && r <= 5)) return '';
+  var p = (5 - r) / 4 * 100;
+  return ' style="background:' + QK.pctColor(p) + ';color:' + QK.pctInk(p) + '"';
 }
 
 // ── picks ───────────────────────────────────────────────────────────────────
@@ -237,19 +251,19 @@ function drawPicks(body, doc, byId) {
 
 function drawSquad(el, body, doc, byId) {
   var s = doc.squad || {};
-  if (!s.xi) { body.innerHTML = FB.empty('No optimised squad this build', s.solver ? String(s.solver) : ''); return; }
+  if (!s.xi) { body.innerHTML = FB.empty('No suggested squad this build', 'The squad picker found no fifteen within the rules this time.'); return; }
   var xi = s.xi.map(function (id) { return byId[id]; }).filter(Boolean);
   var bench = (s.bench || []).map(function (id) { return byId[id]; }).filter(Boolean);
   var formation = (function () { var d = xi.filter(function (r) { return r.pos === 'D'; }).length, m = xi.filter(function (r) { return r.pos === 'M'; }).length, f = xi.filter(function (r) { return r.pos === 'F'; }).length; return d + '-' + m + '-' + f; })();
   body.innerHTML = FB.kpis([
-    FB.kpi('Formation', esc(s.formation || formation), { text: true, sub: esc(s.solver || '') }),
+    FB.kpi('Formation', esc(s.formation || formation), { text: true, sub: 'the best fifteen within the budget' }),
     FB.kpi('Cost', cost(s.cost), { sub: 'of ' + cost(s.budget) }),
     FB.kpi('XI, next ' + (s.horizon || 5), n1(s.xi_h5), { signal: true, sub: 'our projected points' }),
     FB.kpi('XI, next gameweek', n1(s.xi_next), { sub: 'captain doubled' })
   ]) + '<div class="fb-mt">' + FB.grid(
     FB.card('Suggested starting XI', 'Each player: cost · projected points over the next ' + (s.horizon || 5) + ' gameweeks. C captain, V vice.', '<div id="fa-pitch"></div>', { span: 7 }) +
     FB.card('The fifteen', 'Bench below the line.', '<div id="fa-squad-tbl"></div>', { span: 5, flush: true })
-  ) + '</div><p class="fb-cap">Fifteen players (2 goalkeepers, 5 defenders, 5 midfielders, 3 forwards), at most three from a club, within the budget, chosen to maximise the starting XI\'s projected points over the next ' + (s.horizon || 5) + ' gameweeks (plus a tenth of the bench\'s) and the captain\'s next-gameweek points, as an integer programme.</p>';
+  ) + '</div><p class="fb-cap">Fifteen players (2 goalkeepers, 5 defenders, 5 midfielders, 3 forwards), at most three from a club, within the budget, chosen to maximise the starting XI\'s projected points over the next ' + (s.horizon || 5) + ' gameweeks (plus a tenth of the bench\'s) and the captain\'s next-gameweek points, picked by an optimiser that weighs every legal fifteen.</p>';
   var pts = FB.charts.xiPoints(xi.map(function (r) { return FB.merge(r, { pos: r.pos }); }), s.formation || formation);
   FB.charts.formation(el.querySelector('#fa-pitch'), {
     surface: 'half', label: 'Suggested starting XI',
@@ -276,8 +290,11 @@ function drawSquad(el, body, doc, byId) {
 function drawMethod(el, body, meta) {
   var bt = meta.backtest || {}, ms = bt.methods || {}, sc = meta.scoring || {};
   var keys = ['model', 'last5', 'std', 'y365'].filter(function (k) { return ms[k]; });
+  var m = ms.model || {}, l5 = ms.last5 || {};
   body.innerHTML = FB.kpis([
     FB.kpi('Rounds backtested', FB.int(bt.rounds), { sub: FB.int(bt.player_rounds) + ' player-rounds' }),
+    FB.kpi('Rank correlation', isNum(m.spearman_round_mean) ? num(m.spearman_round_mean, 2) : '—', { sub: 'per round · last-5 form ' + (isNum(l5.spearman_round_mean) ? num(l5.spearman_round_mean, 2) : '—'), tip: 'Spearman correlation of projected and actual points among a round\'s players, averaged over rounds, walk-forward. 0 is no better than guessing, 1 every player in the right order.' }),
+    FB.kpi('Top-20 picks scored', isNum(m.top20_actual_mean) ? n1(m.top20_actual_mean) : '—', { sub: 'points a round · form picks ' + (isNum(l5.top20_actual_mean) ? n1(l5.top20_actual_mean) : '—') }),
     FB.kpi('Mean actual points', n1(bt.mean_actual), { sub: 'a player a round' }),
     FB.kpi('Calibration', isNum(bt.calibration) ? '×' + num(bt.calibration, 3) : '—', { sub: 'actual / projected', tip: bt.calibration_note || 'Live projections are multiplied by this ratio of actual to projected points.' }),
     FB.kpi('Our MAE', isNum((ms.model || {}).mae) ? num(ms.model.mae, 2) : '—', { signal: true, sub: 'points a player a round' })

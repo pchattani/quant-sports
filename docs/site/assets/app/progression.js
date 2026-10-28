@@ -21,7 +21,7 @@ var LABELS = { xg_xa_90: 'xG + xA per 90', goals_90: 'Goals per 90', assists_90:
 var SCOPE = { club: 'Club', intl: 'International' };
 
 ['compare/progression', 'compare/progression/:a', 'compare/progression/:a/:b', 'compare/progression/:a/:b/:c', 'compare/progression/:a/:b/:c/:d'].forEach(function (p) {
-  FB.ROUTES.unshift({ segs: p.split('/'), name: 'compare-progression', section: 'lab' });
+  FB.ROUTES.unshift({ segs: p.split('/'), name: 'compare-progression', section: 'scout' });
 });
 function compareHref(scope) {
   var h = QPV.hrefFor('#/compare/progression/');

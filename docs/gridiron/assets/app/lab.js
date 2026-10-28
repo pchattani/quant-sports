@@ -41,6 +41,7 @@ const PRESETS = [
 ];
 const NO_SHRINK = /^(n|g|games|age|season|composite|value|def_value|pts_oe|fg_oe|epa_total|rec_epa|scramble_epa|rush_epa_qb|.*_yds|.*_td|ints|sacks|qb_hits|tfl|tackles|pd|ff|att|carries|targets|rec|fga|fgm|fg_50|punts)$/;
 let LAB = null, LABK = '';
+let EXT = null;    // the Scouting Room's state when the chart is mounted inside it (GI.lab.mount), else null
 const S0 = { kind: 'QB', min: null, shrink: true, preset: 0, x: '', y: '', color: 'team', q: '', qual: true, within: 'broad', pos: 'QB' };
 /* "Compare within: Position": [address code, lab group, spec group] */
 const POSG = [['QB', 'QB', 'qb'], ['RB', 'RB', 'rb'], ['WR', 'WR', 'wr'], ['TE', 'TE', 'te'], ['EDGE', 'DEF', 'edge'], ['DL', 'DEF', 'idl'], ['LB', 'DEF', 'lb'], ['CB', 'DEF', 'cb'], ['S', 'DEF', 's'], ['K', 'K', 'k'], ['P', 'P', 'p']];
@@ -189,7 +190,7 @@ function simStrip(rows, hits, S, nm) {
 
 function draw(S) {
   const team = S0.kind === 'TEAM';
-  const base0 = G().rows.filter(r => team || (inGroup(r) && nOf(r) >= S0.min && (!S0.qual || G().idx.qualified === undefined || raw(r, 'qualified') !== false)));
+  const base0 = G().rows.filter(r => team || (inGroup(r) && nOf(r) >= S0.min && (!S0.qual || G().idx.qualified === undefined || raw(r, 'qualified') !== false) && (!EXT || !EXT.keep || EXT.keep(f => raw(r, f)))));
   Object.keys(MU).forEach(k => delete MU[k]);
   const vw = team ? null : view(), vk0 = viewValue(vw), vk = vk0 && vk0 !== S0.x && vk0 !== S0.y && G().idx[vk0] !== undefined ? vk0 : null;
   [S0.x, S0.y, S0.color, vk].forEach(k => { if (k && G().idx[k] !== undefined && shrinkable(k)) MU[k] = GI.median(base0.map(r => raw(r, k))); });
@@ -227,10 +228,13 @@ function draw(S) {
       if (S0.color === 'pos') { const p = String(raw(r, 'pos') || '—'); if (!posCol[p]) posCol[p] = T.cat[Object.keys(posCol).length % 8]; return posCol[p]; }
       return T.model;
     };
+    const xa = GI.ch.ax(T, { scale: true, inverse: lower(S0.x), fmt: v => fmt(S0.x, v) }), ya = GI.ch.ax(T, { scale: true, inverse: lower(S0.y), fmt: v => fmt(S0.y, v) });
+    /* both titles inside the card (a long y title runs over the plot from the axis line, never off the left edge) */
+    const gB = 10 + QKC.nameAxis(xa, label(S0.x) + (lower(S0.x) ? ' (lower is better: flipped)' : ''), 'bottom'), gT = 12 + QKC.nameAxis(ya, label(S0.y) + (lower(S0.y) ? ' (lower is better: flipped)' : ''), 'side');
     return {
-      grid: { left: 8, right: colourMetric ? 70 : 20, top: 24, bottom: 34, containLabel: true },
-      xAxis: GI.ch.ax(T, { name: label(S0.x), nameLocation: 'middle', nameGap: 28, scale: true, inverse: lower(S0.x), fmt: v => fmt(S0.x, v) }),
-      yAxis: GI.ch.ax(T, { name: label(S0.y), scale: true, inverse: lower(S0.y), fmt: v => fmt(S0.y, v) }),
+      grid: { left: 8, right: colourMetric ? 70 : 20, top: gT, bottom: gB, containLabel: true },
+      xAxis: xa,
+      yAxis: ya,
       visualMap: colourMetric && cv.length ? (pScale ? { type: 'continuous', dimension: 2, min: 0, max: 100, right: 0, top: 'middle', itemHeight: 140, itemWidth: 10, calculable: false,
         text: ['100th', '0th'], textStyle: { color: T.ink3, fontSize: 10 }, inRange: { color: pScale }, outOfRange: { color: T.axis } } : { type: 'continuous', dimension: 2, min: Math.min.apply(null, cv), max: Math.max.apply(null, cv), right: 0, top: 'middle', itemHeight: 140, itemWidth: 10, calculable: false,
         text: [lower(colourMetric) ? 'worse' : 'better', lower(colourMetric) ? 'better' : 'worse'], textStyle: { color: T.ink3, fontSize: 10 }, inRange: { color: lower(colourMetric) ? [T.pos, T.mid, T.neg] : [T.neg, T.mid, T.pos] } }) : undefined,
@@ -245,7 +249,7 @@ function draw(S) {
         markLine: { silent: true, symbol: 'none', lineStyle: { color: T.axis, type: [4, 4] }, label: { show: false }, data: [{ xAxis: mx }, { yAxis: my }] } }]
         .concat(hits.length ? [{ type: 'scatter', silent: true, symbol: 'circle', symbolSize: 22, z: 5, itemStyle: { color: 'transparent', borderColor: T.model, borderWidth: 2 }, data: hits.map(r => [val(r, S0.x), val(r, S0.y)]) }] : [])
     };
-  }, 'Scatter of ' + label(S0.x) + ' against ' + label(S0.y));
+  }, 'Scatter of ' + label(S0.x) + ' against ' + label(S0.y), EXT && EXT.onPick && !team ? { onClick: p => { if (p.data && p.data.r) EXT.onPick(idOf(p.data.r)); } } : undefined);
   GI.set('lab-sim', simStrip(base0, hits, S, nm));
   const rr = GI.corr(xs, ys), mX = meta(S0.x), mY = meta(S0.y);
   GI.set('lab-note', 'Correlation on screen r = ' + GI.num(rr, 2) + ' (' + rows.length + ' ' + noun + '). Dashed lines are the medians of the ' + esc(noun) + '; ' + (lower(S0.x) || lower(S0.y) ? 'axes where less is better are reversed, so ' : '') + 'better is up and to the right. ' +
@@ -267,104 +271,139 @@ function draw(S) {
       .concat(vk ? [{ key: 'pv', label: label(vk), type: 'pctl', pctl: 'pv', fmt: (v, r) => fmt(vk, r.vv), tip: 'The position view\'s value metric. Cell colour: percentile on screen (100 = best)' }] : [])
       .concat([{ key: 'z', label: 'Combined', type: 'bar', fmt: v => '<b>' + GI.num(v, 2) + '</b>', tip: 'Sum of standard scores in the better direction' }])) });
   GI.SP.tagHeads(document.getElementById('lab-table'), vk ? { px: S0.x, py: S0.y, pv: vk } : { px: S0.x, py: S0.y });
+  if (EXT) { if (EXT.onAxes) EXT.onAxes({ x: S0.preset < 0 ? S0.x : '', y: S0.preset < 0 ? S0.y : '', color: S0.preset < 0 && S0.color !== 'team' ? S0.color : '' }); return; }
   const wq = QK.within.query(S0);
   GI.setHashQuiet(GI.ghref('lab', S, { g: S0.kind, x: S0.x, y: S0.y, within: wq.within || undefined, pos: wq.pos || undefined }));
 }
 
-GI.route('lab', function (el, params) {
-  const S = Number(params.season);
-  return Promise.all([GI.load(GI.ypath('lab.json', S)), GI.load(GI.ypath('value.json', S)).catch(() => null), GI.SP.specReady()]).then(all => {
-    const rawD = all[0];
-    if (!el.isConnected) return;
-    const head = GI.pageHead('Lab · ' + S, 'Scatter lab', 'Any two metrics for a position group or the teams. Presets ask the questions the models were built for.') + GI.sectionNav('lab', 'lab') + QK.note('<b>How to read it:</b> each dot is a player or a team, placed on any two metrics. Up and right is not always better: a metric marked ↓ is better when lower, and tendencies are neither good nor bad.');
-    if (LABK !== String(S)) { LAB = prep(rawD, all[1]); LABK = String(S); S0.min = null; S0.x = ''; S0.y = ''; S0.preset = 0; }
-    if (!Object.keys(LAB).length) { el.innerHTML = head + GI.notBuilt('The ' + S + ' lab file', rawD); return; }
-    const qy = params.query || {};
-    if (qy.g && LAB[String(qy.g).toUpperCase()]) S0.kind = String(qy.g).toUpperCase();
-    const wn = QK.within.read(qy, POS_CODES.filter(c => LAB[posOf(c)[1]]));
-    S0.within = wn.within;
-    if (byPos()) { S0.pos = wn.pos; S0.kind = posOf(S0.pos)[1]; }
-    if (qy.q) S0.q = String(qy.q);
-    if (!LAB[S0.kind]) S0.kind = Object.keys(LAB)[0];
-    /* Position without x / y in the address: the position's default view (preset 0) */
-    if (byPos() && !qy.x && !qy.y) { S0.x = ''; S0.y = ''; S0.preset = 0; }
-    el.innerHTML = head + '<div id="lab-kpis"></div><div class="gi-toolbar gi-lab-wn" id="lab-wn-bar"></div><div id="lab-why"></div>' +
-      GI.card('<span id="lab-title">Scatter</span>', '<span id="lab-sub"></span>', '<div class="gi-toolbar" style="margin-bottom:12px">' + GI.field('Preset', '<select id="lab-preset" class="qk-select"></select>') +
-        GI.field('X axis', '<select id="lab-x" class="qk-select"></select>') + GI.field('Y axis', '<select id="lab-y" class="qk-select"></select>') + '<button type="button" class="qk-btn" id="lab-swap" aria-label="Swap the axes">⇄ Swap</button>' +
-        GI.field('Colour', '<select id="lab-color" class="qk-select"></select>') + '<label class="gi-field" id="lab-min-w"><span>Min <span id="lab-min-u"></span> <b id="lab-min-v"></b></span><input id="lab-min" type="range" min="0" max="700" step="1"></label>' +
-        '<label class="gi-check" id="lab-qual-w"><input id="lab-qual" type="checkbox"> qualified only</label><label class="gi-check" id="lab-shrink-w"><input id="lab-shrink" type="checkbox"> shrink by stabilisation</label>' +
-        GI.field('Highlight', '<input id="lab-q" class="qk-input" type="search" placeholder="Player or team">') + '</div>' + '<div id="lab-ours"></div>' + GI.chartBox('lab-chart', 520, 'Scatter') + '<div id="lab-sim" class="gi-lab-sim"></div><p class="gi-cap" id="lab-note"></p>') +
-      GI.card('Ranked', 'By the combined standard score on both axes (top 300); cells coloured by percentile on screen', '<div id="lab-table"></div>', { flush: true });
-    const $ = id => document.getElementById(id);
-    /* a view preset (Position) also sets the colour: its value metric, or the team colours when value is an axis */
-    const applyPreset = () => { const P = presetList(); if (S0.preset < 0 || !P.length) return; const p = P[S0.preset] || P[0]; S0.x = p.x; S0.y = p.y; if (p.color !== undefined) S0.color = p.color; };
-    const reset = () => {
-      const g = G();
-      const maxN = Math.max.apply(null, g.rows.map(nOf).concat([10]));
-      $('lab-min').max = String(Math.ceil(maxN));
-      if (S0.min === null || S0.min > maxN) S0.min = 0;
-      if (!S0.x || g.idx[S0.x] === undefined || !S0.y || g.idx[S0.y] === undefined) { if (S0.preset < 0) S0.preset = 0; applyPreset(); }
-      if (!S0.x || !S0.y || g.idx[S0.x] === undefined || g.idx[S0.y] === undefined) { S0.x = (g.metrics[0] || {}).key || g.nKey; S0.y = (g.metrics[1] || {}).key || g.nKey; S0.preset = -1; }
-      if (S0.color && ['team', 'pos', 'conf'].indexOf(S0.color) < 0 && g.idx[S0.color] === undefined) S0.color = 'team';
-      if (S0.color === 'pos' && S0.kind === 'TEAM') S0.color = 'team';
-      if (S0.color === 'conf' && S0.kind !== 'TEAM') S0.color = 'team';
-    };
-    const sync = () => {
-      const P = presetList();
-      $('lab-preset').innerHTML = P.map((p, i) => '<option value="' + i + '"' + (i === S0.preset ? ' selected' : '') + '>' + esc(p.title) + '</option>').join('') + '<option value="-1"' + (S0.preset < 0 ? ' selected' : '') + '>Custom axes</option>';
-      $('lab-x').innerHTML = metricOpts(S0.x); $('lab-y').innerHTML = metricOpts(S0.y); $('lab-x').value = S0.x; $('lab-y').value = S0.y;
-      $('lab-color').innerHTML = metricOpts(S0.color, true); $('lab-color').value = S0.color;
-      $('lab-min').value = S0.min; $('lab-min-v').textContent = S0.min; $('lab-min-u').textContent = G().nLabel.toLowerCase();
-      $('lab-min-w').style.display = S0.kind === 'TEAM' ? 'none' : '';
-      $('lab-qual-w').style.display = S0.kind === 'TEAM' || G().idx.qualified === undefined ? 'none' : '';
-      $('lab-shrink-w').style.display = S0.kind === 'TEAM' ? 'none' : '';
-      $('lab-shrink').checked = S0.shrink; $('lab-q').value = S0.q; $('lab-qual').checked = S0.qual;
-      GI.set('lab-title', esc(S0.preset >= 0 && P[S0.preset] ? P[S0.preset].title : label(S0.x) + ' v ' + label(S0.y)));
-    };
-    if (qy.x && G().idx[qy.x] !== undefined) { S0.x = qy.x; S0.preset = -1; }
-    if (qy.y && G().idx[qy.y] !== undefined) { S0.y = qy.y; S0.preset = -1; }
-    /* Position with x / y in the address: they win; the preset they match (if any) and its colour, else the view's colour */
-    if (byPos() && S0.preset < 0 && S0.x && S0.y) {
-      const P = presetList(), i = P.findIndex(p => p.x === S0.x && p.y === S0.y), v = view();
-      if (i >= 0) { S0.preset = i; if (P[i].color !== undefined) S0.color = P[i].color; } else if (v && v.color) S0.color = v.color;
-    }
-    reset();
-    sync();
-    const redraw = () => { sync(); draw(S); };
-    const toKind = k => { S0.kind = k; S0.x = ''; S0.y = ''; S0.preset = 0; S0.min = null; reset(); };
-    /* Compare within: Broad keeps the lab's groups (the kind buttons); Position the spec's peer groups (the picker) */
-    const bar = () => {
-      const codes = POS_CODES.filter(c => LAB[posOf(c)[1]]);
-      GI.set('lab-wn-bar', QK.within.html({ within: S0.within, pos: S0.pos }, { id: 'lab-wn', groups: codes.map(c => [c, posName(c)]),
-        note: byPos() ? 'The metrics spec\'s peer group' + (posOf(S0.pos)[1] === 'DEF' ? ' (defensive role from our value model)' : '') + ' · qualified players only by default (the spec minimum, ' + esc(String((GI.SP.BY[posOf(S0.pos)[2]] || {}).unit || 'games')) + ')' : 'Offence by position, every defender together, or the teams' }) +
-        (byPos() ? '' : GI.seg('lab-kind', GI.GROUPS.concat(['TEAM']).map(g => [g, g === 'TEAM' ? 'Teams' : g, !LAB[g]]), S0.kind, 'Group')));
-      GI.set('lab-why', byPos() ? QK.within.viewWhy(view()) : '');
-      QK.within.wire(el, { within: S0.within, pos: S0.pos }, w => {
-        if (w.within === 'pos' && !byPos()) w.pos = S0.kind === 'DEF' ? 'EDGE' : (POS_CODES.indexOf(S0.kind) >= 0 ? S0.kind : 'QB');
-        /* Position sets the colour from its view; back in Broad, the colour chosen there before */
-        if (w.within === 'pos' && !byPos()) S0.bColor = S0.color;
-        else if (w.within !== 'pos' && byPos()) S0.color = S0.bColor !== undefined ? S0.bColor : 'team';
-        S0.within = w.within; S0.pos = w.pos;
-        if (byPos()) S0.qual = true;
-        toKind(byPos() ? posOf(S0.pos)[1] : S0.kind);
-        bar(); redraw();
-      }, { id: 'lab-wn' });
-      GI.wireSeg(el, 'lab-kind', v => { if (!LAB[v]) return; toKind(v); redraw(); });
-    };
-    bar();
-    $('lab-preset').addEventListener('change', e => { S0.preset = parseInt(e.target.value, 10); applyPreset(); redraw(); });
-    $('lab-x').addEventListener('change', e => { S0.x = e.target.value; S0.preset = -1; redraw(); });
-    $('lab-y').addEventListener('change', e => { S0.y = e.target.value; S0.preset = -1; redraw(); });
-    $('lab-swap').addEventListener('click', () => { const t = S0.x; S0.x = S0.y; S0.y = t; S0.preset = -1; redraw(); });
-    $('lab-color').addEventListener('change', e => { S0.color = e.target.value; redraw(); });
+/* Round 9 (28 Oct 2026): the Lab is the Scouting Room's Chart view (gi-scout.js). GI.lab.mount(host, S, ext) draws the same
+ * chart, presets, colour, shrink, medians, corners, ranked table and "Most like" inside the room, without its own group,
+ * minimum, qualified and highlight controls: those come from the room's control bar through ext = { within ('broad' |
+ * 'pos'), kind (QB ... P, DEF), pos (QB ... P, EDGE, DL, LB, CB, S), min (null: qualified players, the payload's floor;
+ * a number: that many plays or more), q (highlight), x, y, color, keep(get) -> bool (the room's team and age filters;
+ * get(field) reads the row), onPick(pid) (a dot opens the room's profile drawer), onAxes({ x, y, color }) (the axes into
+ * the room's address) }. #/lab redirects to #/scout?view=chart (core.js). GI.lab.prep(lab.json, value.json) is the
+ * room's data too, so both read one file the same way. */
+function markup(ext) {
+  const ctl = '<div class="gi-toolbar" style="margin-bottom:12px">' + GI.field('Preset', '<select id="lab-preset" class="qk-select"></select>') +
+    GI.field('X axis', '<select id="lab-x" class="qk-select"></select>') + GI.field('Y axis', '<select id="lab-y" class="qk-select"></select>') + '<button type="button" class="qk-btn" id="lab-swap" aria-label="Swap the axes">⇄ Swap</button>' +
+    GI.field('Colour', '<select id="lab-color" class="qk-select"></select>') +
+    (ext ? '' : '<label class="gi-field" id="lab-min-w"><span>Min <span id="lab-min-u"></span> <b id="lab-min-v"></b></span><input id="lab-min" type="range" min="0" max="700" step="1"></label>' +
+      '<label class="gi-check" id="lab-qual-w"><input id="lab-qual" type="checkbox"> qualified only</label>') +
+    '<label class="gi-check" id="lab-shrink-w"><input id="lab-shrink" type="checkbox"> shrink by stabilisation</label>' +
+    (ext ? '' : GI.field('Highlight', '<input id="lab-q" class="qk-input" type="search" placeholder="Player or team">')) + '</div>';
+  return (ext ? '' : '<div id="lab-kpis"></div><div class="gi-toolbar gi-lab-wn" id="lab-wn-bar"></div><div id="lab-why"></div>') +
+    GI.card('<span id="lab-title">Scatter</span>', '<span id="lab-sub"></span>', ctl + '<div id="lab-ours"></div>' + GI.chartBox('lab-chart', 520, 'Scatter') + '<div id="lab-sim" class="gi-lab-sim"></div><p class="gi-cap" id="lab-note"></p>') +
+    (ext ? '<div id="lab-kpis"></div>' : '') +
+    GI.card('Ranked', 'By the combined standard score on both axes (top 300); cells coloured by percentile on screen', '<div id="lab-table"></div>', { flush: true });
+}
+function load(S) { return Promise.all([GI.load(GI.ypath('lab.json', S)), GI.load(GI.ypath('value.json', S)).catch(() => null), GI.SP.specReady()]); }
+function boot(el, S, qy, ext, all) {
+  EXT = ext || null;
+  const rawD = all[0];
+  if (LABK !== String(S)) { LAB = prep(rawD, all[1]); LABK = String(S); S0.min = null; S0.x = ''; S0.y = ''; S0.preset = 0; }
+  VIEWC = null;
+  if (!Object.keys(LAB).length) { GI.set('lab-chart', GI.notBuilt('The ' + S + ' lab file', rawD)); return; }
+  if (qy.g && LAB[String(qy.g).toUpperCase()]) S0.kind = String(qy.g).toUpperCase();
+  const wn = QK.within.read(qy, POS_CODES.filter(c => LAB[posOf(c)[1]]));
+  S0.within = wn.within;
+  if (byPos()) { S0.pos = wn.pos; S0.kind = posOf(S0.pos)[1]; }
+  S0.q = qy.q ? String(qy.q) : (ext ? '' : S0.q);
+  if (!LAB[S0.kind]) S0.kind = Object.keys(LAB)[0];
+  if (ext) { S0.x = ''; S0.y = ''; S0.preset = 0; S0.color = 'team'; }
+  /* Position without x / y in the address: the position's default view (preset 0) */
+  if (byPos() && !qy.x && !qy.y) { S0.x = ''; S0.y = ''; S0.preset = 0; }
+  const $ = id => document.getElementById(id);
+  const applyPreset = () => { const P = presetList(); if (S0.preset < 0 || !P.length) return; const p = P[S0.preset] || P[0]; S0.x = p.x; S0.y = p.y; if (p.color !== undefined) S0.color = p.color; };
+  const reset = () => {
+    const g = G();
+    const maxN = Math.max.apply(null, g.rows.map(nOf).concat([10]));
+    if ($('lab-min')) $('lab-min').max = String(Math.ceil(maxN));
+    if (ext) { S0.qual = !isNum(ext.min); S0.min = isNum(ext.min) ? ext.min : 0; }
+    else if (S0.min === null || S0.min > maxN) S0.min = 0;
+    if (!S0.x || g.idx[S0.x] === undefined || !S0.y || g.idx[S0.y] === undefined) { if (S0.preset < 0) S0.preset = 0; applyPreset(); }
+    if (!S0.x || !S0.y || g.idx[S0.x] === undefined || g.idx[S0.y] === undefined) { S0.x = (g.metrics[0] || {}).key || g.nKey; S0.y = (g.metrics[1] || {}).key || g.nKey; S0.preset = -1; }
+    if (S0.color && ['team', 'pos', 'conf'].indexOf(S0.color) < 0 && g.idx[S0.color] === undefined) S0.color = 'team';
+    if (S0.color === 'pos' && S0.kind === 'TEAM') S0.color = 'team';
+    if (S0.color === 'conf' && S0.kind !== 'TEAM') S0.color = 'team';
+  };
+  const sync = () => {
+    const P = presetList();
+    $('lab-preset').innerHTML = P.map((p, i) => '<option value="' + i + '"' + (i === S0.preset ? ' selected' : '') + '>' + esc(p.title) + '</option>').join('') + '<option value="-1"' + (S0.preset < 0 ? ' selected' : '') + '>Custom axes</option>';
+    $('lab-x').innerHTML = metricOpts(S0.x); $('lab-y').innerHTML = metricOpts(S0.y); $('lab-x').value = S0.x; $('lab-y').value = S0.y;
+    $('lab-color').innerHTML = metricOpts(S0.color, true); $('lab-color').value = S0.color;
+    if ($('lab-min')) { $('lab-min').value = S0.min; $('lab-min-v').textContent = S0.min; $('lab-min-u').textContent = G().nLabel.toLowerCase(); $('lab-min-w').style.display = S0.kind === 'TEAM' ? 'none' : ''; }
+    if ($('lab-qual-w')) { $('lab-qual-w').style.display = S0.kind === 'TEAM' || G().idx.qualified === undefined ? 'none' : ''; $('lab-qual').checked = S0.qual; }
+    $('lab-shrink-w').style.display = S0.kind === 'TEAM' ? 'none' : '';
+    $('lab-shrink').checked = S0.shrink;
+    if ($('lab-q')) $('lab-q').value = S0.q;
+    GI.set('lab-title', esc(S0.preset >= 0 && P[S0.preset] ? P[S0.preset].title : label(S0.x) + ' v ' + label(S0.y)));
+  };
+  if (qy.x && G().idx[qy.x] !== undefined) { S0.x = qy.x; S0.preset = -1; }
+  if (qy.y && G().idx[qy.y] !== undefined) { S0.y = qy.y; S0.preset = -1; }
+  /* Position with x / y in the address: they win; the preset they match (if any) and its colour, else the view's colour */
+  if (byPos() && S0.preset < 0 && S0.x && S0.y) {
+    const P = presetList(), i = P.findIndex(p => p.x === S0.x && p.y === S0.y), v = view();
+    if (i >= 0) { S0.preset = i; if (P[i].color !== undefined) S0.color = P[i].color; } else if (v && v.color) S0.color = v.color;
+  }
+  reset();
+  if (ext && ext.color && (['team', 'pos'].indexOf(ext.color) >= 0 || G().idx[ext.color] !== undefined)) S0.color = ext.color;
+  sync();
+  const redraw = () => { sync(); draw(S); };
+  const toKind = k => { S0.kind = k; S0.x = ''; S0.y = ''; S0.preset = 0; S0.min = null; reset(); };
+  /* Compare within (the standalone page only; the room has its own bar): Broad keeps the lab's groups, Position the spec's */
+  const bar = () => {
+    if (ext) return;
+    const codes = POS_CODES.filter(c => LAB[posOf(c)[1]]);
+    GI.set('lab-wn-bar', QK.within.html({ within: S0.within, pos: S0.pos }, { id: 'lab-wn', groups: codes.map(c => [c, posName(c)]),
+      note: byPos() ? 'The metrics spec\'s peer group' + (posOf(S0.pos)[1] === 'DEF' ? ' (defensive role from our value model)' : '') + ' · qualified players only by default (the spec minimum, ' + esc(String((GI.SP.BY[posOf(S0.pos)[2]] || {}).unit || 'games')) + ')' : 'Offence by position, every defender together, or the teams' }) +
+      (byPos() ? '' : GI.seg('lab-kind', GI.GROUPS.concat(['TEAM']).map(g => [g, g === 'TEAM' ? 'Teams' : g, !LAB[g]]), S0.kind, 'Group')));
+    GI.set('lab-why', byPos() ? QK.within.viewWhy(view()) : '');
+    QK.within.wire(el, { within: S0.within, pos: S0.pos }, w => {
+      if (w.within === 'pos' && !byPos()) w.pos = S0.kind === 'DEF' ? 'EDGE' : (POS_CODES.indexOf(S0.kind) >= 0 ? S0.kind : 'QB');
+      if (w.within === 'pos' && !byPos()) S0.bColor = S0.color;
+      else if (w.within !== 'pos' && byPos()) S0.color = S0.bColor !== undefined ? S0.bColor : 'team';
+      S0.within = w.within; S0.pos = w.pos;
+      if (byPos()) S0.qual = true;
+      toKind(byPos() ? posOf(S0.pos)[1] : S0.kind);
+      bar(); redraw();
+    }, { id: 'lab-wn' });
+    GI.wireSeg(el, 'lab-kind', v => { if (!LAB[v]) return; toKind(v); redraw(); });
+  };
+  bar();
+  $('lab-preset').addEventListener('change', e => { S0.preset = parseInt(e.target.value, 10); applyPreset(); redraw(); });
+  $('lab-x').addEventListener('change', e => { S0.x = e.target.value; S0.preset = -1; redraw(); });
+  $('lab-y').addEventListener('change', e => { S0.y = e.target.value; S0.preset = -1; redraw(); });
+  $('lab-swap').addEventListener('click', () => { const t = S0.x; S0.x = S0.y; S0.y = t; S0.preset = -1; redraw(); });
+  $('lab-color').addEventListener('change', e => { S0.color = e.target.value; redraw(); });
+  if ($('lab-min')) {
     $('lab-min').addEventListener('input', e => { S0.min = parseInt(e.target.value, 10); $('lab-min-v').textContent = S0.min; });
     $('lab-min').addEventListener('change', redraw);
-    $('lab-shrink').addEventListener('change', e => { S0.shrink = e.target.checked; redraw(); });
     $('lab-qual').addEventListener('change', e => { S0.qual = e.target.checked; redraw(); });
     let timer = null;
     $('lab-q').addEventListener('input', e => { S0.q = e.target.value; clearTimeout(timer); timer = setTimeout(() => draw(S), 250); });
-    draw(S);
+  }
+  $('lab-shrink').addEventListener('change', e => { S0.shrink = e.target.checked; redraw(); });
+  draw(S);
+}
+
+GI.route('lab', function (el, params) {
+  const S = Number(params.season);
+  return load(S).then(all => {
+    if (!el.isConnected) return;
+    el.innerHTML = GI.pageHead('Lab · ' + S, 'Scatter lab', 'Any two metrics for a position group or the teams. Presets ask the questions the models were built for.') + QK.note('<b>How to read it:</b> each dot is a player or a team, placed on any two metrics. Up and right is not always better: a metric marked ↓ is better when lower, and tendencies are neither good nor bad.') + markup(null);
+    boot(el, S, params.query || {}, null, all);
   });
 });
+/* The Scouting Room's Chart: draw into host with the room's state (ext, above). Returns a promise. */
+function mount(host, S, ext) {
+  host.innerHTML = markup(ext || {});
+  const qy = { q: (ext && ext.q) || '' };
+  if (ext && ext.within === 'pos') { qy.within = 'pos'; qy.pos = ext.pos; } else qy.g = (ext && ext.kind) || 'QB';
+  if (ext && ext.x) qy.x = ext.x;
+  if (ext && ext.y) qy.y = ext.y;
+  return load(S).then(all => { if (host.isConnected) boot(host, S, qy, ext || {}, all); });
+}
+GI.lab = { mount: mount, prep: prep, load: load, POSG: POSG };
 
 })(window.GI);

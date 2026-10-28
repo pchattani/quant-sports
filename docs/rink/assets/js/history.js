@@ -144,7 +144,7 @@ function envChart(env, eras) {
     eras.forEach((e, i) => { const a = Math.max(e[0], x0), b = Math.min(e[1] + 1, x1 + 1); if (a >= b) return; shapes.push({ type: 'rect', xref: 'x', yref: 'paper', x0: a - 0.5, x1: b - 0.5, y0: 0, y1: 1, fillcolor: i % 2 ? 'rgba(92,198,242,0.05)' : 'rgba(255,255,255,0.02)', line: { width: 0 }, layer: 'below' });
       ann.push({ x: (a + b - 1) / 2, y: 1, yref: 'paper', yanchor: 'bottom', text: k.esc(e[2]), showarrow: false, font: { size: 9, color: '#8b949e' }, textangle: k.narrow(node) ? -90 : 0, hovertext: k.esc(e[3]) }); });
     k.plot(node, [{ type: 'scatter', mode: 'lines+markers', x: xs, y: vs, text: env.map(r => k.sLabel(r.S)), line: { color: K().ACC, width: 2 }, marker: { size: 4 }, connectgaps: false, hovertemplate: '%{text}: %{y' + (pctLike ? ':.1%' : ':.2f') + '}<extra></extra>' }],
-      k.layout({ margin: { l: 56, r: 10, t: 34, b: 36 }, shapes: shapes, annotations: ann, xaxis: { title: 'Season (start year)', dtick: 10 }, yaxis: { title: ENV_LABEL[ST.env] || k.titleCase(ST.env), tickformat: pctLike ? '.1%' : '' } }));
+      k.layout({ margin: { l: 56, r: 10, t: 34, b: 36 }, shapes: shapes, annotations: ann, xaxis: { title: 'Season (start year)', dtick: 10, tickformat: 'd' }, yaxis: { title: ENV_LABEL[ST.env] || k.titleCase(ST.env), tickformat: pctLike ? '.1%' : '' } }));
   };
   draw();
   const sel = k.$('hi-env-k');
@@ -175,5 +175,7 @@ function seasonLeaders(L) {
   k.set('hi-ld-sub', seasons.length + ' seasons on file, ' + k.esc(k.sLabel(seasons[seasons.length - 1])) + ' to ' + k.esc(k.sLabel(seasons[0])) + '; the league\'s official season totals.');
 }
 
+/* shared with Standings › History (rk-history.js, round 9): the readers and the era and leader cards */
+RK.historyParts = { championsOf: championsOf, envOf: envOf, leadersOf: leadersOf, franchiseOf: franchiseOf, envChart: envChart, seasonLeaders: seasonLeaders, ERAS: ERAS, startYear: startYear };
 if (typeof RK.route === 'function') { try { RK.route('history', render); } catch (e) { /* bound */ } }
 })(window.RK || (window.RK = {}));

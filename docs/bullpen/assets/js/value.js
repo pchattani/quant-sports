@@ -3,8 +3,8 @@
  *
  * Value: the leaderboard (WAR this season, the rate per 600 PA / 700 BF, the percentile, last season, next season's
  * projection, the components behind it) with level, kind, club, position and sample filters, valuation v2 (MLB: the next
- * five seasons with bands, injured-list risk and wins over the median starter; Triple-A: the prospect model's value), and
- * the best at each position (C 1B 2B 3B SS LF CF RF DH SP RP).
+ * five seasons with bands, injured-list risk and wins over the median starter; Triple-A: the prospect model's value). The
+ * best at each position moved to the Scouting Room's Leaders (round 9).
  * Trade: two clubs and the players moving each way; per club the value in and out, the depth chart after the trade
  * (the same allocation as oddsmarkets/baseball/analytics/trade.allocate: positions by scarcity, the best available
  * eligible player by projected value, 80% caps at catcher and 95% elsewhere, a fifth of the starts per starter, a
@@ -80,7 +80,7 @@ function valuePage(el, params) {
       '<label>Find<input id="val-q" type="search" placeholder="player…" value="' + esc(V.q) + '"></label></div></div></section>' +
       '<section class="qk-section"><div id="val-card"></div></section>';
     if (d.valuation || d.prospects) h += '<section class="qk-section"><div id="val-v2card"></div></section>';
-    h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'By position', title: 'The best at each position', sub: 'Players whose primary position it is (most games there; pitchers by role), at least half the leaderboard floor; the percentile is within the position.' }) + '<div class="qk-grid" id="val-best"></div></section>';
+    h += '<p class="qk-sub bp-moved">The best at each position is in the <a class="qk-link" href="' + BP.href('scout', L, S) + '?view=leaders">Scouting Room’s Leaders</a>.</p>';
     el.innerHTML = h;
     const $ = id => document.getElementById(id);
     const posOpts = () => { $('val-pos').innerHTML = '<option value="">All</option>' + POS.filter(p => !PIT() && p !== 'SP' && p !== 'RP').map(p => '<option value="' + p + '"' + (p === V.pos ? ' selected' : '') + '>' + p + '</option>').join(''); };
@@ -111,12 +111,6 @@ function valuePage(el, params) {
             dd: isNum(r[F.war]) && isNum(r[F.war_prev]) ? r[F.war] - r[F.war_prev] : null, proj: r[F.proj], why: r[F.why], href: phref(L, r[F.pid], S, r[F.kind]) }; }) });
       if ($('val-v2card')) drawV2(d, F, sel, L, S, $);
     };
-    const best = d.best || {};
-    $('val-best').innerHTML = POS.map(p => {
-      const list = best[p] || [];
-      return '<div class="qk-span-3">' + U.card2(p, '', list.length ? '<ul class="bp-list bp-lead">' + list.map((r, i) => '<li><span class="n">' + (i + 1) + '</span><span style="min-width:0;flex:1">' + U.playerEnt(r[0], L, BP.teamAbbr(r[2]), (p === 'SP' || p === 'RP') ? 'pitcher' : 'hitter') +
-        (r[8] || r[9] ? '<span class="bp-mv-why">' + esc((r[8] || '') + (r[9] ? ' · ' + r[9] : '')) + '</span>' : '') + '</span><span class="v">' + s1(r[3]) + '</span>' + (isNum(r[5]) ? QK.pctlChip(Math.round(r[5])) : '') + '</li>').join('') + '</ul>' : QK.empty('No qualified player'), { flush: true }) + '</div>';
-    }).join('');
     QK.seg($('val-kind'), k => { V.kind = k; V.pos = ''; V.min = flOf(k); draw(); });
     $('val-team').onchange = e => { V.team = e.target.value; draw(); };
     if ($('val-lg')) $('val-lg').onchange = e => { V.lg = e.target.value; draw(); };
@@ -229,13 +223,45 @@ function tradeHash(L, S, st) {
   return '#/' + L + '/trade?' + q.join('&');
 }
 
+/* Round 9: with no clubs in the address the simulator opens on a real trade: the most lopsided of the season's last
+   four months by our at-the-time grades (data/mlb/trades.json), both sides' players still on a big-league roster. A
+   trade already made is run from before it: each club's roster gets back what it sent and gives up what it received. */
+function presetTrade(L, S) {
+  if (L !== 'mlb' || Number(S) !== BP.currentSeason(L)) return Promise.resolve(null);
+  return BP.load('mlb/trades.json').then(tj => {
+    const list = ((tj && tj.trades) || []).filter(t => t && (t.teams || []).length === 2 && (t.pieces || []).length >= 2);
+    if (!list.length) return null;
+    const last = list.map(t => String(t.date)).sort().pop();
+    const cut = new Date(Date.parse(last) - 120 * 864e5).toISOString().slice(0, 10);
+    const net = t => Math.abs(((t.clubs || {})[t.teams[0]] || {}).net || 0);
+    return list.filter(t => String(t.date) >= cut).sort((a, b) => net(b) - net(a)).slice(0, 6);
+  });
+}
 function tradePage(el, params) {
   const L = Lof(params), S = Sof(params, L);
   const qy = params.query || {};
-  const st = { a: qy.a || '', b: qy.b || '', ao: parseIds(qy.ao), bo: parseIds(qy.bo) };
+  const st = { a: qy.a || '', b: qy.b || '', ao: parseIds(qy.ao), bo: parseIds(qy.bo), done: qy.done || '' };
   el.innerHTML = BP.muted('Loading…');
   if (L === 'aaa') { el.innerHTML = BP.pageHead('Trade simulator', 'Triple-A') + BP.muted('The trade simulator covers MLB and NPB; Triple-A rosters turn over too fast for it to mean much. <a href="' + BP.href('trade', 'mlb') + '">MLB trade simulator →</a>'); return null; }
-  return BP.load(y(L, S, 'trade.json')).then(ix => {
+  const pre = !st.a && !st.b ? presetTrade(L, S) : Promise.resolve(null);
+  return pre.then(cands => {
+    if (!cands || !cands.length) return null;
+    /* the first candidate whose players both clubs' value files still carry */
+    const tryOne = i => {
+      if (i >= cands.length) return null;
+      const t = cands[i], a = String(t.teams[0]), b = String(t.teams[1]);
+      return Promise.all([BP.load(y(L, S, 'value/' + a + '.json')), BP.load(y(L, S, 'value/' + b + '.json'))]).then(r => {
+        const ids = x => ((BP.ok(x) && x.roster) || []).map(p => String(p.pid));
+        const all = ids(r[0]).concat(ids(r[1]));
+        const ao = (t.pieces || []).filter(p => String(p[2]) === a && all.indexOf(String(p[0])) >= 0).map(p => String(p[0]));
+        const bo = (t.pieces || []).filter(p => String(p[2]) === b && all.indexOf(String(p[0])) >= 0).map(p => String(p[0]));
+        if (!ao.length || !bo.length) return tryOne(i + 1);
+        Object.assign(st, { a: a, b: b, ao: ao, bo: bo, done: String(t.date || ''), preset: t });
+        return t;
+      });
+    };
+    return tryOne(0);
+  }).then(() => BP.load(y(L, S, 'trade.json'))).then(ix => {
     if (!el.isConnected) return null;
     const head = BP.pageHead('Trade simulator', BP.levelName(L) + ' ' + S + ' · how a trade stacks up for both clubs', '<a href="' + BP.href('value', L, S) + '">Player value →</a>');
     if (!BP.ok(ix)) { el.innerHTML = head + BP.notBuilt('The trade file for ' + BP.levelName(L) + ' ' + S, ix); return null; }
@@ -245,10 +271,25 @@ function tradePage(el, params) {
     const files = [st.a, st.b].map(t => (t && T[t] ? BP.load(y(L, S, 'value/' + t + '.json')) : Promise.resolve(null)));
     return Promise.all(files).then(res => {
       if (!el.isConnected) return;
-      const A = BP.ok(res[0]) ? res[0] : null, B = BP.ok(res[1]) ? res[1] : null;
+      let A = BP.ok(res[0]) ? res[0] : null, B = BP.ok(res[1]) ? res[1] : null;
+      /* a trade already made (its players sit on the other club's roster): run it from before it happened */
+      let made = false;
+      if (A && B && st.ao.length && st.bo.length) {
+        const inR = (X, id) => (X.roster || []).some(p => String(p.pid) === String(id));
+        made = st.ao.every(id => !inR(A, id) && inR(B, id)) && st.bo.every(id => !inR(B, id) && inR(A, id));
+        if (made) {
+          const take = (X, ids) => (X.roster || []).filter(p => ids.indexOf(String(p.pid)) >= 0);
+          const keep = (X, ids) => (X.roster || []).filter(p => ids.indexOf(String(p.pid)) < 0);
+          const A0 = Object.assign({}, A, { roster: keep(A, st.bo).concat(take(B, st.ao)) }), B0 = Object.assign({}, B, { roster: keep(B, st.ao).concat(take(A, st.bo)) });
+          A = A0; B = B0;
+        }
+      }
       const sel = (id, v, other) => '<select id="' + id + '"><option value="">Pick a club…</option>' + tids.filter(t => t !== other).map(t => '<option value="' + esc(t) + '"' + (t === v ? ' selected' : '') + '>' + esc(BP.teamName(t)) + '</option>').join('') + '</select>';
       const hz = ix.horizon === 'rest' ? 'the rest of the regular season (' + n1(ix.games_per_club) + ' games a club)' : 'next season (this season\'s schedule replayed with every rating carried forward)';
-      let h = head + '<div class="card"><div class="card-header">The trade <span class="card-sub">Pick two clubs, then tick the players each sends. Horizon: ' + esc(hz) + '.</span></div>' +
+      const t0 = st.preset;
+      const intro = made ? QK.explain((t0 ? '<b>A real trade to start:</b> the most lopsided of the last four months by our grades at the time. ' : '<b>A trade already made.</b> ') +
+        'The ' + esc(BP.teamName(st.a)) + ' and the ' + esc(BP.teamName(st.b)) + (st.done ? ' made it on ' + esc(BP.fmtDate(st.done)) : '') + ': the simulator puts both rosters back as they were before it and plays it again. Pick any two clubs to build your own.', { title: 'The example' }) : '';
+      let h = head + intro + '<div class="card"><div class="card-header">The trade <span class="card-sub">Pick two clubs, then tick the players each sends. Horizon: ' + esc(hz) + '.</span></div>' +
         '<div class="trd-pick"><div><span class="gq-dot a"></span>' + sel('trd-a', st.a, st.b) + '<div id="trd-ra" class="trd-roster"></div></div>' +
         '<div><span class="gq-dot b"></span>' + sel('trd-b', st.b, st.a) + '<div id="trd-rb" class="trd-roster"></div></div></div>' +
         '<div class="trd-actions"><button type="button" class="tbtn" id="trd-clear">Clear players</button> <button type="button" class="tbtn" id="trd-copy">Copy link</button> <span id="trd-copied" class="muted-inline"></span></div></div>' +
@@ -285,6 +326,7 @@ function tradePage(el, params) {
       if (!A || !B) { $('trd-out').innerHTML = BP.card('', '', BP.muted('Pick two clubs to start.')); return; }
       $('trd-out').innerHTML = result(L, S, ix, st, A, B);
       BP.sortable($('trd-out'));
+      beforeAfter(L, S, ix, st, A, B);
     });
   });
 }
@@ -332,6 +374,22 @@ function sideResult(L, S, ix, tid, X, outIds, inc, Y) {
     inWar: sum('in', 'war'), outWar: sum('out', 'war'), inProj: sum('in', 'proj'), outProj: sum('out', 'proj'), depth: newDepth, byId: byId, repl: after.repl, rpw: ix.rpw };
 }
 
+/* the before/after chart (round 9): each club's chances and expected wins before the trade (grey) and after (cobalt) */
+function beforeAfter(L, S, ix, st, A, B) {
+  const host = document.getElementById('trd-ba');
+  if (!host) return;
+  const ra = A.roster || [], rb = B.roster || [];
+  const fromA = ra.filter(p => st.ao.indexOf(p.pid) >= 0), fromB = rb.filter(p => st.bo.indexOf(p.pid) >= 0);
+  const X = sideResult(L, S, ix, st.a, A, st.ao, fromB, B), Y = sideResult(L, S, ix, st.b, B, st.bo, fromA, A);
+  const cats = [], bef = [], aft = [];
+  [X, Y].forEach(R => R.odds.forEach(o => { if (isNum(o.a) && isNum(o.b)) { cats.push(BP.teamAbbr(R.tid) + ' · ' + String(o.label).replace(/^P\(|\)$/g, '')); bef.push(o.a); aft.push(o.b); } }));
+  if (!cats.length) { host.hidden = true; return; }
+  const T = QKC.tokens();
+  QKC.bar('#trd-ba-c', { cats: cats, horizontal: true, labels: true, series: [{ name: 'Before', data: bef, color: T.ink3 }, { name: 'After', data: aft, color: T.model }], fmt: v => BP.pct(v, 0), valName: 'Our chance', catName: 'Club and stage', label: 'Chances before and after the trade' });
+  const w = [X, Y].map(R => esc(BP.teamShort(R.tid)) + ' ' + n1(R.x0) + ' → ' + n1(isNum(R.x0) ? R.x0 + R.dNow : null)).join(' · ');
+  document.getElementById('trd-ba-n').innerHTML = 'Expected wins over the horizon: ' + w + '.';
+}
+
 function result(L, S, ix, st, A, B) {
   const ra = (A.roster || []), rb = (B.roster || []);
   const pick = (R, ids) => R.filter(p => ids.indexOf(p.pid) >= 0);
@@ -361,7 +419,9 @@ function result(L, S, ix, st, A, B) {
         { label: 'Next', align: 'right', title: 'Projected WAR next season' }, { label: '3 seasons', align: 'right', title: 'Projected WAR over the next three seasons, aged' }], mv, { compact: true }) +
       '<details class="trd-depth"><summary>Depth chart after the trade</summary><div class="pad trd-text">' + depth + '</div></details></div>';
   };
-  return '<div class="trd-grid">' + block(X, Y) + block(Y, X) + '</div>';
+  return '<section class="qk-card" id="trd-ba"><div class="qk-card-head"><div><div class="qk-card-title">Before and after</div><div class="qk-card-sub">Our chances for both clubs before the trade (grey) and after it (blue)</div></div></div>' +
+    '<div class="qk-card-body"><div id="trd-ba-c" class="qk-chart" style="--h:300px" role="img" aria-label="Chances before and after the trade"></div><p class="bp-note" id="trd-ba-n"></p></div></section>' +
+    '<div class="trd-grid">' + block(X, Y) + block(Y, X) + '</div>';
 }
 
 // ── the team page's "Strengths and needs" ───────────────────────────────────

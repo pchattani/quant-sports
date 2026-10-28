@@ -106,6 +106,8 @@ addRoute('leaders', 'leaders');
 addRoute('awards', 'awards');
 addRoute('playoffs', 'playoffs');
 addRoute('lab', 'lab');
+addRoute('scout', 'scout');
+addRoute('series/:id', 'series');
 addRoute('compare', 'compare');
 addRoute('compare/players', 'compare-players', ['compare'], { kind: 'players' });
 addRoute('compare/players/:a', 'compare-players', ['compare'], { kind: 'players' });
@@ -132,7 +134,7 @@ const ALIASES = {
  * query keys are kept; '#/<L>/season/<S>' keeps its season as ?s=. Deep links with an id (#/glossary/<key>,
  * #/methodology/<part>, #/<L>/compare/players/<a>/<b>) still render where they are, inside their section. */
 const REDIRECTS = {
-  season: ['standings', null], leaders: ['players', 'leaders'], awards: ['players', 'awards'],
+  season: ['standings', null], awards: ['standings', 'races'],
   playoffs: ['standings', 'bracket'], bracket: ['standings', 'bracket'], markets: ['model', 'markets'],
   trade: ['value', 'trade'], moves: ['value', 'moves'], calibration: ['model', 'calibration'],
   glossary: ['model', 'glossary'], methodology: ['model', 'methodology'], docs: ['model', 'methodology'],
@@ -140,7 +142,50 @@ const REDIRECTS = {
 };
 /* The moves view kept its own ?tab= before it moved under Value & Moves; it is ?mt= now. */
 const RENAME_Q = { moves: { tab: 'mt' } };
+/* Round 9 (28 Oct 2026): Players and the Lab are one page, the Scouting Room (#/<L>/scout, hw-scout.js). The old
+   Players tabs, the Lab and the leaderboards open it with their parameters mapped (within / pos, pool, x, y, q, team,
+   season); the award races moved to Standings ▸ Races, and team compare to Teams ▸ Head to head. Returns the hash or
+   null. Player pages and player compare (#/<L>/compare/players/<a>/<b>) stay where they are, inside the room's section. */
+const POOL_ROLE_Q = { G: 'G', F: 'W', C: 'B' };
+function scoutRedirect(L, parts, q) {
+  const head = parts[0], tab = q.tab || '';
+  const out = [];
+  const add = (k, v) => { if (v !== undefined && v !== null && v !== '') out.push(k + '=' + encodeURIComponent(v)); };
+  const tail = () => { add('team', q.team); add('q', q.q); add('s', q.s || q.season); return '#/' + L + '/scout' + (out.length ? '?' + out.join('&') : ''); };
+  if (head === 'players') {
+    if (parts.length > 1) return null;
+    if (tab === 'awards') return '#/' + L + '/standings?tab=races' + (q.s ? '&s=' + encodeURIComponent(q.s) : '');
+    if (tab === 'leaders' || tab === 'boards') add('view', 'leaders');
+    if (q.k) { add('add', q.k); add('sort', q.k); }
+    if (q.role && /^[GWB]$/.test(q.role)) { add('within', 'pos'); add('pos', q.role); }
+    return tail();
+  }
+  if (head === 'leaders') { add('view', 'leaders'); if (q.k || q.m) { add('add', q.k || q.m); add('sort', q.k || q.m); } return tail(); }
+  if (head === 'lab') {
+    if (parts.length > 1) return null;
+    if (tab === 'compare') return '#/' + L + '/compare' + (q.s ? '?s=' + encodeURIComponent(q.s) : '');
+    add('view', 'chart');
+    if (q.within === 'pos' && /^[GWB]$/.test(q.pos || '')) { add('within', 'pos'); add('pos', q.pos); }
+    else if (POOL_ROLE_Q[q.pool]) { add('within', 'pos'); add('pos', POOL_ROLE_Q[q.pool]); }
+    add('x', q.x); add('y', q.y);
+    return tail();
+  }
+  if (head === 'compare' && parts[1] === 'teams') {
+    add('a', parts[2]); add('b', parts[3]); add('s', q.s);
+    return '#/' + L + '/teams' + (out.length ? '?' + out.join('&') : '') + '#tm-h2h';
+  }
+  return null;
+}
 function redirectFor(hash) {
+  {
+    const h0 = String(hash || '').replace(/^#\/?/, ''), qi0 = h0.indexOf('?');
+    const p0 = (qi0 >= 0 ? h0.slice(0, qi0) : h0).split('/').filter(x => x !== '');
+    const L0 = p0.length && isLeague(p0[0].toLowerCase()) ? p0.shift().toLowerCase() : null;
+    if (p0.length && ['players', 'leaders', 'lab', 'compare'].indexOf(p0[0]) >= 0) {
+      const sr = scoutRedirect(L0 || state.league, p0, parseQuery(qi0 >= 0 ? h0.slice(qi0 + 1) : ''));
+      if (sr) return sr.replace(/#tm-h2h$/, '');
+    }
+  }
   let h = String(hash || '').replace(/^#\/?/, '');
   let q = '';
   const qi = h.indexOf('?');
@@ -167,25 +212,25 @@ function redirectFor(hash) {
 
 const TITLES = {
   hub: 'Overview', season: 'Standings', standings: 'Standings', games: 'Games', game: 'Game centre', team: 'Team', player: 'Player',
-  players: 'Players', teams: 'Teams', value: 'Value & Moves', trade: 'Trade simulator', moves: 'Moves', fantasy: 'Fantasy', leaders: 'Leaders', awards: 'Awards', playoffs: 'Playoffs', lab: 'Lab',
+  players: 'Players', scout: 'Scouting Room', series: 'Playoff series', teams: 'Teams', value: 'Value & Moves', trade: 'Trade simulator', moves: 'Moves', fantasy: 'Fantasy', leaders: 'Leaders', awards: 'Awards', playoffs: 'Playoffs', lab: 'Lab',
   compare: 'Compare', 'compare-players': 'Compare players', 'compare-teams': 'Compare teams', model: 'Model',
   markets: 'Our forecasts v the market', calibration: 'Calibration', glossary: 'Glossary', methodology: 'Methodology', disclaimer: 'Disclaimer & terms'
 };
 /* Which kit section (QK.SECTIONS key) each route belongs to. */
-const SECTION_OF = { hub: 'overview', season: 'standings', standings: 'standings', playoffs: 'standings', markets: 'model',
-  games: 'fixtures', game: 'fixtures', team: 'teams', teams: 'teams',
-  player: 'players', players: 'players', leaders: 'players', awards: 'players',
+const SECTION_OF = { hub: 'overview', season: 'standings', standings: 'standings', playoffs: 'standings', series: 'standings', markets: 'model',
+  games: 'fixtures', game: 'fixtures', team: 'teams', teams: 'teams', 'compare-teams': 'teams',
+  player: 'scout', players: 'scout', leaders: 'scout', awards: 'standings', scout: 'scout',
   value: 'value', trade: 'value', moves: 'value', fantasy: 'fantasy',
-  lab: 'lab', compare: 'lab', 'compare-players': 'lab', 'compare-teams': 'lab',
+  lab: 'scout', compare: 'scout', 'compare-players': 'scout', 'compare/progression': 'scout', 'compare/progression/:a': 'scout',
   model: 'model', calibration: 'model', glossary: 'model', methodology: 'model', disclaimer: 'model' };
 const NAV_OF = SECTION_OF;
 /* Route names the redesigned pages own: a legacy module's HW.route(name) registers a view (HW.view(name))
  * that a section page renders inside its tabs, not the route itself. */
-const OWNED = { hub: 1, games: 1, game: 1, standings: 1, teams: 1, team: 1, players: 1, player: 1, value: 1, fantasy: 1,
+const OWNED = { hub: 1, games: 1, game: 1, standings: 1, teams: 1, team: 1, players: 1, player: 1, scout: 1, series: 1, value: 1, fantasy: 1,
   lab: 1, compare: 1, 'compare-players': 1, 'compare-teams': 1, model: 1, glossary: 1, methodology: 1, disclaimer: 1 };
 const VIEWS = {};
 // Where a page lands when the league is switched (id pages fall back to their list).
-const SWITCH_TO = { game: 'games', team: 'teams', player: 'players', 'compare-players': 'compare', 'compare-teams': 'compare' };
+const SWITCH_TO = { game: 'games', team: 'teams', player: 'scout', series: 'standings', 'compare-players': 'compare', 'compare-teams': 'teams' };
 
 function normPattern(s) {
   let p = String(s || '').trim().replace(/^#/, '').replace(/^\/+|\/+$/g, '').replace(/<(\w+)>/g, ':$1');
@@ -368,6 +413,8 @@ function load(path) {
     .then(d => { if (d !== null) CACHE[p] = d; delete PENDING[p]; return d; });
   return PENDING[p];
 }
+/* Drop a cached payload so the next load fetches it again (live game pages refresh every minute). */
+function forget(path) { const p = String(path).replace(/^\/+/, '').replace(/^data\//, ''); delete CACHE[p]; }
 /* Several payloads at once: resolves to an array in the same order. */
 function loadAll(paths) { return Promise.all(paths.map(load)); }
 function ok(d) { return !!d && d.ok !== false; }
@@ -1032,7 +1079,7 @@ function switchLeague(L) {
     return;
   }
   const tab = ((state.params || {}).query || {}).tab;
-  const keepTab = tab && ['standings', 'players', 'value', 'fantasy', 'lab', 'model', 'teams', 'games'].indexOf(to) >= 0 ? '?tab=' + encodeURIComponent(tab) : '';
+  const keepTab = tab && ['standings', 'scout', 'value', 'fantasy', 'model', 'teams', 'games'].indexOf(to) >= 0 ? '?tab=' + encodeURIComponent(tab) : '';
   if (to === 'hub') go('#/' + L);
   else go('#/' + L + '/' + routeEntry(to).pattern.replace(/\/:.*$/, '') + keepTab);
 }
@@ -1062,7 +1109,7 @@ function fillSeasonPicker() {
 }
 /* Section hrefs carry the league (and the season when it is not the current one). */
 function sectionHref(key, L, S) {
-  const sub = { overview: '', fixtures: 'games', standings: 'standings', teams: 'teams', players: 'players', value: 'value', fantasy: 'fantasy', lab: 'lab', model: 'model' }[key];
+  const sub = { overview: '', fixtures: 'games', standings: 'standings', teams: 'teams', players: 'scout', scout: 'scout', value: 'value', fantasy: 'fantasy', lab: 'scout', model: 'model' }[key];
   if (key === 'overview') return '#/' + L + (S && Number(S) !== currentSeason(L) ? '?s=' + S : '');
   if (key === 'fantasy' || key === 'model') return '#/' + L + '/' + sub;
   return href(L, sub, S);
@@ -1070,6 +1117,9 @@ function sectionHref(key, L, S) {
 function updateHeader() {
   const L = state.league, S = state.season;
   document.querySelectorAll('.qk-secnav a[data-sec]').forEach(a => a.setAttribute('href', sectionHref(a.getAttribute('data-sec'), L, S)));
+  /* round 9: WNBA Fantasy has no nav entry in the off-season (hw-fantasy.js shows "Fantasy returns in May" at the route) */
+  const offF = L === 'wnba' && phase(L) === 'offseason';
+  document.querySelectorAll('.qk-secnav a[data-sec="fantasy"]').forEach(a => { a.hidden = offF; a.style.display = offF ? 'none' : ''; });
   document.querySelectorAll('[data-league-btn]').forEach(b => b.setAttribute('aria-pressed', b.getAttribute('data-league-btn') === L ? 'true' : 'false'));
   const brand = document.querySelector('.qk-brand-name b');
   if (brand) brand.textContent = 'Hardwood';
@@ -1128,7 +1178,7 @@ function initHeader() {
   if (window.QK) {
     SHELL = QK.shell({
       sport: 'basketball', section: 'overview',
-      sections: QK.sections('basketball').map(s => { s.href = sectionHref(s.key, state.league, null); return s; }),
+      sections: QK.sections('basketball', { scout: true }).map(s => { s.href = sectionHref(s.key, state.league, null); return s; }),
       ctx: leagueSeg() + '<label class="qk-sr" for="season-select">Season</label><select id="season-select" class="qk-select hw-season" aria-label="Season"></select>',
       search: {
         load: () => Promise.all(LEAGUES.map(l => loadSearch(l, currentSeason(l)))).then(lists => {
@@ -1178,7 +1228,7 @@ return {
   ROUTES: ROUTES, HANDLERS: HANDLERS, TITLES: TITLES, LEAGUES: LEAGUES, LEAGUE_NAME: LEAGUE_NAME,
   switchLeague: switchLeague, setSeason: setSeason, setMeta: setMeta,
   // data
-  load: load, loadAll: loadAll, ok: ok, reason: reason, cached: cached, path: path, lpath: lpath, loadSeason: loadSeason,
+  load: load, loadAll: loadAll, forget: forget, ok: ok, reason: reason, cached: cached, path: path, lpath: lpath, loadSeason: loadSeason,
   index: () => INDEX.data, leagueInfo: leagueInfo, currentSeason: currentSeason, seasons: seasons, seasonLabel: seasonLabel,
   leagueName: leagueName, phase: phase, isLeague: isLeague, NAMES: NAMES,
   // formatting

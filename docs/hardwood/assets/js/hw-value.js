@@ -76,12 +76,53 @@ function board(node, L) {
   });
 }
 
+/* Who moves next (round 9, as the Rink has it): the fan board, every rostered player by our chance of not being with the
+   team by next season, split by how (trade or claim, waived, an off-season move), a team filter, the league base rate
+   and each team's expected departures. The validation lives on Model ▸ Who moves next. Data: <L>/movement.json. */
+function nextTab(node, L, team0) {
+  node.innerHTML = QK.skeleton('lines', 8);
+  return U.movement(L).then(mv => {
+    if (!U.alive(node)) return;
+    if (!mv || !mv.pub.next) { node.innerHTML = U.card2('Who moves next', '', QK.empty('Not published', mv && (mv.m.reasons || {}).next ? mv.m.reasons.next : 'The movement model is not published for this league.')); return; }
+    const m = mv.m, br = m.base_rates || {}, T = m.teams || {};
+    const rows = Object.keys(mv.by).map(k => mv.by[k]).filter(r => isNum(r.p_next)).sort((a, b) => b.p_next - a.p_next);
+    const teams = Object.keys(T).filter(t => HW.NAMES[L].teams[t]).sort((a, b) => HW.teamName(L, a).localeCompare(HW.teamName(L, b)));
+    const dep = teams.map(t => ({ t: t, v: (T[t] || {}).exp_departures })).filter(x => isNum(x.v)).sort((a, b) => b.v - a.v);
+    const team = team0 && T[team0] ? String(team0) : '';
+    const valued = rows.filter(r => isNum(r.value) && r.value >= 1).sort((a, b) => b.p_next - a.p_next)[0];
+    node.innerHTML = '<div class="hw-kpis">' + QK.stats([
+      { label: 'Players forecast', value: rows.length.toLocaleString('en-GB'), sub: 'on today’s rosters' },
+      isNum(br.next) ? { label: 'League base rate', value: U.pct(br.next), sub: 'of players are not with the same team a season later', tip: 'Over the seasons the model learned from' } : null,
+      valued ? { label: 'Best player most likely to move', value: valued.name, text: true, signal: true, href: HW.playerHref(L, valued.pid), sub: U.pctMv(valued.p_next) + ' · ' + HW.teamAbbr(L, valued.team) + ' · ' + U.f(valued.value, 1) + ' WAR' } : null,
+      dep[0] ? { label: 'Most expected departures', value: HW.teamAbbr(L, dep[0].t) + ' ' + U.f(dep[0].v, 1), href: HW.teamHref(L, dep[0].t), sub: 'players gone ' + U.mvHorizon(mv) } : null
+    ]) + '</div>' +
+      QK.sectionHead({ kicker: 'Who moves next', title: 'Who is likely to be somewhere else ' + U.mvHorizon(mv), html: true,
+        sub: esc((m.notes || [])[0] || '') + ' <a class="qk-link" href="' + esc(HW.href(L, 'model') + '?tab=moves') + '">How it works and how it tested →</a>',
+        actions: '<select class="qk-select" id="mv-team" aria-label="Team"><option value="">All teams</option>' + teams.map(t => '<option value="' + esc(t) + '"' + (t === team ? ' selected' : '') + '>' + esc(HW.teamName(L, t)) + '</option>').join('') + '</select>' }) +
+      '<div class="qk-card"><div class="qk-card-body"><div class="hw-mvline">' + U.mvKeys(mv) + '</div>' + (mv.pub.deadline ? U.mvBaseLine(mv, 'deadline') : '') + '<div id="mv-board"></div></div></div>' +
+      (isNum(br.next) ? QK.explain('About ' + U.pct(br.next) + ' of players are not with the same team a season later, so that is the middle. A player at 60% stays put about 4 times in 10. The chance counts trades, waivers and off-season moves.', { title: 'How to read a chance here.' }) : '');
+    const draw = t => {
+      const list = (t ? rows.filter(r => String(r.team) === t) : rows.slice(0, 100)).map(r => Object.assign({ sub: [r.pos, isNum(r.age) ? 'age ' + Math.floor(r.age) : ''].filter(Boolean).join(' · ') }, r));
+      QK.leaderboard(node.querySelector('#mv-board'), { dense: true, rank: true, maxHeight: 720, rowHref: r => HW.playerHref(L, r.pid), columns: [
+        { key: 'name', label: 'Player', type: 'entity', mark: r => U.team(L, r.team), href: r => HW.playerHref(L, r.pid), sub: 'sub' },
+        { key: 'team', label: 'Team', fmt: v => esc(HW.teamAbbr(L, v)) },
+        { key: 'value', label: 'Value', num: true, fmt: v => U.f(v, 1), tip: 'Wins above replacement, recent seasons blended' },
+        { key: 'yrs', label: 'Seasons', num: true, tip: 'Seasons in the league' },
+        { key: 'p_next', label: 'Gone ' + U.mvHorizon(mv), num: true, fmt: (v, r) => U.mvBar(mv, r) + (r.why ? '<span class="hw-quiet" style="display:block">' + esc(r.why) + '</span>' : '') }
+      ], rows: list });
+    };
+    draw(team);
+    node.querySelector('#mv-team').addEventListener('change', e => draw(e.target.value));
+  });
+}
+
 function render(el, params) {
   const L = U.L(params), S = U.S(params);
-  const tab = U.tab(params, ['board', 'war', 'moves', 'trade'], 'board');
+  const tab = U.tab(params, ['board', 'next', 'war', 'moves', 'trade'], 'board');
   const body = U.section(el, { title: 'Value & Moves', kicker: U.kicker(L, S), sub: 'What every player is worth in wins, who is winning the trade market, and a simulator for your own deal. On-field value only: no salaries.',
-    tabs: U.tabs(L, 'value', [['board', 'Board', false], ['war', 'Season value'], ['moves', 'Moves & grades', false], ['trade', 'Trade simulator', false]], S), active: tab });
+    tabs: U.tabs(L, 'value', [['board', 'Board', false], ['next', 'Who moves next', false], ['war', 'Season value'], ['moves', 'Moves & grades', false], ['trade', 'Trade simulator', false]], S), active: tab });
   if (tab === 'board') return board(body, L);
+  if (tab === 'next') return nextTab(body, L, (params.query || {}).team);
   return U.legacy({ war: 'value', moves: 'moves', trade: 'trade' }[tab], body, params);
 }
 

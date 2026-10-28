@@ -198,7 +198,8 @@ def test_season_manifest_and_past_season_payloads(world) -> None:
     # "River Plate FC" in the archive is River Plate (3211) in the store.
     assert arch["standings"][0]["tid"] == 3211 and "group" not in arch["standings"][0]
     assert arch["leaders"]["goals"][0]["tid"] == 3211
-    assert man["seasons"][2]["champion"] == {"team": "River Plate FC", "tid": 3211}
+    # the champion reads as the club's page spells it (one name source), not the archive's "River Plate FC"
+    assert man["seasons"][2]["champion"] == {"team": "River Plate", "tid": 3211}
     f = u.competition_fields()
     assert f["premier-league"]["current_season"]["sid"] == 300 and f["premier-league"]["kind_u"] == "league"
     assert f["euro"]["current_season"]["status"] == "last_edition" and f["euro"]["winner"]["tid"] == 4698
@@ -677,3 +678,17 @@ def test_competitions_without_xg_carry_no_xg(tmp_path) -> None:
     assert rows["premier-league"]["xg"] == 0.1 and "xg" not in rows["wc-qual-uefa"] and "xa" not in rows["wc-qual-uefa"]
     y = next(y for y in p["years"] if y["era"] == "2026/27")
     assert y["g"] == 3 and y["xg"] == 0.1 and y["xg_min"] == 90 and y["xg_g"] == 1
+
+
+def test_club_trophies_count_league_titles_and_cups_without_a_record() -> None:
+    from oddsmarkets.football.analytics.unified import club_season_totals
+    rows = [
+        {"comp": "premier-league", "kind": "league", "era": "2024/25", "source": "archive", "played": 38, "w": 25, "d": 9, "l": 4, "gf": 86, "ga": 41, "pos": 1},
+        {"comp": "efl-cup", "kind": "domestic_cup", "era": "2024/25", "source": "archive", "played": 6, "stage": "winner"},
+        {"comp": "premier-league", "kind": "league", "era": "2026/27", "source": "live", "played": 8, "w": 7, "d": 0, "l": 1, "gf": 13, "ga": 5, "pos": 1},
+        {"comp": "mls", "kind": "league", "era": "2025", "source": "store", "played": 34, "w": 20, "d": 8, "l": 6, "gf": 60, "ga": 40, "pos": 1},
+    ]
+    by = {y["era"]: y for y in club_season_totals(rows)}
+    assert by["2024/25"]["won"] == ["premier-league", "efl-cup"]
+    assert "won" not in by["2026/27"]          # the season under way is no title yet
+    assert "won" not in by["2025"]             # MLS: first place is not MLS Cup

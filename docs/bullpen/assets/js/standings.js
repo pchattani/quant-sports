@@ -268,7 +268,9 @@ function render(el, params) {
     if (lk) tiles.push({ label: 'Luckiest', value: BP.teamAbbr(lk.r.tid) + ' ' + BP.ui.signed(lk.v, 1), sub: 'wins above the Pythagorean record', href: BP.teamHref(lk.r.tid, L, S) });
     const tabs = [{ key: 'div', label: 'Divisions' }].concat(SIMCOLS ? [{ key: 'wc', label: 'Wild card' }] : []).concat([{ key: 'rt', label: 'Ratings and luck' }]);
     body.innerHTML = (tiles.length ? '<div class="bp-kpis">' + QK.stats(tiles) + '</div>' : '') + '<div class="toggle-row std-tabs" id="std-tabs">' + BP.toggles(tabs, VIEW, 'data-v') + '</div>' +
-      '<div id="std-view"></div>' + (LO ? '<div id="std-race"></div>' : '') + (window.QKL && QKL.leaders ? '<div id="std-perf"></div>' : '') + (LO ? '<div id="std-shape"></div>' : '') +
+      '<div id="std-view"></div>' + (LO ? '<div id="std-shape"></div>' : '') +
+      '<p class="qk-sub bp-moved">' + (SIMCOLS && L === 'mlb' ? 'Our chances over the season, division by division, are on <a class="qk-link" href="' + BP.href('chances', L, S) + '">Chances</a>. ' : '') +
+      'The players leading and trailing at every position are in the <a class="qk-link" href="' + BP.href('scout', L, S) + '?view=leaders">Scouting Room’s Leaders</a>.</p>' +
       '<div class="section-note">' + (res.fallback ? 'Computed from the final regular-season games while the season payload is built; our chances and expected records arrive with it. ' : '') +
       (SIMCOLS ? 'Chances: ' + (d.sim && (d.sim.n_sims || d.sim.sims) ? BP.int(d.sim.n_sims || d.sim.sims) + ' ' : '') + 'simulations of the rest of the season and the bracket from our team ratings (x: clinched a place, y: the division, z: the division and a bye, e: eliminated). ' :
         'We do not simulate the Triple-A season, so the table shows records, run differential and our team ratings only. ') +
@@ -277,33 +279,147 @@ function render(el, params) {
     draw();
     if (LO) {
       QKL.wire(document.getElementById('std-view'), LO);
-      if ((LO.league.metrics || []).length) QKL.race(document.getElementById('std-race'), LO);
       QKL.shape(document.getElementById('std-shape'), LO);
     }
-    if (window.QKL && QKL.leaders) performers(document.getElementById('std-perf'), res.fallback ? null : d, L, S);
     BP.setMeta(d.updated_at ? 'Season data ' + esc(BP.fmtStamp(d.updated_at)) : '');
   });
 }
 
-/* Top and bottom performers (QKL.leaders): all hitters, each fielding position, starters and relievers on their spec
-   headline sets with WAR (our model) first (data/<L>/<S>/performers.json, oddsmarkets/baseball/analytics/performers.py:
-   the spec's minimums prorated by team games), then the clubs on the league block's team set (season.json, loaded). */
-function performers(host, d, L, S) {
-  if (!host) return;
-  const lg = d && d.league;
-  BP.loadYear('performers.json', L, S).then(pf => {
-    if (!host.isConnected) return;
-    const views = ((BP.ok(pf) && pf.views) || []).slice();
-    const tv = lg ? QKL.teamView(lg, { label: 'Clubs', peer: 'clubs', ours: 'Team rating model', name: t => BP.teamName(t) }) : null;
-    if (tv) views.push(tv);
-    QKL.leaders(host, { data: { views: views }, title: 'Who leads ' + (L === 'aaa' ? 'Triple-A' : 'the majors') + ', and who is struggling',
-      sub: 'The top five and the bottom five on each key number: all hitters, every position, starters and relievers, with WAR (our model) first and then the numbers that matter for each role, and the clubs. Qualified players only; each name opens the player page.',
-      team: t => (BP.teamInfo(t).placeholder ? null : { abbr: BP.teamAbbr(t), name: BP.teamName(t), colour: BP.teamColourRaw(t), href: BP.teamHref(t, L, S) }),
-      href: (id, V) => BP.playerHref(id, { role: V.kind === 'pitcher' ? 'pitcher' : 'hitter', level: L, season: S }),
-      empty: 'The boards fill once players reach the spec’s minimums (200 plate appearances, 300 batters faced for starters and 120 for relievers over a full season, prorated).' });
+/* ── Chances (#/mlb/chances, round 9): the season simulation's boards in one tab ────────────────────────────────
+   The title race (World Series), each league's postseason or pennant race, the division boards with the projected wins
+   and their 80% range, the seed distribution, and our chances day by day (QKL.race on race_log.json). A finished season
+   shows what happened and the race as it ran; Triple-A has no simulation. */
+function chancesView(el, params) {
+  const L = params.level, S = params.season;
+  el.innerHTML = QK.sectionHead({ kicker: 'Chances · ' + BP.levelName(L) + ' ' + S, title: 'Who wins it all?', sub: 'Our chances from simulating the rest of the season and the bracket 20,000 times: the title, the postseason, each division, the seeds, and how the race has moved.' }) +
+    '<div id="ch-body">' + QK.skeleton('card', 2) + '</div>';
+  if (BP.levelInfo(L).sim === false) {
+    document.getElementById('ch-body').innerHTML = QK.empty('No simulation for Triple-A', 'We simulate the major-league season and bracket only. The Triple-A table and the league finals are on the Table and Bracket tabs.');
+    return null;
+  }
+  return BP.loadYear('season.json', L, S).then(d => {
+    const body = document.getElementById('ch-body');
+    if (!body || !el.isConnected) return;
+    if (!BP.ok(d)) { body.innerHTML = QK.empty('Not built yet', 'The ' + S + ' season file is not available.'); return; }
+    const rows = rowsOf(d), all = Object.keys(rows).map(t => rows[t]).filter(r => !BP.teamInfo(r.tid).placeholder);
+    const post = d.postseason || {}, pt = post.teams || {};
+    const actual = !!post.actual || !(d.sim && d.sim.available);
+    const lo = leagueOpts(d, L, S);
+    const team = t => ({ label: BP.teamShort(t), href: BP.teamHref(t, L, S), mark: BP.ui.team(t, L, S), color: BP.ui.raw(t) });
+    const P = (r, k) => { const s = r.sim || r; return isNum(s[k]) ? s[k] : (pt[r.tid] && isNum(pt[r.tid][k]) ? pt[r.tid][k] : null); };
+    let h = '';
+    if (actual) {
+      const ch = post.champion;
+      h += QK.explain((ch ? '<b>' + esc(BP.teamName(ch)) + ' won the ' + S + ' World Series.</b> ' : '') + 'This season is over, so its chances are history: the race below shows how our numbers moved through the year, and the <a class="qk-link" href="' + BP.ghref('postseason', S) + '">Bracket</a> has every series as it was played.', { title: 'A finished season' });
+    } else {
+      const ws = all.filter(r => isNum(P(r, 'p_ws')) && P(r, 'p_ws') > 0.0005).sort((a, b) => P(b, 'p_ws') - P(a, 'p_ws'));
+      const w0 = ws[0];
+      const tiles = [];
+      if (w0) tiles.push({ label: 'Title favourite', value: BP.teamAbbr(w0.tid) + ' ' + BP.ui.pct(P(w0, 'p_ws')), signal: true, sub: P(w0, 'p_ws') < 0.2 ? 'nobody is better than 1 in 5' : 'about ' + Math.round(10 * P(w0, 'p_ws')) + ' in 10 simulated brackets', href: BP.teamHref(w0.tid, L, S) });
+      const alive = all.filter(r => isNum(P(r, 'p_ws')) && P(r, 'p_ws') > 0.0005).length;
+      tiles.push({ label: 'Still alive', value: String(alive), sub: 'clubs with a World Series chance' });
+      if (d.sim && (d.sim.sims || d.sim.n_sims)) tiles.push({ label: 'Simulations', value: QK.fmt.num(d.sim.sims || d.sim.n_sims), sub: d.sim.kind === 'postseason' ? 'brackets, every remaining game played out' : 'seasons, every remaining game and the bracket' });
+      h += '<div class="bp-kpis">' + QK.stats(tiles) + '</div>';
+      h += '<section class="qk-section"><div class="qk-grid"><div class="qk-span-6">' + BP.ui.card2('World Series', 'Our chance of winning it all', QK.chances(ws.slice(0, 12).map(r => Object.assign(team(r.tid), { p: P(r, 'p_ws') })), { key: false })) + '</div>';
+      const inPost = d.sim && d.sim.kind === 'postseason';
+      const key2 = inPost ? 'p_pennant' : 'p_postseason';
+      const lgs = Array.from(new Set(all.map(r => r.league).filter(Boolean))).sort();
+      h += '<div class="qk-span-6">' + lgs.map(lg => {
+        const list = all.filter(r => r.league === lg && isNum(P(r, key2)) && P(r, key2) > 0.0005).sort((a, b) => P(b, key2) - P(a, key2)).slice(0, inPost ? 6 : 9);
+        const won = inPost && list.length === 1 && P(list[0], key2) >= 0.9995 ? list[0] : null;
+        return BP.ui.card2(lg + (inPost ? ' pennant' : ' postseason'), inPost ? 'Our chance of reaching the World Series' : 'Our chance of a place in October',
+          won ? '<p class="bp-decided">' + BP.ui.teamEnt(won.tid, L, S) + ' won the ' + esc(lg) + ' pennant.</p>' : list.length ? QK.chances(list.map(r => Object.assign(team(r.tid), { p: P(r, key2) })), { key: false }) : QK.empty('Decided', 'Every place is settled.'));
+      }).join('') + '</div></div></section>';
+      if (!inPost && all.some(r => isNum(P(r, 'p_division')))) {
+        const divs = {};
+        all.forEach(r => { (divs[r.division] = divs[r.division] || []).push(r); });
+        const order = Object.keys(divs).sort((a, b) => { const ia = BP.DIVISIONS.indexOf(a), ib = BP.DIVISIONS.indexOf(b); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b); });
+        h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'Divisions', title: 'Every division race', sub: 'Our chance of winning the division, a bye and a place in October, and the wins we expect with the middle 90% of the simulations.' }) +
+          '<div class="qk-grid">' + order.map(dv => '<div class="qk-span-6">' + BP.ui.card2(dv, '', '<div id="ch-dv-' + esc(dv.replace(/\W+/g, '')) + '"></div>', { flush: true }) + '</div>').join('') + '</div></section>';
+        h += '<section class="qk-section">' + BP.ui.card2('Projected wins', 'The average of the simulations (dot) and the middle 90% (bar), every club', '<div id="ch-wins" class="qk-chart" style="height:' + Math.max(420, 18 * all.length) + 'px"></div>') + '</section>';
+        body.innerHTML = h + (lo && (lo.league.metrics || []).length ? '<section class="qk-section" id="ch-race"></section>' : '');
+        order.forEach(dv => {
+          const host = document.getElementById('ch-dv-' + dv.replace(/\W+/g, ''));
+          const list = divs[dv].slice().sort((a, b) => (P(b, 'p_division') || 0) - (P(a, 'p_division') || 0));
+          QK.leaderboard(host, { dense: true, columns: [{ key: 'name', label: 'Club', type: 'entity', mark: o => BP.ui.team(o.t, L, S), href: o => BP.teamHref(o.t, L, S) },
+            { key: 'w', label: 'Proj. W', num: true, fmt: v => (isNum(v) ? v.toFixed(0) : '—') }, { key: 'div', label: 'Division', type: 'bar', fmt: v => BP.ui.pct(v) },
+            { key: 'bye', label: 'Bye', num: true, fmt: v => BP.ui.pct(v) }, { key: 'po', label: 'Postseason', num: true, fmt: v => BP.ui.pct(v) }],
+          rows: list.map(r => ({ t: r.tid, name: BP.teamShort(r.tid), w: isNum(r.proj_w) ? r.proj_w : r.exp_w_final, div: P(r, 'p_division'), bye: P(r, 'p_bye'), po: P(r, 'p_postseason') })) });
+        });
+        const pw = all.filter(r => isNum(r.proj_w) || isNum(r.exp_w_final)).sort((a, b) => (b.proj_w || b.exp_w_final) - (a.proj_w || a.exp_w_final));
+        winsChart(pw, L);
+      } else body.innerHTML = h + (lo && (lo.league.metrics || []).length ? '<section class="qk-section" id="ch-race"></section>' : '');
+    }
+    if (actual) body.innerHTML = h + (lo && (lo.league.metrics || []).length ? '<section class="qk-section" id="ch-race"></section>' : '<p class="bp-note">No day-by-day record of our chances for ' + esc(S) + '.</p>');
+    const rh = document.getElementById('ch-race');
+    if (rh && lo) { rh.innerHTML = '<div id="ch-race-c"></div>'; QKL.race(document.getElementById('ch-race-c'), lo); }
+    /* round 9 (Phase 4): once the regular season is over, next season's standings as the rosters stand */
+    const over = actual || /post|off|complete/.test(String(d.phase || ''));
+    if (over && Number(S) === BP.currentSeason(L)) nextSeason(body, L, S, all);
+    BP.setMeta(d.updated_at ? 'Season data ' + esc(BP.fmtStamp(d.updated_at)) : '');
   });
+}
+/* Next season as the rosters stand (round 9, Phase 4): every player's expected WAR next season from the five-season
+   projections (value.json "e1", valuation v2; "proj" where it is missing), summed by the club the player is with now, and
+   set against the league average (81 wins; a win of WAR is a win). Before free agency, trades and signings: a snapshot of
+   the rosters, not a forecast of next year's clubs. */
+function nextSeason(body, L, S, all) {
+  BP.loadYear('value.json', L, S).then(v => {
+    if (!body.isConnected || !BP.ok(v) || !Array.isArray(v.rows)) return;
+    const F = {};
+    (v.fields || []).forEach((f, i) => { F[f] = i; });
+    if (F.team === undefined || (F.e1 === undefined && F.proj === undefined)) return;
+    const tot = {}, top = {};
+    v.rows.forEach(r => {
+      const t = String(r[F.team] || ''), x = F.e1 !== undefined && isNum(r[F.e1]) ? r[F.e1] : (F.proj !== undefined ? r[F.proj] : null);
+      if (!t || !isNum(x)) return;
+      tot[t] = (tot[t] || 0) + x;
+      (top[t] = top[t] || []).push([r[F.name], x]);
+    });
+    const ids = all.map(r => r.tid).filter(t => isNum(tot[t]));
+    if (ids.length < 20) return;
+    const mean = ids.reduce((a, t) => a + tot[t], 0) / ids.length;
+    const W = t => 81 + (tot[t] - mean);
+    const divs = {};
+    all.forEach(r => { if (isNum(tot[r.tid])) (divs[r.division] = divs[r.division] || []).push(r); });
+    const order = Object.keys(divs).sort((a, b) => { const ia = BP.DIVISIONS.indexOf(a), ib = BP.DIVISIONS.indexOf(b); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b); });
+    const best = ids.slice().sort((a, b) => W(b) - W(a))[0];
+    const sec = document.createElement('section');
+    sec.className = 'qk-section';
+    sec.innerHTML = QK.sectionHead({ kicker: 'Next season', title: (Number(S) + 1) + ' as the rosters stand', sub: 'Every player’s expected WAR next season from our five-season projections, summed by the club they are with today and set against an average club (81 wins). Before free agency, trades and signings: the starting point of the winter, not a forecast of who wins.' }) +
+      '<div class="bp-kpis">' + QK.stats([{ label: 'Strongest roster for ' + (Number(S) + 1), value: BP.teamAbbr(best) + ' ' + Math.round(W(best)), signal: true, sub: 'projected wins, ' + BP.ui.signed(tot[best], 1) + ' WAR', href: BP.teamHref(best, L, S) }]) + '</div>' +
+      '<div class="qk-grid">' + order.map(dv => '<div class="qk-span-6">' + BP.ui.card2(dv, 'Projected ' + (Number(S) + 1) + ' wins', '<div id="nx-' + esc(dv.replace(/\W+/g, '')) + '"></div>', { flush: true }) + '</div>').join('') + '</div>';
+    body.appendChild(sec);
+    order.forEach(dv => {
+      const host = document.getElementById('nx-' + dv.replace(/\W+/g, ''));
+      const list = divs[dv].slice().sort((a, b) => W(b.tid) - W(a.tid));
+      QK.leaderboard(host, { dense: true, rank: true, columns: [{ key: 'name', label: 'Club', type: 'entity', sub: 'sub', mark: o => BP.ui.team(o.t, L, S), href: o => BP.teamHref(o.t, L, S) },
+        { key: 'w', label: 'Proj. W–L', num: true, fmt: (x, o) => Math.round(x) + '–' + (162 - Math.round(x)) }, { key: 'war', label: 'Roster WAR', num: true, fmt: x => BP.ui.signed(x, 1) },
+        { key: 'now', label: (S) + ' W–L', num: true, fmt: (x, o) => o.rec }],
+      rows: list.map(r => { const tp = (top[r.tid] || []).sort((a, b) => b[1] - a[1]).slice(0, 2).map(x => x[0]).join(', '); return { t: r.tid, name: BP.teamShort(r.tid), sub: tp, w: W(r.tid), war: tot[r.tid], now: r.w, rec: r.w + '–' + r.l }; }) });
+    });
+  });
+}
+/* projected wins: the mean (dot) and the 5th to 95th percentile band of the simulations, one row a club */
+function winsChart(pw, L) {
+  const host = document.getElementById('ch-wins');
+  if (!host || !pw.length) return;
+  const T = QKC.tokens();
+  QKC.mount(host, () => ({
+    grid: { left: 8, right: 24, top: 10, bottom: 34, containLabel: true },
+    xAxis: { type: 'value', name: 'Wins (season total)', nameLocation: 'middle', nameGap: 26, scale: true, axisLabel: { color: T.ink3 }, splitLine: { lineStyle: { color: T.grid } } },
+    yAxis: { type: 'category', inverse: true, data: pw.map(r => BP.teamAbbr(r.tid)), axisLabel: { color: T.ink2, fontFamily: T.fontCond, fontWeight: 700 } },
+    tooltip: { trigger: 'item', backgroundColor: '#000', borderColor: T.volt, textStyle: { color: '#fff' },
+      formatter: p => { const r = pw[p.dataIndex]; return esc(BP.teamName(r.tid)) + '<br>' + (isNum(r.proj_w) ? r.proj_w.toFixed(1) : '') + ' wins expected' + (isNum(r.w_p05) ? ' (range ' + r.w_p05 + '–' + r.w_p95 + ')' : ''); } },
+    series: [
+      { type: 'custom', renderItem: (params, api) => { const lo = api.coord([api.value(0), api.value(2)]), hi = api.coord([api.value(1), api.value(2)]); return { type: 'rect', shape: { x: lo[0], y: lo[1] - 4, width: Math.max(1, hi[0] - lo[0]), height: 8 }, style: { fill: T.grid } }; },
+        encode: { x: [0, 1], y: 2 }, data: pw.map((r, i) => [isNum(r.w_p05) ? r.w_p05 : r.proj_w, isNum(r.w_p95) ? r.w_p95 : r.proj_w, i]) },
+      { type: 'scatter', symbolSize: 11, data: pw.map((r, i) => ({ value: [isNum(r.proj_w) ? r.proj_w : r.exp_w_final, i], itemStyle: { color: QK.color.ensure(BP.ui.raw(r.tid) || T.model, T.s1, 3) } })) }
+    ]
+  }), { label: 'Projected wins with the middle 90% of the simulations, every club' });
 }
 
 BP.standingsRows = rowsOf;
 BP.route('standings', render);
+BP.route('chances', chancesView);
 })(window.BP);

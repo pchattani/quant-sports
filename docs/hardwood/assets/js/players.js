@@ -64,7 +64,7 @@ function renderPlayers(el, params, state) {
       draw();
       document.getElementById('pl-note').innerHTML = 'Pills are percentiles (100 = best; ↓ metrics are already flipped) against ' +
         'the whole league or, with the toggle, the player\'s position pool (guards, forwards, centres). The qualification floor for percentiles is ' + fx.num(cat.min_floor, 0) + ' minutes. ' +
-        'Headline columns: ' + heads.map(m => fx.glossLink(m.key, fx.esc(m.label))).join(' · ') + '. The full catalogue of ' + metrics.length + ' metrics is on every player page and in the <a href="#/' + L + '/lab">lab</a>.';
+        'Headline columns: ' + heads.map(m => fx.glossLink(m.key, fx.esc(m.label))).join(' · ') + '. The full catalogue of ' + metrics.length + ' metrics is on every player page and in the <a href="#/' + L + '/scout">Scouting Room</a>.';
     });
   });
 }
@@ -162,7 +162,7 @@ function drawPlayer(el, L, S, pid, seasonRes, career, askedS) {
     '<span class="chip">' + fx.esc(L.toUpperCase() + ' ' + fx.seasonLabel(L, S)) + '</span>' + (p && p.qualified === false ? '<span class="chip warn">below the minutes floor</span>' : '') +
     (askedS ? '<span class="chip warn">no ' + fx.esc(fx.seasonLabel(L, askedS)) + ' games: showing ' + fx.esc(fx.seasonLabel(L, S)) + '</span>' : '') + '</div></div>' +
     '<div class="pg-links">' + (mates[0] ? '<a href="#/' + L + '/compare/players/' + encodeURIComponent(pid) + '/' + encodeURIComponent(mates[0]) + '">Compare with ' + fx.esc(fx.surname(P[mates[0]].name)) + ' →</a>' : '') +
-    '<a href="#/' + L + '/lab">Lab →</a>' + (team ? '<a href="' + fx.teamHref(L, team) + '">Team →</a>' : '') + '<a href="#/' + L + '/players">All players →</a></div></div>';
+    '<a href="#/' + L + '/scout?view=chart">Chart →</a>' + (team ? '<a href="' + fx.teamHref(L, team) + '">Team →</a>' : '') + '<a href="#/' + L + '/scout">Scouting Room →</a></div></div>';
 
   if (EMBED) h = '';
   if (!p) {

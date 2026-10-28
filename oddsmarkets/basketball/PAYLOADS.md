@@ -172,7 +172,7 @@ per deep metric, `len` (games); the progression tab's peer band (oddsmarkets/com
  "model": {"champion": {tid: p}, "conference": {tid: p}, "playoffs": {tid: p}},
  "games": {gid: {"season","home","away","date","model": {"p_home","margin","total","spread_fair"},"market": {...}|null,"edge"}},
  "win_totals": {tid: {"line","p_over_model","p_over_market","ladder"}} | null}` (games: the next 3 days)
-`lab.json`: column-oriented, `{"fields":["id","name","team","season","pool","gp","min", ...metric keys], "metrics":[METRIC], "rows":[[...]], "years":[S...]}` (seasons with box data; pbp metrics null before ~2017).
+`lab.json`: column-oriented, `{"fields":["id","name","team","season","pool","gp","min","qualified","role","age", ...metric keys], "metrics":[METRIC], "rows":[[...]], "years":[S...]}` (seasons with box data; pbp metrics null before ~2017).
 `shots_league.json`: `{"ok","league","season","updated_at","n_shots",
  "grid": {"cols": ["x","y","n","fg","pps","xpps","share"], "rows": [[...]]}  (hexagons of circumradius 1.5 ft; x, y = cell centre in feet, rim at 0,0),
  "grid_square": the same on 2-ft squares, "grid_kind": {...}, "zones": ZONES, "types": {type: {"n","fg","pps"}},

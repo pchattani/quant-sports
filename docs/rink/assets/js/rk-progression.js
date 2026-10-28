@@ -136,8 +136,8 @@ function compare(el, params) {
   if (ids.length === 1 && ids[0].indexOf(',') >= 0) ids = ids[0].split(',');
   ids = ids.filter((x, i) => /^\d+$/.test(x) && ids.indexOf(x) === i).slice(0, 4);
   const sq = '';
-  const body = U.section(el, { section: 'lab', title: 'Compare progression', sub: 'Two to four careers on one chart: by season, by age or by career year, on any number of the position’s deep set, as the value or as a percentile against that season’s peers.',
-    tabs: [{ key: 'lab', label: 'Chart builder', href: '#/lab' + sq }, { key: 'compare', label: 'Compare', href: '#/compare' + sq }, { key: 'prog', label: 'Progression', href: '#/compare/progression' }], active: 'prog' });
+  const body = U.section(el, { section: 'scout', title: 'Compare progression', sub: 'Two to four careers on one chart: by season, by age or by career year, on any number of the position’s deep set, as the value or as a percentile against that season’s peers.',
+    tabs: [{ key: 'lab', label: 'Scouting Room', href: '#/scout' + sq }, { key: 'compare', label: 'Compare', href: '#/compare' + sq }, { key: 'prog', label: 'Progression', href: '#/compare/progression' }], active: 'prog' });
   body.innerHTML = QK.skeleton('chart', 1);
   let fill = Promise.resolve(ids);
   if (!ids.length) {

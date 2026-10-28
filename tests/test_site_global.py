@@ -116,3 +116,37 @@ def test_season_tables_are_newest_first_with_leaders() -> None:
 def test_season_row_handles_missing_stats() -> None:
     row = season_row({"tid": 1, "tname": "X", "year": "20/21", "stats": {}})
     assert "goals" not in row and "ga_90" not in row and row["year"] == "20/21"
+
+
+# ── the pool guard (round 9) ─────────────────────────────────────────────────
+
+def test_a_run_without_a_pooled_fit_keeps_the_last_good_pool(tmp_path) -> None:
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    from build_site_global import build_global
+
+    good = {"model": {"rho": -0.05}, "leagues": {"premier-league": {}}, "clubs": [{"team": "A"}], "updated_at": "2026-10-27T00:00:00Z"}
+    (tmp_path / "pool.json").write_text(json.dumps(good), encoding="utf-8")
+    assert build_global(tmp_path, [], None, None) is None
+    assert json.loads((tmp_path / "pool.json").read_text(encoding="utf-8")) == good
+    # a first build (nothing to keep) still writes the stub, so the page reads "no pooled fit"
+    fresh = tmp_path / "fresh"
+    build_global(fresh, [], None, None)
+    assert json.loads((fresh / "pool.json").read_text(encoding="utf-8"))["model"] is None
+
+
+def test_champions_reference_is_written_slim(tmp_path, monkeypatch) -> None:
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    import build_site_global as g
+    ref = tmp_path / "ref.json"
+    ref.write_text(json.dumps({"source": "Wikidata", "licence": "CC0 1.0", "fetched_at": "x", "competitions": {
+        "premier-league": {"qid": "Q9448", "label": "Premier League", "editions": [{"season": "1992-93 FA Premier League", "year": 1992, "winner": "Manchester United F.C.", "winner_qid": "Q18656"}]},
+        "empty": {"editions": []}}}), encoding="utf-8")
+    monkeypatch.setattr(g, "CHAMPIONS_REF", ref)
+    assert g.write_champions(tmp_path) == 1
+    out = json.loads((tmp_path / "champions.json").read_text(encoding="utf-8"))
+    assert out["licence"] == "CC0 1.0"
+    assert out["competitions"]["premier-league"]["editions"] == [["1992-93 FA Premier League", 1992, "Manchester United F.C."]]

@@ -23,15 +23,34 @@ function boards(d) {
       out.push({ id: id, label: b.label || GI.titleCase(id), group: b.group || '', key: b.key || id, scope: z[2], fmt: b.fmt || '', lower: !!b.lower, rows: rows });
     });
   });
+  /* the single-season records in counts (round 9: history.json season_records, the ten best seasons per stat) */
+  const R = d.season_records || {}, rc = d.record_cols || ['pid', 'name', 'season', 'team', 'value'];
+  Object.keys(R).forEach(k => {
+    const b = R[k] || {};
+    const rows = GI.colRows({ cols: rc, rows: b.rows || [] }).map(o => ({ pid: o.pid, name: o.name, season: o.season, team: o.team, value: o.value, adj: null }));
+    out.push({ id: 'rec_' + k, label: (b.label || GI.titleCase(k)) + ' (most in a season)', group: b.group || '', key: k, scope: 'season', fmt: k === 'sacks' ? '1' : 'int', lower: false, rows: rows });
+  });
   return out.filter(b => b.rows.length);
 }
 
 GI.route('history', function (el) {
+  const head = GI.pageHead('Players · since 1999', 'All-time', 'The best single seasons and careers since 1999 from play-by-play, raw or against their own era.');
+  return body(el, head, {});
+});
+/* The Scouting Room's All-time view (round 9): the same boards inside the room. o.group (QB, RB, WR, TE, DEF, K, P)
+   opens on that group's first board unless the viewer has picked one. */
+let PICKED = false;
+function mount(host, o) {
+  o = o || {};
+  return body(host, '', o);
+}
+function body(el, head, o) {
   return GI.load('history.json').then(d => {
     if (!el.isConnected) return;
-    const head = GI.pageHead('Players · since 1999', 'All-time', 'The best single seasons and careers since 1999 from play-by-play, raw or against their own era.') + GI.sectionNav('players', 'history') + QK.note('<b>Against their own era</b> means 100 is an average qualified player that season and every 10 points is one standard deviation, so a 2004 season and a 2024 season sit on the same scale.');
+    head = head + QK.note('<b>Against their own era</b> means 100 is an average qualified player that season and every 10 points is one standard deviation, so a 2004 season and a 2024 season sit on the same scale.');
     if (!GI.ok(d)) { el.innerHTML = head + GI.notBuilt('The history boards', d); return; }
     const B = boards(d);
+    if (o.group && !PICKED) { const g = String(o.group).toUpperCase(), hit = B.find(b => String(b.group || '').toUpperCase() === g); if (hit) ST.board = hit.id; }
     if (!B.find(b => b.id === ST.board)) ST.board = B[0] ? B[0].id : '';
     const yrs = d.seasons || (d.league || []).map(r => r.season);
     const y0 = Math.min.apply(null, yrs), y1 = Math.max.apply(null, yrs);
@@ -79,7 +98,7 @@ GI.route('history', function (el) {
       const e = ENV[ST.env] || ['', '3'];
       GI.ch.lines('hi-envc', [{ name: e[0], x: L.map(r => r.season), y: L.map(r => r[ST.env]), symbol: true, area: true }], { legend: false, yFmt: v => GI.fmtVal(v, e[1]), xFmt: String, xLabel: x => String(x), xName: 'Season', yName: e[0] });
     };
-    $('hi-board').addEventListener('change', e => { ST.board = e.target.value; draw(); });
+    $('hi-board').addEventListener('change', e => { ST.board = e.target.value; PICKED = true; draw(); });
     $('hi-from').addEventListener('change', e => { ST.from = Number(e.target.value); draw(); });
     $('hi-to').addEventListener('change', e => { ST.to = Number(e.target.value); draw(); });
     let t = null;
@@ -89,6 +108,7 @@ GI.route('history', function (el) {
     draw();
     drawEnv();
   });
-});
+}
+GI.history = { mount: mount };
 
 })(window.GI);

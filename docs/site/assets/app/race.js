@@ -503,15 +503,11 @@ function render(el, body, c, d, ctx) {
       '<div id="rc-stakes"></div>' +
       '<div class="fb-mt">' + FB.card('The run-in', 'Each club\'s next five opponents coloured by our chance of a win, and how hard the rest of the season is from our ratings.', '<div id="rc-runin"></div>', { flush: true }) + '</div>' +
     '</section>' +
-    '<section class="qk-section fb-co-sec" id="rc-cards-sec">' + QK.sectionHead({ kicker: 'Team cards', title: 'Strengths and weak spots', sub: 'Each club against the rest of the league on the measures that predict results best (xG difference, field tilt, shots on target), with set pieces, style and luck beside them. Open a card for the percentiles.' }) +
-      '<div class="fb-rc-cards">' + R.rows.map(function (r) { return cardHTML(R, ctx, r); }).join('') + '</div>' +
-    '</section>' +
-    '<section class="qk-section fb-co-sec">' + QK.sectionHead({ kicker: 'Who\'s for real?', title: 'The shape of the league', sub: 'Attack against defence, points against the points our xG expected, and the tiers our chances draw.' }) +
-      FB.grid(
-        FB.card('Attack v defence', 'xG created and conceded per match. Dashed lines are the league averages.', FB.chartBox('rc-quad-ad', 380, 'Attack against defence'), { span: 6 }) +
-        FB.card('Points v expected points', 'Above the average for points but not for expected points: winning on luck?', FB.chartBox('rc-quad-luck', 380, 'Points against expected points'), { span: 6 })
-      ) +
-      '<div class="fb-mt">' + FB.card('The tiers', 'Where each club\'s season is heading, from our chances.', tiersHTML(R, ctx)) + '</div>' +
+    /* round 9: the team cards are the Teams tab's strengths and weaknesses (teams.js) */
+    '<div id="rc-cards-sec" class="fb-mt">' + FB.note('Each club’s strengths and weak spots, the power board and head to head are on the <a href="' + esc(FB.href.comp(c.slug, 'teams')) + '">Teams</a> tab.') + '</div>' +
+    /* round 9: one offence-v-defence scatter per site, the Teams tab's style map; the race keeps the tiers */
+    '<section class="qk-section fb-co-sec">' + QK.sectionHead({ kicker: 'The tiers', title: 'Where each season is heading', sub: 'The tiers our chances draw. Attack against defence and points against expected points are on the <a href="' + esc(FB.href.comp(c.slug, 'teams')) + '">Teams</a> tab’s style map.', html: true }) +
+      FB.card('The tiers', 'Where each club\'s season is heading, from our chances.', tiersHTML(R, ctx)) +
     '</section>';
   var cur = 'title';
   function drawRace() {
@@ -524,7 +520,6 @@ function render(el, body, c, d, ctx) {
   var st = stakesHTML(R, ctx);
   $(el, 'rc-stakes').innerHTML = st || FB.card('The fixtures to watch', null, stakesGuide(R, ctx));
   runIn($(el, 'rc-runin'), R, ctx);
-  shapeCharts(el, R, ctx);
   var q = (location.hash.split('?')[1] || '');
   var mm = /(?:^|&)club=([^&]+)/.exec(q);
   if (mm) { var card = document.getElementById('rc-card-' + mm[1]); if (card) { card.open = true; card.scrollIntoView({ block: 'start' }); } }

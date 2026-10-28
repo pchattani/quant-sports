@@ -1,6 +1,5 @@
-/* The Quant Campus — Teams (#/<L>/teams) and the team page (#/<L>/team/<tid>), Design System 2.0.
- * Catalogue: every member team as a leaderboard (heat cells: the national percentile of each metric), conference
- * filter, search, and an offense-v-defense map.
+/* The Quant Campus — the team page (#/<L>/team/<tid>), Design System 2.0. The Teams page (#/<L>/teams) is
+ * cc-teamspage.js (round 9: power board, team profile grid, style map, strengths, head to head, through the season).
  * Team page: a card header in the team colour (record, rating, rank, conference), stat tiles (our rating first, with
  * its standard error and national percentile; projected wins and the season chances), the rating through the season,
  * AP v our rank, a percentile card against every team in the country, the schedule with our win chance, the roster
@@ -21,60 +20,6 @@ function flatKeys(cat) {
   });
   return out;
 }
-
-CC.route('teams', function (el, p) {
-  var L = p.L, S = p.S, fb = CC.fb(L);
-  el.innerHTML = U.head('Teams', '', U.kicker(L, S)) + QK.skeleton('lines', 8);
-  return Promise.all([CC.load(CC.path(L, S, 'teams.json')), CC.season(L, S), CC.metrics()]).then(function (a) {
-    if (!U.alive(el)) return;
-    var cat = a[0];
-    if (!CC.ok(cat)) { el.innerHTML = U.head('Teams', '', U.kicker(L, S)) + U.missing('The team catalogue', cat); return; }
-    /* the spec's team headline set (METRICS_SPEC.md) where the catalogue lists it; else the catalogue's first eight */
-    var G = CC.group(L, 'team'), byKey = {};
-    (cat.metrics || []).forEach(function (m) { byKey[m.key] = m; });
-    var hs = G ? G.m.filter(function (m) { return m.set === 'h' && byKey[m.id]; }).map(function (m) { return Object.assign({}, byKey[m.id], { label: m.d || byKey[m.id].label, desc: m.x || byKey[m.id].desc, style: !!m.style }); }) : [];
-    var mets = hs.length >= 4 ? hs : (cat.metrics || []).slice(0, 8);
-    var T = cat.teams || {};
-    var ids = Object.keys(T);
-    var confs = {};
-    ids.forEach(function (t) { if (T[t].conference) confs[T[t].conference] = 1; });
-    var conf = (p.query || {}).conf || '';
-    var opts = '<option value="">All conferences</option>' + Object.keys(confs).sort(function (x, y) { return CC.cname(L, x).localeCompare(CC.cname(L, y)); }).map(function (c) { return '<option value="' + esc(c) + '"' + (c === conf ? ' selected' : '') + '>' + esc(CC.cname(L, c)) + '</option>'; }).join('');
-    el.innerHTML = U.head('Teams', esc(ids.length + (fb ? ' FBS teams' : ' Division I teams')) + ': our ratings, efficiency and schedule strength. Each cell is coloured by its national percentile (blue low, red high; flipped where lower is better).', U.kicker(L, S)) +
-      '<div class="cc-toolbar"><input class="qk-input" type="search" id="tm-q" placeholder="Find a team" aria-label="Find a team"><select class="qk-select" id="tm-conf" aria-label="Conference">' + opts + '</select></div>' +
-      '<div class="qk-grid cc-grid"><div class="qk-span-8">' + U.card('Every team', '<span id="tm-n"></span>', U.lb('tm-table'), { flush: true }) + '</div><div class="qk-span-4" id="tm-map"></div></div>';
-    var FL = flatKeys(cat);
-    var ox = mets.filter(function (m) { return m.key === 'off'; })[0], dx = mets.filter(function (m) { return m.key === 'def'; })[0];
-    function rows() {
-      var q = (QK.$('#tm-q', el).value || '').toLowerCase(), c = QK.$('#tm-conf', el).value;
-      return ids.filter(function (t) { return (!c || String(T[t].conference) === c) && (!q || String(T[t].name || '').toLowerCase().indexOf(q) >= 0); });
-    }
-    function paint() {
-      var rs = rows().sort(function (x, y) { return (T[x].rating_rank || 999) - (T[y].rating_rank || 999); });
-      QK.$('#tm-n', el).textContent = rs.length + ' teams · ranked by our rating';
-      var data = rs.map(function (t) {
-        var x = T[t], o = { team: t, name: x.name, rank: x.rating_rank, conf: CC.cname(L, x.conference), wl: (x.w || 0) - (x.l || 0), rec: CC.record(x.w, x.l) };
-        mets.forEach(function (m) { o[m.key] = (x.values || {})[m.key]; o['p_' + m.key] = FL[m.key] ? null : (x.pct || {})[m.key]; });
-        return o;
-      });
-      QK.leaderboard(QK.$('#tm-table', el), { dense: true, maxHeight: 720, rowHref: function (r) { return CC.teamHref(L, r.team, S); }, columns: [
-        { key: 'rank', label: 'Rk', num: true, tip: 'Our national rank' },
-        { key: 'name', label: 'Team', type: 'entity', sub: 'conf', mark: function (r) { return U.mark(L, r.team); }, href: function (r) { return CC.teamHref(L, r.team, S); } },
-        { key: 'wl', label: 'W–L', num: true, fmt: function (v, r) { return esc(r.rec); } }
-      ].concat(mets.map(function (m) { return { key: m.key, label: m.label, type: 'pctl', pctl: 'p_' + m.key, style: !!m.style, tip: (m.desc || m.label) + (m.lower ? ' (lower is better; the colour is flipped)' : '') + (m.style ? ' (style: shown in grey)' : ''), fmt: function (v) { return CC.fmtMetric(m, v); } }; })), rows: data });
-      if (ox && dx) {
-        QK.$('#tm-map', el).innerHTML = U.card('Offense v defense', 'Up and right is better on both sides of the ball.', U.chart('tm-sc', 420, 'Offense against defense, every team shown'));
-        QKC.scatter('#tm-sc', { points: rs.map(function (t) { var v = T[t].values || {}; return { x: v.off, y: v.def, name: T[t].name, label: CC.tabbr(L, t), color: CC.tcol(L, t), href: CC.teamHref(L, t, S), size: 9 }; }).filter(function (q) { return isNum(q.x) && isNum(q.y); }),
-          xName: ox.label, yName: dx.label, yInverse: !!dx.lower, labelTop: 8, xFmt: function (v) { return CC.f(v, 0); }, yFmt: function (v) { return CC.f(v, 0); } });
-      }
-    }
-    QK.$('#tm-q', el).addEventListener('input', paint);
-    QK.$('#tm-conf', el).addEventListener('change', paint);
-    CC.oursHeads(QK.$('#tm-table', el));
-    paint();
-    QK.$('#tm-table', el).insertAdjacentHTML('afterend', '<div class="cc-ours">' + QK.oursExplain('Our rating is the margin we expect against an average team on a neutral field, split into offence and defence' + (fb ? ', with opponent-adjusted EPA and schedule strength from the same model' : ' (adjusted efficiency per 100 possessions)') + '; columns tagged ' + QK.ours({ short: true }) + ' are ours.') + '</div>');
-  });
-});
 
 /* ── team page ───────────────────────────────────────────────────────── */
 function chanceTiles(L, o) {

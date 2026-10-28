@@ -63,7 +63,7 @@ CC.route('games', function (el, p) {
       [['ranked', fb ? 'Ranked' : 'Ranked or seeded'], ['conf', 'Conference games'], ['close', 'Toss-ups (35–65%)']].map(function (x) {
         return '<button type="button" class="qk-chip" style="--ca:var(--signal)" data-value="' + x[0] + '" aria-pressed="false">' + esc(x[1]) + '</button>'; }).join('') + '</div>';
     el.innerHTML = U.head('Games', (fb ? 'Every game involving an FBS team, week by week' : 'Every game involving a Division I team, day by day') + ', with our chance for each side and a line on why it’s worth your time (the favourite in blue). Tap a game for its page.', U.kicker(L, S)) +
-      '<div class="cc-toolbar">' + nav + '<select class="qk-select" id="g-conf" aria-label="Conference">' + confOpts + '</select></div>' + chips + '<div id="g-sum" class="cc-note"></div><div id="g-list"></div>';
+      '<div class="cc-toolbar">' + nav + '<select class="qk-select" id="g-conf" aria-label="Conference">' + confOpts + '</select></div>' + excitement(L, S, byKey[cur], a[1], fb) + chips + '<div id="g-sum" class="cc-note"></div><div id="g-list"></div>';
     QK.$('#g-conf', el).value = flt.cid;
     function paint() {
       var list = byKey[cur].filter(function (c) {
@@ -94,6 +94,37 @@ CC.route('games', function (el, p) {
     paint();
   });
 });
+
+/* ── round 9, Phase 4: "Games of the week", the excitement index ─────────────────────────────────────────────────
+   For the games still to play on the week (football) or day (basketball) on screen: how close our call is (40%), how
+   good the two teams are (35%: their average rating as a percentile of every team) and how much rides on it (25%:
+   football, the playoff places the result moves in our simulations, season.json sim.stakes; basketball, how undecided
+   both teams' NCAA chances are). 100 is a coin flip between two of the best teams with the most at stake. */
+function excitement(L, S, cards, season, fb) {
+  var pre = (cards || []).filter(function (c) { return c.status === 'pre' && c.model && isNum(c.model.p_home) && !QK.awaiting(CC.game(c, L)); });
+  if (pre.length < 3 || !CC.ok(season)) return '';
+  var R = season.ratings || {}, sim = (season.sim && season.sim.teams) || {};
+  var all = Object.keys(R).map(function (t) { return R[t].rating; }).filter(isNum).sort(function (a, b) { return a - b; });
+  var stakes = {}, smax = 0;
+  ((season.sim && season.sim.stakes) || []).forEach(function (g) { if (isNum(g.swing)) { stakes[String(g.game)] = g.swing; if (g.swing > smax) smax = g.swing; } });
+  var pk = fb ? 'p_cfp' : 'p_ncaa';
+  var rows = pre.map(function (c) {
+    var p = c.model.p_home, close = 1 - Math.abs(2 * p - 1);
+    var rh = (R[String(c.home)] || {}).rating, ra = (R[String(c.away)] || {}).rating;
+    var q = isNum(rh) && isNum(ra) && all.length ? QK.pctRank(all, (rh + ra) / 2) / 100 : 0;
+    var st = 0;
+    if (smax > 0 && isNum(stakes[String(c.id)])) st = stakes[String(c.id)] / smax;
+    else { var a = (sim[String(c.home)] || {})[pk], b = (sim[String(c.away)] || {})[pk]; st = ((isNum(a) ? 4 * a * (1 - a) : 0) + (isNum(b) ? 4 * b * (1 - b) : 0)) / 2; }
+    return { c: c, x: Math.round(100 * (0.4 * close + 0.35 * q + 0.25 * st)), close: close, q: q, st: st };
+  }).sort(function (a, b) { return b.x - a.x; }).slice(0, 6);
+  return U.card('Games of the ' + (fb ? 'week' : 'day'), 'Our excitement index, 0 to 100: how close our call is, how good the two teams are and how much rides on the result. Tap a game for its page.',
+    '<ol class="cc-race-l cc-ex">' + rows.map(function (r, i) {
+      var c = r.c, g = CC.game(c, L);
+      return '<li><span class="cc-race-rk num">' + (i + 1) + '</span>' + QK.teamMark(U.mark(L, c.home), 'sm') + '<span class="cc-race-nm"><a href="' + esc(CC.gameHref(L, c.id, S)) + '">' + esc(g.away.name + ' at ' + g.home.name) + '</a><small>' +
+        esc(CC.when(c) + ' · our call ' + CC.tabbr(L, c.model.p_home >= 0.5 ? c.home : c.away) + ' ' + CC.pct(Math.max(c.model.p_home, 1 - c.model.p_home))) + '</small><span class="cc-race-why">' +
+        esc('Closeness ' + Math.round(100 * r.close) + ' · quality ' + Math.round(100 * r.q) + ' · stakes ' + Math.round(100 * r.st)) + '</span></span><span class="cc-race-bar" aria-hidden="true"><i style="width:' + Math.max(3, r.x) + '%;background:var(--signal)"></i></span><b class="num">' + r.x + '</b></li>';
+    }).join('') + '</ol>', { cls: 'cc-ex-card' });
+}
 
 /* ── game centre ─────────────────────────────────────────────────────── */
 function clockLabel(L, season, t) {

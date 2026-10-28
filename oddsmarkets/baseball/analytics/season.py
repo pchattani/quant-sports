@@ -71,7 +71,7 @@ def series_list(ctx: SeasonContext, sim: dict | None, markets: dict | None) -> l
 
 # season.json's layout version: a skipped (unchanged) season whose season.json is older is rebuilt from its store and
 # teams.json (cheap), so a builder fix reaches past seasons without their pitch tables (2: the played postseason).
-SEASON_VERSION = 2
+SEASON_VERSION = 3   # 3: "calls", our early and pre-postseason chances for a finished season (round 9, Phase 3)
 POST_GTYPES = ("F", "D", "L", "W", "C")
 ROUND_OF_GTYPE = {"F": "WC", "D": "DS", "L": "CS", "W": "WS", "C": "CH"}
 REACH_ORDER = ["WC", "DS", "CS", "LC", "WS", "CH"]   # LC: a Triple-A league final (IL, PCL)
@@ -138,6 +138,48 @@ def actual_postseason(ctx: SeasonContext) -> dict | None:
                     "p_pennant": 1.0 if k >= 4 else 0.0, "p_ws": 1.0 if t == champion else 0.0, "champion": t == champion})
     return {"round": last["round"], "series": series, "seeds": seeds or None, "teams": teams, "matrix": None, "sims": None,
             "actual": True, "champion": champion, "complete": champion is not None}
+
+
+CALL_N = 4000
+CALL_FIRST_SEASON = 2022      # the 12-club bracket our season simulation models
+
+
+def recap_calls(ctx: SeasonContext) -> dict | None:
+    """Our calls for a finished MLB season against what happened, rebuilt walk-forward (race.asof_runner: only the games
+    before each date): after the first week of the regular season, and on the morning of the first postseason game (the
+    bracket as it stood, the regular season's ratings deciding the games). {"first": {asof, label, p_ws, p_postseason},
+    "preplayoff": {asof, label, p_ws}, "method"}; None before 2022 (other bracket formats) or without a postseason."""
+    if ctx.level != "mlb" or ctx.season < CALL_FIRST_SEASON:
+        return None
+    from datetime import date as _date, timedelta
+    from oddsmarkets.baseball.analytics import race as RC
+    reg = sorted(str(g.get("date"))[:10] for g in ctx.games.values() if str(g.get("gtype") or "R") == "R" and g.get("status") == "final")
+    post = sorted(str(g.get("date"))[:10] for g in ctx.games.values() if str(g.get("gtype") or "") in ("F", "D", "L", "W"))
+    if not reg or not post:
+        return None
+    run = RC.asof_runner("mlb", ctx.season, n=CALL_N, store=ctx.store)
+    # a week after every club has opened (the Seoul and Tokyo openers come a week before the rest)
+    opener: dict[str, str] = {}
+    for g in ctx.games.values():
+        if str(g.get("gtype") or "R") == "R" and g.get("status") == "final":
+            d0 = str(g.get("date"))[:10]
+            for t in (str(g.get("home")), str(g.get("away"))):
+                if t not in opener or d0 < opener[t]:
+                    opener[t] = d0
+    first_day = (_date.fromisoformat(max(opener.values())) + timedelta(days=7)).isoformat()
+    out: dict = {"method": "Rebuilt walk-forward from the games before each date (the season simulation on team ratings from "
+                           "run differential; no preseason projection), " + str(CALL_N) + " simulations."}
+    try:
+        a = run(first_day)
+        if a:
+            out["first"] = {"asof": first_day, "label": "After the first week", "p_ws": {t: round(v, 4) for t, v in a["p_ws"].items()},
+                            "p_postseason": {t: round(v, 4) for t, v in a["p_postseason"].items()}}
+        b = run(post[0])
+        if b:
+            out["preplayoff"] = {"asof": post[0], "label": "On the eve of the postseason", "p_ws": {t: round(v, 4) for t, v in b["p_ws"].items() if v > 0}}
+    except Exception:                                            # noqa: BLE001 - the recap stands without the calls
+        return None
+    return out if ("first" in out or "preplayoff" in out) else None
 
 
 def _actual_seeds(ctx: SeasonContext, series: list[dict], reached: dict, teams: dict) -> dict:
@@ -268,7 +310,8 @@ def build(ctx: SeasonContext, teams: dict | None, sim: dict | None, markets: dic
             "sim": {"available": bool(sim.get("available")), "basis": sim.get("basis"), "reason": sim.get("reason"),
                     "kind": "postseason" if post else ("regular" if sim.get("regular") else None),
                     "sims": (sim.get("regular") or post or {}).get("sims"), "remaining_games": (sim.get("regular") or {}).get("remaining_games")},
-            "postseason": bracket, "next_games": sim.get("next_games")}
+            "postseason": bracket, "next_games": sim.get("next_games"),
+            "calls": recap_calls(ctx) if act and act.get("complete") else None}
 
 
 def _streak(ctx: SeasonContext, t: str) -> str | None:

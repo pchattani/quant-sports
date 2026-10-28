@@ -1,6 +1,5 @@
-/* The Quant Campus — Players (#/<L>/players) and the player page (#/<L>/player/<pid>), on kit v4 "Broadcast".
- * Catalogue: a leaderboard with heat cells on the percentile against the position group (the payload's position
- * pools; or all qualified players), position chips, search and the qualified-only floor.
+/* The Quant Campus — the player page (#/<L>/player/<pid>), on kit v4 "Broadcast". The Players catalogue became the
+ * Scouting Room (cc-scout.js; #/<L>/players redirects there, round 9).
  * Player page (the Rink reference, MIGRATION_V4.md): a crumb; the full-bleed team-colour hero (the alternate colour on
  * the diagonal) with the black strip of five numbers (our value first) and "The short version" in plain English from
  * this season's percentiles against the position (football) or role (basketball) group; the LED percentile meters
@@ -72,71 +71,6 @@ function floorText(L, cat, pos) {
 }
 /* one player's position, singular ("Forward", never the catalogue's group name "Forwards"; CC.posName) */
 function posLabel(cat, pos) { var n = CC.posName(CC.state.L, pos); if (n && n !== pos) return n; var x = ((cat && cat.positions) || {})[pos]; return x && x.label ? CC.uk(x.label) : pos; }
-
-CC.route('players', function (el, p) {
-  var L = p.L, S = p.S, fb = CC.fb(L), q0 = p.query || {};
-  el.innerHTML = U.head('Players', '', U.kicker(L, S)) + QK.skeleton('lines', 8);
-  return Promise.all([CC.load(CC.path(L, S, 'players.json')), CC.season(L, S), CC.metrics()]).then(function (a) {
-    if (!U.alive(el)) return;
-    var cat = a[0];
-    if (!CC.ok(cat) || !Object.keys(cat.players || {}).length) {
-      el.innerHTML = U.head('Players', '', U.kicker(L, S)) + (CC.ok(cat) ? QK.empty('No player numbers yet', 'They appear once games have been played this season. Pick last season in the season menu above.') : U.missing('The player catalogue', cat));
-      return;
-    }
-    clean(cat);
-    CC.addPlayers(L, cat.players);
-    var computed = fillPct(cat);
-    var mets = (cat.metrics || []).slice(0, 9), P = cat.players, ids = Object.keys(P);
-    var pos = Object.keys(cat.positions || {}).sort(function (x, y) { return ((cat.positions[y] || {}).n || 0) - ((cat.positions[x] || {}).n || 0); });
-    var st = { pos: q0.pos || 'all', q: '', qual: true, within: true, sort: mets[0] ? mets[0].key : null };
-    el.innerHTML = U.head('Players', 'Season numbers, each cell coloured by its percentile against qualified players at the same position (blue low, red high; flipped where lower is better). ' + esc(QK.fmt.num(ids.length) + ' players') + '.', U.kicker(L, S)) +
-      '<div class="cc-toolbar"><input class="qk-input" type="search" id="pl-q" placeholder="Find a player or team" aria-label="Find a player or team">' +
-      '<label class="cc-check"><input type="checkbox" id="pl-qual" checked> Qualified only</label><label class="cc-check"><input type="checkbox" id="pl-within" checked> Percentiles within the position</label></div>' +
-      '<div class="qk-chips scroll cc-filters" id="pl-pos" role="group" aria-label="Position">' + ['all'].concat(pos).map(function (k) {
-        return '<button type="button" class="qk-chip" style="--ca:var(--signal)" data-value="' + esc(k) + '" aria-pressed="' + (k === st.pos) + '">' + esc(k === 'all' ? 'All' : posLabel(cat, k)) + (k !== 'all' ? ' <span class="n">' + ((cat.positions[k] || {}).n || '') + '</span>' : '') + '</button>'; }).join('') + '</div>' +
-      U.card('', '', '<div class="cc-lbh" id="pl-n"></div>' + U.lb('pl-table'), { flush: true }) +
-      '<div class="cc-ours">' + QK.oursExplain((CC.fb(L) ? 'Value (points above a replacement-level player) and EPA per play' : 'Value (points above a replacement-level player) and the box rating') + ' come from our models; columns tagged ' + QK.ours({ short: true }) + ' are theirs, and the tag says what each measures.') + '</div>';
-    function paint() {
-      var q = st.q.toLowerCase();
-      var rs = ids.filter(function (k) {
-        var x = P[k];
-        if (st.qual && x.qualified === false) return false;
-        if (st.pos !== 'all' && x.pos !== st.pos) return false;
-        if (q && String(x.name || '').toLowerCase().indexOf(q) < 0 && CC.tname(L, x.team).toLowerCase().indexOf(q) < 0) return false;
-        return true;
-      });
-      var k0 = st.sort;
-      rs.sort(function (x, y) { var vx = (P[x].values || {})[k0], vy = (P[y].values || {})[k0]; return (isNum(vy) ? vy : -1e9) - (isNum(vx) ? vx : -1e9); });
-      var shown = rs.slice(0, 400);
-      /* a position picked: the spec's headline set for its peer group, when the payload carries it */
-      var G = null, cols = mets.map(function (m) { var sm = CC.specMeta(L, 'player', m.key); return { key: m.key, label: sm ? sm.d : m.label, desc: (sm && sm.x) || m.desc, lower: m.lower, meta: m }; }), pk = null;
-      if (st.pos !== 'all' && rs.length) {
-        G = CC.group(L, 'player', P[rs[0]]);
-        var hs = G ? G.m.filter(function (m) { return m.set === 'h' && rs.some(function (k) { return isNum(((P[k] || {}).values || {})[m.id]) && isNum(((P[k] || {})[G.pct] || {})[m.id]); }); }) : [];
-        if (hs.length >= 3) { var mm0 = {}; mets.forEach(function (m) { mm0[m.key] = m; }); cols = hs.map(function (m) { return { key: m.id, label: m.d, desc: m.x, lower: m.low, style: m.style, meta: mm0[m.id] || { fmt: '2' } }; }); pk = G.pct; }
-        else G = null;
-      }
-      var peer = G ? G.d.toLowerCase() + ' (the spec’s headline set)' : st.within ? (st.pos === 'all' ? 'each player’s position' : posLabel(cat, st.pos).toLowerCase()) : 'all qualified players';
-      QK.$('#pl-n', el).innerHTML = '<b>' + esc(QK.fmt.num(rs.length)) + ' players</b> · percentiles v ' + esc(peer) + (computed ? ' (computed from this catalogue)' : '') + (rs.length > shown.length ? ' · showing the top 400 by ' + esc((mets[0] || {}).label || 'value') + '; search to find anyone' : '');
-      var rows = shown.map(function (k) {
-        var x = P[k], pc = pk ? (x[pk] || {}) : st.within ? (x.pct_pos || {}) : (x.pct || {});
-        var o = { id: k, name: x.name, team: x.team, sub: [CC.tabbr(L, x.team), x.pos, x['class']].filter(Boolean).join(' · '), gp: x.gp };
-        cols.forEach(function (m) { o[m.key] = (x.values || {})[m.key]; o['p_' + m.key] = pc[m.key]; });
-        return o;
-      });
-      QK.leaderboard(QK.$('#pl-table', el), { dense: true, maxHeight: 760, rowHref: function (r) { return CC.playerHref(L, r.id, S); }, columns: [
-        { key: 'name', label: 'Player', type: 'entity', sub: 'sub', mark: function (r) { return U.mark(L, r.team); }, href: function (r) { return CC.playerHref(L, r.id, S); } },
-        { key: 'gp', label: 'GP', num: true }
-      ].concat(cols.map(function (m) { return { key: m.key, label: m.label, type: 'pctl', pctl: 'p_' + m.key, style: !!m.style, tip: (m.desc || m.label) + (m.lower ? ' (lower is better; the colour is flipped)' : '') + (m.style ? ' (style: shown in grey)' : ''), fmt: function (v) { return CC.fmtMetric(m.meta, v); } }; })), rows: rows });
-    }
-    CC.oursHeads(QK.$('#pl-table', el));
-    QK.$('#pl-q', el).addEventListener('input', function (e) { st.q = e.target.value || ''; paint(); });
-    QK.$('#pl-qual', el).addEventListener('change', function (e) { st.qual = e.target.checked; paint(); });
-    QK.$('#pl-within', el).addEventListener('change', function (e) { st.within = e.target.checked; paint(); });
-    QK.chips(QK.$('#pl-pos', el), function (v) { st.pos = v[0] || 'all'; paint(); });
-    paint();
-  });
-});
 
 var SEASON_COLS = {
   cfb: [['gp', 'GP'], ['cmp', 'Cmp'], ['att', 'Att'], ['pass_yds', 'Pass yds', 'yds'], ['pass_td', 'Pass TD', 'td'], ['int', 'INT'], ['car', 'Car'], ['rush_yds', 'Rush yds'], ['rush_td', 'Rush TD'], ['rec', 'Rec'], ['rec_yds', 'Rec yds'], ['rec_td', 'Rec TD'],
@@ -296,7 +230,7 @@ CC.route('player', function (el, p) {
     var hstats = (fb ? (HEAD[pos] || []) : HEAD.bb).filter(function (h0) { return isNum(vals[h0[0]]); }).map(function (h0) { return { label: h0[1], value: fb ? (vals[h0[0]] % 1 ? CC.f(vals[h0[0]], 1) : fmtInt(vals[h0[0]])) : CC.f(vals[h0[0]], 1) }; });
     if (cp && isNum(cp.gp)) hstats.unshift({ label: 'GP', value: String(cp.gp) });
     var short0 = cp ? shortText() : '';
-    var crumb = '<nav class="cc-crumb" aria-label="Breadcrumb"><a href="' + esc(CC.href(L, 'players', null, S)) + '">' + esc(CC.LNAME[L]) + '</a><span aria-hidden="true">›</span>' +
+    var crumb = '<nav class="cc-crumb" aria-label="Breadcrumb"><a href="' + esc(CC.scoutHref(L, S)) + '">' + esc(CC.LNAME[L]) + ' · Scouting Room</a><span aria-hidden="true">›</span>' +
       (t ? '<a href="' + esc(CC.teamHref(L, team, cur.season || S)) + '">' + esc(t.short || t.name) + '</a><span aria-hidden="true">›</span>' : '') + esc(name) + '</nav>';
     // stat tiles: ours first (v4: the black strip of five numbers under the hero)
     var k = [];
@@ -331,7 +265,7 @@ CC.route('player', function (el, p) {
     var typeCard = sim.length ? '<article class="qk-card"><div class="qk-card-body"><div class="qk-kicker">Their type</div><h4 class="cc-h4">Plays most like</h4><ul class="cc-type">' + sim.slice(0, 4).map(function (s0) {
       var same = Number(s0.season) === Number(S);
       return '<li><span><a href="' + esc(CC.playerHref(L, s0.id, s0.season)) + '">' + esc(s0.name || CC.pname(L, s0.id)) + '</a>' + (same ? '' : ' <span class="qk-sub">' + esc(CC.seasonLabel(L, s0.season)) + '</span>') + '</span>' +
-        (same ? '<a class="v" href="' + esc(CC.href(L, 'lab', null, S, 'kind=compare&p=' + pid + ',' + s0.id)) + '">Compare</a>' : '<span class="v">distance ' + CC.f(s0.distance, 2) + '</span>') + '</li>'; }).join('') + '</ul>' +
+        (same ? '<a class="v" href="' + esc(CC.compareHref(L, S, [pid, s0.id])) + '">Compare</a>' : '<span class="v">distance ' + CC.f(s0.distance, 2) + '</span>') + '</li>'; }).join('') + '</ul>' +
       '<div class="qk-aside" style="margin-top:10px">Closest statistical profiles: a smaller distance is a closer match.</div></div></article>' : '';
     var log = cur.log || [];
     var vkLog = null, LOGK = { value: 'Value', epa: 'EPA', pts: 'Points', pass_yds: 'Passing yards', rush_yds: 'Rushing yards', rec_yds: 'Receiving yards', tkl: 'Tackles', sacks: 'Sacks', fgm: 'Field goals' }, lk = [];
@@ -509,7 +443,7 @@ CC.route('player', function (el, p) {
       };
       var pick = QK.$('#pp-tape-pick', el);
       pick.innerHTML = tapeIds.map(function (id, i) { return '<button type="button" class="qk-chip" data-value="' + esc(id) + '" aria-pressed="' + (i === 0) + '">' + esc(QK.surname(cat.players[id].name || '') || cat.players[id].name) + '</button>'; }).join('') +
-        '<a class="qk-chip" href="' + esc(CC.href(L, 'lab', null, S, 'kind=compare&p=' + [pid].concat(tapeIds.slice(0, 2)).join(','))) + '">' + (tapeIds.length > 1 ? 'All three in Compare' : 'Open in Compare') + '</a>';
+        '<a class="qk-chip" href="' + esc(CC.compareHref(L, S, [pid].concat(tapeIds.slice(0, 2)))) + '">' + (tapeIds.length > 1 ? 'All three in Compare' : 'Open in Compare') + '</a>';
       QK.$$('button', pick).forEach(function (b) { b.addEventListener('click', function () {
         QK.$$('button', pick).forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
         drawTape(b.getAttribute('data-value'));

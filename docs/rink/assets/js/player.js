@@ -75,7 +75,7 @@ function render(el, params, state) {
   const k = K();
   const pid = String(params.id || (params.rest || [])[0] || '');
   el.innerHTML = k.muted('Loading…');
-  if (!pid) { el.innerHTML = k.card('Player', '', k.muted('No player id. Find one on the <a href="#/skaters">skaters</a> or <a href="#/goalies">goalies</a> pages or with the search box.')); return; }
+  if (!pid) { el.innerHTML = k.card('Player', '', k.muted('No player id. Find one in the <a href="#/scout">Scouting Room</a> or with the search box.')); return; }
   return k.ready().then(() => {
     const S = k.S(params, state);
     return Promise.all([RK.load('players/' + pid + '.json'), k.loadY(S, 'skaters.json'), k.loadY(S, 'goalies.json'), k.loadNames(), k.loadY(S, 'teams.json')]).then(res => ({ S: S, res: res }));
@@ -120,21 +120,30 @@ function render(el, params, state) {
       c.height || c.weight ? '<span class="muted-inline">' + [c.height ? k.esc(fmtHeight(c.height)) : '', c.weight ? k.esc(c.weight) + ' lb' : ''].filter(Boolean).join(', ') + '</span>' : '',
       c.number || c.sweater ? '<span class="muted-inline">#' + k.esc(c.number || c.sweater) + '</span>' : '', yrs ? '<span class="muted-inline">' + k.esc(yrs) + '</span>' : ''].filter(Boolean).join(' ');
     const links = ['<a href="' + k.compareHref(pid, '') + k.sq(S) + '">Compare →</a>', team ? '<a href="' + k.teamHref(team, S) + '">' + k.esc(k.teamNick(team)) + ' →</a>' : '',
-      '<a href="' + k.withQ(goalie ? '#/goalies' : '#/skaters', S, goalie ? {} : { p: group }) + '">All ' + (goalie ? 'goalies' : (group === 'D' ? 'defencemen' : 'forwards')) + ' →</a>'].filter(Boolean).join('');
-    let h = k.head(k.esc(name), sub, links, k.esc(goalie ? 'G' : k.posLabel(pos0) || '?'), team ? k.teamColour(team) : null);
+      '<a href="' + k.withQ('#/scout', S, goalie ? { kind: 'g' } : { within: 'pos', pos: group === 'D' ? 'D' : 'F' }) + '">All ' + (goalie ? 'goalies' : (group === 'D' ? 'defencemen' : 'forwards')) + ' →</a>'].filter(Boolean).join('');
+    /* Round 9 (28 Oct 2026): this view is the player page's Detail tab (rk-player.js draws the hero), rebuilt in the house
+       order: the headline numbers, the charts (shots, impact, on-ice, tracking, deployment, linemates), the career chart and
+       table, the projection and the most similar players, then every metric's percentile and the game log folded, then the
+       explain strip. The old header repeated the hero. */
+    void sub; void links;
+    const jumps = [['pp-j-cards', 'Charts'], ['pp-j-car', 'Career'], ['pp-j-proj', 'Projection and similar'], ['pp-j-pct', 'Every metric'], ['pp-j-log', 'Game log']];
+    let h = '<nav class="tm-jump" aria-label="On this tab"><div class="qk-chips scroll">' + jumps.map(j => '<a class="qk-chip" href="#' + j[0] + '" data-jump="' + j[0] + '">' + k.esc(j[1]) + '</a>').join('') + '</div></nav>';
     h += tiles(ctx);
-    if (cp && metrics.length) {
-      h += '<div class="card"><div class="card-header">Percentiles <span class="card-sub" id="pp-sl-sub"></span><span class="gq-ctl">' +
-        (goalie ? '' : k.toggle('pp-basis', [['pct_pos', group === 'D' ? 'Defencemen' : 'Forwards'], ['pct', 'League']], ST.basis)) + '</span></div><div class="gq-pad" id="pp-sl"></div></div>';
-    }
+    h += '<div class="tm-sec" id="pp-j-cards"></div>';
     if (goalie) h += goalieCards();
     else h += skaterCards(ctx);
-    h += '<div class="card"><div class="card-header">Game log <span class="card-sub">' + k.esc(k.sLabel(cur.season || S)) + ', every game played.</span></div><div id="pp-log"></div></div>';
-    h += '<div class="card"><div class="card-header">Career <span class="card-sub">Every NHL season since the debut (the league\'s season totals); shot, on-ice and model columns start in 2009–10, when the play-by-play does' + (goalie ? '' : ' (shifts from 2010–11)') + '.</span></div><div id="pp-car-c" style="height:240px"></div><div id="pp-car"></div></div>';
-    h += '<div class="grid-2"><div class="card"><div class="card-header">Projection <span class="card-sub">Rest of season and next season: each rate regressed towards the mean by its stabilisation point, with ageing; ranges are 10th–90th percentiles.</span></div><div id="pp-proj"></div></div>' +
+    h += '<div class="card tm-sec" id="pp-j-car"><div class="card-header">Career <span class="card-sub">Every NHL season since the debut (the league\'s season totals); shot, on-ice and model columns start in 2009–10, when the play-by-play does' + (goalie ? '' : ' (shifts from 2010–11)') + '.</span></div><div id="pp-car-c" style="height:240px"></div><div id="pp-car"></div></div>';
+    h += '<div class="grid-2 tm-sec" id="pp-j-proj"><div class="card"><div class="card-header">Projection <span class="card-sub">Rest of season and next season: each rate regressed towards the mean by its stabilisation point, with ageing; ranges are 10th–90th percentiles.</span></div><div id="pp-proj"></div></div>' +
       '<div class="card"><div class="card-header">Similar players <span class="card-sub">This season\'s nearest qualified ' + (goalie ? 'goalies' : 'skaters at the position') + ' on the percentile profile; 100 would be identical.</span></div><div id="pp-sim"></div></div></div>';
+    if (cp && metrics.length) {
+      h += '<details class="rk-fold tm-sec" id="pp-j-pct"><summary>Every metric: the percentiles against the peers</summary><div class="rk-fold-b"><div class="card"><div class="card-header">Percentiles <span class="card-sub" id="pp-sl-sub"></span><span class="gq-ctl">' +
+        (goalie ? '' : k.toggle('pp-basis', [['pct_pos', group === 'D' ? 'Defencemen' : 'Forwards'], ['pct', 'League']], ST.basis)) + '</span></div><div class="gq-pad" id="pp-sl"></div></div></div></details>';
+    }
+    h += '<details class="rk-fold tm-sec" id="pp-j-log"><summary>Game log: ' + k.esc(k.sLabel(cur.season || S)) + ', every game played</summary><div class="rk-fold-b"><div id="pp-log"></div></div></details>';
+    h += QK.explain('<b>Reading the detail.</b> Percentiles rank the player against the same position this season (100 = best); a metric still short of the sample where it settles is early, so read it lightly. The projection regresses every rate towards the average by how fast it stabilises.', { html: true });
     el.innerHTML = h;
     k.setMeta(k.esc(name));
+    el.querySelectorAll('[data-jump]').forEach(aa => aa.addEventListener('click', ev => { ev.preventDefault(); const tg = document.getElementById(aa.getAttribute('data-jump')); if (!tg) return; if (tg.tagName === 'DETAILS') tg.open = true; const off = ['.qk-topbar', '.qk-secnav'].reduce((z, q) => z + ((document.querySelector(q) || {}).offsetHeight || 0), 0) + 12; window.scrollTo({ top: tg.getBoundingClientRect().top + window.scrollY - off, behavior: 'smooth' }); }));
     if (cp && metrics.length) {
       const drawSl = () => {
         const pc = goalie ? (cp.pct || cp.pct_pos || {}) : ((ST.basis === 'pct_pos' ? (cp.pct_pos || cp.pct) : cp.pct) || {});

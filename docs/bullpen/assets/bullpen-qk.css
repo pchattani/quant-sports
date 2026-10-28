@@ -489,3 +489,133 @@ input[type=number],
 .bp-lab-sim .bp-note { margin: 0; }
 /* round 9: a card foot carrying sentences (method notes, sources) reads as prose, not as condensed capitals */
 .qk-card-foot > .bp-fn { text-transform: none; letter-spacing: 0; font: 500 var(--fs-xs)/1.45 var(--font-ui); color: var(--ink-3); flex: 1 1 320px; }
+/* round 9: Standings > History (bp-history.js) */
+.bph-strip { display: grid; gap: 4px; }
+.bph-dec { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 8px; align-items: center; }
+.bph-dl { font: 700 var(--fs-xs)/1 var(--font-cond); letter-spacing: 0.06em; color: var(--ink-3); text-transform: uppercase; }
+.bph-yrs { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 2px; }
+.bph-y { position: relative; display: flex; align-items: flex-end; justify-content: center; height: 46px; padding: 0 2px 5px; font: 400 1.05rem/1 var(--font-display); color: #fff; letter-spacing: 0.02em; text-decoration: none; overflow: hidden; }
+.bph-y small { position: absolute; top: 4px; left: 5px; font: 700 10px/1 var(--font-cond); color: rgba(255, 255, 255, 0.82); }
+.bph-y.none { background: var(--s-2); color: var(--ink-3); }
+.bph-y.none small { color: var(--ink-3); }
+.bph-y.off { background: transparent; }
+a.bph-y:hover { outline: 2px solid var(--volt); outline-offset: -2px; color: #fff; }
+.bph-key { display: flex; gap: 16px; margin-bottom: 10px; font: 700 var(--fs-2xs)/1 var(--font-cond); text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); }
+.bph-key i { display: inline-block; width: 14px; height: 10px; margin-right: 6px; vertical-align: -1px; }
+.bph-key i.t { background: var(--signal-deep); } .bph-key i.p { background: var(--s-3); }
+.bph-bars { display: grid; gap: 4px; }
+.bph-bar { display: grid; grid-template-columns: 34px minmax(0, 11rem) minmax(0, 1fr) 2.2rem 2.2rem; gap: 8px; align-items: center; color: var(--ink-1); text-decoration: none; }
+.bph-bar:hover .bph-nm { color: var(--signal); }
+.bph-nm { font: 600 var(--fs-sm)/1.2 var(--font-ui); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bph-tr { position: relative; height: 16px; background: transparent; }
+.bph-tr i { position: absolute; left: 0; top: 0; bottom: 0; }
+.bph-tr i.p { background: var(--s-3); }
+.bph-bar b { font: 400 1.4rem/1 var(--font-display); text-align: right; }
+.bph-pn { color: var(--ink-3); text-align: right; font-size: var(--fs-xs); }
+.bph-dr { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.bph-dr li { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 10px; align-items: center; }
+.bph-dry { display: flex; align-items: center; justify-content: center; height: 40px; font: 400 1.6rem/1 var(--font-display); color: #fff; }
+.bph-dr small { display: block; color: var(--ink-3); font-size: var(--fs-xs); }
+.bph-recs { display: grid; gap: 2px; }
+.bph-rc { display: grid; gap: 2px; padding: 12px 14px; background: var(--block); }
+.bph-rc b { font: 400 2.2rem/1 var(--font-display); color: var(--volt); }
+.bph-rc span:last-child { color: var(--block-ink-2); font-size: var(--fs-sm); }
+.bph-rc small { color: var(--block-ink-3); }
+tr.bph-champ td:first-child { box-shadow: inset 3px 0 0 var(--volt); }
+@media (max-width: 640px) {
+  .bph-dec { grid-template-columns: 1fr; gap: 3px; }
+  .bph-y { height: 36px; font-size: 0.8rem; padding-bottom: 3px; }
+  .bph-y small { font-size: 8px; top: 2px; left: 3px; }
+  .bph-bar { grid-template-columns: 30px minmax(0, 7rem) minmax(0, 1fr) 1.8rem 1.8rem; gap: 6px; }
+}
+/* round 9: the Scouting Room's "best at each position" (Leaders view) */
+.sc-best { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+.sc-best-c { background: var(--s-1); border-top: 5px solid var(--card-rule); padding: 12px 14px; min-width: 0; }
+.sc-best-c .bp-list { margin-top: 6px; }
+.bp-moved { margin-top: var(--sp-4); }
+/* round 9: the season recap's awards (overview of a finished season) */
+.ov-aw { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 2px; }
+.ov-aw-c { background: var(--block); padding: 14px 16px; display: grid; gap: 4px; border-top: 4px solid var(--block-2); min-width: 0; }
+.ov-aw-c.hit { border-top-color: var(--volt); }
+.ov-aw-n { font: 400 1.5rem/1.05 var(--font-display); color: #fff; }
+.ov-aw-n a { color: #fff; }
+.ov-aw-v { font: 400 2.4rem/1 var(--font-display); color: var(--signal); }
+.ov-aw-s { font-size: var(--fs-xs); color: var(--block-ink-2); }
+.bp-decided { font-size: var(--fs-md); margin: 6px 0; }
+/* round 9: Triple-A's finals on its overview */
+.ov-fins { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 2px; }
+.ov-fin { display: grid; gap: 6px; align-content: start; padding: 16px 18px; background: var(--block); color: #fff; text-decoration: none; border-top: 4px solid var(--block-2); min-width: 0; }
+.ov-fin.big { border-top-color: var(--volt); }
+.ov-fin:hover { border-top-color: var(--signal); color: #fff; }
+.ov-fin-sc { font: 400 2.6rem/1 var(--font-display); color: var(--volt); }
+.ov-fin.big .ov-fin-sc { font-size: 3.4rem; }
+.ov-fin-o { color: var(--block-ink-2); font-size: var(--fs-sm); }
+.ov-pros .sb { margin-left: auto; color: var(--ink-3); font-size: var(--fs-xs); white-space: nowrap; }
+.ov-pros li { display: flex; gap: 8px; align-items: baseline; }
+@media (max-width: 760px) { .ov-fins { grid-template-columns: minmax(0, 1fr); } }
+.ov-fin-w .bp-ent { color: #fff; }
+.ov-fin-o a { color: var(--signal); }
+/* round 9: the trade list folds (Value & Moves > Trades) */
+.bp-trds { gap: 6px; }
+details.bp-trd > summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: 70px minmax(150px, auto) minmax(0, 1fr) auto auto; gap: 14px; align-items: center; padding: 12px 16px; background: var(--s-1); border-top: 3px solid var(--card-rule); }
+details.bp-trd > summary::-webkit-details-marker { display: none; }
+details.bp-trd > summary::after { content: '+'; font: 400 1.4rem/1 var(--font-display); color: var(--signal); }
+details.bp-trd[open] > summary { border-top-color: var(--volt); }
+details.bp-trd[open] > summary::after { content: '−'; }
+details.bp-trd > summary:hover { background: var(--s-2); }
+.bp-trd-sum .d { font: 700 var(--fs-xs)/1 var(--font-cond); text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-3); }
+.bp-trd-sum .c { font: 700 var(--fs-sm)/1.2 var(--font-cond); letter-spacing: 0.04em; white-space: nowrap; }
+.bp-trd-sum .w { color: var(--ink-2); font-size: var(--fs-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.bp-trd-sum .v { color: var(--ink-3); font-size: var(--fs-xs); white-space: nowrap; }
+details.bp-trd > .qk-card { border-top: 0; }
+@media (max-width: 760px) { details.bp-trd > summary { grid-template-columns: 56px minmax(0, 1fr) auto; } .bp-trd-sum .w, .bp-trd-sum .v { display: none; } }
+/* round 9: How it works for fans (docs.js) */
+.bp-hows { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 12px; }
+.bp-how { background: var(--s-1); border-top: 5px solid var(--card-rule); padding: 18px 20px; min-width: 0; }
+.bp-how h3 { font: 400 1.6rem/1.05 var(--font-display); margin: 4px 0 12px; color: var(--ink-1); text-transform: uppercase; }
+.bp-how p { margin: 12px 0 0; color: var(--ink-2); font-size: var(--fs-sm); }
+.bp-flow { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; align-items: stretch; }
+.bp-flow li { position: relative; display: grid; gap: 2px; align-content: center; padding: 8px 12px; background: var(--block); min-width: 0; flex: 1 1 120px; }
+.bp-flow li:not(:last-child)::after { content: '→'; position: absolute; right: -10px; top: 50%; transform: translateY(-50%); z-index: 1; color: var(--volt); font: 700 14px/1 var(--font-cond); }
+.bp-flow li b { font: 700 var(--fs-xs)/1.2 var(--font-cond); text-transform: uppercase; letter-spacing: 0.04em; color: #fff; }
+.bp-flow li span { font-size: 11px; color: var(--block-ink-3); }
+.bp-flow li.out { background: var(--signal-deep); }
+.bp-flow li.out span { color: #e6e9ff; }
+details.bp-tech { margin-top: var(--sp-6); }
+details.bp-tech > summary { cursor: pointer; list-style: none; display: grid; gap: 4px; padding: 16px 20px; background: var(--s-1); border-top: 5px solid var(--card-rule); }
+details.bp-tech > summary::-webkit-details-marker { display: none; }
+details.bp-tech > summary b { font: 400 1.6rem/1 var(--font-display); text-transform: uppercase; color: var(--ink-1); }
+details.bp-tech > summary b::after { content: ' +'; color: var(--signal); }
+details.bp-tech[open] > summary b::after { content: ' −'; }
+details.bp-tech > summary span:last-child { color: var(--ink-3); font-size: var(--fs-sm); }
+details.bp-tech > .doc { margin-top: var(--sp-4); }
+.gl-searchcard .gl-top input { font-size: var(--fs-md); }
+@media (max-width: 640px) { .bp-hows { grid-template-columns: minmax(0, 1fr); } .bp-flow li { flex-basis: 100%; } .bp-flow li:not(:last-child)::after { content: '↓'; right: auto; left: 50%; top: auto; bottom: -11px; transform: translateX(-50%); } }
+/* round 9: the game hero takes the full width; our numbers and the forecast table sit side by side under it */
+.bp-gtop { grid-template-columns: minmax(0, 1fr); }
+.bp-gside:not(:empty) { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: var(--sp-5); align-items: start; }
+.bp-gside > :only-child { grid-column: 1 / -1; }
+.bp-gside .qk-stats { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+@media (max-width: 1000px) { .bp-gside:not(:empty) { grid-template-columns: minmax(0, 1fr); } }
+.bp-gside:not(:empty) > * + * { margin-top: 0; }
+.bp-flow { flex-direction: column; gap: 10px; }
+.bp-flow li { flex: 0 0 auto; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 10px; }
+.bp-flow li:not(:last-child)::after { content: '↓'; right: auto; left: 18px; top: auto; bottom: -11px; transform: none; }
+/* round 9: glossary groups fold to six entries */
+.gl-group.folded .gl-entry:nth-of-type(n+4) { display: none; }
+#glossary-root.gl-searching .gl-group.folded .gl-entry:not(.hidden) { display: grid; }
+#glossary-root.gl-searching .gl-more { display: none; }
+.gl-more { margin: 4px 16px 16px; }
+.gl-groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start; }
+.gl-groups > .card { margin: 0; }
+.gl-groups .gl-entry { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 1000px) { .gl-groups { grid-template-columns: minmax(0, 1fr); } }
+/* round 9: the award history grid (Races) */
+table.aw-h th, table.aw-h td { vertical-align: top; }
+td.aw-h-c { position: relative; padding: 8px 10px 8px 14px; min-width: 130px; }
+td.aw-h-c::before { content: ''; position: absolute; left: 0; top: 6px; bottom: 6px; width: 5px; background: var(--cc, var(--s-3)); }
+td.aw-h-c b { display: block; font-weight: 600; }
+td.aw-h-c .num { color: var(--ink-2); font-size: var(--fs-xs); }
+td.aw-h-c.hit { box-shadow: inset 0 -3px 0 var(--volt); }
+td.aw-h-c.open { opacity: 0.85; }
+td.aw-h-c.open .qk-kicker { display: block; font-size: 10px; }

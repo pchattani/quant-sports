@@ -92,6 +92,21 @@ def test_needs_grades_and_swap_ranking():
     assert "contracts" in n["label"]
 
 
+def test_needs_reliability_falls_back_to_every_retirement_when_causes_are_unpublished():
+    """Round 9: since 2023 the feed says only "Retired", so dnf_mech is 0 for every team and graded every team 50.
+    With no mechanical cause anywhere but retirements in the field, Reliability reads dnf_rate and says so."""
+    tcat = {"teams": {"T1": {"name": "One", "values": {"dnf_mech": 0, "dnf_rate": 0.05, "dnfs": 2}, "pct": {"dnf_mech": 50, "dnf_rate": 100}},
+                      "T2": {"name": "Two", "values": {"dnf_mech": 0, "dnf_rate": 0.4, "dnfs": 12}, "pct": {"dnf_mech": 50, "dnf_rate": 0}}}}
+    n = VL.needs_payload(2030, tcat, {"drivers": {}}, {"ok": False}, {})
+    rel = {t: [a for a in n["teams"][t]["areas"] if a["key"] == "reliability"][0] for t in ("T1", "T2")}
+    assert rel["T1"]["metric"] == "dnf_rate" and rel["T1"]["pct"] == 100 and rel["T2"]["pct"] == 0
+    assert "any cause" in rel["T1"]["stat"]
+    tcat["teams"]["T2"]["values"]["dnf_mech"] = 3                        # a published cause: the mechanical count again
+    tcat["teams"]["T2"]["pct"]["dnf_mech"] = 0
+    n = VL.needs_payload(2030, tcat, {"drivers": {}}, {"ok": False}, {})
+    assert [a for a in n["teams"]["T2"]["areas"] if a["key"] == "reliability"][0]["metric"] == "dnf_mech"
+
+
 def test_swap_table_on_the_synthetic_season(paddock_data):
     from oddsmarkets.f1.models.decomposition import season_effects
     eff = season_effects(YEAR)

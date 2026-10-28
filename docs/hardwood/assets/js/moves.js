@@ -6,12 +6,16 @@
  * analytics/picks.py: the pick-value curve, its validation and every team's own future picks).
  * Values are four-season WAR (valuation v2), discounted 0.9 a season from the trade's season. A side's share
  * is value in / (value in + value out) on positive parts; grades A >= 0.65, B >= 0.55, C 0.45-0.55, D >= 0.35,
- * F below; "minor" when the deal moved little value. On-field value only: no salaries or contracts. */
+ * F below; "minor" when the deal moved little value. On-field value only: no salaries or contracts.
+ * Round 9 (28 Oct 2026): rebuilt on the house order and kept short. The ratings view leads with the net value by team as
+ * a chart, then the winners and losers (the top and bottom five, the rest a tap away), the most lopsided deals, and every
+ * trade ten at a time ("Show more"); the feed shows 40 rows at a time. The page was 12,000 px of walls of tables. */
 (function (HW) {
 'use strict';
 
 const FX = () => HW.fx;
-const ST = { tab: 'ratings', basis: 'now', team: 'all', type: 'all', q: '' };
+const ST = { tab: 'ratings', basis: 'now', team: 'all', type: 'all', q: '', nDeals: 10, nFeed: 40, allTeams: false };
+const MORE = (id, left, label) => (left > 0 ? '<div class="hw-more"><button type="button" class="qk-btn sm" id="' + id + '">' + label + ' (' + left + ' more)</button></div>' : '');
 
 function grade(g) {
   if (!g) return '—';
@@ -117,24 +121,42 @@ function body(L, S, dp, tx, rated) {
   const now = ST.basis === 'now';
   const teams = Object.keys((dp || {}).teams || {});
   const rows = teams.map(t => { const x = dp.teams[t]; return { t: t, x: x }; }).sort((a, b) => (now ? b.x.net_now - a.x.net_now : b.x.net_time - a.x.net_time));
-  let h = '<div class="card"><div class="card-header">Winners and losers <span class="card-sub">Net value from each team\'s trades in the last 12 months: at the time (four-season value as of the trade date, no hindsight), realised since (our model\'s value of what the incoming and outgoing players have produced for their new teams, updated as games are played), and today\'s view (realised plus today\'s projection of what is left of the four seasons while the player is still there; a pick from today\'s projected finish of its original owner, or the player it became once used).</span></div>' +
+  /* the number, then the chart: net value from trades by team */
+  const net = r => (now ? r.x.net_now : r.x.net_time);
+  const best = rows[0], worst = rows[rows.length - 1];
+  let h = rows.length ? '<div class="hw-kpis">' + QK.stats([
+    best ? { label: 'Won the trade market', value: fx.teamAbbr(L, best.t) + ' ' + fx.signed(net(best), 1), signal: true, href: fx.teamHref(L, best.t), sub: 'net WAR from ' + best.x.n + ' trade' + (best.x.n === 1 ? '' : 's') + ', ' + (now ? 'today’s view' : 'at the time') } : null,
+    worst && worst !== best ? { label: 'Gave the most away', value: fx.teamAbbr(L, worst.t) + ' ' + fx.signed(net(worst), 1), href: fx.teamHref(L, worst.t), sub: 'net WAR from ' + worst.x.n + ' trade' + (worst.x.n === 1 ? '' : 's') } : null,
+    { label: 'Trades rated', value: String(rated.length), sub: 'in the last 12 months' }]) + '</div>' +
+    fx.card('Net value from trades, by team', 'WAR in minus WAR out over four seasons, ' + (now ? 'today’s view (realised since plus what is left)' : 'at the time of each trade (no hindsight)'), '<div id="mv-net" class="qk-chart" style="--h:' + (20 * rows.length + 60) + 'px" role="img" aria-label="Net trade value by team"></div>') : '';
+  h += '<div class="card"><div class="card-header">Winners and losers <span class="card-sub">Net value from each team\'s trades in the last 12 months: at the time (four-season value as of the trade date, no hindsight), realised since (our model\'s value of what the incoming and outgoing players have produced for their new teams, updated as games are played), and today\'s view (realised plus today\'s projection of what is left of the four seasons while the player is still there; a pick from today\'s projected finish of its original owner, or the player it became once used).</span></div>' +
     HW.tableHTML([{ label: '#', align: 'right' }, { label: 'Team' }, { label: 'Deals', align: 'right' }, { label: 'In (time)', align: 'right' }, { label: 'Out (time)', align: 'right' }, { label: 'Net at the time', align: 'right' }, { label: 'Realised net', align: 'right' }, { label: 'Net today', align: 'right' }],
-      rows.map((r, i) => [i + 1, { v: fx.teamName(L, r.t), html: fx.teamLink(L, r.t) }, r.x.n, { v: r.x.in_time, html: fx.num(r.x.in_time, 1) }, { v: r.x.out_time, html: fx.num(r.x.out_time, 1) },
-        { v: r.x.net_time, html: signedCls(r.x.net_time) }, { v: r.x.net_real, html: signedCls(r.x.net_real) }, { v: r.x.net_now, html: '<strong>' + signedCls(r.x.net_now) + '</strong>' }]), { compact: true, sticky: true }) + '</div>';
+      (ST.allTeams || rows.length <= 10 ? rows : rows.slice(0, 5).concat(rows.slice(-5))).map((r) => [rows.indexOf(r) + 1, { v: fx.teamName(L, r.t), html: fx.teamLink(L, r.t) }, r.x.n, { v: r.x.in_time, html: fx.num(r.x.in_time, 1) }, { v: r.x.out_time, html: fx.num(r.x.out_time, 1) },
+        { v: r.x.net_time, html: signedCls(r.x.net_time) }, { v: r.x.net_real, html: signedCls(r.x.net_real) }, { v: r.x.net_now, html: '<strong>' + signedCls(r.x.net_now) + '</strong>' }]), { compact: true, sticky: true }) + (!ST.allTeams && rows.length > 10 ? MORE('mv-allteams', rows.length - 10, 'Every team') : '') + '</div>';
   const lop = d => Math.max.apply(null, (d.sides || []).map(s => Math.abs((now ? s.now_in - s.now_out : s.v_in - s.v_out) || 0)).concat([0]));
   const top = rated.slice().sort((a, b) => lop(b) - lop(a)).slice(0, 6);
   h += fx.card('Most lopsided deals', (now ? 'Today\'s view' : 'At the time') + ': the widest difference between what a side gave and got.', '<div class="pad">' + top.map(d => dealCard(L, d, ST.basis)).join('') + '</div>');
   const teamOpts = Array.from(new Set(rated.reduce((a, d) => a.concat(d.teams || []), []))).sort((a, b) => String(fx.teamName(L, a)).localeCompare(String(fx.teamName(L, b))));
   h += '<div class="card"><div class="card-header">Every trade <span class="card-sub" id="mv-n"></span></div><div class="lab-controls hf-controls"><label>Team<select id="mv-team"><option value="all">All teams</option>' +
     teamOpts.map(t => '<option value="' + fx.esc(t) + '"' + (ST.team === t ? ' selected' : '') + '>' + fx.esc(fx.teamName(L, t)) + '</option>').join('') + '</select></label></div><div class="pad" id="mv-all"></div></div>';
+  h += QK.explain('<b>A deal graded A</b> means the side got at least 65% of the value that changed hands; C is roughly even. Values are wins above replacement over four seasons, so a young player counts for his whole future, not this season alone. On-field value only: no salaries.', { title: 'What’s that grade?' });
   box.innerHTML = h;
   HW.sortable(box);
+  if (rows.length && document.getElementById('mv-net')) {
+    const ord = rows.slice();
+    QKC.bar('#mv-net', { cats: ord.map(r => fx.teamAbbr(L, r.t)), series: [{ name: 'Net WAR', data: ord.map(r => Math.round((net(r) || 0) * 10) / 10) }], horizontal: true, labels: true, diverging: true, fmt: x => fx.signed(x, 1), labelWidth: 46, valName: 'Net WAR from trades', catName: 'Team',
+      hrefs: ord.map(r => '#/' + L + '/value?tab=moves&team=' + r.t) });
+  }
+  const at = document.getElementById('mv-allteams');
+  if (at) at.onclick = () => { ST.allTeams = true; body(L, S, dp, tx, rated); };
   const all = () => {
     const list = rated.filter(d => ST.team === 'all' || (d.teams || []).indexOf(ST.team) >= 0);
     document.getElementById('mv-n').textContent = list.length + ' deals, newest first';
-    document.getElementById('mv-all').innerHTML = list.map(d => dealCard(L, d, ST.basis, ST.team !== 'all' ? ST.team : null)).join('') || fx.muted('No trades.');
+    document.getElementById('mv-all').innerHTML = (list.slice(0, ST.nDeals).map(d => dealCard(L, d, ST.basis, ST.team !== 'all' ? ST.team : null)).join('') || fx.muted('No trades.')) + MORE('mv-more', list.length - ST.nDeals, 'Show more trades');
+    const mb = document.getElementById('mv-more');
+    if (mb) mb.onclick = () => { ST.nDeals += 10; all(); };
   };
-  document.getElementById('mv-team').onchange = e => { ST.team = e.target.value; syncUrl(L); all(); };
+  document.getElementById('mv-team').onchange = e => { ST.team = e.target.value; ST.nDeals = 10; syncUrl(L); all(); };
   all();
 }
 
@@ -158,10 +180,12 @@ function feed(L, tx, box) {
     const list = rows.filter(r => (ST.team === 'all' || r.team === ST.team) && (ST.type === 'all' || (r.types || []).indexOf(ST.type) >= 0) && (!q || String(r.text).toLowerCase().indexOf(q) >= 0));
     document.getElementById('mv-fn').textContent = list.length + ' of ' + rows.length + ' rows';
     document.getElementById('mv-ftab').innerHTML = HW.tableHTML([{ label: 'Date' }, { label: 'Team' }, { label: 'Type' }, { label: 'Transaction' }],
-      list.slice(0, 400).map(r => [{ v: r.date, html: fx.esc(r.date) }, { v: fx.teamAbbr(L, r.team), html: fx.teamLink(L, r.team, { abbr: true }) },
+      list.slice(0, ST.nFeed).map(r => [{ v: r.date, html: fx.esc(r.date) }, { v: fx.teamAbbr(L, r.team), html: fx.teamLink(L, r.team, { abbr: true }) },
         { v: (r.types || []).join(','), html: (r.types || []).map(t => '<span class="chip' + (t === 'trade' ? ' info' : t === 'release' ? ' red' : t === 'sign' ? ' ok' : '') + '">' + fx.esc(types[t] || t) + '</span>').join(' ') },
         { v: r.text, html: '<span class="mv-txt">' + fx.esc(r.text) + '</span>' + ((r.players || []).length ? '<div class="vl-why">' + r.players.map(p => fx.playerLink(L, p)).join(' · ') + '</div>' : '') +
-          (r.deal ? ' <a class="muted-inline" href="#/' + L + '/moves?tab=ratings">rated ›</a>' : '') }]), { compact: true });
+          (r.deal ? ' <a class="muted-inline" href="#/' + L + '/value?tab=moves">rated ›</a>' : '') }]), { compact: true }) + MORE('mv-fmore', list.length - ST.nFeed, 'Show more');
+    const fb = document.getElementById('mv-fmore');
+    if (fb) fb.onclick = () => { ST.nFeed += 40; draw(); };
   };
   document.getElementById('mv-ft').onchange = e => { ST.team = e.target.value; syncUrl(L); draw(); };
   document.getElementById('mv-fy').onchange = e => { ST.type = e.target.value; syncUrl(L); draw(); };

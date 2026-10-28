@@ -7,13 +7,18 @@
  *   #/races[/<y>]  #/circuits  #/circuit/<id>                          [races]
  *   #/race/<y>/<r>[/laps|strategy|quali|telemetry]   race centre       [races]
  *   #/standings[/<y>][?tab=championship|odds|pace]                     [standings]
- *   #/constructors[/<y>]  #/team/<id>                                  [constructors]
- *   #/drivers[/<y>]  #/driver/<id>                                     [drivers]
+ *   #/constructors[/<y>] (the Teams page, pd-teams.js)  #/team/<id>[/<y>]   [constructors]
+ *   #/scout (the Scouting Room, pd-scout.js)  #/driver/<id>[/<y>]  #/compare/drivers/<a>/<b>   [scouting room]
  *   #/value[/<y>][?tab=drivers|swap|needs&x=&w=]                       [value & moves]
  *   #/fantasy                                                          [fantasy]
- *   #/lab  #/compare[/drivers|teams[/<a>[/<b>]]]                       [lab]
+ * Round 9: the Drivers list and the Lab are the Scouting Room (#/drivers[/<y>] -> #/scout?s=<y>, #/lab?x=&y=&q= ->
+ * #/scout?view=chart&x=&y=&q=, bare #/compare[/drivers[/<a>]] -> the room's compare tray), and Compare teams is the
+ * Teams page's head to head (#/compare/teams/<a>/<b> -> #/constructors?a=&b=&sec=h2h).
  *   #/model  #/methodology[/<sec>]  #/calibration  #/glossary[/<key>]  #/disclaimer   [model]
  * Old routes are redirected through ROUTE_MAP (see below) so every link ever shared still lands.
+ * The season comes from the address only (round 9): a page without a year in its route is the current season, and the
+ * links a page draws to a driver or a constructor carry the page's season (#/driver/<id>/<y>), so the year never
+ * carries over in session state and the season select always shows the season on screen.
  *
  * A page registers with PD.route(name, fn); fn(el, params, state) renders into el (a fresh div,
  * detached when the viewer navigates away: test el.isConnected after any await) and may return a
@@ -49,17 +54,14 @@ addRoute('standings/:year', 'standings', 'standings');
 addRoute('constructors', 'constructors', 'teams');
 addRoute('constructors/:year', 'constructors', 'teams');
 addRoute('team/:id', 'team', 'teams');
-addRoute('drivers', 'drivers', 'players');
-addRoute('drivers/:year', 'drivers', 'players');
-addRoute('driver/:id', 'driver', 'players');
+addRoute('team/:id/:year', 'team', 'teams');
+addRoute('scout', 'scout', 'scout');
+addRoute('driver/:id', 'driver', 'scout');
+addRoute('driver/:id/:year', 'driver', 'scout');
 addRoute('value', 'value', 'value');
 addRoute('value/:year', 'value', 'value');
 addRoute('fantasy', 'fantasy', 'fantasy');
-addRoute('lab', 'lab', 'lab');
-addRoute('compare', 'compare', 'lab');
-addRoute('compare/:kind', 'compare', 'lab');
-addRoute('compare/:kind/:a', 'compare', 'lab');
-addRoute('compare/:kind/:a/:b', 'compare', 'lab');
+addRoute('compare/:kind/:a/:b', 'compare', 'scout');
 addRoute('model', 'model', 'model');
 addRoute('methodology', 'methodology', 'model');
 addRoute('methodology/:sec', 'methodology', 'model');
@@ -69,8 +71,9 @@ addRoute('glossary/:key', 'glossary', 'model');
 addRoute('disclaimer', 'disclaimer', 'model');
 
 /* Old hash routes -> their new home. [from pattern, to template, extra query]. ':x' captures carry
- * over; the old query string is kept (swap's ?x=&w=, telemetry's ?s=&a=&la=&b=&lb=). Exposed as
- * PD.ROUTE_MAP and applied to links inside static text (methodology) as well. */
+ * over (into the path, and into an extra query value written ':x'); the old query string is kept (swap's ?x=&w=,
+ * telemetry's ?s=&a=&la=&b=&lb=, the Lab's ?x=&y=&q=). Exposed as PD.ROUTE_MAP and applied to links inside static
+ * text (methodology) as well. */
 var ROUTE_MAP = [
   ['hub', ''], ['home', ''], ['index', ''],
   ['season', 'standings'], ['season/:year', 'standings/:year'],
@@ -81,13 +84,17 @@ var ROUTE_MAP = [
   ['race/:year/:round/qualifying', 'race/:year/:round/quali'],
   ['race/:year/:round/results', 'race/:year/:round'],
   ['compare/drivers/:a/:b/:rest', 'compare/drivers/:a/:b'],
+  ['drivers', 'scout'], ['drivers/:year', 'scout', { s: ':year' }], ['players', 'scout'], ['leaders', 'scout', { view: 'leaders' }],
+  ['lab', 'scout', { view: 'chart' }], ['compare', 'scout'], ['compare/drivers', 'scout'], ['compare/drivers/:a', 'scout', { cmp: ':a' }],
+  ['compare/teams', 'constructors', { sec: 'h2h' }], ['compare/teams/:a', 'constructors', { a: ':a', sec: 'h2h' }],
+  ['compare/teams/:a/:b', 'constructors', { a: ':a', b: ':b', sec: 'h2h' }],
   ['glossary/g', 'glossary']
 ];
 
 var TITLES = {
   overview: '', races: 'Races', circuits: 'Circuits', circuit: 'Circuit', race: 'Race centre', standings: 'Standings',
-  constructors: 'Constructors', team: 'Constructor', drivers: 'Drivers', driver: 'Driver', value: 'Value & Moves',
-  fantasy: 'Fantasy', lab: 'Lab', compare: 'Compare', model: 'Model', methodology: 'Methodology',
+  constructors: 'Constructors', team: 'Constructor', scout: 'Scouting Room', driver: 'Driver', value: 'Value & Moves',
+  fantasy: 'Fantasy', compare: 'Compare', model: 'Model', methodology: 'Methodology',
   calibration: 'Calibration', glossary: 'Glossary', disclaimer: 'Disclaimer and terms'
 };
 
@@ -129,7 +136,9 @@ function redirectFor(hash) {
     var p = matchSegs(m[0] ? m[0].split('/') : [], s.parts);
     if (!p) continue;
     var to = m[1].split('/').filter(Boolean).map(function (seg) { return seg.charAt(0) === ':' ? encodeURIComponent(p[seg.slice(1)]) : seg; }).join('/');
-    var q = Object.assign({}, m[2] || {}, s.query);
+    var ex = {};
+    Object.keys(m[2] || {}).forEach(function (k) { var v = m[2][k]; ex[k] = typeof v === 'string' && v.charAt(0) === ':' ? p[v.slice(1)] : v; });
+    var q = Object.assign(ex, s.query);
     return '#/' + to + qs(q);
   }
   return null;
@@ -170,8 +179,8 @@ function render() {
   state.route = r.name;
   state.params = r.params;
   state.hash = location.hash || '#/';
-  if (typeof r.params.year === 'number') setYear(r.params.year, true);
-  else if (!state.year) setYear(currentSeason(), true);
+  /* the season is the address's, else the current one: never the last page's (round 9, the sticky-year fix) */
+  setYear(typeof r.params.year === 'number' ? r.params.year : currentSeason(), true);
   if (SHELL) SHELL.setSection(r.section || '');
   var app = document.getElementById('app');
   if (!app) return;
@@ -261,6 +270,19 @@ function esc(s) {
 function num(v, d) { return isNum(v) ? Number(v).toFixed(d === undefined ? 1 : d) : '—'; }
 function int(v) { return isNum(v) ? Math.round(v).toLocaleString('en-GB') : '—'; }
 function pts(v) { return isNum(v) ? (v % 1 ? Number(v).toFixed(1) : String(Math.round(v))) : '—'; }
+/* A championship chance: ">99.9%" until the title is clinched arithmetically (a simulation that never loses is not a
+   clinch: the magic number may still be 49), "<0.1%" until the driver or team is out; c is the championship row
+   ({ p_title, clinched, eliminated }). */
+function chance(p, c, d) {
+  if (!isNum(p)) return '—';
+  var dd = d === undefined ? 1 : d, lim = Math.pow(10, -dd);
+  if (c && c.clinched) return '100%';
+  if (c && c.eliminated) return '0%';
+  if (p * 100 >= 100 - lim / 2) return '>' + (100 - lim).toFixed(dd) + '%';
+  if (p * 100 < lim / 2) return '<' + lim.toFixed(dd) + '%';
+  return pct(p, dd);
+}
+function titlePct(c, d) { return c ? chance(c.p_title, c, d) : '—'; }
 function pct(p, d) {
   if (!isNum(p)) return '—';
   var dd = d === undefined ? 1 : d;
@@ -410,8 +432,10 @@ function driverTeam(id) { return (NAMES.drivers[id] || {}).team || null; }
 function driverColour(id, team) { var t = team || driverTeam(id); return t ? teamColour(t) : PALETTE[hashIndex(id || '', PALETTE.length)]; }
 function compoundColour(c) { return COMPOUNDS[String(c || 'UNKNOWN').toUpperCase()] || COMPOUNDS.UNKNOWN; }
 function teamDot(id) { return '<i class="pd-dot" style="--tc:' + esc(teamColour(id)) + '" aria-hidden="true"></i>'; }
-function driverHref(id) { return '#/driver/' + encodeURIComponent(id); }
-function teamHref(id) { return '#/team/' + encodeURIComponent(id); }
+/* Entity links carry the season: y, else the season of the page drawing the link; the current season adds nothing. */
+function yTail(y) { var yy = y === undefined || y === null ? state.year : y; yy = parseInt(yy, 10); return !isNaN(yy) && yy !== currentSeason() ? '/' + yy : ''; }
+function driverHref(id, y) { return '#/driver/' + encodeURIComponent(id) + yTail(y); }
+function teamHref(id, y) { return '#/team/' + encodeURIComponent(id) + yTail(y); }
 function raceHref(y, r, tab) { return '#/race/' + y + '/' + r + (tab ? '/' + tab : ''); }
 /* opts: {name, code: true, team (dot colour), dot: false} or a name string. */
 function driverLink(id, opts) {
@@ -419,12 +443,12 @@ function driverLink(id, opts) {
   var o = typeof opts === 'string' ? { name: opts } : (opts || {});
   var label = o.name || (o.code ? driverCode(id) : driverName(id));
   var t = o.team || driverTeam(id);
-  return '<a class="pd-link" href="' + driverHref(id) + '">' + (o.dot === false || !t ? '' : teamDot(t)) + esc(label) + '</a>';
+  return '<a class="pd-link" href="' + driverHref(id, o.y) + '">' + (o.dot === false || !t ? '' : teamDot(t)) + esc(label) + '</a>';
 }
 function teamLink(id, opts) {
   if (!id) return '<span class="qk-muted">—</span>';
   var o = typeof opts === 'string' ? { name: opts } : (opts || {});
-  return '<a class="pd-link" href="' + teamHref(id) + '">' + (o.dot === false ? '' : teamDot(id)) + esc(o.name || teamName(id)) + '</a>';
+  return '<a class="pd-link" href="' + teamHref(id, o.y) + '">' + (o.dot === false ? '' : teamDot(id)) + esc(o.name || teamName(id)) + '</a>';
 }
 function circuitLink(id, name) { return id ? '<a class="pd-link" href="#/circuit/' + encodeURIComponent(id) + '">' + esc(name || circuitName(id)) + '</a>' : '<span class="qk-muted">—</span>'; }
 function raceLink(y, r, label) { return '<a class="pd-link" href="' + raceHref(y, r) + '">' + esc(label || (y + ' R' + r)) + '</a>'; }
@@ -501,10 +525,10 @@ function table(el, cols, rows, opts) {
 function set(id, html) { var n = document.getElementById(id); if (n) n.innerHTML = html; return n; }
 function alive(el) { return !!el && el.isConnected; }
 function pctl(p) { return QK.pctlChip(p); }
-function probBar(p, colour, max) {
+function probBar(p, colour, max, text) {
   if (!isNum(p)) return '<span class="qk-muted">—</span>';
   var w = Math.max(0, Math.min(1, p / (max || 1))) * 100;
-  return '<span class="pd-pbar"><span class="pd-pbar-t"><span style="width:' + w.toFixed(1) + '%;background:' + esc(colour || 'var(--c-1)') + '"></span></span><span class="pd-pbar-v">' + pct(p) + '</span></span>';
+  return '<span class="pd-pbar"><span class="pd-pbar-t"><span style="width:' + w.toFixed(1) + '%;background:' + esc(colour || 'var(--c-1)') + '"></span></span><span class="pd-pbar-v">' + (text || pct(p)) + '</span></span>';
 }
 function deltaHTML(v, d) { return !isNum(v) ? '<span class="qk-muted">—</span>' : '<span class="' + (v > 0 ? 'pd-up' : v < 0 ? 'pd-down' : '') + '">' + signed(v, d === undefined ? 0 : d) + '</span>'; }
 function posHTML(p, status) {
@@ -552,7 +576,7 @@ function heatTable(spec) {
 
 function currentSeason() { var d = INDEX.data; return d && d.current_season ? d.current_season : new Date().getFullYear(); }
 /* Year-scoped sections: the season select keeps them on the picked season. */
-var YEAR_BASES = { races: 'races', standings: 'standings', constructors: 'constructors', drivers: 'drivers', value: 'value' };
+var YEAR_BASES = { races: 'races', standings: 'standings', constructors: 'constructors', value: 'value' };
 function setYear(y, silent) {
   var yy = parseInt(y, 10);
   if (isNaN(yy)) return;
@@ -565,13 +589,16 @@ function setYear(y, silent) {
   updateSectionHrefs();
   if (!silent) {
     var base = YEAR_BASES[state.route];
+    var ent = { driver: 'driver', team: 'team' }[state.route];
+    if (state.route === 'scout') { var q0 = Object.assign({}, state.params.query || {}); q0.s = yy !== currentSeason() ? yy : null; q0.p = null; go('#/scout' + qs(q0)); return; }
+    if (ent && state.params && state.params.id) { go('#/' + ent + '/' + encodeURIComponent(state.params.id) + (yy !== currentSeason() ? '/' + yy : '') + qs(state.params.query)); return; }
     go('#/' + (base || 'standings') + '/' + yy);
   }
 }
 function updateSectionHrefs() {
   var y = state.year, cur = currentSeason();
   var tail = y && y !== cur ? '/' + y : '';
-  var map = { fixtures: '#/races' + tail, standings: '#/standings' + tail, teams: '#/constructors' + tail, players: '#/drivers' + tail, value: '#/value' + (y && y !== cur && y >= 1994 ? '/' + y : '') };
+  var map = { fixtures: '#/races' + tail, standings: '#/standings' + tail, teams: '#/constructors' + tail, scout: '#/scout' + (tail ? '?s=' + y : ''), value: '#/value' + (y && y !== cur && y >= 1994 ? '/' + y : '') };
   Array.prototype.forEach.call(document.querySelectorAll('.qk-secnav a[data-sec]'), function (a) { var k = a.getAttribute('data-sec'); if (map[k]) a.setAttribute('href', map[k]); });
 }
 function index() { return INDEX.data; }
@@ -582,16 +609,16 @@ function searchRows() {
     var rows = [], seen = {};
     function add(key, t, s, href) { if (seen[key]) return; seen[key] = 1; rows.push({ sport: 'f1', t: t, s: s, href: href }); }
     var idx = INDEX.data || {};
-    Object.keys(idx.drivers || {}).forEach(function (id) { var x = idx.drivers[id]; add('d:' + id, x.name || titleCase(id), 'Driver · ' + teamName(x.team) + (x.number ? ' · #' + x.number : ''), driverHref(id)); });
-    Object.keys(idx.teams || {}).forEach(function (id) { add('t:' + id, teamName(id), 'Constructor · ' + y, teamHref(id)); });
-    ((arr[0] || {}).all_time || []).forEach(function (x) { add('d:' + x.driver, x.name || titleCase(x.driver), 'Driver · ' + (x.years || []).join('–'), driverHref(x.driver)); });
-    Object.keys(NAMES.drivers).forEach(function (id) { add('d:' + id, driverName(id), 'Driver', driverHref(id)); });
-    Object.keys(NAMES.teams).forEach(function (id) { add('t:' + id, teamName(id), 'Constructor', teamHref(id)); });
+    Object.keys(idx.drivers || {}).forEach(function (id) { var x = idx.drivers[id]; add('d:' + id, x.name || titleCase(id), 'Driver · ' + teamName(x.team) + (x.number ? ' · #' + x.number : ''), driverHref(id, y)); });
+    Object.keys(idx.teams || {}).forEach(function (id) { add('t:' + id, teamName(id), 'Constructor · ' + y, teamHref(id, y)); });
+    ((arr[0] || {}).all_time || []).forEach(function (x) { add('d:' + x.driver, x.name || titleCase(x.driver), 'Driver · ' + (x.years || []).join('–'), driverHref(x.driver, y)); });
+    Object.keys(NAMES.drivers).forEach(function (id) { add('d:' + id, driverName(id), 'Driver', driverHref(id, y)); });
+    Object.keys(NAMES.teams).forEach(function (id) { add('t:' + id, teamName(id), 'Constructor', teamHref(id, y)); });
     var circ = arr[1] || {};
     Object.keys(circ).forEach(function (id) { var c = circ[id]; if (c && c.name) add('c:' + id, c.name, 'Circuit · ' + (c.country || '') + ((c.history || []).length ? ' · ' + c.history.length + ' races' : ''), '#/circuit/' + id); });
     var s = arr[2];
     if (ok(s)) (s.calendar || []).forEach(function (c) { add('r:' + c.round, s.year + ' ' + c.name, 'Race · round ' + c.round + ' · ' + fmtDate(c.date, { weekday: false }), raceHref(s.year, c.round)); });
-    [['Standings', '#/standings'], ['Title chances', '#/standings?tab=odds'], ['Driver value', '#/value'], ['Driver-swap simulator', '#/value?tab=swap'], ['Fantasy', '#/fantasy'], ['Driver lab', '#/lab'], ['Compare drivers', '#/compare'], ['Methodology', '#/methodology'], ['Calibration', '#/calibration'], ['Glossary', '#/glossary']]
+    [['Standings', '#/standings'], ['Title chances', '#/standings?tab=odds'], ['Driver value', '#/value'], ['Driver-swap simulator', '#/value?tab=swap'], ['Fantasy', '#/fantasy'], ['Scouting Room', '#/scout'], ['Build your own chart', '#/scout?view=chart'], ['Compare drivers', '#/scout'], ['Teams: head to head', '#/constructors?sec=h2h'], ['How it works', '#/methodology'], ['How we’re doing', '#/model'], ['Glossary', '#/glossary']]
       .forEach(function (p) { add('p:' + p[0], p[0], 'Page', p[1]); });
     return rows;
   });
@@ -602,8 +629,9 @@ function bootShell() {
   var years = (idx.seasons && idx.seasons.length ? idx.seasons.slice() : [currentSeason()]).sort(function (a, b) { return b - a; });
   var ctx = '<label class="pd-season"><select class="qk-select" id="pd-season" aria-label="Season">' +
     years.map(function (y) { return '<option value="' + y + '">' + y + '</option>'; }).join('') + '</select></label>';
-  var secs = QK.sections('f1').map(function (s) {
-    s.href = { overview: '#/', fixtures: '#/races', standings: '#/standings', teams: '#/constructors', players: '#/drivers', value: '#/value', fantasy: '#/fantasy', lab: '#/lab', model: '#/model' }[s.key] || s.href;
+  /* round 9: the Scouting Room in the Drivers slot (QK.sections scout: Drivers and the Lab become #/scout) */
+  var secs = QK.sections('f1', { scout: true }).map(function (s) {
+    s.href = { overview: '#/', fixtures: '#/races', standings: '#/standings', teams: '#/constructors', scout: '#/scout', value: '#/value', fantasy: '#/fantasy', model: '#/model' }[s.key] || s.href;
     return s;
   });
   SHELL = QK.shell({ sport: 'f1', section: 'overview', sections: secs, ctx: ctx, search: { load: searchRows } });
@@ -637,7 +665,7 @@ return {
   state: state, route: route, go: go, render: render, parseHash: parseHash, redirectFor: redirectFor, fixLinks: fixLinks,
   ROUTES: ROUTES, ROUTE_MAP: ROUTE_MAP, onLeave: onLeave, interval: interval, setHashQuiet: setHashQuiet, init: init, qs: qs,
   load: load, loadAll: loadAll, ok: ok, reason: reason, index: index, currentSeason: currentSeason, setYear: setYear, NAMES: NAMES,
-  esc: esc, num: num, int: int, pts: pts, pct: pct, signed: signed, fmtMs: fmtMs, fmtGap: fmtGap, fmtDate: fmtDate, fmtTime: fmtTime,
+  esc: esc, num: num, int: int, pts: pts, pct: pct, chance: chance, titlePct: titlePct, signed: signed, fmtMs: fmtMs, fmtGap: fmtGap, fmtDate: fmtDate, fmtTime: fmtTime,
   fmtStamp: fmtStamp, countdown: countdown, ordinal: ordinal, fmtVal: fmtVal, parseDate: parseDate, isNum: isNum, titleCase: titleCase,
   shortRace: shortRace, median: median, mean: mean, rowsOf: rowsOf, ageOf: ageOf, finished: finished,
   driverName: driverName, driverCode: driverCode, driverSurname: driverSurname, teamName: teamName, circuitName: circuitName, teamAbbr: teamAbbr,

@@ -569,8 +569,9 @@ function scatter(x, pts, o) {
         row(p.color, o.xName || 'x', o.xFmt ? o.xFmt(d.x) : PD.num(d.x, 2)) + row(p.color, o.yName || 'y', o.yFmt ? o.yFmt(d.y) : PD.num(d.y, 2)) + (d.extra ? d.extra : ''); } }),
       series: series
     };
-  }, o.label);
+  }, o.label, o.onClick ? { onClick: function (p) { if (p.seriesIndex === 0 && pts[p.dataIndex]) o.onClick(pts[p.dataIndex], p.dataIndex); } } : null);
 }
+/* scatter o.onClick(point, i): a click on a point calls it instead of following point.href (the Scouting Room's drawer). */
 /* steps [{label, value, total: bool}] — a waterfall from an absolute start to a total. */
 function waterfall(x, steps, o) {
   o = o || {};

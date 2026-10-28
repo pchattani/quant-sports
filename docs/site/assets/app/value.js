@@ -32,7 +32,9 @@ var ROLE_SLOT = { GK: 4, CB: 1, FB: 7, DM: 3, CM: 6, AM: 5, W: 2, ST: 8, DF: 1, 
 var MINUTES_CAP = 85;
 var HONEST = 'Model suggestions based on on-field value and our fair-fee and budget models; not considering wages, contracts, fit or availability unless shown.';
 var KIND_LABEL = { fee: 'Transfer', free: 'Free', undisclosed: 'Undisclosed fee', loan: 'Loan', loan_end: 'Loan return', youth: 'Promoted' };
-var TABS = [['', 'Players'], ['positions', 'Best by position'], ['transfers', 'Transfers'], ['simulator', 'Simulator'], ['budgets', 'Budgets'], ['method', 'Method']];
+/* Round 9: "Best by position" is Value's landing page; the players' leaderboard is the Scouting Room's Value column set
+   (#/value/players lands there); the method is Model › How it works (#/value/method lands there). */
+var TABS = [['', 'Best by position'], ['transfers', 'Transfers'], ['simulator', 'Simulator'], ['budgets', 'Budgets']];
 
 function has(v) { return isNum(v); }
 function g2(v) { return has(v) ? signed(v, 2) : '—'; }
@@ -108,25 +110,25 @@ function clubFile(tid) {
 function head(tab) {
   return FB.pageHead('Value & Transfers', tab === 'simulator' ? 'Transfer simulator' : tab === 'transfers' ? 'Transfers' : tab === 'budgets' ? 'Transfer budgets' : tab === 'method' ? 'How player value is made' : tab === 'positions' ? 'The best at each position' : 'Player value',
     'Every player\'s minutes measured in goals above a replacement-level player, on one scale across competitions with the pooled model; fair fees and budgets fitted on real transfers. <a href="#/model/methodology/value">Methodology →</a>') +
-    FB.subnav(TABS.map(function (t) { return ['#/value' + (t[0] ? '/' + t[0] : ''), t[1], t[0] || 'players']; }), tab || 'players', 'Value views');
+    FB.subnav(TABS.map(function (t) { return ['#/value' + (t[0] ? '/' + t[0] : ''), t[1], t[0] || 'positions']; }).concat([['#/scout?cols=value', 'Every player (Scouting Room)', 'players']]), tab === 'players' ? 'positions' : tab || 'positions', 'Value views');
 }
 function missing(el) { el.insertAdjacentHTML('beforeend', FB.empty('Not built yet', 'The value payloads (data/value/) arrive with the next hourly build.')); }
 
 FB.route('value', function (el, p) {
-  var tab = p.tab || 'players';
-  if (TABS.every(function (t) { return (t[0] || 'players') !== tab; })) tab = 'players';
+  var tab = p.tab || 'positions';
+  if (tab === 'method') { FB.go('#/model/methodology/value'); return; }
+  if (tab === 'players') { FB.go('#/scout' + FB.qs({ cols: 'value', q: (p.query || {}).q || null })); return; }
+  if (tab !== 'positions' && TABS.every(function (t) { return t[0] !== tab; })) tab = 'positions';
   el.innerHTML = head(tab) + '<div id="va-body">' + FB.loading('lines', 6) + '</div>';
   var q = FB.merge(p.query || {}, {});
   return loadCore().then(function (ok) {
     if (!FB.alive(el)) return;
     var body = el.querySelector('#va-body');
     if (!ok) { body.innerHTML = ''; missing(body); return; }
-    if (tab === 'positions') return drawPositions(el, body, q);
     if (tab === 'transfers') return drawTransfers(el, body, q);
     if (tab === 'simulator') return drawSimulator(el, body, q);
     if (tab === 'budgets') return drawBudgets(el, body, q);
-    if (tab === 'method') return drawMethod(el, body);
-    return drawPlayers(el, body, q);
+    return drawPositions(el, body, q);
   });
 });
 
@@ -253,91 +255,6 @@ function wireFilters(root, q, redraw) {
   });
 }
 
-function drawPlayers(el, body, q) {
-  var m = META;
-  var r2 = ((m.validation || {}).r2 || {}).xgd || {};
-  var cv = ((((m.fee || {}).validation) || {}).cv || {}).model || {};
-  body.innerHTML = FB.kpis([
-    FB.kpi('Players valued', intl((m.counts || {}).players), { sub: intl((m.counts || {}).regulars) + ' regulars (900+ min in 12 months)' }),
-    FB.kpi('Matches fitted', intl((m.model || {}).fit_matches), { sub: 'club matches with both line-ups' }),
-    FB.kpi('Held-out fit', r2.value ? pct(r2.value, 1) : '—', { signal: true, sub: 'of xG difference explained · rating ' + (r2.rating ? pct(r2.rating, 1) : '—'), tip: 'Walk-forward R² of next matches\' non-penalty xG difference, against a home-advantage-only baseline.' }),
-    FB.kpi('Fee model', cv.error_factor ? '×' + num(cv.error_factor, 2) : '—', { sub: cv.spearman ? 'typical error · rank corr. ' + num(cv.spearman, 2) : 'not fitted', tip: 'Out-of-sample typical error of the fair fee against real published fees.' }),
-    FB.kpi('Updated', esc(FB.fmtDate(m.updated_at)), { text: true, sub: 'rebuilt every hour' })
-  ]) +
-    '<div class="fb-mt">' + FB.note('<b>GAR/90</b> is the goals a player adds per 90 minutes over a replacement-level player in the same role, the kind a club could sign cheaply. +0.30 is about one extra goal of difference every three matches. A <b>held-out fit</b> of ' + (r2.value ? pct(r2.value, 0) : '—') + ' sounds low, but one match is noisy and a player is one of eleven.') + '</div>' +
-    '<div id="va-filter-card" class="fb-mt">' + FB.card('', '', '<div id="va-filters"></div><p class="fb-cap" id="va-note"></p>') + '</div>' +
-    '<div class="fb-mt">' + FB.grid(
-      FB.card('Value against age', 'GAR/90 of the players shown (top 200) by age; colour is the position. Click a dot for the player.', FB.chartBox('va-sc-age', 340, 'Value per 90 by age') + roleLegend(), { span: 6 }) +
-      FB.card('Our value against Sofascore\'s', 'Valuation v2 (points above replacement over four seasons) against Sofascore\'s market value (log scale), for reference.', FB.chartBox('va-sc-mv', 340, 'Our value against Sofascore market value') + roleLegend(), { span: 6, id: 'va-mv-card' })
-    ) + '</div>' +
-    '<div class="fb-mt">' + FB.card('Leaderboard', 'Goals above replacement per 90; the cell colour is the percentile among peers in the same role (blue low, red high). ' + esc(HONEST), '<div id="va-table"></div>', { flush: true }) + '</div>' +
-    '<p class="fb-cap">' + esc(validationLine(m)) + ' <a href="#/value/method">The weights and checks →</a></p>';
-  var redraw = function (nq, keepInputs) {
-    q = nq;
-    var go = function () {
-      if (!FB.alive(el)) return;
-      if (!keepInputs) { el.querySelector('#va-filters').innerHTML = filterBar(q, true); wireFilters(el, q, redraw); }
-      drawPlayersBody(el, q);
-    };
-    if (q.v === 'season' && !LINES) { FB.set('va-table', FB.loading('lines', 6)); needLines().then(go); } else go();
-  };
-  redraw(q);
-}
-
-function drawPlayersBody(el, q) {
-  var season = q.v === 'season';
-  var rows = valueRows(q).sort(function (a, b) { return (b.gar90 || 0) - (a.gar90 || 0); });
-  var shown = rows.slice(0, 150);
-  FB.set('va-note', intl(rows.length) + ' players' + (rows.length > shown.length ? ' (the top ' + shown.length + ' shown)' : '') + ' · ' +
-    (season ? ((q.c || '') in POOLED ? 'this season (each player\'s own, as the Lab), one row per player: his matches summed over ' + (q.c === 'club' ? 'club competitions' : q.c === 'intl' ? 'national-team football' : 'every competition') + '; percentiles within the position group among the players shown with 900+ minutes; trend against his last season in the same scope.'
-      : 'this season\'s lines in ' + FB.compName(q.c) + '; percentiles within the competition and position group over its minutes floor; trend against last season in the same competition.')
-      : 'club football over the last 12 months, every competition; percentiles among regulars (900+ minutes) in the same role.'));
-  var cols = [
-    { key: 'name', label: 'Player', type: 'entity', sub: 'freeTxt', href: function (r) { return FB.href.player(r.id); } },
-    { key: 'role', label: 'Pos', fmt: function (v) { return roleBadge(v); } },
-    { key: 'club', label: 'Club', fmt: function (v, r) { return clink(r.tid, v); } },
-    { key: 'comp', label: season ? 'Competition' : 'League', fmt: function (v, r) { return r.mix && r.comps && r.comps.length > 1 ? '<span class="qk-muted fb-lb-mix">' + esc(r.mix) + '</span>' : v ? FB.compLink(v, { short: true }) : '—'; } },
-    { key: 'age', label: 'Age', num: true },
-    { key: 'min', label: 'Min', num: true },
-    { key: 'gar90', label: 'GAR/90', type: 'pctl', pctl: 'pct', tip: 'Goals above replacement per 90 minutes; the cell colour is the percentile among peers in the same role', fmt: function (v) { return '<b>' + g2(v) + '</b>'; } },
-    { key: 'gar', label: 'GAR', num: true, tip: 'Goals above replacement in these minutes', fmt: function (v) { return has(v) ? signed(v, 1) : '—'; } },
-    { key: 'par', label: 'PAR', num: true, tip: 'Points above replacement: GAR times the points a goal of goal difference is worth', fmt: function (v) { return has(v) ? signed(v, 1) : '—'; } }
-  ];
-  if (season) cols.push({ key: 'trend', label: 'Trend', num: true, tip: (q.c || '') in POOLED ? 'GAR/90 change against his last season in the same scope (450+ minutes then)' : 'GAR/90 change against last season in the same competition (450+ minutes then)', fmt: function (v, r) { return has(r.prev90) ? FB.deltaHTML(r.gar90 - r.prev90, 2) : '—'; } });
-  else cols = cols.concat([
-    { key: 'proj', label: 'Proj.', num: true, tip: 'Projected GAR/90: shrunk toward replacement by 900 minutes', fmt: function (v) { return g2(v); } },
-    { key: 'v2', label: 'Value', num: true, tip: 'Valuation v2: expected points above replacement over the next four seasons, with its 10-90% band', fmt: function (v, r) { return has(v) ? '<span data-tip="10-90%: ' + num(r.v2lo, 1) + ' to ' + num(r.v2hi, 1) + ' points">' + num(v, 1) + '</span>' : '—'; } },
-    feeOn() ? { key: 'fee', label: 'Fair fee', num: true, tip: 'The fee model fitted on real fees: what a club like the player\'s own would pay', fmt: function (v, r) { return has(v) ? '<span data-tip="Middle half: ' + esc(moneyRange(r.feelo, r.feehi)) + '">' + money(v) + '</span>' : '—'; } }
-      : { key: 'fvi', label: 'FVI', num: true, tip: 'Fair value index: 100 = the median regular of the top five leagues; not euros' },
-    { key: 'mv', label: 'Sofascore value', num: true, tip: 'Sofascore\'s proposed market value, for reference', fmt: function (v) { return money(v); } }
-  ]);
-  cols.push({ key: 'why', label: 'Why', sort: false, fmt: function (v, r) { return drivers(r.c); } });
-  cols.push({ key: 'sim', label: '', sort: false, fmt: function (v, r) { return '<a class="fb-link fb-va-sim" href="#/value/simulator?p=' + esc(r.id) + '">Simulate →</a>'; } });
-  shown.forEach(function (r) { r.trend = has(r.prev90) ? r.gar90 - r.prev90 : null; r.freeTxt = r.free ? 'no club' : ''; });
-  var tnode = document.getElementById('va-table');
-  if (tnode) QK.leaderboard(tnode, { columns: cols, rows: shown, rank: true, dense: true, maxHeight: 640, caption: 'Player value leaderboard' });
-  if (!shown.length) FB.set('va-table', FB.empty('No player clears the filters', 'Lower the minutes or widen the filters.'));
-  /* charts */
-  var top = rows.slice(0, 200);
-  var c1 = el.querySelector('#va-sc-age');
-  if (c1) {
-    if (top.filter(function (r) { return has(r.age); }).length < 3) { c1.style.height = 'auto'; c1.innerHTML = FB.muted('Not enough players for a chart.'); }
-    else QKC.scatter(c1, {
-      points: top.filter(function (r) { return has(r.age); }).map(function (r) { return { x: r.age, y: r.gar90, name: r.name + ' · ' + (r.club || '') + ' · ' + r.role, color: roleHex(r.role), size: 6 + Math.min(14, Math.sqrt(r.min || 0) / 6), href: FB.href.player(r.id), label: FB.surname(r.name) }; }),
-      xName: 'Age (years)', yName: 'GAR per 90', xFmt: function (v) { return num(v, 0); }, yFmt: function (v) { return signed(v, 2); }, labelTop: 8, label: 'Value per 90 by age'
-    });
-  }
-  var c2 = el.querySelector('#va-sc-mv');
-  var mvRows = season ? [] : top.filter(function (r) { return has(r.mv) && r.mv > 0 && has(r.v2); });
-  if (c2) {
-    if (mvRows.length < 3) { c2.style.height = 'auto'; c2.innerHTML = FB.muted(season ? 'Sofascore\'s values are compared on the last-12-months view.' : 'Too few Sofascore values under these filters.'); }
-    else QKC.scatter(c2, {
-      points: mvRows.map(function (r) { return { x: Math.log10(r.mv), y: r.v2, name: r.name + ' · ' + money(r.mv), color: roleHex(r.role), size: 9, href: FB.href.player(r.id), label: FB.surname(r.name) }; }),
-      xName: 'Sofascore market value (log scale)', yName: 'Value v2 (pts)', xFmt: function (v) { return money(Math.pow(10, v)); }, yFmt: function (v) { return num(v, 1); }, labelTop: 8,
-      quadrants: ['Underrated', 'Stars', '', 'Valued high'], label: 'Our value against Sofascore market value'
-    });
-  }
-}
 
 // ══ best at each position ═══════════════════════════════════════════════
 
@@ -392,11 +309,23 @@ function loadTransfers() {
   return Promise.all([FB.load('value/transfers.json'), FB.clubsIndex()]).then(function (d) {
     var T = d[0];
     if (!T) return null;
-    var deals = FB.rows(T), byKey = {};
-    deals.forEach(function (x) { byKey[x.key] = x; });
+    var deals = dedupeMoves(FB.rows(T)), byKey = {};
+    FB.rows(T).forEach(function (x) { byKey[x.key] = x; });
     TRANSFERS = { T: T, deals: deals, byKey: byKey };
     return TRANSFERS;
   });
+}
+/* One row per move (as transfers.dedupe in the build): the same player, clubs and kind within 14 days is one move
+   Sofascore listed twice. The feed is newest first, so the older listing (the announcement) is the one kept. */
+function dedupeMoves(list) {
+  var seen = {}, out = [];
+  list.slice().sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; }).forEach(function (d) {
+    var k = [d.pid, d.from, d.to, d.kind].join('|'), t = Date.parse(d.date), p = seen[k];
+    if (p !== undefined && !isNaN(t) && t - p <= 14 * 864e5) return;
+    seen[k] = t;
+    out.push(d);
+  });
+  return out.reverse();
 }
 function covLine(T) {
   var cov = T.coverage || {};
@@ -702,15 +631,39 @@ function playerCard(P) {
     (P.c ? '<p class="fb-cap fb-va-hero-why">Why: ' + drivers(P.c, 4) + ' <span class="qk-muted">(per 90, against the average ' + esc(roleLabel(P.role).toLowerCase()) + ')</span></p>' : '') + '</section>';
 }
 
+/* Round 9: the simulator opens on a real, topical move when the address names none: the most valuable regular our
+   "who moves next" model gives a real chance of moving this window (value/moves.json p, 25%+), to the strongest club on
+   the pooled scale in another league that could buy him (pool.json). The address then names it, so the link shares. */
+function topicalMove(LC) {
+  return Promise.all([FB.load('value/moves.json'), FB.load('pool.json')]).then(function (arr) {
+    var mv = {};
+    FB.rows(arr[0]).forEach(function (r) { mv[FB.personId(r.id)] = r.p; });
+    var eg = PLAYERS.filter(function (x) { return (x.min || 0) >= 1500 && has(x.gar90) && x.tid && (mv[String(x.id)] || 0) >= 0.25; })
+      .sort(function (a, b) { return (b.gar90 || 0) - (a.gar90 || 0); })[0];
+    if (!eg) return null;
+    var from = LC.byId[String(eg.tid)];
+    var clubs = ((arr[1] || {}).clubs || []).slice().sort(function (a, b) { return (a.rank || 9999) - (b.rank || 9999); });
+    var to = clubs.filter(function (c) { var l = LC.byId[String(c.team_id)]; return l && String(c.team_id) !== String(eg.tid) && (!from || l.league !== from.league); })[0];
+    return to ? { p: eg, to: LC.byId[String(to.team_id)], chance: mv[String(eg.id)] } : null;
+  }, function () { return null; });
+}
 function drawSimulator(el, body, q) {
   body.innerHTML = FB.loading('lines', 5);
   return leagueClubs().then(function (LC) {
     if (!FB.alive(el)) return;
+    if (!q.p && !q.to && !q.blank) return topicalMove(LC).then(function (t) {
+      if (!FB.alive(el)) return;
+      if (!t) return drawSimulator(el, body, FB.merge(q, { blank: '1' }));
+      FB.setQuery({ p: t.p.id, to: t.to.id });
+      return drawSimulator(el, body, FB.merge(q, { p: String(t.p.id), to: String(t.to.id), topical: Math.round(100 * t.chance) }));
+    });
     var P = q.p ? BYID[String(q.p)] : null;
     var B = q.to ? LC.byId[String(q.to)] : null;
     body.innerHTML = FB.card('Pick a move', 'Put a player in another club\'s squad and see what the models say. Clubs: the twelve pooled leagues and Argentina.',
       '<div class="fb-va-picks">' + FB.field('Player', picker('tr-player', 'Search a player…', P ? P.name : '')) + FB.field('Buying club', picker('tr-club', 'Search a club…', B ? B.name : '')) +
-      '<button type="button" class="qk-btn" id="tr-share">Copy link</button></div><p class="fb-cap">' + esc(HONEST) + '</p>') + '<div id="tr-body" class="fb-mt"></div>';
+      '<button type="button" class="qk-btn" id="tr-share">Copy link</button></div><p class="fb-cap">' + esc(HONEST) + '</p>') +
+      (q.topical && P && B ? '<div class="fb-mt">' + FB.note('<b>Opened on a topical move.</b> ' + esc(P.name) + ' has a ' + esc(q.topical) + '% chance of moving this window in our who-moves-next model, and is the most valuable regular above 25%; ' + esc(B.name) + ' is the strongest club on our one scale in another league. Pick any player and club above to try your own.') + '</div>' : '') +
+      '<div id="tr-body" class="fb-mt"></div>';
     var nav = function (patch) { FB.setQuery(patch, true); };
     wirePicker(el, 'tr-player', PLAYERS.filter(function (x) { return (x.min || 0) >= 90; }).map(function (x) {
       return { n: x.name, w: x.min, p: x, label: '<span class="fb-va-res-n">' + esc(x.name) + '</span> ' + roleBadge(x.role) + ' <span class="qk-muted">' + esc(x.club || 'no club') + ' · ' + g2(x.gar90) + '</span>' };
@@ -880,6 +833,10 @@ function ledgerShell(prefix) {
     FB.card('By window', 'Published fees; * from players\' transfer histories, still filling in.', FB.chartBox(prefix + '-win', 260, 'Spending and sales by window'), { span: 12 }));
 }
 
+/* the budget model's inputs in words (value meta budgets.features), never the variable names */
+var FEATURE_WORDS = { log_mv_pre: 'the squad’s market value before the window', log_prev_spend: 'what the club spent in the previous window', log_prev_income: 'what it took in from sales then',
+  league_offset: 'its league', club_xgd: 'how well it is playing (xG difference)' };
+function featureWords(fs) { var w = (fs || []).map(function (f) { return FEATURE_WORDS[f] || null; }).filter(Boolean); return w.length ? w.join(', ') : 'the club’s market history'; }
 function drawBudgets(el, body, q) {
   body.innerHTML = FB.loading('lines', 5);
   return Promise.all([leagueClubs(), loadTransfers()]).then(function (d) {
@@ -892,8 +849,8 @@ function drawBudgets(el, body, q) {
     var club = q.club && LC.byId[String(q.club)] ? LC.byId[String(q.club)] : null;
     body.innerHTML = FB.kpis([
       FB.kpi('Clubs with a budget', intl(b.n_clubs), { sub: 'fitted on the ' + esc(b.target_window || '') + ' window' }),
-      FB.kpi('Rank correlation', b.ok ? num(b.spearman_cv, 2) : '—', { signal: true, sub: 'out of sample, 5 folds by club' }),
-      FB.kpi('R² (log spend)', b.ok ? num(b.r2_log_cv, 2) : '—', { sub: 'out of sample' }),
+      FB.kpi('How well it ranks clubs', b.ok ? num(b.spearman_cv, 2) : '—', { signal: true, sub: 'rank correlation with real spending, clubs it had not seen', tip: 'Spearman rank correlation, out of sample (5 folds by club): 1 would order every club’s spending exactly.' }),
+      FB.kpi('Spending explained', b.ok ? pct(b.r2_log_cv) : '—', { sub: 'of the spread in (log) spending, out of sample' }),
       FB.kpi('Inside 25-75%', b.ok ? pct(b.inside_25_75_cv) : '—', { sub: 'clubs out of sample (50% is calibrated)' }),
       FB.kpi('Winter v summer', b.ok ? pct(b.winter_ratio) : '—', { sub: 'a winter window\'s share of a summer\'s' })
     ]) +
@@ -906,7 +863,7 @@ function drawBudgets(el, body, q) {
         FB.card('Net spend by club, latest window', compName(lg) + ' · published fees in, less fees out.', FB.chartBox('bu-net', 360, 'Net spend by club'), { span: 7 }) +
         FB.card('The league\'s windows', 'Spending and sales.', FB.chartBox('bu-lgwin', 360, 'League spending by window'), { span: 5 })
       ) + '</div>' +
-      '<p class="fb-cap">' + (b.ok ? 'Inputs: ' + esc((b.features || []).join(', ')) + '.' : esc(b.reason || 'Budgets not fitted this build.')) + ' ' + esc(HONEST) + '</p>';
+      '<p class="fb-cap">' + (b.ok ? 'What the budget model reads: ' + featureWords(b.features) + '.' : esc(b.reason || 'Budgets not fitted this build.')) + ' ' + esc(HONEST) + '</p>';
     var sl = el.querySelector('#bu-lg'), sc = el.querySelector('#bu-club');
     if (sl) sl.addEventListener('change', function () { FB.setQuery({ lg: sl.value, club: null }, true); });
     if (sc) sc.addEventListener('change', function () { FB.setQuery({ lg: lg, club: sc.value || null }, true); });
@@ -925,6 +882,13 @@ function drawBudgets(el, body, q) {
       series: [{ name: 'Spent', data: keys.map(function (k) { return W[k].spend || 0; }) }, { name: 'Sold', data: keys.map(function (k) { return W[k].income || 0; }) }] });
     else { lb.style.height = 'auto'; lb.innerHTML = FB.muted('No windows on record.'); }
     var cb = el.querySelector('#bu-club-body');
+    /* round 9: the page opens on a real club, the league's biggest net spender of the latest window */
+    if (!club && nk.length && LC.byId[String(nk[0])]) {
+      club = LC.byId[String(nk[0])];
+      FB.setQuery({ lg: lg, club: club.id });
+      if (sc) sc.value = String(club.id);
+      cb.insertAdjacentHTML('beforebegin', FB.note('<b>Opened on ' + esc(club.name) + '</b>, the biggest net spender in ' + esc(compName(lg)) + '’s latest window. Pick any club above.'));
+    }
     if (!club) { cb.innerHTML = FB.empty('Pick a club', 'Its budget for the next windows, the last 12 months in the market, and every signing and sale.'); return; }
     cb.innerHTML = FB.loading('lines', 4);
     return clubFile(club.id).then(function (cd) {
@@ -940,6 +904,8 @@ function drawBudgets(el, body, q) {
 
 // ══ method ══════════════════════════════════════════════════════════════
 
+/* the value model's weights and held-out checks (was Value › Method; Model › How it works shows it) */
+FB.valueMethod = function (el, body) { return loadCore().then(function (ok) { if (ok && FB.alive(el)) drawMethod(el, body); }); };
 function drawMethod(el, body) {
   var m = META, mod = m.model || {}, v = (m.validation || {}).r2 || {};
   var f = m.fee || {}, fv = f.validation || {}, cv = fv.cv || {}, ts = fv.time_split || {};

@@ -187,7 +187,7 @@ function leadersHTML(L, season) {
   return '<div class="leaders-grid">' + keys.map(k => '<div class="ld-box"><div class="day-head">' + esc(LEADER_LABEL[k] || k.toUpperCase()) + '</div>' +
     HW.tableHTML([{ label: '#', align: 'right' }, { label: 'Player' }, { label: '', align: 'right' }], ld[k].slice(0, 5).map((r, i) =>
       [String(i + 1), { html: HW.playerLink(L, r[0], { team: (HW.NAMES[L].players[String(r[0])] || {}).team }) }, { v: r[1], html: '<b>' + HW.fmtVal(r[1], fmt(k)) + '</b>' }]), { compact: true }) + '</div>').join('') +
-    '</div><a class="more-link" href="' + HW.href(L, 'leaders') + '">Full leaderboards →</a>';
+    '</div><a class="more-link" href="' + HW.href(L, 'scout') + (HW.sq(L) ? '&' : '?') + 'view=leaders">Full leaderboards in the Scouting Room →</a>';
 }
 
 function render(el, params) {

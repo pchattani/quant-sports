@@ -25,9 +25,17 @@ function render(el, params, state) {
     '<div class="lab-controls af-controls"><label>Add a player<span id="el-pick"></span></label><label>Window<select id="el-win"><option value="all">Everything on file</option><option value="5">Last 5 years</option><option value="2">Last 2 years</option><option value="1">Last year</option></select></label>' +
     '<label>&nbsp;<button type="button" id="el-reset">Top 5 now</button></label></div><div id="el-chips" class="af-chips"></div><div id="el-chart" style="height:440px"></div><div class="pg-note" id="el-chart-note"></div></div>' +
     '<div class="card"><div class="card-header">All-time peaks <span class="card-sub" id="el-peak-sub"></span>' + k.toggle('el-peak', [['all', 'Overall'], ['hard', 'Hard'], ['clay', 'Clay'], ['grass', 'Grass']], ES.peak) + '</div><div id="el-peaks"></div></div>';
-  return k.ready().then(() => Promise.all([TA.load(T + '/elo.json'), k.loadNames(T)])).then(res => {
+  /* a finished season (round 9): the table and the line picks start from that year's season-end Elo (its catalogue) */
+  const Y = params.year, past = TA.past && TA.past.is(T, Y);
+  return k.ready().then(() => Promise.all([TA.load(T + '/elo.json'), k.loadNames(T), past ? TA.past.cat(T, Y) : Promise.resolve(null)])).then(res => {
     if (!k.alive(el)) return;
-    const E = res[0];
+    let E = res[0];
+    if (past && res[2] && k.ok(E)) {
+      const cur = {};
+      TA.past.byElo(res[2], 'elo').forEach((x, i) => { cur[x.id] = { all: TA.past.val(x.p, 'elo'), hard: TA.past.val(x.p, 'elo_hard'), clay: TA.past.val(x.p, 'elo_clay'), grass: TA.past.val(x.p, 'elo_grass'), n: x.p.matches, rank: i + 1, off: x.p.rank }; });
+      E = Object.assign({}, E, { current: cur, _now: E.current, _year: Y });
+      el.querySelector('.card-header').firstChild.textContent = k.TN(T) + ' Elo at the end of ' + Y + ' ';
+    }
     if (!k.ok(E) || !E.current) { document.getElementById('el-table').innerHTML = k.notBuilt('The ' + k.TN(T) + ' Elo file', E); document.getElementById('el-sub').textContent = ''; return; }
     const q = (params.query || {}).p;
     if (q) ES.picks = String(q).split(',').filter(Boolean).slice(0, 8);
@@ -79,19 +87,19 @@ function drawTable(T, E) {
       cell(id, 'all'), cell(id, 'hard'), cell(id, 'clay'), cell(id, 'grass'),
       { v: spec || '', html: spec ? k.surfChip(spec) + ' <span class="muted-inline">' + k.signed(gap, 0) + '</span>' : '—' },
       { v: c.n, html: k.int(c.n), align: 'right' }, { v: k.isNum(c.rank) ? c.rank : 9999, html: k.isNum(c.rank) ? String(c.rank) : '—', align: 'right' },
-      { v: k.isNum((k.NAMES[T][id] || {}).rank) ? k.NAMES[T][id].rank : 9999, html: k.isNum((k.NAMES[T][id] || {}).rank) ? String(k.NAMES[T][id].rank) : '—', align: 'right' }
+      (() => { const o = E._year ? c.off : (k.NAMES[T][id] || {}).rank; return { v: k.isNum(o) ? o : 9999, html: k.isNum(o) ? String(o) : '—', align: 'right' }; })()
     ] };
   });
   const host = document.getElementById('el-table');
   host.innerHTML = k.table([{ label: '#', sortable: false }, { label: 'Player' }, { label: 'Ctry' }, { label: 'Overall', align: 'right' }, { label: 'Hard', align: 'right' }, { label: 'Clay', align: 'right' }, { label: 'Grass', align: 'right' },
     { label: 'Best surface', title: 'The surface with the highest rating, and how far it sits above the overall one' }, { label: 'Matches', align: 'right', title: 'Matches rated (all levels, including qualifying and Challengers)' },
-    { label: 'Elo rank', align: 'right', title: 'Rank by overall Elo' }, { label: 'ATP/WTA rank', align: 'right', title: 'Latest official ranking' }], rows, { compact: true, sticky: true }) +
+    { label: 'Elo rank', align: 'right', title: 'Rank by overall Elo' }, { label: 'ATP/WTA rank', align: 'right', title: E._year ? 'Official ranking at the player’s last tour-level match of ' + E._year : 'Latest official ranking' }], rows, { compact: true, sticky: true }) +
     (ids.length > ES.show ? '<div class="pg-note"><button type="button" class="af-more" id="el-more">Show all ' + ids.length + '</button></div>' : '');
   k.sortable(host);
   if (TA.v2 && TA.v2.oursHeads) TA.v2.oursHeads(host, { Overall: 'elo', Hard: 'elo_hard', Clay: 'elo_clay', Grass: 'elo_grass', 'Elo rank': 'elo_rank' });
   const more = document.getElementById('el-more');
   if (more) more.onclick = () => { ES.show = 100000; drawTable(T, E); };
-  document.getElementById('el-sub').textContent = ids.length + ' active players rated · ranked by ' + (s === 'all' ? 'overall' : s) + ' Elo; click a header to sort';
+  document.getElementById('el-sub').textContent = ids.length + (E._year ? ' players with 10+ matches in ' + E._year + ', at the season’s end' : ' active players rated') + ' · ranked by ' + (s === 'all' ? 'overall' : s) + ' Elo; click a header to sort';
   document.getElementById('el-note').innerHTML = 'Every match from qualifying up moves the ratings; a player\'s surface Elo moves only on that surface. Our match forecast uses a blend of the two, ' +
     'w × surface + (1 − w) × overall, with w fitted (0.46 for the ATP; the WTA uses the code default 0.5 until its own fit is committed). 1500 is the long-run mean of everyone rated, so a top-100 player sits far above it. ' +
     'After 60 days out a rating decays towards 1500. Details in the <a href="#/methodology/elo">methodology</a>.';
@@ -103,7 +111,7 @@ function drawPeaks(T, E) {
   const sub = document.getElementById('el-peak-sub');
   sub.textContent = 'The highest ' + (s === 'all' ? 'overall' : s) + ' Elo each player reached, since ' + k.FIRST_YEAR[T] + ' (the first year of ' + k.TN(T) + ' results on file).';
   if (!list.length) { host.innerHTML = k.muted('No peak table in the Elo file.'); return; }
-  const cur = E.current || {};
+  const cur = E._now || E.current || {};
   host.innerHTML = k.table([{ label: '#', sortable: false }, { label: 'Player' }, { label: 'Peak', align: 'right' }, { label: 'Date', align: 'right' }, { label: 'Now', align: 'right' }, { label: 'Off the peak', align: 'right' }],
     list.map((r, i) => {
       const now = (cur[r[0]] || {})[s];

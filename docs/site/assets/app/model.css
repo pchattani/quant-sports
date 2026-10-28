@@ -66,3 +66,9 @@
 .fb-md-h { margin-top: var(--sp-5); }
 
 .fb-md-pad { padding: 0 var(--sp-3) var(--sp-3); }
+/* round 9: How it works for fans: the pictures, then the technical detail folded away */
+.fb-md-tech > summary { cursor: pointer; list-style: none; }
+.fb-md-tech > summary::-webkit-details-marker { display: none; }
+.fb-md-tech > summary .qk-sh-title::after { content: ' +'; color: var(--volt); }
+.fb-md-tech[open] > summary .qk-sh-title::after { content: ' −'; }
+.fb-md-pics .qk-card { min-width: 0; }

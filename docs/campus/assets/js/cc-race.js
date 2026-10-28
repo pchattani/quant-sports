@@ -1,4 +1,5 @@
-/* The Quant Campus — the race and the team cards on Standings (#/<L>/standings?tab=race | tab=cards).
+/* The Quant Campus — the race on Standings (#/<L>/standings?tab=race). The Team cards moved to the Teams page (round 9:
+ * cc-teamspage.js, strengths and weaknesses and the style map).
  *
  *   Race (current season): how the playoff / tournament, title and conference races are shaping up.
  *     - the forecast lines (538 style) from <L>/race_log.json, one snapshot a day ("tracking since" its first day);
@@ -12,15 +13,11 @@
  *       (season.json sim.stakes; football), or the games between undecided teams (basketball);
  *     - the road left: remaining schedule strength from our ratings (sim.teams[t].sos_rem);
  *     - tiers.
- *   Team cards (any season): the shape of the league (offence v defence quadrant, record v points luck) and one
- *     card per team: strengths and weaknesses as plain-English chips, percentiles against every FBS / Division I
- *     team (teams.json pct, METRICS_SPEC college team set), and an expandable full metric list.
- * Reads <L>/<S>/season.json, schedule.json, teams.json, cfp.json | bracket.json and <L>/race_log.json. */
+ * Reads <L>/<S>/season.json, schedule.json, cfp.json | bracket.json and <L>/race_log.json. */
 (function (CC) {
 'use strict';
 var U = CC.ui, esc = CC.esc, isNum = CC.isNum;
 var POWER = { cfb: ['SEC', 'Big Ten', 'Big 12', 'ACC'], mbb: ['SEC', 'Big Ten', 'Big 12', 'ACC', 'Big East'], wbb: ['SEC', 'Big Ten', 'Big 12', 'ACC', 'Big East'] };
-var PYTH = { cfb: 2.37, mbb: 11.5, wbb: 10.0 };
 var DAY = 86400000;
 
 function confOrder(L, season) {
@@ -111,11 +108,11 @@ CC.raceTab = function (node, L, S, season, x) {
   /* who moved */
   html += '<div id="rc-moved"></div>';
   /* picture */
-  html += '<div id="rc-picture"></div>';
+  html += '<div id="rc-bubble"></div><div id="rc-picture"></div>';
   /* stakes */
   html += '<div id="rc-stakes"></div>';
   /* locks and lines, road left, tiers */
-  html += '<div class="qk-grid cc-grid"><div class="qk-span-6" id="rc-locks"></div><div class="qk-span-6" id="rc-road"></div></div>';
+  html += '<div id="rc-sos"></div><div class="qk-grid cc-grid"><div class="qk-span-6" id="rc-locks"></div><div class="qk-span-6" id="rc-road"></div></div>';
   html += '<div id="rc-tiers"></div>';
   node.innerHTML = html;
 
@@ -137,7 +134,7 @@ CC.raceTab = function (node, L, S, season, x) {
     box.innerHTML = U.chart('rc-fc', 340, 'Chances over time');
     QKC.forecast(QK.$('#rc-fc', node), {
       x: dd.map(function (d) { return d + 'T12:00:00Z'; }), xType: 'time', xName: 'Date', yName: 'Chance',
-      series: rank.map(function (t) { return { name: CC.tshort(L, t), label: CC.tabbr(L, t), color: CC.traw(L, t), data: dd.map(function (d) { var v = (lm[d] || {})[t]; return isNum(v) ? v : (m === ck ? null : 0); }) }; }),
+      series: rank.map(function (t, i) { return { name: CC.tshort(L, t), label: CC.tabbr(L, t), color: CC.lineColours(L, rank)[i], data: dd.map(function (d) { var v = (lm[d] || {})[t]; return isNum(v) ? v : (m === ck ? null : 0); }) }; }),
       today: dd[dd.length - 1] + 'T12:00:00Z', label: 'Chances over time'
     });
   }
@@ -153,7 +150,7 @@ CC.raceTab = function (node, L, S, season, x) {
       x: xs.map(function (d) { return CC.date(d + 'T12:00:00Z'); }), xName: 'Week of',
       yName: fb ? 'Rating (points v average FBS)' : 'Rating (per 100 possessions)', yScale: true,
       yFmt: function (v) { return CC.signed(v, 1); },
-      series: top.map(function (t) { var m = {}; paths[t].forEach(function (p) { m[p[0]] = p[1]; }); return { name: CC.tshort(L, t), label: CC.tabbr(L, t), color: CC.traw(L, t), symbols: true, data: xs.map(function (d) { return isNum(m[d]) ? m[d] : null; }) }; }),
+      series: top.map(function (t, i) { var m = {}; paths[t].forEach(function (p) { m[p[0]] = p[1]; }); return { name: CC.tshort(L, t), label: CC.tabbr(L, t), color: CC.lineColours(L, top)[i], symbols: true, data: xs.map(function (d) { return isNum(m[d]) ? m[d] : null; }) }; }),
       label: 'Ratings over the season'
     });
   }
@@ -187,6 +184,21 @@ CC.raceTab = function (node, L, S, season, x) {
     }
     QK.$('#rc-moved', node).innerHTML = U.section('Who moved this week', basis,
       '<div class="qk-grid cc-grid"><div class="qk-span-6">' + U.card('Rising', '', list(up, 'pos')) + '</div><div class="qk-span-6">' + U.card('Falling', '', list(dn, 'neg')) + '</div></div>', '', 'Movers');
+  })();
+
+  /* round 9, Phase 4: the bubble watch: every team still in the balance for the field, its chance as a bar against the
+     coin-flip line, the teams just in above it and just out below */
+  (function () {
+    var box = QK.$('#rc-bubble', node);
+    var lo = fb ? 0.1 : 0.15, hi = fb ? 0.9 : 0.85;
+    var bt = byP.filter(function (t) { var p = sim[t][pk] || 0; return p >= lo && p <= hi; }).slice(0, 24);
+    if (!box || bt.length < 3) return;
+    box.innerHTML = U.section('Bubble watch', 'Every team between ' + CC.pct(lo, 0) + ' and ' + CC.pct(hi, 0) + ' to make the ' + (fb ? '12-team playoff' : 'field of 68') + ', from our simulated seasons. Above the 50% line we have them in more often than out; the further from it, the safer.',
+      U.card('', '', U.chart('rc-bub', Math.max(280, bt.length * 24 + 60), 'Bubble watch')), '', 'On the bubble');
+    QKC.bar(QK.$('#rc-bub', node), { cats: bt.map(function (t) { var r = R[t] || {}; return CC.tshort(L, t) + ' ' + CC.record(r.w, r.l); }), horizontal: true, diverging: true, labels: true, min: -0.5, max: 0.5,
+      fmt: function (v) { return CC.pct(v + 0.5, 0); }, series: [{ name: (fb ? 'Playoff' : 'NCAA') + ' chance, against 50%', data: bt.map(function (t) { return (sim[t][pk] || 0) - 0.5; }) }],
+      hrefs: bt.map(function (t) { return CC.teamHref(L, t, S); }), labelWidth: 150, valName: 'Our chance to make the ' + (fb ? 'playoff' : 'field') + ' (the centre line is 50%)', catName: 'Team',
+      valTicks: { values: [-0.5, -0.25, 0, 0.25, 0.5], labels: ['0%', '25%', '50%', '75%', '100%'] } });
   })();
 
   /* the CFP picture / the NCAA seeding race */
@@ -293,6 +305,15 @@ CC.raceTab = function (node, L, S, season, x) {
     var order = withRem.slice().sort(function (a, b) { return sim[b].sos_rem - sim[a].sos_rem; }), rk = {};
     order.forEach(function (t, i) { rk[t] = i + 1; });
     var cont = byP.filter(function (t) { return (sim[t][pk] || 0) >= 0.03 && isNum(sim[t].sos_rem); }).slice(0, 16);
+    /* round 9, Phase 4: remaining schedule strength as a chart, the contenders from toughest road to easiest */
+    var sb = QK.$('#rc-sos', node), cs0 = cont.slice().sort(function (a, b) { return sim[b].sos_rem - sim[a].sos_rem; });
+    if (sb && cs0.length >= 3) {
+      sb.innerHTML = U.section('The road left', 'How hard the rest of the regular season is for each contender: the average rating of the opponents still to play, the toughest at the top. ' + (fb ? 'A point is a point better than an average FBS team.' : 'Points per 100 possessions against an average team.'),
+        U.card('', '', U.chart('rc-sos-c', Math.max(260, cs0.length * 26 + 60), 'Remaining schedule strength of the contenders')), '', 'Schedule strength');
+      QKC.bar(QK.$('#rc-sos-c', node), { cats: cs0.map(function (t) { return CC.tshort(L, t) + ' (' + sim[t].n_rem + ' left)'; }), horizontal: true, labels: true, fmt: function (v) { return CC.signed(v, 1); },
+        series: [{ name: 'Average opponent rating', data: cs0.map(function (t) { return sim[t].sos_rem; }) }], colors: cs0.map(function (t) { return CC.tcol(L, t); }), hrefs: cs0.map(function (t) { return CC.teamHref(L, t, S); }), labelWidth: 150,
+        valName: 'Average rating of the opponents left (' + (fb ? 'points' : 'per 100') + ')', catName: 'Contender' });
+    }
     box.innerHTML = U.card('The road left', 'Contenders’ remaining regular-season schedules: the average rating of the opponents still to play (' + (fb ? 'points v an average FBS team' : 'per 100 possessions') + '), ranked 1 = toughest of ' + withRem.length + '.',
       U.table(['Team', { label: 'Left', align: 'right' }, { label: 'Opp. rating', align: 'right' }, { label: 'Rank', align: 'right', title: '1 = toughest remaining schedule' }, { label: 'Exp. wins left', align: 'right', title: 'Expected wins in the rest of the season, from our simulations' }], cont.map(function (t) {
         var r = R[t] || {}, s0 = sim[t];
@@ -319,124 +340,4 @@ CC.raceTab = function (node, L, S, season, x) {
   })();
 };
 
-/* ── Team cards ───────────────────────────────────────────────────────── */
-var CHIP = {
-  cfb: [
-    ['off', 90, 'Elite offence', 15, 'Struggling offence'], ['def', 90, 'Elite defence', 15, 'Leaky defence'],
-    ['pass_epa', 85, 'Dangerous passing game', 12, 'Passing game stalls'], ['rush_epa', 85, 'Strong run game', 12, 'No run game'],
-    ['explosive', 85, 'Big-play offence', 12, 'Few big plays'], ['sr_def', 88, 'Down-to-down defence', 12, 'Defence gives up steady gains'],
-    ['to_margin', 85, 'Wins the turnover battle', 15, 'Turnover-prone'], ['third_pct', 88, 'Converts on third down', 12, 'Stalls on third down'],
-    ['sos', 85, 'Battle-tested schedule', 12, 'Soft schedule so far']],
-  bb: [
-    ['off', 90, 'Elite offence', 15, 'Struggling offence'], ['def', 90, 'Elite defence', 15, 'Leaky defence'],
-    ['efg', 88, 'Efficient shooting', 12, 'Poor shot quality'], ['opp_efg', 88, 'Contests every shot', 12, 'Opponents shoot freely'],
-    ['tov_rate', 88, 'Takes care of the ball', 12, 'Turnover-prone'], ['orb_rate', 88, 'Owns the offensive glass', 12, 'One shot and done'],
-    ['opp_tov_rate', 88, 'Forces turnovers', null, null], ['ft_pct', 90, 'Reliable at the line', 10, 'Misses at the line'],
-    ['sos', 85, 'Battle-tested schedule', 12, 'Soft schedule so far']]
-};
-var STYLE = { tempo: [80, 'Plays fast', 20, 'Slows it down'], tpar: [85, 'Lives behind the arc', 15, 'Works inside the arc'] };
-var CARD_KEYS = { cfb: ['rating', 'off', 'def', 'epa_off', 'epa_def', 'pass_epa', 'rush_epa', 'explosive', 'to_margin'],
-  bb: ['rating', 'off', 'def', 'efg', 'opp_efg', 'tov_rate', 'orb_rate', 'opp_tov_rate', 'tempo'] };
-
-/* points-based expected wins (Pythagorean, exponent by sport) and the luck read: actual wins minus it */
-function luck(L, r) {
-  if (!r || !isNum(r.pf) || !isNum(r.pa) || !(r.pf + r.pa > 0)) return null;
-  var g = (r.w || 0) + (r.l || 0);
-  if (!g) return null;
-  var k = PYTH[L] || 2.37, a = Math.pow(r.pf, k), b = Math.pow(r.pa, k);
-  var exp = g * a / (a + b);
-  return { exp: exp, d: (r.w || 0) - exp, g: g };
-}
-function chipsFor(L, t, row, lk) {
-  var bb = !CC.fb(L), set = CHIP[bb ? 'bb' : 'cfb'], pc = row.pct || {}, out = [];
-  set.forEach(function (c) {
-    var p = pc[c[0]];
-    if (!isNum(p)) return;
-    if (p >= c[1]) out.push({ t: c[2], k: 'good', p: p });
-    else if (c[3] !== null && p <= c[3]) out.push({ t: c[4], k: 'bad', p: p });
-  });
-  Object.keys(STYLE).forEach(function (k) { var p = pc[k], s0 = STYLE[k]; if (!isNum(p)) return; if (p >= s0[0]) out.push({ t: s0[1], k: 'style', p: p }); else if (p <= s0[2]) out.push({ t: s0[3], k: 'style', p: p }); });
-  if (lk && lk.g >= 4) {
-    if (lk.d >= 1) out.push({ t: 'Riding luck: ' + CC.f(lk.d, 1) + ' wins above its points', k: 'luck', p: 50 });
-    else if (lk.d <= -1) out.push({ t: 'Unlucky: ' + CC.f(-lk.d, 1) + ' wins below its points', k: 'luck', p: 50 });
-  } else if (bb && isNum((row.values || {}).luck) && (row.values.w || row.w) && Math.abs(row.values.luck) >= 0.04) {
-    out.push({ t: row.values.luck > 0 ? 'Riding luck in close games' : 'Unlucky in close games', k: 'luck', p: 50 });
-  }
-  return out;
-}
-function chipHTML(c) { return '<span class="cc-rc-chip ' + c.k + '">' + esc(c.t) + '</span>'; }
-function metricMap(teamsP) { var m = {}; (teamsP.metrics || []).forEach(function (x) { m[x.key] = x; }); return m; }
-function shortVersion(L, row, mm) {
-  var pc = row.pct || {}, keys = Object.keys(pc).filter(function (k) { return isNum(pc[k]) && mm[k] && mm[k].group !== 'Results' && k !== 'rating' && k !== 'sos' && k !== 'tempo' && k !== 'tpar' && k !== 'luck' && k !== 'wpct'; });
-  if (!keys.length) return '';
-  keys.sort(function (a, b) { return pc[b] - pc[a]; });
-  var best = keys[0], worst = keys[keys.length - 1];
-  return 'Best at ' + esc(mm[best].label || best) + ' (' + QK.ordinal(Math.round(pc[best])) + ' percentile)' + (pc[worst] < 40 ? '; weak spot: ' + esc(mm[worst].label || worst) + ' (' + QK.ordinal(Math.round(pc[worst])) + ')' : '; no clear weak spot') + '.';
-}
-
-CC.cardsTab = function (node, L, S, season, teamsP, q) {
-  if (!CC.ok(teamsP) || !teamsP.teams) { node.innerHTML = U.missing('Team cards', teamsP); return; }
-  var fb = CC.fb(L), sim = simTeams(season), R = recs(season), mm = metricMap(teamsP), cs = confOrder(L, season);
-  var TT = teamsP.teams;
-  var pick = q && q.conf && (q.conf === 'top' || cs.indexOf(q.conf) >= 0) ? q.conf : 'top';
-  var chips = '<div class="qk-chips scroll cc-filters" id="rc-cchips" role="group" aria-label="Conference">' + ['top'].concat(cs).map(function (c) {
-    return '<button type="button" class="qk-chip" style="--ca:var(--signal)" data-value="' + esc(c) + '" aria-pressed="' + (c === pick) + '">' + esc(c === 'top' ? 'Top 25' : CC.cname(L, c)) + '</button>'; }).join('') + '</div>';
-  var pre = !Object.keys(R).some(function (t) { return (R[t].w || 0) + (R[t].l || 0) > 0; });
-  node.innerHTML = chips + (pre ? U.note('Preseason: the ratings are last season’s, regressed, until games are played; the box-score percentiles start with the first games.') : '') +
-    U.section('Shape of the league', 'Every team in the selection on our offence and defence ratings, and its record against what its points say.', '<div class="qk-grid cc-grid"><div class="qk-span-7">' + U.card('Offence v defence', (fb ? 'Points added per game on each side of the ball, against an average FBS team.' : 'Adjusted points scored and allowed per 100 possessions (defence: fewer allowed is higher on the chart).') + ' Dashed lines: the average of the teams shown.', U.chart('rc-quad', 400, 'Offence against defence')) +
-      '</div><div class="qk-span-5">' + U.card('Riding luck?', fb ? 'Wins minus the wins its points for and against would usually bring (Pythagorean, exponent 2.37). Above zero: more wins than the scores suggest.' : 'Wins minus the wins its points for and against would usually bring (Pythagorean). Above zero: winning the close ones.', '<div id="rc-luck"></div>') + '</div></div>', '', 'Who’s for real?') +
-    '<div id="rc-cards"></div>';
-  function sel() {
-    var ids = Object.keys(TT);
-    if (pick === 'top') {
-      var ap = ((season.polls || {}).ap || []).map(function (r) { return String(r.team); });
-      var list = ap.length ? ap.slice(0, 25) : (season.power || []).slice(0, 25).map(function (r) { return String(r.team); });
-      return list.filter(function (t) { return TT[t]; });
-    }
-    return ids.filter(function (t) { return String(TT[t].conference) === String(pick); }).sort(function (a, b) { return (TT[a].rating_rank || 999) - (TT[b].rating_rank || 999); });
-  }
-  function draw() {
-    var ids = sel();
-    var pts = ids.map(function (t) {
-      var v = TT[t].values || {};
-      if (!isNum(v.off) || !isNum(v.def)) return null;
-      return { x: v.off, y: fb ? v.def : -v.def, name: CC.tname(L, t), label: CC.tabbr(L, t), color: CC.traw(L, t), href: CC.teamHref(L, t, S), sub: CC.record(TT[t].w, TT[t].l) + ' · rating ' + CC.signed(v.rating, 1) };
-    }).filter(Boolean);
-    var qb = QK.$('#rc-quad', node);
-    if (pts.length >= 3) QKC.quadrant(qb, { points: pts, xName: fb ? 'Offence (points added per game)' : 'Offence (adj. points per 100)', yName: fb ? 'Defence (points prevented per game)' : 'Defence (adj. points allowed per 100)',
-      refX: 'mean', refY: 'mean', xFmt: function (v) { return fb ? CC.signed(v, 0) : CC.f(v, 0); }, yFmt: function (v) { return fb ? CC.signed(v, 0) : CC.f(Math.abs(v), 0); },
-      corners: { tr: 'Complete teams', tl: 'Defence first', br: 'Outscore you', bl: 'Struggling' }, label: 'Offence against defence' });
-    else qb.innerHTML = QK.empty('Too few teams', '');
-    var lr = ids.map(function (t) { var lk = luck(L, R[t]); return lk ? { t: t, d: lk.d, exp: lk.exp } : null; }).filter(Boolean).sort(function (a, b) { return b.d - a.d; });
-    var lb = QK.$('#rc-luck', node);
-    if (lr.length >= 3 && lr.some(function (r) { return Math.abs(r.d) > 0.05; })) {
-      lb.innerHTML = U.chart('rc-luckc', Math.max(220, lr.length * 22 + 60), 'Wins against points-expected wins');
-      QKC.bar(QK.$('#rc-luckc', node), { horizontal: true, diverging: true, cats: lr.map(function (r) { return CC.tshort(L, r.t); }), series: [{ name: 'Wins above expected', data: lr.map(function (r) { return Math.round(r.d * 10) / 10; }) }],
-        valName: 'Wins above points-expected', labels: true, fmt: function (v) { return CC.signed(v, 1); }, hrefs: lr.map(function (r) { return CC.teamHref(L, r.t, S); }), label: 'Wins against points-expected wins' });
-    } else lb.innerHTML = QK.empty('Not enough games yet', 'This reads once teams have played a few games.');
-    var cardsHTML = ids.map(function (t) {
-      var row = TT[t], r = R[t] || {}, s0 = sim[t] || {}, lk = luck(L, r);
-      var ch = chipsFor(L, t, row, lk);
-      var keys = (CARD_KEYS[fb ? 'cfb' : 'bb']).filter(function (k) { return mm[k] && isNum((row.pct || {})[k]); });
-      var bars = QK.pctlBars(keys.map(function (k) { var m = mm[k]; return { label: m.label, pctl: row.pct[k], value: CC.fmtMetric(m, (row.values || {})[k]), tip: m.desc, style: k === 'tempo' }; }));
-      var all = Object.keys(row.pct || {}).filter(function (k) { return keys.indexOf(k) < 0 && mm[k]; });
-      var more = all.length ? '<details class="cc-rc-more"><summary>Every metric (' + all.length + ' more)</summary>' + QK.pctlBars(all.map(function (k) { var m = mm[k]; return { label: m.label, pctl: row.pct[k], value: CC.fmtMetric(m, (row.values || {})[k]), tip: m.desc, style: k === 'tempo' || k === 'tpar' }; })) + '</details>' : '';
-      var race = [];
-      if (isNum(s0.p_cfp)) race.push('CFP <b>' + CC.pct(s0.p_cfp) + '</b>');
-      if (isNum(s0.p_ncaa)) race.push('NCAA <b>' + CC.pct(s0.p_ncaa) + '</b>');
-      if (isNum(s0.p_conf)) race.push('Conf. title <b>' + CC.pct(s0.p_conf) + '</b>');
-      if (isNum(s0.p_conf_reg)) race.push('Conf. title <b>' + CC.pct(s0.p_conf_reg) + '</b>');
-      if (fb && isNum(s0.p_bowl) && s0.p_bowl < 0.995) race.push('Bowl <b>' + CC.pct(s0.p_bowl) + '</b>');
-      var t0 = CC.team(L, t) || {};
-      var head = '<div class="cc-rc-ch"><span class="cc-rc-stripe" style="background:' + esc(CC.tcol(L, t)) + '"></span>' + U.teamEnt(L, t, { season: S, full: true }) +
-        '<span class="cc-rc-rec num">' + esc(CC.record(row.w, row.l)) + (isNum(r.conf_w) ? ' <small>' + esc(CC.record(r.conf_w, r.conf_l)) + ' conf.</small>' : '') + '</span></div>' +
-        '<div class="cc-rc-sub">#' + (row.rating_rank || '—') + ' in our ratings · ' + esc(CC.cname(L, row.conference || t0.conference)) + (race.length ? ' · ' + race.join(' · ') : '') + '</div>';
-      return '<article class="qk-card cc-rc-card">' + head + (ch.length ? '<div class="cc-rc-chips">' + ch.map(chipHTML).join('') + '</div>' : '') + '<p class="cc-rc-short">' + shortVersion(L, row, mm) + '</p>' + bars + more + '</article>';
-    }).join('');
-    QK.$('#rc-cards', node).innerHTML = U.section('Team cards', 'Strengths and weaknesses: percentiles against every ' + (fb ? 'FBS' : 'Division I') + ' team this season (the metric set on the Model page). Chips name the clear strengths (85th percentile and up), weak spots (15th and below) and how a team plays.',
-      QK.pctKey({}) + '<div class="cc-rc-grid">' + cardsHTML + '</div>', '', 'Strengths and weaknesses');
-  }
-  QK.chips(QK.$('#rc-cchips', node), function (v) { pick = v[0] || 'top'; draw(); });
-  draw();
-};
 })(window.CC);

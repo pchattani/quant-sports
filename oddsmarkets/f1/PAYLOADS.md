@@ -23,7 +23,7 @@ rather than omitted.
 `data/markets.json` — `{"updated_at", "drivers_title": TITLE, "constructors_title": TITLE, "next_race": {"year","round","prices": {driverId: p}, "model": {driverId: p}, "sources": [...]}, "h2h": [...]}`
   TITLE = `{"available", "prices": {id: p}, "model": {id: p}, "edge": {id: rel}, "sources": [...], "eliminated": [...], "implied_total"}`
 `data/elo.json` — `{"all_time": [{"driver","name","peak_teammate","peak_field","peak_quali","races","years":[a,b]}] (top 200), "current": {driverId: {"elo","elo_teammate","elo_quali"}}}`
-`data/lab.json` — column-oriented like the football lab: `{"fields": [...], "metrics": [{key,label,group,fmt,lower,desc}], "rows": [[...]] , "windows": {"season": year}}`
+`data/lab.json` — column-oriented like the football lab: `{"fields": [...], "metrics": [{key,label,group,fmt,lower,desc}], "rows": [[...]] , "windows": {"season": year}}`; fields start `driver, name, team, year, races, age` (round 9: `age` = whole years on 1 July of the season, from the store's date of birth, for the Scouting Room's age band; null when unknown)
   one row per driver-season 2018→ (driverId, name, team, year, races, then every catalogue metric value).
 
 ## Per season — `data/<year>/`

@@ -29,11 +29,50 @@ function listOf(d, kind) {
 }
 function sub(r, keys) { for (let i = 0; i < keys.length; i++) { const x = r[keys[i]]; if (x && typeof x === 'object') return x; } return {}; }
 
+/* Farm systems (round 9, Phase 4): the organisations ranked by the prospect model's value of their Triple-A players
+   (data/aaa/<S>/value.json "p_value": expected MLB WAR over the next four seasons, discounted, from the season's line;
+   established major leaguers are left out by the model), the five most valuable summed, the top three named. Triple-A
+   only: the deeper farm (Double-A down) is not in our data. */
+function farm(host, S, all) {
+  if (!host) return;
+  const k = K(), U = BP.ui;
+  const meta = {};
+  all.hitter.concat(all.pitcher).forEach(r => { meta[r.pid] = r; });
+  BP.load('aaa/' + S + '/value.json').then(v => {
+    if (!host.isConnected || !v || v.ok === false || !Array.isArray(v.rows)) return;
+    const F = {};
+    (v.fields || []).forEach((f, i) => { F[f] = i; });
+    if (F.p_value === undefined) return;
+    const org = {};
+    v.rows.forEach(r => {
+      const pv = r[F.p_value];
+      if (!k.isNum(pv)) return;
+      const pid = String(r[F.pid]), m = meta[pid] || {};
+      const o = String(m.parent || (BP.teamInfo(r[F.team]) || {}).parent || '');
+      if (!o) return;
+      (org[o] = org[o] || []).push({ pid: pid, name: r[F.name] || m.name, v: pv, kind: r[F.kind], pos: r[F.pos], age: r[F.age] });
+    });
+    const ids = Object.keys(org).map(o => { const l = org[o].sort((a, b) => b.v - a.v); return { o: o, top: l.slice(0, 5), sum: l.slice(0, 5).reduce((a, x) => a + x.v, 0), n: l.length }; })
+      .filter(x => x.top.length).sort((a, b) => b.sum - a.sum);
+    if (ids.length < 10) return;
+    const T = QKC.tokens();
+    host.innerHTML = QK.sectionHead({ kicker: 'Farm systems', title: 'Whose farm is ready to help?', sub: 'Every organisation ranked by the expected major-league WAR of its five most valuable Triple-A prospects over the next four seasons, from our prospect model (stat lines only, no scouting grades).' }) +
+      '<div class="qk-grid"><div class="qk-span-5">' + U.card2('Prospect value by organisation', 'Expected MLB WAR, the five best Triple-A prospects', U.chart('pr-farm-c', Math.max(320, 18 * ids.length + 60), 'Farm-system value by organisation')) + '</div>' +
+      '<div class="qk-span-7">' + U.card2('The best farms', 'Each organisation’s three most valuable Triple-A prospects', '<div id="pr-farm-t"></div>', { flush: true }) + '</div></div>';
+    QKC.bar('#pr-farm-c', { cats: ids.map(x => k.teamAbbr(x.o)), series: [{ name: 'Prospect value', data: ids.map(x => x.sum) }], colors: ids.map(x => QK.color.ensure(U.raw(x.o) || T.model, T.s1, 3)),
+      horizontal: true, labels: true, fmt: x => k.num(x, 1), labelWidth: 44, hrefs: ids.map(x => BP.teamHref(x.o, 'mlb')), valName: 'Expected MLB WAR, next four seasons', catName: 'Organisation', label: 'Farm-system value by organisation' });
+    QK.leaderboard(document.getElementById('pr-farm-t'), { dense: true, rank: true, maxHeight: 560, columns: [
+      { key: 'name', label: 'Organisation', type: 'entity', mark: x => U.team(x.o, 'mlb'), href: x => BP.teamHref(x.o, 'mlb') },
+      { key: 'sum', label: 'Top five', type: 'bar', fmt: x => k.num(x, 1) },
+      { key: 'who', label: 'Their best', sort: false, fmt: (x, r) => r.top.slice(0, 3).map(p => '<a href="' + k.esc(BP.playerHref(p.pid, { level: 'aaa', role: p.kind === 'P' ? 'pitcher' : 'hitter' })) + '">' + k.esc(p.name || p.pid) + '</a> <span class="qk-muted">' + k.num(p.v, 1) + '</span>').join(', ') }],
+    rows: ids.map(x => ({ o: x.o, name: k.teamName(x.o), sum: x.sum, top: x.top, who: '' })) });
+  });
+}
 function render(el, params, state) {
   const k = K();
   const U = BP.ui;
   el.innerHTML = QK.sectionHead({ kicker: 'Prospects · Triple-A', title: 'Triple-A to the majors', sub: 'Every Triple-A player\'s line translated to the majors, and what our model would expect on the day of a call-up.' }) +
-    '<div id="pr-kpis"></div>' +
+    '<div id="pr-kpis"></div><section class="qk-section" id="pr-farm"></section>' +
     '<section class="qk-card"><div class="qk-card-body"><div class="bp-ctl">' + U.seg('pr-kind', 'Kind', [['hitter', 'Hitters'], ['pitcher', 'Pitchers']], ST.kind) +
     '<label>Search<input id="pr-q" class="gq-search" type="search" placeholder="name or club…"></label><label>Parent club<select id="pr-parent"><option value="">All organisations</option></select></label></div></div></section>' +
     '<section class="qk-section">' + QK.sectionHead({ kicker: 'Call-up previews', title: 'Ready now', sub: 'The six with the best major-league translation, and what our projection expects from them next season.' }) + '<div class="qk-grid" id="pr-prev"></div></section>' +
@@ -47,6 +86,7 @@ function render(el, params, state) {
     const all = { hitter: listOf(d, 'hitter'), pitcher: listOf(d, 'pitcher') };
     if (!all.hitter.length && !all.pitcher.length) { $('pr-card').innerHTML = U.card2('Prospects', '', QK.empty('Not built yet', 'The ' + S + ' Triple-A prospect file is not available.')); $('pr-prev').innerHTML = ''; return; }
     all.hitter.concat(all.pitcher).forEach(r => { if (r.name) k.learn(r.pid, { name: r.name, pos: r.pos, team: r.team }); });
+    farm($('pr-farm'), S, all);
     const parents = Array.from(new Set(all.hitter.concat(all.pitcher).map(r => r.parent || r.org || r.mlb_team).filter(Boolean)));
     $('pr-parent').innerHTML = '<option value="">All organisations</option>' + parents.sort((a, b) => k.teamAbbr(a).localeCompare(k.teamAbbr(b))).map(t => '<option value="' + k.esc(t) + '">' + k.esc(k.teamAbbr(t) + ' · ' + k.teamName(t)) + '</option>').join('');
     const aaa = r => Object.assign({}, r, sub(r, ['aaa', 'stats', 'line']));

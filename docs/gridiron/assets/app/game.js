@@ -138,21 +138,12 @@ function hero(g, pre, season) {
   G.home.alt = GI.teamInfo(g.home).alt; G.away.alt = GI.teamInfo(g.away).alt; G.home.full = GI.teamName(g.home); G.away.full = GI.teamName(g.away);
   G.league = 'NFL';
   if (live && st === 'half') G.clock = 'Half';
-  const R = (season && season.ratings) || {};
-  const ua = (R[g.away] || {}).values || {}, uh = (R[g.home] || {}).values || {};
-  const fx = [];
-  const add = (label, a, b, f, low) => { if (isNum(a) && isNum(b)) fx.push({ label: label, a: f(a), b: f(b), better: Math.abs(a - b) < 1e-9 ? null : ((a > b) !== !!low ? 'a' : 'b') }); };
-  add('Team rating, points a game', ua.rating, uh.rating, v => GI.signed(v, 1));
-  add('Offence rating', ua.off_rating, uh.off_rating, v => GI.signed(v, 1));
-  add('Defence rating', ua.def_rating, uh.def_rating, v => GI.signed(v, 1));
-  add('Pass offence, EPA a dropback', ua.off_pass_epa, uh.off_pass_epa, v => GI.signed(v, 2));
-  add('Pass defence, EPA allowed', ua.def_pass_epa, uh.def_pass_epa, v => GI.signed(v, 2), true);
   const extra = [];
   if (!fin && !live && isNum(m.home_pts) && isNum(m.away_pts)) extra.push('Our projected score is ' + GI.teamShort(g.away) + ' ' + GI.num(m.away_pts, 0) + ', ' + GI.teamShort(g.home) + ' ' + GI.num(m.home_pts, 0));
   if (!fin && !live && isNum(m.total)) extra.push('we expect about ' + Math.round(m.total) + ' points in all');
   const src = (mk.sources || []).map(GI.titleCase).join(' / ') || 'Kalshi / Polymarket';
   const venue = g.stadium_name || g.stadium || '';
-  return '<div class="gi-preview">' + QK.previewCard(G, { kicker: 'NFL' + (venue ? ' · ' + venue : ''), nick: t => t.name, colors: cols, factors: fx, factorsTitle: 'How they match up this season',
+  return '<div class="gi-preview">' + QK.previewCard(G, { kicker: 'NFL' + (venue ? ' · ' + venue : ''), nick: t => t.name, colors: cols, factors: [],   /* round 9: the match-up lives in the Tale of the tape below */
     /* round 6: the market quiet under the hero (small and grey, the sources on hover) */
     noteExtra: extra.length ? esc(extra.join(', and ') + '.') : '', market: st === 'pre' && isNum(mk.p_home) ? { p: Number(mk.p_home), src: mk.sources || null, label: src, quiet: true } : null }) + '</div>';
 }

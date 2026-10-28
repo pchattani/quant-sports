@@ -1,4 +1,5 @@
-/* The Quant Gridiron — the playoff picture (#/playoffs[/<S>]), in the Standings section, on Design System 2.0.
+/* The Quant Gridiron — Chances (#/playoffs[/<S>]) and the Bracket (#/bracket[/<S>]), in the Standings section (round 9:
+ * the old playoff picture split in two, with Season forecasts, the win totals and the draft order folded into Chances).
  * The bracket (projected from today's seeds before the playoffs; 14 teams from 2020), each game with our win chance;
  * Super Bowl chances (ours only: kit v3 keeps the market to game detail and the Model page); the likeliest Super Bowl
  * matchups; each conference's seed distribution; our round-by-round chances. Reads <S>/season.json. */
@@ -69,7 +70,10 @@ function gameBox(g, m, cls) {
     return '<div class="gi-br-t' + (w && w !== t ? ' lost' : '') + '"><span class="s">' + esc(seedOf(t)) + '</span>' + GI.mark(t, 'sm') + '<span class="n">' + esc(GI.teamAbbr(t)) + '</span><span class="p">' + (fin || live ? esc(isNum(sc) ? sc : '') : (p !== null ? GI.pct(p, 0) : '')) + '</span></div>';
   };
   const tag = g.game_id ? 'a href="' + GI.gameHref(g.game_id) + '"' : 'div';
-  return '<' + tag + ' class="gi-br-g' + (cls ? ' ' + cls : '') + '">' + row(g.away, 'away') + row(g.home, 'home') + '</' + (g.game_id ? 'a' : 'div') + '>';
+  /* a played game: our pre-game call for the winner under the score (blue when we had the winner favoured) */
+  const pc = fin && w && pH !== null ? (w === g.home ? pH : 1 - pH) : null;
+  const call = isNum(pc) ? '<span class="gi-br-call' + (pc >= 0.5 ? ' hit' : '') + '" title="Our pre-game chance for the winner">Our call: ' + esc(GI.teamAbbr(w)) + ' ' + GI.pct(pc, 0) + '</span>' : '';
+  return '<' + tag + ' class="gi-br-g' + (cls ? ' ' + cls : '') + '">' + row(g.away, 'away') + row(g.home, 'home') + call + '</' + (g.game_id ? 'a' : 'div') + '>';
 }
 function bracketHTML(m) {
   if (!m.AFC.seeds.length && !m.NFC.seeds.length) return GI.muted('The bracket is not set yet.');
@@ -90,38 +94,141 @@ function seedDist(rows, S) {
   }).join(''));
 }
 
+/* Chances (#/playoffs[/<S>]?view=sb|conf|div|playoffs|seed1|wins|draft): the season simulation's boards in one place
+ * (round 9: the Season forecasts page folded in; the win totals and the draft order moved here from Standings), then the
+ * round-by-round table and how the race has moved (QKL.race: our chances over time and the week's movers). */
+const VIEWS = [['sb', 'Super Bowl'], ['conf', 'Conference'], ['div', 'Division'], ['playoffs', 'Playoffs'], ['seed1', 'No. 1 seed'], ['wins', 'Win totals'], ['draft', 'No. 1 pick']];
+let CV = 'sb';
+const markOf = t => ({ name: GI.teamName(t), abbr: GI.teamAbbr(t), colour: GI.teamInfo(t).colour });
+function chanceList(list, key, S, o) {
+  o = o || {};
+  const L = list.filter(r => isNum(r[key])).sort((a, b) => b[key] - a[key]);
+  if (!L.length) return GI.muted('The season simulation has not run yet.');
+  return QK.chances(L.map(r => ({ label: GI.teamShort(r.team), p: r[key], href: GI.teamHref(r.team, S), color: GI.teamInfo(r.team).colour, mark: markOf(r.team) })), { limit: o.limit || 16, key: false });
+}
+function chancesBody(host, d, rows, S) {
+  const v = CV;
+  const sbm = (((d.bracket || {}).sim || {}).sb_matchups || []).slice(0, 10);
+  let h = '';
+  if (v === 'sb') h = GI.grid(GI.card('Who lifts the Lombardi Trophy?', 'Our chance from 20,000 simulated seasons', chanceList(rows, 'p_sb', S, { limit: 14 }) + QK.note('Even the favourite misses most seasons: a 20% chance means four seasons in five end without the trophy.'), { span: 7 }) +
+    GI.card('Likeliest Super Bowls', 'Share of our simulated seasons', sbm.length ? GI.chartBox('po-sbm', 440, 'Likeliest Super Bowl matchups') : GI.muted('Matchups arrive with the season simulation.'), { span: 5 }));
+  else if (v === 'conf') h = GI.grid(GI.CONFERENCES.map(c => GI.card(c + ' champion', 'Our chance of reaching the Super Bowl', chanceList(rows.filter(r => r.conference === c), 'p_conf', S), { span: 6 })).join(''));
+  else if (v === 'div') h = GI.grid(GI.DIVISIONS.map(dv => GI.card(dv, 'Our chance of winning the division', chanceList(rows.filter(r => r.division === dv), 'p_div', S), { span: 6 })).join(''));
+  else if (v === 'playoffs') h = GI.grid(GI.CONFERENCES.map(c => GI.card(c + ': make the playoffs', 'Seven of sixteen get in', chanceList(rows.filter(r => r.conference === c), 'p_playoffs', S), { span: 6 })).join('')) + seedDist(rows, S);
+  else if (v === 'seed1') h = GI.grid(GI.CONFERENCES.map(c => GI.card(c + ' No. 1 seed', 'The bye and home field to the conference final', chanceList(rows.filter(r => r.conference === c), 'p_bye', S, { limit: 8 }), { span: 6 })).join(''));
+  else if (v === 'wins') h = GI.STD.winsView(rows, S);
+  else if (v === 'draft') h = GI.STD.draftView(d, rows, S);
+  host.innerHTML = h;
+  GI.sortable(host);
+  if (v === 'sb' && sbm.length) GI.ch.bar('po-sbm', { cats: sbm.map(x => GI.teamAbbr(x.afc) + ' v ' + GI.teamAbbr(x.nfc)), series: [{ name: 'Chance', color: 'model', data: sbm.map(x => x.p) }], horizontal: true, labels: true, fmt: x => GI.pct(x, 1), labelWidth: 80, valName: 'Share of simulated seasons', catName: 'AFC v NFC' });
+  if (v === 'wins') GI.STD.drawWins(rows);
+  if (v === 'draft') {
+    const list = (Array.isArray(d.draft) ? d.draft : []).filter(x => isNum(x.p_first_pick) && x.p_first_pick > 0.001).sort((a, b) => b.p_first_pick - a.p_first_pick).slice(0, 10);
+    GI.ch.probBars('dr-first', list.map(x => ({ label: GI.teamName(x.team), p: x.p_first_pick, colour: GI.teamColour(x.team), href: GI.teamHref(x.team) })), { keepHeight: true, labelWidth: 140, valName: 'First-pick probability', emptyText: 'No team has a real chance at the first pick yet.' });
+  }
+}
+function roundByRound(rows, S) {
+  const list = rows.filter(r => isNum(r.p_sb)).sort((a, b) => (b.p_sb || 0) - (a.p_sb || 0));
+  if (!list.length) return '';
+  return GI.card('Round by round', 'Our chance of reaching each stage, from the season simulation', GI.tableHTML([{ label: 'Team' }, { label: 'Conf' }, { label: 'Playoffs', align: 'right' }, { label: 'Division', align: 'right' }, { label: 'Bye', align: 'right' },
+    { label: 'Reach SB', align: 'right', title: 'Win the conference' }, { label: 'Win SB', align: 'right' }, { label: 'Projected wins', align: 'right' }],
+    list.map(r => ({ _href: GI.teamHref(r.team, S), cells: [{ html: GI.teamLink(r.team, { short: true, season: S }), v: r.team }, r.conference,
+      { html: GI.probBar(r.p_playoffs, GI.tc(r.team)), v: r.p_playoffs }, { html: GI.pct(r.p_div, 0), v: r.p_div }, { html: GI.pct(r.p_bye, 0), v: r.p_bye }, { html: GI.pct(r.p_conf, 1), v: r.p_conf }, { html: '<b class="gi-ours">' + GI.pct(r.p_sb, 1) + '</b>', v: r.p_sb }, { html: GI.num(r.proj_w, 1), v: r.proj_w }] })), { sticky: true }), { flush: true });
+}
+function pager(S, href) { return (S > GI.FIRST_SEASON ? '<a class="qk-btn" href="' + href(S - 1) + '">← ' + (S - 1) + '</a>' : '') + (S < GI.currentSeason() ? '<a class="qk-btn" href="' + href(S + 1) + '">' + (S + 1) + ' →</a>' : ''); }
+
 GI.route('playoffs', function (el, params) {
+  const S = Number(params.season);
+  const q = params.query || {};
+  CV = VIEWS.some(x => x[0] === q.view) ? q.view : 'sb';
+  return GI.loadAll([GI.ypath('season.json', S)]).then(res => {
+    if (!el.isConnected) return;
+    const d = res[0];
+    const nav = GI.sectionNav('standings', 'playoffs');
+    const head = GI.pageHead('Standings · ' + S, S + ' chances', 'Every season question from 20,000 simulated seasons: the Super Bowl, the conferences, the divisions, the playoffs, the No. 1 seeds, win totals and the No. 1 pick.', pager(S, GI.playoffsHref)) + nav;
+    if (!GI.ok(d)) { el.innerHTML = head + GI.notBuilt('The ' + S + ' chances', d); return; }
+    const rows = GI.seasonRows(d);
+    if (!rows.some(r => isNum(r.p_playoffs) || isNum(r.p_sb))) {
+      el.innerHTML = head + QK.empty(S < GI.currentSeason() ? 'The ' + S + ' season is over' : 'The simulation has not run yet', S < GI.currentSeason() ? 'Chances are kept for the season in play. How it finished is on the Table and the Bracket.' : 'Chances appear once the season simulation has run.') +
+        '<p style="text-align:center"><a class="qk-btn" href="' + GI.standingsHref(S) + '">Table</a> <a class="qk-btn primary" href="' + GI.bracketHref(S) + '">Bracket</a></p>';
+      return;
+    }
+    el.innerHTML = head + '<div class="qk-chips scroll" id="po-chips" role="group" aria-label="Question" style="margin-bottom:var(--sp-4)">' + VIEWS.map(x => '<button type="button" class="qk-chip" data-value="' + x[0] + '" aria-pressed="' + (x[0] === CV) + '">' + esc(x[1]) + '</button>').join('') + '</div>' +
+      '<div id="po-body"></div>' + roundByRound(rows, S) + (d.league && window.QKL ? '<div id="po-race"></div>' : '');
+    GI.sortable(el);
+    const body = el.querySelector('#po-body');
+    QK.chips(el.querySelector('#po-chips'), x => { CV = x[0]; GI.setHashQuiet(GI.ghref('playoffs', S, { view: CV === 'sb' ? undefined : CV })); chancesBody(body, d, rows, S); });
+    chancesBody(body, d, rows, S);
+    /* how the race has moved: our chances over time and the week's movers (QKL.race); the games that matter sit on the Table */
+    const lo = GI.leagueOpts ? GI.leagueOpts(d, S, GI.CONFERENCES[0]) : null;
+    if (lo && el.querySelector('#po-race')) {
+      QKL.race(el.querySelector('#po-race'), lo);
+      QK.$$('#po-race .qk-card', el).forEach(c => { const t = c.querySelector('.qk-card-title'); if (t && /games that matter/i.test(t.textContent)) { const p = c.parentNode; if (p && p.classList.contains('qk-span-12')) p.remove(); else c.remove(); } });
+    }
+  });
+});
+
+/* Bracket (#/bracket[/<S>]): the bracket (projected from today's seeds during the season; a finished season shows every
+ * result with our pre-game call) and each conference's seed distribution. */
+GI.route('bracket', function (el, params) {
   const S = Number(params.season);
   return GI.loadAll([GI.ypath('season.json', S)]).then(res => {
     if (!el.isConnected) return;
     const d = res[0];
-    const pager = (S > GI.FIRST_SEASON ? '<a class="qk-btn" href="' + GI.playoffsHref(S - 1) + '">← ' + (S - 1) + '</a>' : '') + (S < GI.currentSeason() ? '<a class="qk-btn" href="' + GI.playoffsHref(S + 1) + '">' + (S + 1) + ' →</a>' : '');
-    const nav = GI.sectionNav('standings', 'playoffs');
-    if (!GI.ok(d)) { el.innerHTML = GI.pageHead('Standings', S + ' playoff picture', '', pager) + nav + GI.notBuilt('The ' + S + ' playoff picture', d); return; }
+    const nav = GI.sectionNav('standings', 'bracket');
+    const fmt = S >= 2020 ? '14 teams: seven per conference; only the No. 1 seed has a bye' : '12 teams: six per conference; the top two seeds have byes';
+    if (!GI.ok(d)) { el.innerHTML = GI.pageHead('Standings', S + ' bracket', '', pager(S, GI.bracketHref)) + nav + GI.notBuilt('The ' + S + ' bracket', d); return; }
     const rows = GI.seasonRows(d);
     const m = bracketModel(d, rows);
-    const fmt = S >= 2020 ? '14 teams: seven per conference; only the No. 1 seed has a bye' : '12 teams: six per conference; the top two seeds have byes';
-    const sbm = (((d.bracket || {}).sim || {}).sb_matchups || []).slice(0, 10);
-    const list = rows.filter(r => isNum(r.p_sb)).sort((a, b) => (b.p_sb || 0) - (a.p_sb || 0));
-    el.innerHTML = GI.pageHead('Standings', S + ' playoff picture', esc(fmt) + (m.projected ? ' · <b>projected</b> from today\'s seeds' : ''), pager) + nav +
-      GI.card(m.projected ? 'Projected bracket' : 'Bracket', m.projected ? 'If the season ended today: today’s seeds. Each team’s chance of reaching each round is in “Round by round” below; a game’s win chance appears once the matchup is set' : 'Our win chance for each game, the score once played', S < 2020 ? GI.muted('The bracket view follows the 14-team format (2020 on). The seeds and chances below still apply.') : bracketHTML(m)) +
-      (d.league && window.QKL ? '<div id="po-race"></div>' : '') +
-      GI.grid(GI.card('Super Bowl chances', 'Our chance from 20,000 simulated seasons', '<div id="po-sb"></div>' + QK.note('Even the favourite misses most seasons: a 20% chance means four seasons in five end without the trophy.'), { span: 7 }) +
-        GI.card('Likeliest Super Bowls', 'Share of our simulated seasons', sbm.length ? GI.chartBox('po-sbm', 440, 'Likeliest Super Bowl matchups') : GI.muted('Matchups arrive with the season simulation.'), { span: 5 })) +
-      seedDist(rows, S) +
-      GI.card('Round by round', 'Our chance of reaching each stage, from the season simulation', GI.tableHTML([{ label: 'Team' }, { label: 'Conf' }, { label: 'Playoffs', align: 'right' }, { label: 'Bye', align: 'right' },
-        { label: 'Reach SB', align: 'right', title: 'Win the conference' }, { label: 'Win SB', align: 'right' }],
-        list.map(r => ({ _href: GI.teamHref(r.team, S), cells: [{ html: GI.teamLink(r.team, { short: true, season: S }), v: r.team }, r.conference,
-          { html: GI.probBar(r.p_playoffs, GI.tc(r.team)), v: r.p_playoffs }, { html: GI.pct(r.p_bye, 0), v: r.p_bye }, { html: GI.pct(r.p_conf, 1), v: r.p_conf }, { html: '<b class="gi-ours">' + GI.pct(r.p_sb, 1) + '</b>', v: r.p_sb }] })), { sticky: true }), { flush: true }) +
-      (d.league && window.QKL ? '<div id="po-shape"></div>' : '');
+    const champ = m.SB && winnerOf(m.SB);
+    el.innerHTML = GI.pageHead('Standings · ' + S, S + ' bracket', esc(fmt) + (m.projected ? ' · <b>projected</b> from today\'s seeds' : ''), pager(S, GI.bracketHref)) + nav +
+      (champ ? '<div class="gi-br-champ" style="--tc:' + esc(GI.tc(champ)) + '">' + GI.mark(champ, 'lg') + '<div><span class="qk-kicker">Super Bowl champions</span><b>' + esc(GI.teamName(champ)) + '</b><span>' + esc(GI.teamAbbr(m.SB.away)) + ' ' + m.SB.as + ', ' + esc(GI.teamAbbr(m.SB.home)) + ' ' + m.SB.hs + '</span></div></div>' : '') +
+      GI.card(m.projected ? 'Projected bracket' : 'Bracket', m.projected ? 'If the season ended today: today’s seeds. Each team’s chance of reaching each round is on Chances; a game’s win chance appears once the matchup is set' : 'Every result, with our pre-game call for the winner in small type (blue: we had the winner favoured)', S < 2020 ? GI.muted('The bracket view follows the 14-team format (2020 on). The seeds below still apply.') : bracketHTML(m)) +
+      (m.projected ? seedDist(rows, S) : '');
     GI.sortable(el);
-    /* how the playoff race is shaping up (docs/_design/league.js): our chances over the season by conference, the
-       week's movers and why, magic numbers and the schedule left, the games that swing it; then the league's shape */
-    const lo = GI.leagueOpts ? GI.leagueOpts(d, S, GI.CONFERENCES[0]) : null;
-    if (lo && el.querySelector('#po-race')) { QKL.race(el.querySelector('#po-race'), lo); QKL.shape(el.querySelector('#po-shape'), lo); }
-    GI.set('po-sb', list.length ? QK.chances(list.map(r => ({ label: GI.teamShort(r.team), p: r.p_sb, href: GI.teamHref(r.team, S), mark: { name: GI.teamName(r.team), abbr: GI.teamAbbr(r.team), colour: GI.teamInfo(r.team).colour } })), { limit: 14, key: false }) : GI.muted('The season simulation has not run yet.'));
-    if (sbm.length) GI.ch.bar('po-sbm', { cats: sbm.map(x => GI.teamAbbr(x.afc) + ' v ' + GI.teamAbbr(x.nfc)), series: [{ name: 'Chance', color: 'model', data: sbm.map(x => x.p) }], horizontal: true, labels: true, fmt: v => GI.pct(v, 1), labelWidth: 80, valName: 'Share of simulated seasons', catName: 'AFC v NFC' });
   });
 });
+
+
+/* A finished season's recap (round 9, phase 3), at the top of its Standings › Table: the champion and the Super Bowl
+ * with our pre-game call, our record on the playoff games, the bracket with every score, the award winners against our
+ * own ranking, and what we called before the season where we kept it (the race log starts with 2026). Reads the season
+ * file the page has, history.json (award winners) and <S>/awards.json (our ranking for a past season). */
+const AW = [['mvp', 'MVP'], ['opoy', 'Offensive Player of the Year'], ['dpoy', 'Defensive Player of the Year'], ['oroy', 'Offensive Rookie of the Year'], ['droy', 'Defensive Rookie of the Year'], ['cpoy', 'Comeback Player of the Year'], ['coty', 'Coach of the Year']];
+GI.recap = function (host, d, S, rows) {
+  if (!host) return;
+  const m = bracketModel(d, rows);
+  const games = [m.AFC, m.NFC].reduce((a, c) => a.concat(c.WC, c.DIV, [c.CON]), []).concat([m.SB]).filter(g => g && GI.isFinal(g) && winnerOf(g));
+  const call = g => { const p = isNum(g.p_home) ? Number(g.p_home) : (g.model && isNum(g.model.p_home) ? g.model.p_home : null); if (p === null) return null; const w = winnerOf(g); return w === g.home ? p : 1 - p; };
+  const called = games.map(call).filter(isNum), hits = called.filter(p => p > 0.5).length;
+  const champ = m.SB && winnerOf(m.SB);
+  const sbCall = m.SB ? call(m.SB) : null;
+  const top = rows.filter(r => isNum(r.rating)).sort((a, b) => b.rating - a.rating)[0];
+  const best = rows.slice().sort((a, b) => GI.STD.pctW(b) - GI.STD.pctW(a) || (b.diff || 0) - (a.diff || 0))[0];
+  const far = t => { if (t === champ) return 'won the Super Bowl'; const lost = games.filter(g => g.home === t || g.away === t).map(g => g.round); if (!lost.length) return 'missed the playoffs'; const r = lost[lost.length - 1]; return { WC: 'lost in the Wild Card round', DIV: 'lost in the Divisional round', CON: 'lost the conference final', SB: 'lost the Super Bowl' }[r] || 'reached the playoffs'; };
+  host.innerHTML = '<section class="qk-section gi-recap">' +
+    (champ ? '<div class="gi-br-champ" style="--tc:' + esc(GI.tc(champ)) + '">' + GI.mark(champ, 'lg') + '<div><span class="qk-kicker">' + S + ' champions</span><b>' + esc(GI.teamName(champ)) + '</b><span>Super Bowl: ' + esc(GI.teamAbbr(m.SB.away)) + ' ' + m.SB.as + ', ' + esc(GI.teamAbbr(m.SB.home)) + ' ' + m.SB.hs +
+      (isNum(sbCall) ? ' · our pre-game call: ' + esc(GI.teamAbbr(champ)) + ' ' + GI.pct(sbCall, 0) : '') + '</span></div></div>' : '') +
+    GI.kpis([called.length ? GI.kpi('Our playoff calls', hits + ' of ' + called.length, 'games where we favoured the winner before kick-off', { signal: true }) : '',
+      best ? GI.kpi('Best record', esc(GI.teamAbbr(best.team)) + ' ' + GI.record(best.w, best.l, best.t), esc(far(best.team)), { href: GI.teamHref(best.team, S) }) : '',
+      top ? GI.kpi('Our top-rated team', esc(GI.teamAbbr(top.team)) + ' ' + GI.signed(top.rating, 1), 'at the end of the regular season; ' + esc(far(top.team)), { href: GI.teamHref(top.team, S) }) : '']) +
+    GI.card('How the playoffs went', 'Every score, with our pre-game call for the winner (blue: we had the winner favoured) · <a href="' + GI.bracketHref(S) + '">the full bracket</a>', S >= 2020 ? bracketHTML(m) : GI.muted('The bracket view follows the 14-team format (2020 on).')) +
+    '<div id="rc-aw"></div>' +
+    '<p class="gi-cap">Before the season: we kept no daily simulation for ' + S + ' (the race log starts with 2026), so there is no pre-season call to set against how it finished. The final standings with the seeds are below.</p></section>';
+  Promise.all([GI.load('history.json'), GI.loadYear('awards.json', S)]).then(res => {
+    const h = res[0], a = res[1];
+    const row = ((h && h.champions && h.champions.seasons) || []).filter(x => x.season === S)[0];
+    const W = (row && row.awards) || {}, A = (GI.ok(a) && a.awards) || {};
+    const list = AW.filter(k => W[k[0]]);
+    if (!list.length || !host.isConnected) return;
+    const fold = x => GI.fold(String(x || '').replace(/[.']/g, '').replace(/\s+(jr|sr|ii|iii|iv)$/i, ''));
+    GI.set('rc-aw', GI.card('The awards', 'The winners, and where each sat on our own list (our value metrics ranked the candidates; a past season has no award probabilities)', GI.tableHTML([{ label: 'Award' }, { label: 'Winner' }, { label: 'Top of our list' }, { label: 'Winner on our list', align: 'right' }],
+      list.map(k => {
+        const w = W[k[0]], c = ((A[k[0]] || {}).candidates || []), i = c.findIndex(x => fold(x.name) === fold(w[0]));
+        return [esc(k[1]), { html: '<b>' + esc(w[0]) + '</b> <span class="gi-tag">' + esc(GI.teamAbbr(w[1])) + '</span>', v: w[0] }, { html: c[0] ? (c[0].pid ? GI.playerLink(c[0].pid, c[0].name) : esc(c[0].name)) : '—', v: c[0] ? c[0].name : '' },
+          { html: i >= 0 ? (i === 0 ? '<b class="gi-ours">1st</b>' : GI.ordinal(i + 1)) : (c.length ? 'not in our top ' + c.length : '—'), v: i >= 0 ? i : 99 }];
+      })), { flush: true }));
+  });
+};
 
 })(window.GI);

@@ -604,9 +604,9 @@ function drawPerson(el, doc, q) {
   if (isNum(doc.mv)) tags.push('<span class="qk-tag" data-tip="Sofascore\'s market value, a reference only">Market value ' + esc(FB.money(doc.mv, doc.mvc)) + '</span>');
   var clubHref = cc && cc.tid && FB.clubRow(cc.tid) ? FB.href.club(cc.tid) : null;
   var cy0 = byYear(R.all).filter(function (y) { return y.era === curEra; })[0] || null;
-  var hero = FB.crumb([['#/players', 'Football'], cc && cc.name ? [clubHref, cc.name] : null, doc.name || 'Player'].filter(Boolean)) + QK.playerHeader({
+  var hero = FB.crumb([['#/scout', 'Scouting Room'], cc && cc.name ? [clubHref, cc.name] : null, doc.name || 'Player'].filter(Boolean)) + QK.playerHeader({
     name: doc.name || 'Player ' + doc.id, number: doc.shirt, pos: posLabel(doc.pos),
-    kicker: (curEra || '') + (cur && cur.apps ? ' · ' + cur.apps + ' appearance' + (cur.apps === 1 ? '' : 's') + ' in' : ''),
+    kicker: (curEra || '') + (cur && cur.apps ? ' · ' + cur.apps + ' appearance' + (cur.apps === 1 ? '' : 's') + (cur.rows > 0 ? ' in ' + cur.rows + ' competition' + (cur.rows === 1 ? '' : 's') : '') : ''),
     team: cc && cc.name ? { name: cc.name, href: clubHref, colour: cc.tid ? FB.clubColour(cc.tid) : null, alt: cc.tid ? FB.clubAlt(cc.tid) : null } : null,
     meta: [age ? age + ' years old' : null, doc.nat || null, doc.height ? doc.height + ' cm' : null, doc.foot ? cap1(doc.foot) + ' foot' : null,
       untilTxt ? 'Contract to ' + untilTxt : null],
@@ -746,11 +746,11 @@ function linksLine(doc, R) {
   var best = R.seasons.filter(function (s) { return s.source === 'live' && compOk(s.comp); }).sort(function (a, b) { return (b.min || 0) - (a.min || 0); })[0];
   var bits = [];
   if (best) {
-    bits.push('<a href="#/compare/players/' + esc(best.comp) + ':' + esc(doc.id) + '">Compare this player →</a>');
-    bits.push('<a href="#/lab/' + esc(best.comp) + '/' + esc(doc.pos === 'G' ? 'G' : (doc.pos || 'M')) + '">Player lab →</a>');
+    bits.push('<a href="#/scout?cmp=' + esc(FB.enc(doc.id)) + '&amp;c=' + esc(FB.enc(best.comp)) + '">Compare this player →</a>');
+    bits.push('<a href="#/scout?view=chart&amp;c=' + esc(FB.enc(best.comp)) + '&amp;grp=' + esc(doc.pos === 'G' ? 'G' : (doc.pos || 'M')) + '">Chart in the Scouting Room →</a>');
   }
   if (doc.progression && doc.progression.length) bits.push('<a href="#/compare/progression/' + esc(doc.id) + '">Compare progression →</a>');
-  bits.push('<a href="#/value' + FB.qs({ q: doc.name }) + '">Player value →</a>');
+  bits.push('<a href="#/scout' + FB.qs({ cols: 'value', q: doc.name }) + '">Player value →</a>');
   bits.push('<a href="#/value/simulator' + FB.qs({ p: doc.id }) + '">Transfer simulator →</a>');
   bits.push('<a href="#/model/glossary">Glossary →</a>');
   return bits.join(' &nbsp;·&nbsp; ');

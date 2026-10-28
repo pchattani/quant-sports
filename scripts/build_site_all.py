@@ -596,6 +596,56 @@ def _standing_rows(state, results: LeagueResults, cfg: LeagueConfig, zone: str |
     return rows
 
 
+def derived_groups(matches, max_size: int = 6) -> dict[str, list[dict]]:
+    """
+    Group tables for a league phase whose store carries no groups: the league-stage pairings' connected components
+    (sides that play each other), each a group of at most `max_size`, ordered by points, goal difference and goals,
+    labelled "1", "2", ... in order of their strongest side's points. {} when the matches do not split that way.
+    """
+    league = [m for m in matches if (m.stage or "league") == "league" and m.home_team and m.away_team]
+    if not league:
+        return {}
+    parent: dict[str, str] = {}
+
+    def find(x: str) -> str:
+        parent.setdefault(x, x)
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    for m in league:
+        a, b = find(m.home_team), find(m.away_team)
+        if a != b:
+            parent[a] = b
+    comps: dict[str, list[str]] = {}
+    for t in list(parent):
+        comps.setdefault(find(t), []).append(t)
+    if len(comps) < 2 or any(len(v) > max_size or len(v) < 2 for v in comps.values()):
+        return {}
+    tables = []
+    for members in comps.values():
+        rec = {t: {"pos": 0, "team": t, "played": 0, "w": 0, "d": 0, "l": 0, "gf": 0, "ga": 0, "gd": 0, "pts": 0, "exp_pts": None,
+                   "p05": None, "p50": None, "p95": None, "p_title": None, "p_pos": [], "bands": {}} for t in members}
+        for m in league:
+            if m.home_team not in rec or not m.is_finished or m.home_goals is None or m.away_goals is None:
+                continue
+            h, a = rec[m.home_team], rec[m.away_team]
+            for r, gf, ga in ((h, m.home_goals, m.away_goals), (a, m.away_goals, m.home_goals)):
+                r["played"] += 1; r["gf"] += gf; r["ga"] += ga
+                r["w" if gf > ga else "d" if gf == ga else "l"] += 1
+        rows = list(rec.values())
+        for r in rows:
+            r["gd"] = r["gf"] - r["ga"]
+            r["pts"] = 3 * r["w"] + r["d"]
+        rows.sort(key=lambda r: (-r["pts"], -r["gd"], -r["gf"], r["team"]))
+        for i, r in enumerate(rows, start=1):
+            r["pos"] = i
+        tables.append(rows)
+    tables.sort(key=lambda rows: (-rows[0]["pts"], -rows[0]["gd"], rows[0]["team"]))
+    return {str(i): rows for i, rows in enumerate(tables, start=1)}
+
+
 def _fixture_rows(matches) -> list[dict]:
     return [
         {
@@ -902,7 +952,15 @@ def build_international(cfg: CupConfig, store: dict, out_dir: Path, base: dict, 
         table["overall"] = []
         table["group_label"] = "Group"
     else:
-        table["standings"] = _rows(None) if state.games_played and len(state.teams) <= 40 else []
+        derived = derived_groups(state.finished + state.remaining) if len(state.teams) > 40 else {}
+        if derived:
+            # A league phase the store gives no groups for (the Nations League's leagues A-D): the groups are the
+            # sets of sides that play each other, and each one's table is computed from its results.
+            table["conferences"] = derived
+            table["overall"] = []
+            table["group_label"] = "Group"
+        else:
+            table["standings"] = _rows(None) if state.games_played and len(state.teams) <= 40 else []
     _write(out_dir, "table.json", table)
     labels = {**CUP_ROUND_LABELS, "r32": "Round of 32", "r64": "Round of 64", "3rd": "Third place", "po": "Play-off"}
     _write(out_dir, "bracket.json", {
@@ -945,10 +1003,10 @@ def build_international(cfg: CupConfig, store: dict, out_dir: Path, base: dict, 
         "training_matches": 0, "calibration": {},
         "model": {"dc_fitted": bool(model is not None and model.dc.is_fitted), "params_method": "international fit"},
         "h2h_tiebreak": False, "source": "Sofascore", "cup_kind": cfg.kind, "phase": "live", "unsimulated": True,
-        "detail_matches": len(store.get("lineups") or {}), "sheet_matches": len(store.get("team_stats") or {}),
+        "detail_matches": len(store.get("lineups") or {}), "detail_season": len(_season_view(store).get("lineups") or {}), "sheet_matches": len(store.get("team_stats") or {}),
     }
     _write(out_dir, "meta.json", meta)
-    tabs = [t for t in TABS_INTERNATIONAL if not (t == "table" and not (state.groups or table.get("standings")))
+    tabs = [t for t in TABS_INTERNATIONAL if not (t == "table" and not (state.groups or table.get("standings") or table.get("conferences")))
             and not (t == "bracket" and not state.known_pairs)]
     standings = table.get("standings") or next(iter(table.get("conferences", {}).values()), None) or []
     return {
@@ -1649,7 +1707,7 @@ def build_league(cfg: LeagueConfig, entry: dict, args, sims: int | None,
         },
         "h2h_tiebreak": cfg.h2h_tiebreak,
         "source": "Sofascore",
-        "detail_matches": len(store.get("lineups") or {}),
+        "detail_matches": len(store.get("lineups") or {}), "detail_season": len(_season_view(store).get("lineups") or {}),
         "sheet_matches": len(store.get("team_stats") or {}),
     }
     _write(out_dir, "meta.json", meta)
@@ -1734,7 +1792,7 @@ def build_cup_pre(cfg: CupConfig, store: dict, out_dir: Path, base: dict, args) 
         "store_age_hours": round(age, 1) if age is not None else None, "season_stale": False,
         "training_matches": 0, "calibration": {}, "model": {"dc_fitted": False, "params_method": "none"},
         "h2h_tiebreak": False, "source": "Sofascore", "cup_kind": cfg.kind, "phase": "pre", "phase_note": note,
-        "detail_matches": len(store.get("lineups") or {}), "sheet_matches": len(store.get("team_stats") or {}),
+        "detail_matches": len(store.get("lineups") or {}), "detail_season": len(_season_view(store).get("lineups") or {}), "sheet_matches": len(store.get("team_stats") or {}),
     }
     _write(out_dir, "meta.json", meta)
     return {
@@ -1948,7 +2006,7 @@ def build_cup(cfg: CupConfig, entry: dict, args, sims: int | None, pooled: Dixon
                   "dc_fitted": dc.is_fitted, "params_method": method},
         "h2h_tiebreak": False, "source": "Sofascore", "cup_kind": cfg.kind,
         "forced_ties": len(state.playoff_results), "cup_complete": complete, "field_partial": partial,
-        "detail_matches": len(store.get("lineups") or {}), "sheet_matches": len(store.get("team_stats") or {}),
+        "detail_matches": len(store.get("lineups") or {}), "detail_season": len(_season_view(store).get("lineups") or {}), "sheet_matches": len(store.get("team_stats") or {}),
     }
     _write(out_dir, "meta.json", meta)
     standings = table.get("standings") or (next(iter(table.get("conferences", {}).values()), None)) or []

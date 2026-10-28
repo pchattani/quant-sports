@@ -117,7 +117,7 @@ function board(S, pl) {
   const q = (pl.cat.qualification || {})[S0.pool === 'A' ? 'F' : S0.pool] || pl.cat.qualification_note;
   k.set('ld-note', (RK.ours ? RK.ours.explain([m.key], { label: () => m.label }) : '') + '<strong>' + k.esc(m.label) + '</strong>: ' + k.esc(k.cleanDesc(m.desc || '')) + (k.isNum(m.stabilises_at) ? ' Stabilises at about ' + k.int(m.stabilises_at) + ' ' + k.esc(m.unit || (S0.pool === 'G' ? 'shots' : 'minutes')) + '.' : '') +
     (q && typeof q === 'string' ? ' Qualified: ' + k.esc(q) + '.' : '') + ' Percentiles are against qualified ' + (S0.pool === 'F' || S0.pool === 'D' ? name + ' (the position pool)' : name) + ' after shrinking towards the pool mean. ' + k.glossLink(m.key, 'Glossary →') +
-    ' · <a href="' + k.withQ('#/lab', S, { kind: S0.pool === 'G' ? 'G' : 'S', x: m.key }) + '">In the lab →</a>');
+    ' · <a href="' + k.withQ('#/scout', S, { view: 'chart', kind: S0.pool === 'G' ? 'g' : '', x: m.key }) + '">In the lab →</a>');
 }
 
 /* leaders.json when the catalogues are missing: {metric: [[pid, value]]} or {"boards": {...}}. */

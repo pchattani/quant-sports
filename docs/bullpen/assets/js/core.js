@@ -28,8 +28,14 @@
  *   #/<L>/teams  #/<L>/team/<tid>      teams
  *   #/<L>/leaders  #/<L>/lab           leaderboards, lab (redirect to the Scouting Room); #/<L>/arsenal: per-pitch-type boards
  *   #/<L>/value  #/<L>/trade           player value and the best at each position; the trade simulator
- *   #/postseason  #/markets  #/umpires  #/umpire/<id>  #/parks  #/park/<vid>  #/prospects
- *   #/history  #/awards  #/compare[/<a>[/<b>]]  #/calibration  #/glossary[/<key>]  #/methodology  #/disclaimer
+ *   #/postseason  #/umpires  #/umpire/<id>  #/parks  #/park/<vid>  #/prospects
+ *   #/history (team history)  #/awards (the award races)  #/compare[/<a>[/<b>]]  #/glossary[/<key>]  #/disclaimer
+ *   #/<L>/chances (the season simulation's boards)
+ *   Model: #/methodology ("How it works")  #/calibration ("How we're doing")  #/versus ("Our forecasts v the market")
+ *   #/who-moves-next (the moves model's validation)
+ * Round 9 (Phase 2): the forecast board is gone (#/markets and #/odds open the bracket); the all-time player careers are the
+ * Scouting Room's "All-time" view (#/alltime and the old #/history?m=... boards redirect there); #/history is the team
+ * history (champions, best team-seasons, franchise records). Standings: Table, Chances, Bracket, History, Races.
  *
  * Season: every page reads BP.state.season. It comes from a "?s=<YYYY>" query (any page),
  * else the level's current season (index.json levels[L].season, else index.json season).
@@ -218,7 +224,10 @@ addRoute('fantasy', 'fantasy');
 addRoute('compare', 'compare', true);
 addRoute('compare/:a', 'compare', true);
 addRoute('compare/:a/:b', 'compare', true);
-addRoute('markets', 'markets', true);
+addRoute('alltime', 'alltime', true);
+addRoute('chances', 'chances');
+addRoute('versus', 'versus', true);
+addRoute('who-moves-next', 'who-moves-next', true);
 addRoute('calibration', 'calibration', true);
 addRoute('glossary', 'glossary', true);
 addRoute('glossary/:id', 'glossary', true);
@@ -226,32 +235,36 @@ addRoute('methodology', 'methodology', true);
 addRoute('disclaimer', 'disclaimer', true);
 
 const ALIASES = { home: 'hub', index: 'hub', '': 'hub', overview: 'hub', schedule: 'games', scores: 'games', fixtures: 'games', playoffs: 'postseason', docs: 'methodology',
-  leaderboards: 'leaders', umpire_scorecards: 'umpires', ballparks: 'parks', players: 'scout', scouting: 'scout', model: 'methodology', odds: 'markets', terms: 'disclaimer' };
+  leaderboards: 'leaders', umpire_scorecards: 'umpires', ballparks: 'parks', players: 'scout', scouting: 'scout', model: 'methodology', odds: 'postseason', markets: 'postseason', forecasts: 'postseason', bracket: 'postseason', terms: 'disclaimer',
+  races: 'awards', 'how-it-works': 'methodology', 'how-were-doing': 'calibration', 'team-history': 'history' };
 const TITLES = {
   hub: 'Overview', games: 'Games', game: 'Game centre', standings: 'Standings', postseason: 'Postseason', hitters: 'Hitters', pitchers: 'Pitchers',
   hitter: 'Hitter', pitcher: 'Pitcher', player: 'Player', teams: 'Teams', team: 'Team', leaders: 'Leaders', umpires: 'Umpires', umpire: 'Umpire',
-  parks: 'Parks', park: 'Park', prospects: 'Prospects', history: 'History', awards: 'Awards', lab: 'Lab', scout: 'Scouting Room', arsenal: 'Pitch types', compare: 'Compare', value: 'Value', trade: 'Trade simulator', moves: 'Moves', fantasy: 'Fantasy',
-  markets: 'Forecast board', calibration: 'How we’re doing', glossary: 'Glossary', methodology: 'Methodology', disclaimer: 'Disclaimer & terms'
+  parks: 'Parks', park: 'Park', prospects: 'Prospects', history: 'History', awards: 'Races', lab: 'Lab', alltime: 'All-time', chances: 'Chances', scout: 'Scouting Room', arsenal: 'Pitch types', compare: 'Compare', value: 'Value', trade: 'Trade simulator', moves: 'Moves', fantasy: 'Fantasy',
+  calibration: 'How we’re doing', versus: 'Our forecasts v the market', 'who-moves-next': 'Who moves next', glossary: 'Glossary', methodology: 'How it works', disclaimer: 'Disclaimer & terms'
 };
 /* The sections (QK.sections('baseball', { scout: true }): Players and Lab are one "Scouting Room") and the routes each holds. */
-const SECTION_OF = { hub: 'overview', games: 'fixtures', game: 'fixtures', markets: 'fixtures', standings: 'standings', postseason: 'standings', awards: 'standings',
+const SECTION_OF = { hub: 'overview', games: 'fixtures', game: 'fixtures', standings: 'standings', chances: 'standings', postseason: 'standings', awards: 'standings', alltime: 'scout',
   history: 'standings', teams: 'teams', team: 'teams', hitters: 'scout', pitchers: 'scout', hitter: 'scout', pitcher: 'scout', player: 'scout',
   leaders: 'scout', prospects: 'scout', value: 'value', trade: 'value', moves: 'value', fantasy: 'fantasy', lab: 'scout', scout: 'scout', arsenal: 'scout',
-  compare: 'scout', parks: 'teams', park: 'teams', umpires: 'teams', umpire: 'teams', methodology: 'model', calibration: 'model', glossary: 'model', disclaimer: 'model' };
+  compare: 'scout', parks: 'teams', park: 'teams', umpires: 'teams', umpire: 'teams', methodology: 'model', calibration: 'model', versus: 'model', 'who-moves-next': 'model',
+  glossary: 'model', disclaimer: 'model' };
 /* Tabs per section: [route, label, scope] with scope 'g' (a global route), 'mlb' (MLB only) or '' (per level). */
 const SECTION_TABS = {
-  fixtures: [['games', 'Scoreboard', ''], ['markets', 'Forecast board', 'g']],
-  standings: [['standings', 'Standings', ''], ['postseason', 'Postseason', 'g'], ['awards', 'Award races', 'g'], ['history', 'All-time', 'g']],
+  fixtures: [['games', 'Scoreboard', '']],
+  standings: [['standings', 'Table', ''], ['chances', 'Chances', 'mlb'], ['postseason', 'Bracket', 'g'], ['history', 'History', 'g'], ['awards', 'Races', 'g']],
   teams: [['teams', 'All teams', ''], ['parks', 'Parks', 'g'], ['umpires', 'Umpires', 'g']],
   scout: [['scout', 'Scouting Room', ''], ['arsenal', 'Pitch types', ''], ['compare', 'Compare', 'g'], ['prospects', 'Prospects', 'g']],
   value: [['value', 'Player value', ''], ['trade', 'Trade simulator', 'mlb'], ['moves', 'Moves & trades', 'mlb']],
   fantasy: [['fantasy', 'Fantasy baseball', 'mlb']],
-  model: [['methodology', 'Methodology', 'g'], ['calibration', 'How we’re doing', 'g'], ['glossary', 'Glossary', 'g'], ['disclaimer', 'Terms', 'g']]
+  /* the standing Model order (round 9): How it works, How we're doing, the other Model tabs, Glossary, Terms */
+  model: [['methodology', 'How it works', 'g'], ['calibration', 'How we’re doing', 'g'], ['versus', 'Our forecasts v the market', 'g'], ['who-moves-next', 'Who moves next', 'g'],
+    ['glossary', 'Glossary', 'g'], ['disclaimer', 'Terms', 'g']]
 };
 const SECTION_LABEL = { overview: 'Overview', fixtures: 'Games', standings: 'Standings', teams: 'Teams', scout: 'Scouting Room', value: 'Value & Moves', fantasy: 'Fantasy', model: 'Model' };
 const SECTION_BLURB = {
   fixtures: 'Every game, by the numbers: our win chance from a plate-appearance simulation with the lineups and starters, live while games are on.',
-  standings: 'Divisions, wild cards, the postseason bracket and title chances from the season simulation.',
+  standings: 'The table, our chances from the season simulation, the bracket, every champion since 1903 and the award races.',
   teams: 'Every club ranked, profiled and set against the rest: our ratings, the team metrics, strengths and weaknesses, head to head.',
   scout: 'Every player and every metric, judged against the same position: sort the board, chart any two numbers, scan the leaders, open a profile, pin up to four to compare.',
   value: 'What every player is worth now and over the next five seasons, trades rated and simulated.',
@@ -262,8 +275,8 @@ const SECTION_BLURB = {
 const DETAIL_OF = { game: 'games', team: 'teams', hitter: 'scout', pitcher: 'scout', player: 'scout', park: 'parks', umpire: 'umpires' };
 const NAV_OF = { hub: 'hub', games: 'games', game: 'games', standings: 'standings', postseason: 'postseason', hitters: 'hitters', hitter: 'hitters',
   pitchers: 'pitchers', pitcher: 'pitchers', player: 'hitters', teams: 'teams', team: 'teams', leaders: 'leaders', umpires: 'umpires', umpire: 'umpires',
-  parks: 'parks', park: 'parks', prospects: 'prospects', history: 'history', awards: 'awards', lab: 'scout', scout: 'scout', arsenal: 'arsenal', compare: 'compare', value: 'value', trade: 'trade', moves: 'moves', fantasy: 'fantasy', markets: 'markets',
-  calibration: 'calibration', glossary: 'glossary', methodology: 'methodology' };
+  parks: 'parks', park: 'parks', prospects: 'prospects', history: 'history', awards: 'awards', lab: 'scout', scout: 'scout', arsenal: 'arsenal', compare: 'compare', value: 'value', trade: 'trade', moves: 'moves', fantasy: 'fantasy',
+  calibration: 'calibration', versus: 'versus', 'who-moves-next': 'who-moves-next', glossary: 'glossary', methodology: 'methodology', chances: 'chances', alltime: 'scout' };
 // Where a page lands when the level is switched (id pages fall back to their list).
 const SWITCH_TO = { game: 'games', hitter: 'scout', pitcher: 'scout', player: 'scout', team: 'teams' };
 
@@ -275,8 +288,16 @@ function qstr(o) {
   return k.length ? '?' + k.map(x => encodeURIComponent(x) + '=' + encodeURIComponent(o[x])).join('&') : '';
 }
 function redirectOf(r) {
-  if (['hitters', 'pitchers', 'leaders', 'lab'].indexOf(r.name) < 0 || state.level === 'npb' || r.level === 'npb') return null;
+  if (state.level === 'npb' || r.level === 'npb') return null;
   const q = r.params.query || {}, out = {};
+  /* round 9: the all-time careers live in the Scouting Room (#/alltime, and the old #/history boards with a metric) */
+  if (r.name === 'alltime' || (r.name === 'history' && (q.m || q.scope))) {
+    const o = { view: 'alltime' };
+    if (q.m) o.m = q.m;
+    if (q.scope) o.scope = q.scope;
+    return '#/mlb/scout' + qstr(o);
+  }
+  if (['hitters', 'pitchers', 'leaders', 'lab'].indexOf(r.name) < 0) return null;
   const L = r.level || state.level;
   if (r.name === 'hitters') out.kind = 'hitter';
   if (r.name === 'pitchers') out.kind = /^rp$/i.test(q.role || q.r || '') ? 'rp' : 'sp';
@@ -488,7 +509,9 @@ function sectionBar(r) {
   const tabs = SECTION_TABS[sec] || [];
   const detail = DETAIL_OF[r.name];
   const glob = (routeEntry(r.name) || {}).global;
-  const kicker = (sec === 'model' ? SITE : glob && ['postseason', 'awards', 'markets', 'compare'].indexOf(r.name) < 0 ? SITE + ' · MLB and Triple-A' : LEVEL_LONG[L] + ' · ' + S);
+  /* the MLB-only global pages (the bracket, the races, the club history) name MLB whatever level was last viewed */
+  const mlbOnly = ['postseason', 'awards', 'history'].indexOf(r.name) >= 0;
+  const kicker = sec === 'model' ? SITE : mlbOnly ? LEVEL_LONG.mlb + (r.name === 'history' ? '' : ' · ' + S) : glob && r.name !== 'compare' ? SITE + ' · MLB and Triple-A' : LEVEL_LONG[L] + ' · ' + S;
   let back = '';
   if (detail) {
     const t = tabs.find(x => x[0] === detail) || [detail, TITLES[detail] || titleCase(detail), routeEntry(detail) && routeEntry(detail).global ? 'g' : ''];

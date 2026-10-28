@@ -135,7 +135,7 @@ function playerCard(host, pid, L, S) {
       '<div style="margin-top:8px">' + typeKeys(m) + '</div><div class="bp-note">' + esc(ctx) + '</div>' +
       (deadlineLine(m) ? '<div class="bp-note">' + deadlineLine(m) + '</div>' : (isNum(row[F.p_dl]) ? '<div class="bp-note">' + esc(d.deadline_label === 'traded' ? 'Traded' : 'Moved') + ' before the deadline: <b>' + pct(row[F.p_dl]) + '</b></div>' : '')) +
       (fits.length ? '<div class="qk-kicker" style="margin:12px 0 6px">Clubs that fit</div><ul class="bp-list">' + fits.slice(0, 5).map(f => '<li>' + U.teamEnt(f.t, 'mlb') + '<span class="v">' + pct(f.p, 1) + '</span></li>').join('') + '</ul>' : ''),
-      { foot: '<span class="bp-fn">An estimate from on-field value and history; no contract data</span><a href="#/methodology#who-moves-next">How →</a>' });
+      { foot: '<span class="bp-fn">An estimate from on-field value and history; no contract data</span><a href="#/who-moves-next">How →</a>' });
   });
   if ('IntersectionObserver' in window) {
     const io = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) { io.disconnect(); go(); } }, { rootMargin: '200px' });
@@ -174,14 +174,12 @@ function modelBlock(host) {
 
 BP.moves = { load: load, rosterColumn: rosterColumn, teamCards: teamCards, playerCard: playerCard, modelBlock: modelBlock, typeBar: typeBar, typeKeys: typeKeys };
 
-/* The Model page: append "Who moves next" to the methodology. */
-const METH = BP.HANDLERS.methodology;
-if (METH) BP.route('methodology', (el, params, state) => Promise.resolve(METH(el, params, state)).then(() => {
-  if (!el.isConnected) return;
-  const box = document.createElement('div');
-  box.className = 'qk-section';
-  el.appendChild(box);
-  modelBlock(box);
-  if (BP.ui && BP.ui.howSureTop) BP.ui.howSureTop(el, (BP.state && BP.state.level) || 'mlb');
-}));
+/* The Model section's "Who moves next" tab (#/who-moves-next, round 9): the moves model and its validation, which used to
+   hang off the foot of the methodology (with a second "How sure are we?" hero, now gone: that lives on How we're doing). */
+BP.route('who-moves-next', el => {
+  el.innerHTML = QK.sectionHead({ kicker: 'Who moves next · the model', title: 'Who changes clubs, and how we check it', sub: 'The chance that each player is traded, released or leaves this winter, from on-field value and history (no contract data), and how those chances have held up.' }) +
+    '<div class="qk-section" id="wmn-box"></div><div class="qk-section" id="wmn-trd"></div><p class="qk-sub">The fan board, every club’s likely movers, is on <a class="qk-link" href="#/mlb/moves">Value &amp; Moves</a>.</p>';
+  modelBlock(document.getElementById('wmn-box'));
+  return BP.tradeMethod ? BP.tradeMethod(document.getElementById('wmn-trd')) : null;
+});
 })(window.BP);

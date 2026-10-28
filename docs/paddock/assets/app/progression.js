@@ -17,7 +17,7 @@ var compareHref = QPV.hrefFor('#/compare/progression/');
 
 /* the routes, ahead of compare/:kind/:a/:b */
 ['compare/progression', 'compare/progression/:a', 'compare/progression/:a/:b', 'compare/progression/:a/:b/:c', 'compare/progression/:a/:b/:c/:d'].forEach(function (p) {
-  PD.ROUTES.unshift({ pattern: p, segs: p.split('/'), name: 'compare-progression', section: 'lab' });
+  PD.ROUTES.unshift({ pattern: p, segs: p.split('/'), name: 'compare-progression', section: 'scout' });
 });
 
 function toP(c) {

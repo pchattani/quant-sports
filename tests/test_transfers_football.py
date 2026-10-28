@@ -212,3 +212,16 @@ def test_grades_perf_and_budgets() -> None:
     assert b["next"]["window"] == "2027-W" and b["next"]["hi"] < b["summer"]["hi"]
     few = TR.fit_budgets(sums, clubs, set(clubs[:5]), {}, {}, {}, {}, date(2026, 10, 16))
     assert few["report"]["ok"] is False and few["clubs"] == {}
+
+
+def test_normalise_drops_a_move_listed_twice() -> None:
+    from datetime import datetime, timezone
+    from oddsmarkets.football.analytics.transfers import normalise
+    ts = lambda s: int(datetime.fromisoformat(s).replace(tzinfo=timezone.utc).timestamp())
+    store = {"transfers": {
+        "1": {"ts": ts("2026-09-02"), "p": 7, "n": "A", "f": 10, "t": 20, "type": 1},
+        "2": {"ts": ts("2026-09-03"), "p": 7, "n": "A", "f": 10, "t": 20, "type": 1},
+        "3": {"ts": ts("2027-01-10"), "p": 7, "n": "A", "f": 10, "t": 20, "type": 1},   # a second loan months later is real
+    }}
+    out = normalise(store)
+    assert [t["key"] for t in out] == ["1", "3"]

@@ -113,7 +113,7 @@ function drawTable(L, S, cat, metrics, meta) {
   HW.sortable(host);
   document.getElementById('ld-sub').innerHTML = ids.length + ' players with ' + LS.minGp + '+ games and ' + LS.minMin + '+ minutes' + (LS.pool !== 'all' ? ' in the ' + LS.pool + ' pool' : '') + (m.lower ? ' · lower is better, so the lowest ranks first' : '');
   document.getElementById('ld-note').innerHTML = (HW.ours ? HW.ours.explain([m.key], { label: () => m.label }) : '') + '<strong>' + fx.glossLink(m.key, fx.esc(m.label)) + '</strong>' + (m.desc ? ': ' + fx.esc(m.desc).replace(/\.?$/, '.') : '.') + (m.scope === 'pbp' ? ' Play-by-play metric (about 2017 on).' : '') +
-    ' Per-100 figures are per 100 team possessions with the player on the floor; per-game and totals are raw. The <a href="' + fx.href(L, 'lab') + '">lab</a> plots any two of these against each other.';
+    ' Per-100 figures are per 100 team possessions with the player on the floor; per-game and totals are raw. The <a href="' + fx.href(L, 'scout') + '?view=chart">Scouting Room chart</a> plots any two of these against each other.';
 }
 
 HW.route('leaders', render);

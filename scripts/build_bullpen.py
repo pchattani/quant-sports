@@ -8,6 +8,8 @@ docs/bullpen/assets/base.css (copied from the football site's docs/site/assets/s
 NPB (level "npb", oddsmarkets/baseball/npb/build.py): data/npb/<S>/{season,schedule,players,teams}.json, game pages,
 data/npb/history.json, careers/, names.json, calibration.json (its own stores are inputs and are not deployed).
 
+data/mlb/team_history.json (analytics/team_history.py: champions, best team-seasons, franchise records; Lahman 1901 on);
+data/mlb/award_history.json (analytics/award_history.py: the winners against our walk-forward pre-vote calls).
 Per level, data/<L>/: history.json (MLB: Retrosheet-era careers and all-time leaderboards, with the Retrosheet
 notice), calibration.json (builder D's backtest writes it; kept as is, an {"ok": false} placeholder when missing).
 
@@ -271,6 +273,18 @@ def build_season(b: Build, level: str, season: int, full: bool, cfg: dict, share
     blocks = {}
     if full and not cfg["no_careers"]:
         blocks = b.step(f"player blocks {level} {season}", lambda: CR.current_blocks(ctx, hit, pit), {}) or {}
+    if full and current and level == "mlb":
+        # on pace for history (round 9): the season's leaders against the top single seasons since 1901
+        from oddsmarkets.baseball.analytics import records as RD
+        ch = b.step(f"chases {level} {season}", lambda: RD.build(season, hit, pit, ctx.phase), None)
+        if ch:
+            b.write(d + "chases.json", ch)
+    if full and current and blocks:
+        # who is hot and who is cold (round 9): the rolling windows of the blocks against each player's season
+        from oddsmarkets.baseball.analytics import form as FM
+        fm = b.step(f"form {level} {season}", lambda: FM.build(level, season, blocks, hit, pit), None)
+        if fm:
+            b.write(d + "form.json", fm)
     out = {"hitters": reduce_cat(hit, "hitter"), "pitchers": reduce_cat(pit, "pitcher"), "blocks": blocks, "current": current,
            "phase": ctx.phase, "season": season, "fld_validation": (fldp or {}).get("validation") if (fldp or {}).get("ok") else None}
     if full and current:
@@ -849,6 +863,30 @@ def main(argv: list[str] | None = None) -> int:
         from oddsmarkets.baseball.npb import build as NPB
         levels["npb"] = b.step("level npb", lambda: NPB.build_level(b, cfg), {}) or {}
         gc.collect()
+    # the clubs' history (Standings > History): Lahman Teams.csv 1901 on, then our finished seasons; kept when the cached
+    # Lahman file is not on this machine
+    if "mlb" in levels:
+        from oddsmarkets.baseball.analytics import team_history as TH
+
+        def team_hist():
+            out = TH.build(an.seasons_on_disk("mlb"))
+            if out is None:
+                logger.info("team history: no Lahman Teams.csv on this machine; team_history.json kept")
+            return out
+        th = b.step("team history mlb", team_hist, None)
+        if th:
+            b.write("mlb/team_history.json", th)
+        # the award winners against our pre-vote calls (Standings > Races): the committed walk-forward calls, plus this
+        # season's call once its regular season is over
+        from oddsmarkets.baseball.analytics import award_history as AH
+
+        def award_hist():
+            cur = max(an.seasons_on_disk("mlb") or [0])
+            sj = an.read_json(data / "mlb" / str(cur) / "season.json") or {}
+            return AH.build(cur, an.read_json(data / "mlb" / str(cur) / "awards.json"), str(sj.get("phase") or "") in ("postseason", "offseason", "complete"))
+        ah = b.step("award history mlb", award_hist, None)
+        if ah:
+            b.write("mlb/award_history.json", ah)
     # history (MLB, Retrosheet era) and the career files
     hist_rows = None
     hist_extra: set[str] = set()
