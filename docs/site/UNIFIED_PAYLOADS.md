@@ -900,3 +900,60 @@ movement-based list.
   (`clubs/<tid>.json` and `value/club/<tid>.json`) `pool` gain `rank_rated` and `rated`.
 - Written by `oddsmarkets/football/analytics/value_fields.py` after the value layer (players_live, lab, changed
   people roles) and by the unified step (people roles from the value files on disk, people_names.json).
+
+## 16. As built (28 October 2026): season tables, every player's history back as far as Sofascore has it
+
+Why: a person's seasons came from the line-up stores (the current and previous editions of each competition) plus the
+archive's per-player careers for ~1,250 profiled players, so most progressions started in 2025. Sofascore's
+league-wide season statistics give every player of a competition-season in pages of 100, one call a page.
+
+### 16.1 The season-table stores (fetcher output; never loaded by the page, pruned from the deploy)
+
+`seasontables/<slug>/<sid>/store.json`, one per competition-season, written by
+`scripts/fetch_sofascore_season_tables.py` from `/unique-tournament/{tid}/season/{sid}/statistics?limit=100&offset=..
+&order=-minutesPlayed&accumulation=total&fields=..` (68 fields a call):
+`{v, slug, tid, sid, name, year, fields, rows, teams, pages, next_page, complete, n, live, fetched_at, source}`.
+`fields` starts `id` (player), `team` (Sofascore team id), `name`, then only the Sofascore fields some row of that
+season has (an old season is minutes, appearances, starts, goals, assists and cards; xG appears from about 2019 in the big
+leagues). `rows` are arrays in `fields` order, most minutes first. One row per player and season: a player who moved
+within the competition is one row under his last club (Sofascore's table). Checked on the Premier League 2025/26: 537
+players in six pages, every one's minutes equal to the store's line-ups.
+
+The fetch: finished seasons newest first, round-robin (every competition's last finished season, then the one before),
+leagues, then continental club competitions, then national and super cups, then national-team competitions; a
+competition stops after two seasons without statistics; seasons under way last, refreshed every seven days at most.
+150 calls in the hourly task (under `data/deploy/locks/sofascore.lock`, which the task holds while its fetchers run)
+and a gap runner the task starts each hour (`--gap-runner`: one batch of 150 at :28 under the same lock, no call after
+:50, six hours' wait after a 403). `--status` prints progress and an ETA. The stores travel like the other stores (the
+task's engine commit, `push_stores.py`) and `export_public.py` classes every `store.json` under `docs/site/data` as a store.
+
+### 16.2 `people/<pid>.json`
+
+- The build reads the tables for the people it writes (it creates no person from a table alone).
+- An edition no store holds becomes a row per (competition, season, team) in **`hist`** (new key), column-oriented:
+  `{"f": ["comp", "sid", "season", "era", "tid", "apps", "starts", "min", "g", "a", "xg", "xa", "rt", "sh", "kp"],
+  "r": [[...], ...]}`, newest first, trailing nulls dropped (a pre-2014 season ends at its assists), xG, xA and the
+  rating to two decimals. `season` is the competition's settled label, `era` the edition's season key (13.1; an
+  international edition without dates falls in the season its year closes, as the archive's), `tid` Sofascore's team
+  id (no name matching); the club's name is in the file's `teams` (added once per club, `national` for a national
+  team). Implied for every row: `kind` and `scope` (from `comps`), `coverage: "totals"`, `source: "archive"`,
+  `src: "table"`. A field Sofascore lacks for the season is null, never zero. `unified.unpack_hist(p)` (Python) and
+  `players.js` `personRows` turn them back into archive-shaped rows; about 75 bytes a row against about 270 as dicts.
+  `archive[]` keeps the archive store's profiled-career rows (non-followed tournaments among them).
+- The archive's per-player row (profiled careers) for the same edition gives way to the table's (the same totals).
+- An edition a store holds keeps its line-up rows. When it is the person's only row there, partial, and the table has
+  more minutes, the row takes the table's totals (`coverage: "totals"`, `src: "table"`, `lineups` {apps, min}), as 13.2
+  already did with the archive; a full row only takes `xg` / `xa` it lacks when the minutes agree (5%).
+- `years[]` adds the `hist` rows (13.2), so the season totals and the Progression go back as far as the tables do.
+
+### 16.3 Progression (`people/<pid>.json` `progression`, `progression_ref.json`)
+
+- A progression row gains `st`: the share of its minutes from Sofascore's season totals (archive and table rows, no
+  line-ups behind them); absent when none. Such seasons have the box set only (goals, assists, xG and xA, shots, key
+  passes, the rating, each only where the totals have it: `progression.py` already computes a rate only when rows with
+  the field hold half the minutes); the Lab's deep set and our model's numbers (GAR, line-up value) stay on the Lab's
+  seasons.
+- The per-season peer quantiles (`QK.prog.ref`) now pool every person's table seasons, so old seasons have peer bands.
+- Front end (`assets/app/progression.js`): a season with `st` >= 0.5 reads "minutes · Sofascore season totals" in every
+  tooltip (chart, grid headers, compare), and the header says how many seasons (and which) come from Sofascore's
+  season totals.

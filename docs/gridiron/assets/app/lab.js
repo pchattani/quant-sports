@@ -13,7 +13,14 @@
  * pass rushers, interior linemen, linebackers, corners and safeties by value.json's role (the roster position when a
  * player has no value row). The scatter, ranks, percentiles, medians, presets, the picker's headline order, the
  * qualified floor and the "Most like" strip follow the group. Defender counts get per-game rates in the page (tackles,
- * tackles for loss, passes defensed, interceptions, forced fumbles over games) for the spec's per-game headline. */
+ * tackles for loss, passes defensed, interceptions, forced fumbles over games) for the spec's per-game headline.
+ * Round 7, the Position default view (QK.within.view on the spec group's `view`, nfl.labels.json): entering a position,
+ * switching position, or loading &within=pos&pos=.. without x / y opens on what makes a player at the position good
+ * (x), their production (y) and their value (the colour, on the percentile scale within the group on screen); a view
+ * metric counts only when the payload carries it for 30%+ of the group's qualified rows, else the next in its set.
+ * Explicit x / y in the address win. The pickers list the view's three sets first, the presets lead with the view's,
+ * a "Position view" line sits under the control, the ranked table adds the value column (colour metric, else the first
+ * aggregate, unless it is an axis) with its percentile, and "Most like" uses the view's metrics. Broad is unchanged. */
 (function (GI) {
 'use strict';
 
@@ -111,16 +118,56 @@ function val(r, key) {
   const u = meta(key).unit, nv = u ? raw(r, u) : null, n = isNum(nv) ? Number(nv) : nOf(r), kk = kOf(key);
   return (n * v + kk * mu) / (n + kk);
 }
+/* ── the Position default view (round 7). has(id): a picker metric the group on screen (its qualified rows) carries for
+ * at least VIEW_SHARE of its rows, so a default never opens an empty chart. Cached per season, position and filter. */
+const VIEW_SHARE = 0.3;
+let VIEWC = null;
+const vName = id => meta(id).label || GI.SP.specLabel(id, id);
+function view() {
+  if (!byPos() || S0.kind === 'TEAM') return null;
+  const k = LABK + '|' + S0.pos + '|' + S0.qual;
+  if (VIEWC && VIEWC.k === k) return VIEWC.v;
+  const cat = QK.spec && QK.spec.get ? QK.spec.get('nfl') : null, sg = cat ? cat.group(posOf(S0.pos)[2]) : null;
+  let v = null;
+  if (sg && sg.view) {
+    const rows = G().rows.filter(r => inGroup(r) && (!S0.qual || G().idx.qualified === undefined || raw(r, 'qualified') !== false));
+    const keys = {}, cov = {};
+    G().metrics.forEach(m => { keys[m.key] = 1; });
+    const has = id => {
+      if (!keys[id] || !rows.length) return false;
+      if (cov[id] === undefined) cov[id] = rows.filter(r => isNum(raw(r, id))).length >= VIEW_SHARE * rows.length;
+      return cov[id];
+    };
+    v = QK.within.view(sg, has);
+    /* a colour that is already an axis adds nothing: the next value metric, else none */
+    if (v && v.color && (v.color === v.x || v.color === v.y)) v.color = v.sets[2].ids.filter(id => id !== v.x && id !== v.y)[0] || null;
+    /* a default the season's data cannot show: the line says what the chart opens on instead */
+    const d = sg.view['default'] || {};
+    if (v && (v.x !== d.x || v.y !== d.y || v.color !== d.color) && v.x && v.y) v.why = String(v.why || '') + ' Not all of these are in this season\'s data, so it opens on ' + vName(v.x) + ' against ' + vName(v.y) + (v.color ? ', coloured by ' + vName(v.color) : '') + '.';
+  }
+  VIEWC = { k: k, v: v };
+  return v;
+}
+/* the view's value metric for the ranked table: its colour, else its first aggregate */
+function viewValue(v) { return v ? (v.color || v.sets[2].ids[0] || null) : null; }
 function presetList() {
-  const out = [], seen = {};
-  (byPos() ? (ROLE_PRESETS[S0.pos] || []).map(p => [S0.kind, p[0], p[1], p[2]]) : []).concat(PRESETS.filter(p => p[0] === S0.kind)).forEach(p => { if (G().idx[p[1]] !== undefined && G().idx[p[2]] !== undefined && !seen[p[1] + p[2]]) { seen[p[1] + p[2]] = 1; out.push({ x: p[1], y: p[2], title: p[3] }); } });
+  const out = [], seen = {}, v = view();
+  const vp = v ? QK.within.viewPresets(v, vName).map(p => [S0.kind, p.x, p.y, p.label, p.color || 'team']) : [];
+  (byPos() ? vp.concat((ROLE_PRESETS[S0.pos] || []).map(p => [S0.kind, p[0], p[1], p[2]])) : []).concat(PRESETS.filter(p => p[0] === S0.kind)).forEach(p => { if (G().idx[p[1]] !== undefined && G().idx[p[2]] !== undefined && !seen[p[1] + p[2]]) { seen[p[1] + p[2]] = 1; out.push({ x: p[1], y: p[2], title: p[3], color: p[4] }); } });
   return out;
 }
 function zs(a) { const n = a.length; if (!n) return { m: 0, s: 1 }; const m = a.reduce((x, y) => x + y, 0) / n; return { m: m, s: Math.sqrt(a.reduce((x, y) => x + (y - m) * (y - m), 0) / n) || 1 }; }
 function pctRank(sorted, v) { let lo = 0, hi = sorted.length; while (lo < hi) { const mid = (lo + hi) >> 1; if (sorted[mid] < v) lo = mid + 1; else hi = mid; } let up = lo; while (up < sorted.length && sorted[up] === v) up++; return sorted.length ? 100 * ((lo + up) / 2) / sorted.length : null; }
 function metricOpts(sel, colour) {
-  return (colour ? '<option value="team">Team</option>' + (S0.kind !== 'TEAM' ? '<option value="pos">Position</option>' : '<option value="conf">Conference</option>') + '<option value="">One colour</option>' : '') +
-    GI.SP.orderOpts(G().metrics.map(m => ({ key: m.key, label: m.label, lower: m.lower, group: m.group })), sel, headKeys());
+  const items = G().metrics.map(m => ({ key: m.key, label: m.label, lower: m.lower, group: m.group }));
+  const fixed = colour ? '<option value="team">Team</option>' + (S0.kind !== 'TEAM' ? '<option value="pos">Position</option>' : '<option value="conf">Conference</option>') + '<option value="">One colour</option>' : '';
+  const v = view();
+  if (!v) return fixed + GI.SP.orderOpts(items, sel, headKeys());
+  /* Position: the view's three sets first (excellence, production, value), then the lab's own grouping */
+  const r = QK.within.viewOrder(v, items, it => it.key);
+  const opt = it => '<option value="' + esc(it.key) + '"' + (it.key === sel ? ' selected' : '') + '>' + esc(it.label) + (it.lower ? ' ↓' : '') + '</option>';
+  return r.sets.map(s => '<optgroup label="' + esc(s.label) + '">' + s.items.map(opt).join('') + '</optgroup>').join('') +
+    (fixed ? '<optgroup label="Team or position">' + fixed + '</optgroup>' : '') + GI.SP.orderOpts(r.rest, sel, headKeys());
 }
 /* the spec's headline ids of the group on screen: the position's group, or the broad group's */
 function headKeys() { return GI.SP.headIds(byPos() ? posOf(S0.pos)[2] : S0.kind); }
@@ -130,7 +177,11 @@ function simStrip(rows, hits, S, nm) {
   if (S0.kind === 'TEAM') return '';
   const noun = byPos() ? posName(S0.pos).toLowerCase() : (GI.GROUP_NAME[S0.kind] || 'players').toLowerCase();
   if (!hits.length) return '<p class="gi-cap">Highlight a player to list the five most like them among the ' + esc(noun) + ' on this chart.</p>';
-  const t = hits[0], keys = headKeys().filter(k => G().idx[k] !== undefined);
+  const v = view();
+  /* Position: the view's metrics (about four for excellence, four for production, two for value) */
+  const keys = v ? [].concat(v.sets[0].ids.slice(0, 4), v.sets[1].ids.slice(0, 4), v.sets[2].ids.slice(0, 2)).filter((k, i, a) => a.indexOf(k) === i && G().idx[k] !== undefined)
+    : headKeys().filter(k => G().idx[k] !== undefined);
+  const t = hits[0];
   const near = QK.within.similar(rows, t, keys, (r, k) => raw(r, k), 5);
   return QK.within.simHtml('Most like ' + nm(t) + ' · ' + noun, near.map(o => ({ name: nm(o.row), href: GI.compareHref(idOf(t), idOf(o.row)) + (S && Number(S) !== GI.currentSeason() ? '?s=' + S : ''),
     sub: [raw(o.row, 'team') || '', GI.int(nOf(o.row)) + ' ' + G().nLabel.toLowerCase()].filter(Boolean).join(' · ') + ' · compare' })));
@@ -140,7 +191,8 @@ function draw(S) {
   const team = S0.kind === 'TEAM';
   const base0 = G().rows.filter(r => team || (inGroup(r) && nOf(r) >= S0.min && (!S0.qual || G().idx.qualified === undefined || raw(r, 'qualified') !== false)));
   Object.keys(MU).forEach(k => delete MU[k]);
-  [S0.x, S0.y, S0.color].forEach(k => { if (k && G().idx[k] !== undefined && shrinkable(k)) MU[k] = GI.median(base0.map(r => raw(r, k))); });
+  const vw = team ? null : view(), vk0 = viewValue(vw), vk = vk0 && vk0 !== S0.x && vk0 !== S0.y && G().idx[vk0] !== undefined ? vk0 : null;
+  [S0.x, S0.y, S0.color, vk].forEach(k => { if (k && G().idx[k] !== undefined && shrinkable(k)) MU[k] = GI.median(base0.map(r => raw(r, k))); });
   const rows = base0.filter(r => val(r, S0.x) !== null && val(r, S0.y) !== null);
   const noun = team ? 'teams' : (byPos() ? posName(S0.pos) : (GI.GROUP_NAME[S0.kind] || 'players')).toLowerCase();
   GI.set('lab-sub', rows.length + ' ' + noun + ' · ' + S + (team ? '' : ' · ' + S0.min + '+ ' + G().nLabel.toLowerCase() + (S0.qual ? ' · qualified' : '')));
@@ -162,9 +214,13 @@ function draw(S) {
   const size = r => (team ? 14 : 6 + 13 * (hi > lo ? Math.sqrt((nOf(r) - lo) / (hi - lo)) : 0.5));
   const href = r => (team ? GI.teamHref(idOf(r), S) : GI.playerHref(idOf(r), S));
   const colourMetric = S0.color && ['team', 'pos', 'conf'].indexOf(S0.color) < 0 ? S0.color : null;
+  /* Position: the colour metric on the percentile scale within the group on screen (100 = best) */
+  const cPct = byPos() && colourMetric ? rows.map(r => val(r, colourMetric)).filter(isNum).sort((a, b) => a - b) : null;
+  const cOf = r => { const v = colourMetric ? val(r, colourMetric) : null; if (!cPct) return v; return isNum(v) && cPct.length ? pOf(cPct, v, lower(colourMetric) ? -1 : 1) : null; };
   const posCol = {};
   GI.ch.mount('lab-chart', T => {
-    const cv = colourMetric ? rows.map(r => val(r, colourMetric)).filter(isNum) : [];
+    const cv = colourMetric ? rows.map(cOf).filter(isNum) : [];
+    const pScale = cPct ? [0, 25, 50, 75, 100].map(p => QK.pctHex(p)) : null;
     const colourOf = r => {
       if (S0.color === 'team') return GI.ch.lift(GI.teamColour(tm(r)), T);
       if (S0.color === 'conf') return GI.teamInfo(tm(r)).conference === 'AFC' ? T.cat[1] : T.model;
@@ -175,13 +231,14 @@ function draw(S) {
       grid: { left: 8, right: colourMetric ? 70 : 20, top: 24, bottom: 34, containLabel: true },
       xAxis: GI.ch.ax(T, { name: label(S0.x), nameLocation: 'middle', nameGap: 28, scale: true, inverse: lower(S0.x), fmt: v => fmt(S0.x, v) }),
       yAxis: GI.ch.ax(T, { name: label(S0.y), scale: true, inverse: lower(S0.y), fmt: v => fmt(S0.y, v) }),
-      visualMap: colourMetric && cv.length ? { type: 'continuous', dimension: 2, min: Math.min.apply(null, cv), max: Math.max.apply(null, cv), right: 0, top: 'middle', itemHeight: 140, itemWidth: 10, calculable: false,
-        text: [lower(colourMetric) ? 'worse' : 'better', lower(colourMetric) ? 'better' : 'worse'], textStyle: { color: T.ink3, fontSize: 10 }, inRange: { color: lower(colourMetric) ? [T.pos, T.mid, T.neg] : [T.neg, T.mid, T.pos] } } : undefined,
+      visualMap: colourMetric && cv.length ? (pScale ? { type: 'continuous', dimension: 2, min: 0, max: 100, right: 0, top: 'middle', itemHeight: 140, itemWidth: 10, calculable: false,
+        text: ['100th', '0th'], textStyle: { color: T.ink3, fontSize: 10 }, inRange: { color: pScale }, outOfRange: { color: T.axis } } : { type: 'continuous', dimension: 2, min: Math.min.apply(null, cv), max: Math.max.apply(null, cv), right: 0, top: 'middle', itemHeight: 140, itemWidth: 10, calculable: false,
+        text: [lower(colourMetric) ? 'worse' : 'better', lower(colourMetric) ? 'better' : 'worse'], textStyle: { color: T.ink3, fontSize: 10 }, inRange: { color: lower(colourMetric) ? [T.pos, T.mid, T.neg] : [T.neg, T.mid, T.pos] } }) : undefined,
       tooltip: GI.ch.tip(T, { formatter: p => { const r = p.data.r; return GI.ch.thead(esc(nm(r)) + (team ? '' : ' · ' + esc(tm(r) || ''))) +
         GI.ch.trow(p.color, label(S0.x), fmt(S0.x, val(r, S0.x)) + ' · ' + Math.round(pOf(sX, val(r, S0.x), dirx)) + 'th') + GI.ch.trow(p.color, label(S0.y), fmt(S0.y, val(r, S0.y)) + ' · ' + Math.round(pOf(sY, val(r, S0.y), diry)) + 'th') +
-        (team ? '' : GI.ch.trow(T.ink3, G().nLabel, GI.int(nOf(r)))) + (colourMetric ? GI.ch.trow(T.ink3, label(colourMetric), fmt(colourMetric, val(r, colourMetric))) : ''); } }),
+        (team ? '' : GI.ch.trow(T.ink3, G().nLabel, GI.int(nOf(r)))) + (colourMetric ? GI.ch.trow(T.ink3, label(colourMetric), fmt(colourMetric, val(r, colourMetric)) + (cPct && isNum(cOf(r)) ? ' · ' + Math.round(cOf(r)) + 'th' : '')) : ''); } }),
       series: [{ type: 'scatter', symbolSize: v => v[3],
-        data: rows.map(r => ({ value: [val(r, S0.x), val(r, S0.y), colourMetric ? val(r, colourMetric) : 0, size(r)], r: r, href: href(r),
+        data: rows.map(r => ({ value: [val(r, S0.x), val(r, S0.y), colourMetric ? (cPct ? (isNum(cOf(r)) ? cOf(r) : -1) : val(r, colourMetric)) : 0, size(r)], r: r, href: href(r),
           itemStyle: colourMetric ? { borderColor: T.s1, borderWidth: 0.7, opacity: 0.9 } : { color: colourOf(r), borderColor: T.s1, borderWidth: 0.7, opacity: 0.88 },
           label: { show: labelled.indexOf(r) >= 0, formatter: short(r), position: 'top', color: hits.indexOf(r) >= 0 ? T.model : T.ink2, fontSize: 10, fontWeight: 600 } })),
         labelLayout: { hideOverlap: true }, emphasis: { scale: 1.4, label: { show: true } },
@@ -199,15 +256,17 @@ function draw(S) {
   GI.set('lab-kpis', GI.kpis([GI.kpi('Correlation', GI.num(rr, 2), 'r on screen, ' + rows.length + ' ' + noun, { tip: 'Pearson correlation of the two axes for the rows shown' }),
     best ? GI.kpi('Best on both', esc(team ? GI.teamAbbr(idOf(best)) : GI.surnameOf(nm(best))), 'the furthest into the good corner (combined standard score ' + GI.num(ranked[0].z, 2) + ')', { signal: true, href: href(best) }) : '',
     GI.kpi('Medians', fmt(S0.x, mx) + ' · ' + fmt(S0.y, my), esc(label(S0.x)) + ' · ' + esc(label(S0.y)), { text: true })]));
-  const lrows = ranked.slice(0, 300).map(o => { const r = o.r, vx = val(r, S0.x), vy = val(r, S0.y);
+  const sV = vk ? rows.map(r => val(r, vk)).filter(isNum).sort((a, b) => a - b) : null, dirv = vk && lower(vk) ? -1 : 1;
+  const lrows = ranked.slice(0, 300).map(o => { const r = o.r, vx = val(r, S0.x), vy = val(r, S0.y), vv = vk ? val(r, vk) : null;
     const grp = raw(r, '_grp'), gn = grp && GI.SP.BY[grp] ? GI.SP.BY[grp].code : '';
-    return { id: idOf(r), name: nm(r), team: tm(r) || (team ? idOf(r) : null), sub: team ? (GI.teamInfo(idOf(r)).division || '') : [raw(r, 'pos') ? GI.posLabel(raw(r, 'pos')) + (gn && gn !== raw(r, 'pos') ? ' (' + ({ ED: 'pass rusher', IDL: 'interior' }[gn] || gn) + ')' : '') : '', GI.teamAbbr(tm(r))].filter(Boolean).join(' · '), n: nOf(r), vx: vx, px: pOf(sX, vx, dirx), vy: vy, py: pOf(sY, vy, diry), z: o.z }; });
+    return { id: idOf(r), name: nm(r), team: tm(r) || (team ? idOf(r) : null), sub: team ? (GI.teamInfo(idOf(r)).division || '') : [raw(r, 'pos') ? GI.posLabel(raw(r, 'pos')) + (gn && gn !== raw(r, 'pos') ? ' (' + ({ ED: 'pass rusher', IDL: 'interior' }[gn] || gn) + ')' : '') : '', GI.teamAbbr(tm(r))].filter(Boolean).join(' · '), n: nOf(r), vx: vx, px: pOf(sX, vx, dirx), vy: vy, py: pOf(sY, vy, diry), vv: vv, pv: vk && isNum(vv) && sV.length ? pOf(sV, vv, dirv) : null, z: o.z }; });
   QK.leaderboard(document.getElementById('lab-table'), { dense: true, rank: true, maxHeight: 600, rows: lrows, rowHref: r => (team ? GI.teamHref(r.id, S) : GI.playerHref(r.id, S)),
     columns: [{ key: 'name', label: team ? 'Team' : 'Player', type: 'entity', sub: 'sub', mark: r => ({ name: GI.teamName(r.team), abbr: GI.teamAbbr(r.team), colour: GI.teamInfo(r.team).colour }), href: r => (team ? GI.teamHref(r.id, S) : GI.playerHref(r.id, S)) }]
       .concat(team ? [] : [{ key: 'n', label: G().nLabel, num: true }])
-      .concat([{ key: 'px', label: label(S0.x), type: 'pctl', pctl: 'px', fmt: (v, r) => fmt(S0.x, r.vx), tip: 'Cell colour: percentile on screen (100 = best)' }, { key: 'py', label: label(S0.y), type: 'pctl', pctl: 'py', fmt: (v, r) => fmt(S0.y, r.vy), tip: 'Cell colour: percentile on screen (100 = best)' },
-        { key: 'z', label: 'Combined', type: 'bar', fmt: v => '<b>' + GI.num(v, 2) + '</b>', tip: 'Sum of standard scores in the better direction' }]) });
-  GI.SP.tagHeads(document.getElementById('lab-table'), { px: S0.x, py: S0.y });
+      .concat([{ key: 'px', label: label(S0.x), type: 'pctl', pctl: 'px', fmt: (v, r) => fmt(S0.x, r.vx), tip: 'Cell colour: percentile on screen (100 = best)' }, { key: 'py', label: label(S0.y), type: 'pctl', pctl: 'py', fmt: (v, r) => fmt(S0.y, r.vy), tip: 'Cell colour: percentile on screen (100 = best)' }]
+      .concat(vk ? [{ key: 'pv', label: label(vk), type: 'pctl', pctl: 'pv', fmt: (v, r) => fmt(vk, r.vv), tip: 'The position view\'s value metric. Cell colour: percentile on screen (100 = best)' }] : [])
+      .concat([{ key: 'z', label: 'Combined', type: 'bar', fmt: v => '<b>' + GI.num(v, 2) + '</b>', tip: 'Sum of standard scores in the better direction' }])) });
+  GI.SP.tagHeads(document.getElementById('lab-table'), vk ? { px: S0.x, py: S0.y, pv: vk } : { px: S0.x, py: S0.y });
   const wq = QK.within.query(S0);
   GI.setHashQuiet(GI.ghref('lab', S, { g: S0.kind, x: S0.x, y: S0.y, within: wq.within || undefined, pos: wq.pos || undefined }));
 }
@@ -227,7 +286,9 @@ GI.route('lab', function (el, params) {
     if (byPos()) { S0.pos = wn.pos; S0.kind = posOf(S0.pos)[1]; }
     if (qy.q) S0.q = String(qy.q);
     if (!LAB[S0.kind]) S0.kind = Object.keys(LAB)[0];
-    el.innerHTML = head + '<div id="lab-kpis"></div><div class="gi-toolbar gi-lab-wn" id="lab-wn-bar"></div>' +
+    /* Position without x / y in the address: the position's default view (preset 0) */
+    if (byPos() && !qy.x && !qy.y) { S0.x = ''; S0.y = ''; S0.preset = 0; }
+    el.innerHTML = head + '<div id="lab-kpis"></div><div class="gi-toolbar gi-lab-wn" id="lab-wn-bar"></div><div id="lab-why"></div>' +
       GI.card('<span id="lab-title">Scatter</span>', '<span id="lab-sub"></span>', '<div class="gi-toolbar" style="margin-bottom:12px">' + GI.field('Preset', '<select id="lab-preset" class="qk-select"></select>') +
         GI.field('X axis', '<select id="lab-x" class="qk-select"></select>') + GI.field('Y axis', '<select id="lab-y" class="qk-select"></select>') + '<button type="button" class="qk-btn" id="lab-swap" aria-label="Swap the axes">⇄ Swap</button>' +
         GI.field('Colour', '<select id="lab-color" class="qk-select"></select>') + '<label class="gi-field" id="lab-min-w"><span>Min <span id="lab-min-u"></span> <b id="lab-min-v"></b></span><input id="lab-min" type="range" min="0" max="700" step="1"></label>' +
@@ -235,7 +296,8 @@ GI.route('lab', function (el, params) {
         GI.field('Highlight', '<input id="lab-q" class="qk-input" type="search" placeholder="Player or team">') + '</div>' + '<div id="lab-ours"></div>' + GI.chartBox('lab-chart', 520, 'Scatter') + '<div id="lab-sim" class="gi-lab-sim"></div><p class="gi-cap" id="lab-note"></p>') +
       GI.card('Ranked', 'By the combined standard score on both axes (top 300); cells coloured by percentile on screen', '<div id="lab-table"></div>', { flush: true });
     const $ = id => document.getElementById(id);
-    const applyPreset = () => { const P = presetList(); if (S0.preset < 0 || !P.length) return; const p = P[S0.preset] || P[0]; S0.x = p.x; S0.y = p.y; };
+    /* a view preset (Position) also sets the colour: its value metric, or the team colours when value is an axis */
+    const applyPreset = () => { const P = presetList(); if (S0.preset < 0 || !P.length) return; const p = P[S0.preset] || P[0]; S0.x = p.x; S0.y = p.y; if (p.color !== undefined) S0.color = p.color; };
     const reset = () => {
       const g = G();
       const maxN = Math.max.apply(null, g.rows.map(nOf).concat([10]));
@@ -261,6 +323,11 @@ GI.route('lab', function (el, params) {
     };
     if (qy.x && G().idx[qy.x] !== undefined) { S0.x = qy.x; S0.preset = -1; }
     if (qy.y && G().idx[qy.y] !== undefined) { S0.y = qy.y; S0.preset = -1; }
+    /* Position with x / y in the address: they win; the preset they match (if any) and its colour, else the view's colour */
+    if (byPos() && S0.preset < 0 && S0.x && S0.y) {
+      const P = presetList(), i = P.findIndex(p => p.x === S0.x && p.y === S0.y), v = view();
+      if (i >= 0) { S0.preset = i; if (P[i].color !== undefined) S0.color = P[i].color; } else if (v && v.color) S0.color = v.color;
+    }
     reset();
     sync();
     const redraw = () => { sync(); draw(S); };
@@ -271,11 +338,15 @@ GI.route('lab', function (el, params) {
       GI.set('lab-wn-bar', QK.within.html({ within: S0.within, pos: S0.pos }, { id: 'lab-wn', groups: codes.map(c => [c, posName(c)]),
         note: byPos() ? 'The metrics spec\'s peer group' + (posOf(S0.pos)[1] === 'DEF' ? ' (defensive role from our value model)' : '') + ' · qualified players only by default (the spec minimum, ' + esc(String((GI.SP.BY[posOf(S0.pos)[2]] || {}).unit || 'games')) + ')' : 'Offence by position, every defender together, or the teams' }) +
         (byPos() ? '' : GI.seg('lab-kind', GI.GROUPS.concat(['TEAM']).map(g => [g, g === 'TEAM' ? 'Teams' : g, !LAB[g]]), S0.kind, 'Group')));
+      GI.set('lab-why', byPos() ? QK.within.viewWhy(view()) : '');
       QK.within.wire(el, { within: S0.within, pos: S0.pos }, w => {
         if (w.within === 'pos' && !byPos()) w.pos = S0.kind === 'DEF' ? 'EDGE' : (POS_CODES.indexOf(S0.kind) >= 0 ? S0.kind : 'QB');
+        /* Position sets the colour from its view; back in Broad, the colour chosen there before */
+        if (w.within === 'pos' && !byPos()) S0.bColor = S0.color;
+        else if (w.within !== 'pos' && byPos()) S0.color = S0.bColor !== undefined ? S0.bColor : 'team';
         S0.within = w.within; S0.pos = w.pos;
-        toKind(byPos() ? posOf(S0.pos)[1] : S0.kind);
         if (byPos()) S0.qual = true;
+        toKind(byPos() ? posOf(S0.pos)[1] : S0.kind);
         bar(); redraw();
       }, { id: 'lab-wn' });
       GI.wireSeg(el, 'lab-kind', v => { if (!LAB[v]) return; toKind(v); redraw(); });

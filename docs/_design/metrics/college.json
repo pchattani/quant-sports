@@ -655,6 +655,44 @@
     "distance": "weighted euclidean over the features both player-seasons have, divided by the square root of the summed weights",
     "k": 5,
     "constraints": "same level and group, qualified player-seasons, the last ten seasons, not the player's own seasons"
+   },
+   "view": {
+    "excellence": {
+     "label": "Passing",
+     "ids": [
+      "sr_db",
+      "ypa",
+      "cmp_pct",
+      "td_rate",
+      "int_rate",
+      "sack_rate",
+      "expl_pass"
+     ]
+    },
+    "production": {
+     "label": "Production",
+     "ids": [
+      "epa_play",
+      "epa_db",
+      "ypd",
+      "qb_rush_epa",
+      "rush_pg"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "value_pg",
+      "value",
+      "epa"
+     ]
+    },
+    "default": {
+     "x": "sr_db",
+     "y": "epa_play",
+     "color": "value_pg"
+    },
+    "why": "Quarterbacks: dropback success rate against EPA per play, coloured by value per game."
    }
   },
   {
@@ -1106,6 +1144,40 @@
     "distance": "weighted euclidean over the features both player-seasons have, divided by the square root of the summed weights",
     "k": 5,
     "constraints": "same level and group, qualified player-seasons, the last ten seasons, not the player's own seasons"
+   },
+   "view": {
+    "excellence": {
+     "label": "Running",
+     "ids": [
+      "sr_rush",
+      "ypc",
+      "expl_rush",
+      "stuff_rate"
+     ]
+    },
+    "production": {
+     "label": "Production",
+     "ids": [
+      "epa_play",
+      "epa_rush",
+      "rush_share",
+      "tgt_share"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "value_pg",
+      "value",
+      "epa"
+     ]
+    },
+    "default": {
+     "x": "sr_rush",
+     "y": "epa_play",
+     "color": "value_pg"
+    },
+    "why": "Running backs: rushing success rate against EPA per play, coloured by value per game."
    }
   },
   {
@@ -1598,6 +1670,41 @@
     "distance": "weighted euclidean over the features both player-seasons have, divided by the square root of the summed weights",
     "k": 5,
     "constraints": "same level and group, qualified player-seasons, the last ten seasons, not the player's own seasons"
+   },
+   "view": {
+    "excellence": {
+     "label": "Getting open",
+     "ids": [
+      "tgt_share",
+      "catch_rate",
+      "ypr",
+      "sr_tgt",
+      "expl_tgt"
+     ]
+    },
+    "production": {
+     "label": "Production",
+     "ids": [
+      "yptpa",
+      "epa_tgt",
+      "ypt",
+      "epa_play"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "value_pg",
+      "value",
+      "epa"
+     ]
+    },
+    "default": {
+     "x": "tgt_share",
+     "y": "yptpa",
+     "color": "value_pg"
+    },
+    "why": "Receivers: target share against yards per team pass attempt, coloured by value per game."
    }
   },
   {
@@ -2090,6 +2197,41 @@
     "distance": "weighted euclidean over the features both player-seasons have, divided by the square root of the summed weights",
     "k": 5,
     "constraints": "same level and group, qualified player-seasons, the last ten seasons, not the player's own seasons"
+   },
+   "view": {
+    "excellence": {
+     "label": "Getting open",
+     "ids": [
+      "tgt_share",
+      "catch_rate",
+      "ypr",
+      "sr_tgt",
+      "expl_tgt"
+     ]
+    },
+    "production": {
+     "label": "Production",
+     "ids": [
+      "yptpa",
+      "epa_tgt",
+      "ypt",
+      "epa_play"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "value_pg",
+      "value",
+      "epa"
+     ]
+    },
+    "default": {
+     "x": "tgt_share",
+     "y": "yptpa",
+     "color": "value_pg"
+    },
+    "why": "Tight ends: target share against yards per team pass attempt, coloured by value per game."
    }
   },
   {
@@ -2490,6 +2632,38 @@
     "distance": "weighted euclidean over the features both player-seasons have, divided by the square root of the summed weights",
     "k": 5,
     "constraints": "same level and group, qualified player-seasons, the last ten seasons, not the player's own seasons"
+   },
+   "view": {
+    "excellence": {
+     "label": "Pass rush",
+     "ids": [
+      "sacks_pg",
+      "hurries_pg",
+      "havoc_pg",
+      "tfl_pg"
+     ]
+    },
+    "production": {
+     "label": "Plays made",
+     "ids": [
+      "tkl_pg",
+      "pd_pg",
+      "def_int_pg"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "value_pg",
+      "value"
+     ]
+    },
+    "default": {
+     "x": "havoc_pg",
+     "y": "tkl_pg",
+     "color": "value_pg"
+    },
+    "why": "Defensive linemen: havoc plays per game against tackles per game, coloured by value per game."
    }
   },
   {
@@ -2890,6 +3064,38 @@
     "distance": "weighted euclidean over the features both player-seasons have, divided by the square root of the summed weights",
     "k": 5,
     "constraints": "same level and group, qualified player-seasons, the last ten seasons, not the player's own seasons"
+   },
+   "view": {
+    "excellence": {
+     "label": "Tackling",
+     "ids": [
+      "tkl_pg",
+      "tfl_pg"
+     ]
+    },
+    "production": {
+     "label": "Plays made",
+     "ids": [
+      "havoc_pg",
+      "sacks_pg",
+      "pd_pg",
+      "def_int_pg",
+      "hurries_pg"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "value_pg",
+      "value"
+     ]
+    },
+    "default": {
+     "x": "tkl_pg",
+     "y": "havoc_pg",
+     "color": "value_pg"
+    },
+    "why": "Linebackers: tackles per game against havoc plays per game, coloured by value per game."
    }
   },
   {
@@ -3288,6 +3494,36 @@
     "distance": "weighted euclidean over the features both player-seasons have, divided by the square root of the summed weights",
     "k": 5,
     "constraints": "same level and group, qualified player-seasons, the last ten seasons, not the player's own seasons"
+   },
+   "view": {
+    "excellence": {
+     "label": "Coverage",
+     "ids": [
+      "pd_pg",
+      "def_int_pg"
+     ]
+    },
+    "production": {
+     "label": "Plays made",
+     "ids": [
+      "havoc_pg",
+      "tkl_pg",
+      "tfl_pg"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "value_pg",
+      "value"
+     ]
+    },
+    "default": {
+     "x": "pd_pg",
+     "y": "havoc_pg",
+     "color": "value_pg"
+    },
+    "why": "Defensive backs: passes defended per game against havoc plays per game, coloured by value per game."
    }
   },
   {
@@ -3552,6 +3788,35 @@
     "distance": "weighted euclidean over the features both player-seasons have, divided by the square root of the summed weights",
     "k": 5,
     "constraints": "same level and group, qualified player-seasons, the last ten seasons, not the player's own seasons"
+   },
+   "view": {
+    "excellence": {
+     "label": "Kicking",
+     "ids": [
+      "fg_pct",
+      "fg_long"
+     ]
+    },
+    "production": {
+     "label": "Scoring",
+     "ids": [
+      "xp_pct",
+      "fga_pg"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "value_pg",
+      "value"
+     ]
+    },
+    "default": {
+     "x": "fg_pct",
+     "y": "fg_long",
+     "color": "value_pg"
+    },
+    "why": "Kickers: field-goal rate against longest make, coloured by value per game."
    }
   },
   {
@@ -3778,6 +4043,33 @@
     "distance": "weighted euclidean over the features both player-seasons have, divided by the square root of the summed weights",
     "k": 5,
     "constraints": "same level and group, qualified player-seasons, the last ten seasons, not the player's own seasons"
+   },
+   "view": {
+    "excellence": {
+     "label": "Punting",
+     "ids": [
+      "gross",
+      "in20_rate",
+      "tb_rate"
+     ]
+    },
+    "production": {
+     "label": "Results",
+     "ids": []
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "value_pg",
+      "value"
+     ]
+    },
+    "default": {
+     "x": "gross",
+     "y": "in20_rate",
+     "color": "value_pg"
+    },
+    "why": "Punters: gross average against the share inside the 20, coloured by value per game."
    }
   },
   {
@@ -5058,6 +5350,43 @@
     "distance": "weighted euclidean over the features both player-seasons have, divided by the square root of the summed weights",
     "k": 5,
     "constraints": "same level and group, qualified player-seasons, the last ten seasons, not the player's own seasons"
+   },
+   "view": {
+    "excellence": {
+     "label": "Playmaking",
+     "ids": [
+      "ast_pct",
+      "ast_tov",
+      "tov_pct",
+      "stl_pct",
+      "tp_pct"
+     ]
+    },
+    "production": {
+     "label": "Scoring",
+     "ids": [
+      "ts_add",
+      "pts100",
+      "ts",
+      "ortg",
+      "fta100",
+      "usg"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "r",
+      "value_pg",
+      "value"
+     ]
+    },
+    "default": {
+     "x": "ast_pct",
+     "y": "ts_add",
+     "color": "r"
+    },
+    "why": "Guards: assist rate against scoring efficiency added, coloured by box rating."
    }
   },
   {
@@ -6340,6 +6669,44 @@
     "distance": "weighted euclidean over the features both player-seasons have, divided by the square root of the summed weights",
     "k": 5,
     "constraints": "same level and group, qualified player-seasons, the last ten seasons, not the player's own seasons"
+   },
+   "view": {
+    "excellence": {
+     "label": "Two-way wing",
+     "ids": [
+      "stl_pct",
+      "tp_pct",
+      "tpar",
+      "blk_pct",
+      "drb_pct",
+      "trb_pct"
+     ]
+    },
+    "production": {
+     "label": "Scoring",
+     "ids": [
+      "ts_add",
+      "pts100",
+      "ts",
+      "ortg",
+      "fta100",
+      "usg"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "r",
+      "value_pg",
+      "value"
+     ]
+    },
+    "default": {
+     "x": "stl_pct",
+     "y": "ts_add",
+     "color": "r"
+    },
+    "why": "Wings: steal rate against scoring efficiency added, coloured by box rating."
    }
   },
   {
@@ -7664,6 +8031,43 @@
     "distance": "weighted euclidean over the features both player-seasons have, divided by the square root of the summed weights",
     "k": 5,
     "constraints": "same level and group, qualified player-seasons, the last ten seasons, not the player's own seasons"
+   },
+   "view": {
+    "excellence": {
+     "label": "Rim and glass",
+     "ids": [
+      "blk_pct",
+      "trb_pct",
+      "orb_pct",
+      "drb_pct",
+      "fg_pct"
+     ]
+    },
+    "production": {
+     "label": "Scoring",
+     "ids": [
+      "ts_add",
+      "pts100",
+      "ts",
+      "ortg",
+      "fta100",
+      "usg"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "r",
+      "value_pg",
+      "value"
+     ]
+    },
+    "default": {
+     "x": "blk_pct",
+     "y": "ts_add",
+     "color": "r"
+    },
+    "why": "Bigs: block rate against scoring efficiency added, coloured by box rating."
    }
   },
   {
@@ -8944,6 +9348,43 @@
     "distance": "weighted euclidean over the features both player-seasons have, divided by the square root of the summed weights",
     "k": 5,
     "constraints": "same level and group, qualified player-seasons, the last ten seasons, not the player's own seasons"
+   },
+   "view": {
+    "excellence": {
+     "label": "Playmaking",
+     "ids": [
+      "ast_pct",
+      "ast_tov",
+      "tov_pct",
+      "stl_pct",
+      "tp_pct"
+     ]
+    },
+    "production": {
+     "label": "Scoring",
+     "ids": [
+      "ts_add",
+      "pts100",
+      "ts",
+      "ortg",
+      "fta100",
+      "usg"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "r",
+      "value_pg",
+      "value"
+     ]
+    },
+    "default": {
+     "x": "ast_pct",
+     "y": "ts_add",
+     "color": "r"
+    },
+    "why": "Guards: assist rate against scoring efficiency added, coloured by box rating."
    }
   },
   {
@@ -10226,6 +10667,44 @@
     "distance": "weighted euclidean over the features both player-seasons have, divided by the square root of the summed weights",
     "k": 5,
     "constraints": "same level and group, qualified player-seasons, the last ten seasons, not the player's own seasons"
+   },
+   "view": {
+    "excellence": {
+     "label": "Two-way wing",
+     "ids": [
+      "stl_pct",
+      "tp_pct",
+      "tpar",
+      "blk_pct",
+      "drb_pct",
+      "trb_pct"
+     ]
+    },
+    "production": {
+     "label": "Scoring",
+     "ids": [
+      "ts_add",
+      "pts100",
+      "ts",
+      "ortg",
+      "fta100",
+      "usg"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "r",
+      "value_pg",
+      "value"
+     ]
+    },
+    "default": {
+     "x": "stl_pct",
+     "y": "ts_add",
+     "color": "r"
+    },
+    "why": "Wings: steal rate against scoring efficiency added, coloured by box rating."
    }
   },
   {
@@ -11550,6 +12029,43 @@
     "distance": "weighted euclidean over the features both player-seasons have, divided by the square root of the summed weights",
     "k": 5,
     "constraints": "same level and group, qualified player-seasons, the last ten seasons, not the player's own seasons"
+   },
+   "view": {
+    "excellence": {
+     "label": "Rim and glass",
+     "ids": [
+      "blk_pct",
+      "trb_pct",
+      "orb_pct",
+      "drb_pct",
+      "fg_pct"
+     ]
+    },
+    "production": {
+     "label": "Scoring",
+     "ids": [
+      "ts_add",
+      "pts100",
+      "ts",
+      "ortg",
+      "fta100",
+      "usg"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "r",
+      "value_pg",
+      "value"
+     ]
+    },
+    "default": {
+     "x": "blk_pct",
+     "y": "ts_add",
+     "color": "r"
+    },
+    "why": "Bigs: block rate against scoring efficiency added, coloured by box rating."
    }
   },
   {

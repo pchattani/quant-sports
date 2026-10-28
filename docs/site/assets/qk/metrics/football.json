@@ -604,6 +604,49 @@
         "distance": "weighted euclidean",
         "k": 5,
         "constraints": "same group; candidates over the same minimum; one row per person; the player excluded"
+      },
+      "view": {
+        "excellence": {
+          "label": "Defending",
+          "ids": [
+            "padj_tkl_int_90",
+            "aerials_won_90",
+            "aerial_pct",
+            "duel_pct",
+            "duels_won_90",
+            "interceptions_90",
+            "clearances_90",
+            "blocks_90",
+            "recoveries_90"
+          ]
+        },
+        "production": {
+          "label": "On the ball",
+          "ids": [
+            "opp_half_passes_90",
+            "prog_dist_90",
+            "prog_carries_90",
+            "long_balls_90",
+            "long_ball_pct",
+            "pass_pct",
+            "npxg_xa_90",
+            "shot_creation_90"
+          ]
+        },
+        "aggregate": {
+          "label": "Value",
+          "ids": [
+            "gar90",
+            "rating",
+            "on_npxgd_90"
+          ]
+        },
+        "default": {
+          "x": "padj_tkl_int_90",
+          "y": "opp_half_passes_90",
+          "color": "gar90"
+        },
+        "why": "Centre-backs: possession-adjusted tackles and interceptions against passes into the opponent's half, coloured by value added per 90."
       }
     },
     {
@@ -1206,6 +1249,44 @@
         "distance": "weighted euclidean",
         "k": 5,
         "constraints": "same group; candidates over the same minimum; one row per person; the player excluded"
+      },
+      "view": {
+        "excellence": {
+          "label": "Defending and running",
+          "ids": [
+            "prog_actions_90",
+            "crosses_90",
+            "padj_tkl_int_90",
+            "recoveries_90",
+            "duel_pct",
+            "interceptions_90",
+            "hsr_km_90"
+          ]
+        },
+        "production": {
+          "label": "Attacking",
+          "ids": [
+            "npxg_xa_90",
+            "xa_90",
+            "key_passes_90",
+            "shot_creation_90",
+            "dribbles_90"
+          ]
+        },
+        "aggregate": {
+          "label": "Value",
+          "ids": [
+            "gar90",
+            "rating",
+            "on_npxgd_90"
+          ]
+        },
+        "default": {
+          "x": "prog_actions_90",
+          "y": "npxg_xa_90",
+          "color": "gar90"
+        },
+        "why": "Full-backs and wing-backs: carrying the ball upfield against expected goals plus assists, coloured by value added per 90."
       }
     },
     {
@@ -1836,6 +1917,45 @@
         "distance": "weighted euclidean",
         "k": 5,
         "constraints": "same group; candidates over the same minimum; one row per person; the player excluded"
+      },
+      "view": {
+        "excellence": {
+          "label": "Control and ball-winning",
+          "ids": [
+            "opp_half_passes_90",
+            "prog_dist_90",
+            "long_balls_90",
+            "pass_pct",
+            "loss_per_100",
+            "padj_tkl_int_90",
+            "ball_wins_90",
+            "recoveries_90",
+            "interceptions_90"
+          ]
+        },
+        "production": {
+          "label": "Attacking",
+          "ids": [
+            "npxg_xa_90",
+            "xa_90",
+            "key_passes_90",
+            "shot_creation_90"
+          ]
+        },
+        "aggregate": {
+          "label": "Value",
+          "ids": [
+            "gar90",
+            "rating",
+            "on_npxgd_90"
+          ]
+        },
+        "default": {
+          "x": "opp_half_passes_90",
+          "y": "npxg_xa_90",
+          "color": "gar90"
+        },
+        "why": "Midfielders: passes into the opponent's half against expected goals plus assists, coloured by value added per 90."
       }
     },
     {
@@ -2413,6 +2533,44 @@
         "distance": "weighted euclidean",
         "k": 5,
         "constraints": "same group; candidates over the same minimum; one row per person; the player excluded"
+      },
+      "view": {
+        "excellence": {
+          "label": "Creating",
+          "ids": [
+            "shot_creation_90",
+            "dribbles_90",
+            "dribble_pct",
+            "key_passes_90",
+            "big_chances_90",
+            "prog_actions_90",
+            "opp_half_passes_90"
+          ]
+        },
+        "production": {
+          "label": "Attacking",
+          "ids": [
+            "npxg_xa_90",
+            "npxg_90",
+            "xa_90",
+            "ga_90",
+            "shots_90"
+          ]
+        },
+        "aggregate": {
+          "label": "Value",
+          "ids": [
+            "gar90",
+            "rating",
+            "on_npxgd_90"
+          ]
+        },
+        "default": {
+          "x": "shot_creation_90",
+          "y": "npxg_xa_90",
+          "color": "gar90"
+        },
+        "why": "Attacking midfielders and wingers: shot creation against expected goals plus assists, coloured by value added per 90."
       }
     },
     {
@@ -3014,6 +3172,45 @@
         "distance": "weighted euclidean",
         "k": 5,
         "constraints": "same group; candidates over the same minimum; one row per person; the player excluded"
+      },
+      "view": {
+        "excellence": {
+          "label": "Finishing and movement",
+          "ids": [
+            "npxg_90",
+            "xg_per_shot",
+            "sot_90",
+            "xgot_90",
+            "finishing",
+            "big_chances_90",
+            "aerials_won_90"
+          ]
+        },
+        "production": {
+          "label": "Attacking",
+          "ids": [
+            "ga_90",
+            "goals_90",
+            "npxg_xa_90",
+            "xa_90",
+            "shots_90",
+            "shot_creation_90"
+          ]
+        },
+        "aggregate": {
+          "label": "Value",
+          "ids": [
+            "gar90",
+            "rating",
+            "on_npxgd_90"
+          ]
+        },
+        "default": {
+          "x": "npxg_90",
+          "y": "ga_90",
+          "color": "gar90"
+        },
+        "why": "Strikers: non-penalty xG per 90 (getting into scoring positions) against goals plus assists, coloured by value added per 90."
       }
     },
     {
@@ -3364,6 +3561,40 @@
         "distance": "weighted euclidean",
         "k": 5,
         "constraints": "same group; candidates over the same minimum; one row per person; the player excluded"
+      },
+      "view": {
+        "excellence": {
+          "label": "Shot-stopping",
+          "ids": [
+            "goals_prevented_90",
+            "save_pct",
+            "saves_90",
+            "high_claims_90",
+            "sweeper_90"
+          ]
+        },
+        "production": {
+          "label": "Distribution",
+          "ids": [
+            "pass_pct",
+            "long_ball_pct",
+            "passes_90",
+            "long_balls_90"
+          ]
+        },
+        "aggregate": {
+          "label": "Value",
+          "ids": [
+            "gar90",
+            "rating"
+          ]
+        },
+        "default": {
+          "x": "goals_prevented_90",
+          "y": "pass_pct",
+          "color": "gar90"
+        },
+        "why": "Goalkeepers: goals prevented (shot-stopping above an average keeper) against passing accuracy, coloured by value added per 90."
       }
     },
     {

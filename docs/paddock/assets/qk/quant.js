@@ -2453,7 +2453,18 @@ QK.optgroups = function (items, cat, o) {
  *   QK.within.wire(root, st, cb, o) -> wires it: sets st.within / st.pos and calls cb(st) on a change
  *   QK.within.floor(group, scale)  -> the spec minimum (group.min.value) x scale (prorating), or null
  *   QK.within.similar(rows, target, keys, val, n) -> the n rows most like target within the group: [{ row, d }]
- *   QK.within.simHtml(label, [{ name, href, sub }]) -> the "Most like" chip strip */
+ *   QK.within.simHtml(label, [{ name, href, sub }]) -> the "Most like" chip strip
+ * The Position default view (the spec group's "view", passed through the labels file): what makes the position
+ * excellent, the hitting / attacking / scoring set, and the aggregate value metrics, with a default x, y and colour.
+ *   QK.within.view(group, has)    -> { why, x, y, color, sets: [{ key: 'excellence'|'production'|'aggregate', label, ids }] }
+ *        or null (no view); has(id) -> bool keeps the ids the page's payload carries; the defaults fall back to the
+ *        first id of their set (x: excellence, y: production, then excellence; color: aggregate) and x !== y
+ *   QK.within.viewPresets(v, name) -> [{ x, y, color, label }]: the default (excellence against production, coloured by
+ *        value), then excellence and production each against value; name(id) -> the metric's display name
+ *   QK.within.viewOrder(v, items, key) -> { sets: [{ label, items }], rest: [items] }: picker items in the view's sets
+ *        first (in the view's order), the rest as given; key(item) -> id (default item.key|id|value)
+ *   QK.within.viewOptgroups(v, items, cat, o) -> '<optgroup>' HTML: the view's sets, then QK.optgroups(rest, cat, o)
+ *   QK.within.viewWhy(v)          -> the one-line "Position view" note, or '' */
 QK.within = {
   read: function (q, codes) {
     q = q || {}; codes = codes || [];
@@ -2504,6 +2515,63 @@ QK.within = {
       if (c >= need) out.push({ row: r, d: Math.sqrt(s / c) });
     });
     return out.sort(function (a, b) { return a.d - b.d; }).slice(0, n || 5);
+  },
+  view: function (g, has) {
+    var v = g && g.view;
+    if (!v) return null;
+    has = has || function () { return true; };
+    var sets = ['excellence', 'production', 'aggregate'].map(function (k) {
+      var s = v[k] || {};
+      return { key: k, label: s.label || k, ids: (s.ids || []).filter(function (id) { return has(id); }) };
+    });
+    var d = v['default'] || {}, ex = sets[0].ids, pr = sets[1].ids, ag = sets[2].ids;
+    var pick = function (want, lists, not) {
+      if (want && has(want) && want !== not) return want;
+      for (var i = 0; i < lists.length; i++) for (var j = 0; j < lists[i].length; j++) if (lists[i][j] !== not) return lists[i][j];
+      return null;
+    };
+    var x = pick(d.x, [ex, pr, ag]);
+    var y = pick(d.y, [pr, ex, ag], x);
+    return { why: v.why || '', x: x, y: y, color: pick(d.color, [ag]), sets: sets };
+  },
+  viewPresets: function (v, name) {
+    if (!v || !v.x || !v.y) return [];
+    name = name || function (id) { return id; };
+    var out = [{ x: v.x, y: v.y, color: v.color, label: name(v.x) + ' against ' + name(v.y) + (v.color ? ' · colour ' + name(v.color) : '') }];
+    var ag = v.sets[2].ids.filter(function (id) { return id !== v.color; }).concat(v.color ? [v.color] : []);
+    var val = v.color || ag[0];
+    if (val) {
+      if (val !== v.x) out.push({ x: v.x, y: val, color: null, label: name(v.x) + ' against ' + name(val) });
+      if (val !== v.y) out.push({ x: v.y, y: val, color: null, label: name(v.y) + ' against ' + name(val) });
+    }
+    var ex2 = v.sets[0].ids.filter(function (id) { return id !== v.x && id !== v.y; })[0];
+    if (ex2) out.push({ x: v.x, y: ex2, color: v.color, label: name(v.x) + ' against ' + name(ex2) + (v.color ? ' · colour ' + name(v.color) : '') });
+    return out;
+  },
+  viewOrder: function (v, items, key) {
+    key = key || function (it) { return it.key !== undefined ? it.key : (it.id !== undefined ? it.id : it.value); };
+    if (!v) return { sets: [], rest: (items || []).slice() };
+    var used = {}, by = {};
+    (items || []).forEach(function (it) { var k = key(it); if (by[k] === undefined) by[k] = it; });
+    var sets = v.sets.map(function (s) {
+      var its = [];
+      s.ids.forEach(function (id) { if (by[id] !== undefined && !used[id]) { used[id] = 1; its.push(by[id]); } });
+      return { label: s.label, items: its };
+    }).filter(function (s) { return s.items.length; });
+    return { sets: sets, rest: (items || []).filter(function (it) { return !used[key(it)]; }) };
+  },
+  viewOptgroups: function (v, items, cat, o) {
+    o = o || {};
+    var r = QK.within.viewOrder(v, items, o.key);
+    var opt = function (it) {
+      var val = it.value !== undefined ? it.value : (it.key !== undefined ? it.key : it.id);
+      return '<option value="' + esc(val) + '"' + (String(val) === String(o.selected) ? ' selected' : '') + '>' + esc(it.label) + '</option>';
+    };
+    return r.sets.map(function (s) { return '<optgroup label="' + esc(s.label) + '">' + s.items.map(opt).join('') + '</optgroup>'; }).join('') +
+      QK.optgroups(r.rest, cat, o);
+  },
+  viewWhy: function (v) {
+    return v && v.why ? '<p class="qk-within-why"><b>Position view.</b> ' + esc(v.why) + '</p>' : '';
   },
   /* the "Most like" strip: label (text) and items [{ name, href, sub? }] as chips; empty without items */
   simHtml: function (label, items) {

@@ -1328,6 +1328,9 @@ class Unified:
         all_pids = set(self.apps) | {p for p in archive_players if (archive_players[p] or {}).get("details")} | set(roster) | listed
         all_pids -= set(self.aliases)
         self.frame_of_person: dict[str, str] = {}
+        # Sofascore's league-wide season tables (UNIFIED_PAYLOADS 16): every person's season totals in every followed
+        # competition, back as far as Sofascore has them; read for the people written here only
+        self._load_tables(all_pids | set(self.aliases))
 
         for pid in all_pids:
             apps = sorted(self.apps.get(pid, []), key=lambda a: (a[0], a[1]), reverse=True)
@@ -1364,6 +1367,7 @@ class Unified:
                 else:
                     s["current"] = bool(nt and str(nt["tid"]) == str(s["tid"]))
             arch_rows = self._person_archive(pid, seasons, tslug, frame)
+            arch_rows = self._person_tables(pid, seasons, arch_rows, frame)
             years = season_totals(seasons + arch_rows)
             # A career list the old cap cut short: the season it stopped in, and every older one, may miss
             # competitions (the backfill lists it again); those years say so instead of reading "full".
@@ -1404,8 +1408,20 @@ class Unified:
             payload["apps_fields"] = APPS_FIELDS
             payload["apps"] = apps
             payload["seasons"] = seasons
-            if arch_rows:
-                payload["archive"] = arch_rows
+            # Sofascore's season-table rows (UNIFIED_PAYLOADS 16.2) are written column-oriented in `hist`, their clubs
+            # once in `teams`; the archive's profiled-career rows stay in `archive`
+            legacy = [r for r in arch_rows if r.get("src") != "table"]
+            if legacy:
+                payload["archive"] = legacy
+            hist = pack_hist([r for r in arch_rows if r.get("src") == "table"])
+            if hist:
+                payload["hist"] = hist
+                for r in arch_rows:
+                    t = r.get("tid")
+                    if r.get("src") == "table" and t is not None and str(t) not in teams:
+                        teams[str(t)] = {"name": r.get("team") or (self.clubs.get(str(t)) or {}).get("name")}
+                        if (self.clubs.get(str(t)) or {}).get("national") or r.get("scope") == "international":
+                            teams[str(t)]["national"] = True
             if cut:
                 payload["career_gap"] = {"through": cut}
             payload["years"] = years
@@ -1569,6 +1585,111 @@ class Unified:
                         **({"sid": int(sid) if sid.isdigit() else sid} if sid else {}),
                         **{dst: row[src] for src, dst in self.ARCHIVE_KEYS if row.get(src) is not None},
                         "coverage": COVERAGE_TOTALS, "source": "archive"})
+        out.sort(key=lambda r: era_key(r.get("era") or ""), reverse=True)
+        return out
+
+    # -- season tables (UNIFIED_PAYLOADS 16) ------------------------------------------------------------------
+
+    TABLE_KEYS = (("appearances", "apps"), ("matchesStarted", "starts"), ("minutesPlayed", "min"), ("goals", "g"),
+                  ("assists", "a"), ("expectedGoals", "xg"), ("expectedAssists", "xa"), ("rating", "rt"),
+                  ("totalShots", "sh"), ("keyPasses", "kp"))
+
+    def _load_tables(self, pids: set[str]) -> int:
+        """
+        The season-table stores (docs/site/data/seasontables/<slug>/<sid>/store.json, written by
+        scripts/fetch_sofascore_season_tables.py) for the given people: self.table_rows {pid: [(slug, sid, team tid,
+        {apps, starts, min, g, a, xg, xa, rt, sh, kp})]}, self.table_meta {(slug, sid): {name, year, tid, teams}}.
+        A person listed under a merged duplicate id is read under the person's id.
+        """
+        self.table_rows: dict[str, list[tuple]] = {}
+        self.table_meta: dict[tuple, dict] = {}
+        root = self.data_dir / "seasontables"
+        if not root.exists():
+            return 0
+        n = 0
+        for f in sorted(root.glob("*/*/store.json")):
+            try:
+                sh = json.loads(f.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            slug, sid = sh.get("slug") or f.parent.parent.name, str(sh.get("sid") or f.parent.name)
+            if slug not in self.comps or not sh.get("rows"):
+                continue
+            fields = sh.get("fields") or []
+            if "id" not in fields:
+                continue
+            i_id, i_team = fields.index("id"), fields.index("team") if "team" in fields else None
+            cols = [(fields.index(src), dst) for src, dst in self.TABLE_KEYS if src in fields]
+            self.table_meta[(slug, sid)] = {"name": sh.get("name"), "year": sh.get("year"), "tid": sh.get("tid"),
+                                            "teams": sh.get("teams") or {}}
+            for r in sh["rows"]:
+                pid = str(r[i_id])
+                if pid not in pids:
+                    continue
+                st = {dst: r[i] for i, dst in cols if r[i] is not None}
+                if not st.get("min") and not st.get("apps"):
+                    continue
+                pid = self.aliases.get(pid, pid)
+                self.table_rows.setdefault(pid, []).append((slug, sid, r[i_team] if i_team is not None else None, st))
+                n += 1
+        logger.info("season tables: %d rows for %d people from %d competition-seasons", n, len(self.table_rows),
+                    len(self.table_meta))
+        return n
+
+    def _person_tables(self, pid: str, seasons: list[dict], arch_rows: list[dict], frame: str = "split") -> list[dict]:
+        """
+        The season-table rows of one person merged with his line-up rows and the archive's: a (competition, season)
+        the stores hold keeps its line-up rows (authoritative), a partial one taking the totals as the archive does
+        (13.2) and a full one only the xG and xA it lacks; an edition no store holds gets one row per team from the
+        table, `coverage: "totals"`, `src: "table"`; the archive's per-player row for the same edition gives way to the
+        table's (same numbers, but the table names the club by id). Returns the archive rows plus the new rows.
+        """
+        rows = getattr(self, "table_rows", {}).get(pid)
+        if not rows:
+            return arch_rows
+        by_store: dict[tuple, list[dict]] = {}
+        for r in seasons:
+            by_store.setdefault((r["comp"], str(r.get("sid"))), []).append(r)
+        liga_eras = {r.get("era") for r in seasons if r["comp"] == LIGA_ARGENTINA_SLUG}
+        table_eds = {(slug, sid) for slug, sid, _t, _s in rows}
+        out = [r for r in arch_rows if (r.get("comp"), str(r.get("sid"))) not in table_eds]
+        for slug, sid, team_tid, st in rows:
+            meta = self.table_meta.get((slug, sid)) or {}
+            same = by_store.get((slug, sid))
+            if same:
+                if len(same) == 1:
+                    r0 = same[0]
+                    if r0.get("coverage") not in (None, COVERAGE_FULL, COVERAGE_TOTALS) and _num(st.get("min")) > _num(r0.get("min")):
+                        r0["lineups"] = {"apps": r0["apps"], "min": r0["min"]}
+                        for _src, dst in self.TABLE_KEYS:
+                            if st.get(dst) is not None:
+                                r0[dst] = st[dst]
+                        r0["coverage"] = COVERAGE_TOTALS
+                        r0["src"] = "table"
+                        r0.pop("gap", None)
+                    elif abs(_num(st.get("min")) - _num(r0.get("min"))) <= max(10, 0.05 * _num(r0.get("min"))):
+                        for dst in ("xg", "xa"):
+                            if r0.get(dst) is None and st.get(dst) is not None:
+                                r0[dst] = st[dst]
+                continue
+            kind = (self.comps.get(slug) or {}).get("kind") or "league"
+            season, era = season_label(meta.get("name"), meta.get("year"))
+            # the competition's settled label when its season list knows the edition (two editions never read alike)
+            season = (self.season_meta.get((slug, sid)) or {}).get("season") or fan_label(slug, season)
+            era = self._archive_era({"tid": meta.get("tid"), "year": meta.get("year")}, slug, sid, season, era, kind, frame)
+            if not era or (slug == LIGA_ARGENTINA_SLUG and era in liga_eras):
+                continue
+            row = {"comp": slug, "kind": kind, "scope": "international" if kind == "international" else "club",
+                   "season": season, "era": era, "sid": int(sid) if sid.isdigit() else sid}
+            if team_tid is not None:
+                c = self.clubs.get(str(team_tid)) or {}
+                row["tid"] = int(team_tid)
+                row["team"] = c.get("name") or (meta.get("teams") or {}).get(str(team_tid))
+            for _src, dst in self.TABLE_KEYS:
+                if st.get(dst) is not None:
+                    row[dst] = st[dst]
+            row.update({"coverage": COVERAGE_TOTALS, "source": "archive", "src": "table"})
+            out.append(row)
         out.sort(key=lambda r: era_key(r.get("era") or ""), reverse=True)
         return out
 
@@ -1888,6 +2009,44 @@ class Unified:
                 fields["seasons"] = [{k: r[k] for k in ("sid", "season", "era", "source")} for r in man["seasons"]]
             out[slug] = fields
         return out
+
+
+HIST_FIELDS = ["comp", "sid", "season", "era", "tid", "apps", "starts", "min", "g", "a", "xg", "xa", "rt", "sh", "kp"]
+
+
+def pack_hist(rows: list[dict]) -> dict | None:
+    """A person's season-table rows, column-oriented (UNIFIED_PAYLOADS 16.2): {"f": HIST_FIELDS, "r": [[...]]}, newest
+    first, trailing nulls dropped (an old season ends at its assists), xG and the rating to two decimals. kind, scope,
+    coverage ("totals") and the source are implied; the club's name is in the file's `teams`."""
+    if not rows:
+        return None
+    out = []
+    for r in sorted(rows, key=lambda r: (era_key(r.get("era") or ""), _num(r.get("min"))), reverse=True):
+        a = [round(r[k], 2) if k in ("xg", "xa", "rt") and isinstance(r.get(k), float) else r.get(k) for k in HIST_FIELDS]
+        while a and a[-1] is None:
+            a.pop()
+        out.append(a)
+    return {"f": HIST_FIELDS, "r": out}
+
+
+def unpack_hist(p: dict) -> list[dict]:
+    """people/<pid>.json `hist` back into archive-shaped rows (kind and scope from the file's `comps`, the club's name
+    from its `teams`)."""
+    h = p.get("hist") or {}
+    f = h.get("f") or []
+    comps = p.get("comps") or {}
+    teams = p.get("teams") or {}
+    out = []
+    for a in h.get("r") or []:
+        r = {k: v for k, v in zip(f, a) if v is not None}
+        c = comps.get(r.get("comp")) or {}
+        r["kind"] = c.get("kind") or "league"
+        r["scope"] = c.get("scope") or ("international" if r["kind"] == "international" else "club")
+        if r.get("tid") is not None:
+            r["team"] = (teams.get(str(r["tid"])) or {}).get("name")
+        r.update({"coverage": COVERAGE_TOTALS, "source": "archive", "src": "table"})
+        out.append(r)
+    return out
 
 
 def season_totals(rows: list[dict]) -> list[dict]:

@@ -12,7 +12,11 @@
  *        "Compare within" (QK.within): Broad (the default) is the position letters, goalkeepers or outfield players by
  *        line; Position is the spec's formation-role peer groups (GK, CB, FB/WB, DM/CM, AM/W, ST, on the rows' `role`),
  *        and the scatter, ranks, percentiles, medians, metric order, minimum (the spec's floor: 450 minutes, goalkeepers
- *        900) and the "Most like" suggestions all follow the group
+ *        900) and the "Most like" suggestions all follow the group. Position mode opens on the spec group's default
+ *        view (QK.within.view, football.json `view`): what makes a player in the role good against their attacking or
+ *        on-the-ball output, coloured by value added (GAR/90); the pickers and presets lead with the view's three sets,
+ *        the ranked table adds the view's value column and "Most like" uses the view's metrics. Explicit x / y in the
+ *        address still win; Broad is unchanged
  *   #/compare/players/<a>/<b>[?p3=<c>&view=classic&scope=]
  *        two or three players side by side (kit v4: two draw the tale of the tape, three the table): QK.compareView on the one metric set the player card
  *        uses (FB.PLAYER_SETS, players.js), percentiles against the shared position group, and where each one sits in
@@ -194,19 +198,76 @@ function pool() {
   return LAB.rows.filter(function (r) { return inGroup(r) && (r[I.minutes] || 0) >= S.min; });
 }
 function isGkView() { return byPos() ? S.role === 'GK' : S.pos === 'G'; }
-/* The position's presets that this view can draw (an older payload without GAR drops the value presets). */
+/* The position's presets that this view can draw (an older payload without GAR drops the value presets). Position mode
+   leads with the view's presets ([x, y, title, colour, true]: the default, excellence and attacking each against value,
+   excellence against a second excellence metric); the role's own pairs follow, without repeats. */
 function presets() {
-  return curPresets().filter(function (pp) { return !LAB || (LAB.idx[pp[0]] !== undefined && LAB.idx[pp[1]] !== undefined); });
+  var own = curPresets().filter(function (pp) { return !LAB || (LAB.idx[pp[0]] !== undefined && LAB.idx[pp[1]] !== undefined); });
+  var v = posView();
+  if (!v) return own;
+  var vp = QK.within.viewPresets(v, function (k) { return (LAB.meta[k] || {}).label || k; }).map(function (p) { return [p.x, p.y, p.label, p.color, true]; });
+  return vp.concat(own.filter(function (pp) { return !vp.some(function (q) { return q[0] === pp[0] && q[1] === pp[1]; }); }));
 }
 function applyPreset() {
   if (S.preset < 0) return;
   var ps = presets();
   var p = ps[S.preset] || ps[0] || curPresets()[0];
   S.x = p[0]; S.y = p[1];
+  // a view preset carries its colour; the "against value" ones fall back to the default colour rather than repeat an axis
+  if (p[4]) { if (p[3]) S.color = p[3]; else if (S.color === p[0] || S.color === p[1]) S.color = S.defColor; }
 }
-function metricOpts(scope) {
-  var groups = {}, order = [], head = headlineFor(S.pos), heads = [];
-  LAB.metrics.forEach(function (m) {
+/* the metrics this view's pickers offer (goalkeeping metrics only for goalkeepers, outfield ones only for the rest) */
+function offered(m) { return isGkView() ? m.scope !== 'out' : m.scope !== 'gk'; }
+/* The Position default view (QK.within.view on the spec group's `view`; spec ids are the lab's keys, and ids the lab does
+   not carry yet, prog_dist_90 and on_npxgd_90, drop out). has(id): the pickers offer the metric and at least VIEW_SHARE
+   of the group on screen has a value (the whole role when fewer than 3 clear the minimum), so a default never opens on
+   an empty chart; the kit then falls back to the next metric of the same set. */
+var VIEW_SHARE = 0.3;
+function posView() {
+  if (!byPos() || !LAB || !SPEC || !SPEC.group) return null;
+  var g = SPEC.group(roleGroup(S.role).id);
+  if (!g || !g.view) return null;
+  var rows = pool();
+  if (rows.length < 3) rows = LAB.rows.filter(inGroup);
+  var memo = {};
+  var has = function (id) {
+    if (memo[id] !== undefined) return memo[id];
+    var m = LAB.meta[id];
+    if (!m || LAB.idx[id] === undefined || id === 'minutes' || id === 'age' || !offered(m)) return (memo[id] = false);
+    if (!rows.length) return (memo[id] = true);
+    var i = LAB.idx[id], n = 0;
+    rows.forEach(function (r) { if (r[i] !== null && r[i] !== undefined) n++; });
+    return (memo[id] = n / rows.length >= VIEW_SHARE);
+  };
+  return QK.within.view(g, has);
+}
+/* entering Position, another role, or ?within=pos without axes: the view's x, y and colour (preset 0) */
+function applyView() {
+  var v = posView();
+  S.preset = 0;
+  if (!v || !v.x || !v.y) { S.viewColor = null; applyPreset(); return; }
+  S.x = v.x; S.y = v.y;
+  if (v.color) S.color = v.color;
+  S.viewColor = v.color || null;
+}
+/* the ranked table's value column in Position mode: the view's colour metric, else its first aggregate, never X or Y */
+function valueKey(v) {
+  if (!v) return '';
+  return [v.color].concat(v.sets[2].ids).filter(function (k) { return k && LAB.idx[k] !== undefined && k !== S.x && k !== S.y; })[0] || '';
+}
+/* v (Position mode): the X, Y and Colour pickers lead with the view's three sets under the view's labels (our metrics
+   marked "ours"), then the colour groupings, then the lab's grouping of the rest. */
+function metricOpts(scope, v) {
+  var groups = {}, order = [], head = headlineFor(S.pos), heads = [], lead = [];
+  var ms = LAB.metrics;
+  if (v && scope !== 'size') {
+    var vo = QK.within.viewOrder(v, ms.filter(offered), function (m) { return m.key; });
+    lead = vo.sets.map(function (st) { return { group: st.label, items: st.items.map(function (m) { return [m.key, m.label + (oursOf(m.key) ? ' · ours' : '')]; }) }; });
+    var used = {};
+    vo.sets.forEach(function (st) { st.items.forEach(function (m) { used[m.key] = 1; }); });
+    ms = ms.filter(function (m) { return !used[m.key]; });
+  }
+  ms.forEach(function (m) {
     if (isGkView() ? m.scope === 'out' : m.scope === 'gk') return;
     if (!m.ours && head[m.key] !== undefined) { heads.push(m); return; }
     var g = m.ours ? 'Our models' : 'Box score · ' + m.group;
@@ -217,9 +278,9 @@ function metricOpts(scope) {
     groups['Box score · key numbers'] = heads.sort(function (a, b) { return head[a.key] - head[b.key]; }).map(function (m) { return [m.key, m.label]; });
     order.splice(groups['Our models'] ? 1 : 0, 0, 'Box score · key numbers');
   }
-  var out = [];
+  var out = lead.slice();
   if (scope === 'size') out.push(['minutes', 'Minutes played'], ['', 'Same size']);
-  if (scope === 'color') out.push(['comp', 'Main competition'], ['team', 'Club'], ['', 'One colour']);
+  if (scope === 'color') { if (lead.length) out.push({ group: 'Groups', items: [['comp', 'Main competition'], ['team', 'Club'], ['', 'One colour']] }); else out.push(['comp', 'Main competition'], ['team', 'Club'], ['', 'One colour']); }
   order.forEach(function (g) { out.push({ group: g, items: groups[g] }); });
   if (!scope) out.push({ group: 'Profile', items: [['age', 'Age'], ['minutes', 'Minutes']] });
   return out;
@@ -238,16 +299,21 @@ function stateFromRoute(p) {
   var q = p.query || {};
   var st = { win: WIN_ORDER.indexOf(q.w) >= 0 ? q.w : 'season', scope: p.comp || 'all', pos: POS[p.pos] ? p.pos : (POS[q.pos] ? q.pos : 'F'),
     min: isNum(q.min) ? Number(q.min) : null, adj: q.adj !== '0', shrink: q.shrink !== '0', preset: isNum(q.preset) ? Number(q.preset) : 0,
-    x: q.x || '', y: q.y || '', size: q.size === 'none' ? '' : (q.size || 'minutes'), color: q.color === undefined ? null : (q.color === 'none' ? '' : q.color), q: q.q || '' };
+    x: q.x || '', y: q.y || '', size: q.size === 'none' ? '' : (q.size || 'minutes'), color: q.color === undefined ? null : (q.color === 'none' ? '' : q.color), q: q.q || '',
+    colorSet: q.color !== undefined };
   if (st.x && st.y && q.preset === undefined) st.preset = -1;
+  // Position mode opens on the role's view unless the address names both axes (a preset or colour in it still counts)
+  st.openView = !(st.x && st.y);
   var w = QK.within.read(q, ROLE_CODES);
   st.within = w.within;
   st.role = ROLE_CODES.indexOf(q.pos) >= 0 ? q.pos : LETTER_ROLE[st.pos];
   return st;
 }
+/* the colour the address leaves out: the view's in Position mode (a reload re-applies it), else the default */
+function defColorNow() { return byPos() && S.viewColor ? S.viewColor : S.defColor; }
 function writeHash() {
   var q = { w: S.win === 'season' ? null : S.win, min: S.min === defMin() ? null : S.min, preset: S.preset >= 0 ? (S.preset ? S.preset : null) : null,
-    x: S.preset < 0 ? S.x : null, y: S.preset < 0 ? S.y : null, size: S.size === 'minutes' ? null : (S.size || 'none'), color: S.color === S.defColor ? null : (S.color || 'none'),
+    x: S.preset < 0 ? S.x : null, y: S.preset < 0 ? S.y : null, size: S.size === 'minutes' ? null : (S.size || 'none'), color: S.color === defColorNow() ? null : (S.color || 'none'),
     shrink: S.shrink ? null : '0', adj: S.adj ? null : '0', q: S.q || null };
   var wq = QK.within.query({ within: S.within, pos: S.role });
   q.within = wq.within; q.pos = wq.pos;
@@ -256,14 +322,14 @@ function writeHash() {
 
 FB.route('lab', function (el, p) {
   S = stateFromRoute(p);
-  el.innerHTML = FB.pageHead('Lab', 'Player lab', 'Chart any two player metrics for one position group: broad (goalkeepers, or outfield players by line) or a formation role (centre-backs, full-backs, strikers ...). Every player is one dot: matches in the season or window, across every competition, club football only, national-team football only, or one competition. Presets pick the pairs that separate styles of player; medians split the chart into quadrants.') +
+  el.innerHTML = FB.pageHead('Lab', 'Player lab', 'Chart any two player metrics for one position group: broad (goalkeepers, or outfield players by line) or a formation role (centre-backs, full-backs, strikers ...). Every player is one dot: matches in the season or window, across every competition, club football only, national-team football only, or one competition. Presets pick the pairs that separate styles of player; medians split the chart into quadrants. Position opens on what makes a player in that role good, their attacking or on-the-ball output, and their overall value.') +
     subnav('lab') +
     '<section class="qk-card fb-lb-ctl"><div class="qk-card-body" id="lb-ctl">' + FB.loading('lines', 3) + '</div></section>' +
     '<div id="lb-cover"></div>' +
     FB.card('<span id="lb-title">The chart</span>', '<span id="lb-sub"></span>', FB.chartBox('lb-chart', 640, 'Player lab scatter') + '<div id="lb-sim" class="fb-lb-sim"></div><p class="fb-cap" id="lb-note"></p>', { id: 'lb-chart-card' }) +
     '<div id="lb-ours" class="fb-mt"></div>' +
     QK.explain('<b>What’s that number?</b> Every dot is one player, and the top-right corner is better than the middle of the group on both axes. <b>Shrink small samples</b> pulls a player with few minutes towards the group’s middle, so a hot few hundred minutes does not top the chart; <b>league-adjust</b> multiplies attacking rates by the scoring factor of the leagues they came from.', { cls: 'fb-mt' }) +
-    FB.card('Ranked on this view', 'The group ranked by the sum of standard scores on both axes (better direction); percentiles within the group (Broad or Position, as chosen above) shown. Top 60. A standard score is how many spreads above the group’s average a number sits: +1 is better than about five in six.', '<div id="lb-table"></div>', { flush: true, cls: 'fb-mt' });
+    FB.card('Ranked on this view', 'The group ranked by the sum of standard scores on both axes (better direction); percentiles within the group (Broad or Position, as chosen above) shown, and in Position mode the role’s value column with its percentile. Top 60. A standard score is how many spreads above the group’s average a number sits: +1 is better than about five in six.', '<div id="lb-table"></div>', { flush: true, cls: 'fb-mt' });
   return show(el, true);
 });
 
@@ -278,6 +344,16 @@ function show(el, first) {
     if (S.color === null || (S.color && S.color !== 'comp' && S.color !== 'team' && LAB.idx[S.color] === undefined)) S.color = S.defColor;
     if (single() && S.color === 'comp') S.color = 'rating';
     if (S.size && S.size !== 'minutes' && LAB.idx[S.size] === undefined) S.size = 'minutes';
+    if (first && byPos() && S.openView) {
+      // ?within=pos&pos=.. without both axes: the role's view (preset 0, or the preset the address names), its colour
+      // unless the address names one, and an axis the address names over the view's
+      var c0 = S.color, qp = S.preset, qx = S.x, qy = S.y, keepC = S.colorSet;
+      applyView();
+      if (qp > 0) { S.preset = qp; applyPreset(); }
+      if (keepC) S.color = c0;
+      if (qx && LAB.idx[qx] !== undefined && qx !== S.y) { S.x = qx; S.preset = -1; }
+      if (qy && LAB.idx[qy] !== undefined && qy !== S.x) { S.y = qy; S.preset = -1; }
+    }
     if (!S.x || !S.y || LAB.idx[S.x] === undefined || LAB.idx[S.y] === undefined) { if (S.preset < 0) S.preset = 0; applyPreset(); }
     controls(el);
     draw(el);
@@ -285,20 +361,30 @@ function show(el, first) {
 }
 
 function controls(el) {
-  var rg = byPos() ? roleGroup(S.role) : null;
+  var rg = byPos() ? roleGroup(S.role) : null, v = posView(), ps = presets();
+  // the window, competitions or minimum can change the list: keep the selected preset only while it names the axes on screen
+  if (S.preset >= 0 && (!ps[S.preset] || ps[S.preset][0] !== S.x || ps[S.preset][1] !== S.y)) {
+    S.preset = -1;
+    ps.forEach(function (pp, i) { if (S.preset < 0 && pp[0] === S.x && pp[1] === S.y) S.preset = i; });
+  }
+  var pOpt = function (pp, i) { return [String(i), pp[2]]; };
+  var nv = ps.filter(function (pp) { return pp[4]; }).length;
+  var presetOpts = nv ? [{ group: 'Position view · ' + groupNoun(), items: ps.slice(0, nv).map(pOpt) }, { group: 'More pairs', items: ps.slice(nv).map(function (pp, i) { return pOpt(pp, i + nv); }) }]
+    : ps.map(pOpt);
   var html = QK.within.html({ within: S.within, pos: S.role }, { id: 'lb-wn', cls: 'fb-lb-within', groups: ROLES.map(function (g) { return [g[0], roleGroup(g[0]).name]; }),
-    note: rg ? 'Formation role (the one started in most) · minimum ' + FB.int(rg.min) + ' minutes (the metrics spec)' : 'Goalkeepers, or outfield players by line' }) + FB.toolbar([
+    note: rg ? 'Opens on what makes a player in the role good, their attacking or on-the-ball output, and their overall value · formation role (the one started in most) · minimum ' + FB.int(rg.min) + ' minutes (the metrics spec)' : 'Goalkeepers, or outfield players by line' }) +
+    QK.within.viewWhy(v) + FB.toolbar([
     FB.field('Season', FB.select('lb-win', winOpts(), S.win, 'Season or window')),
     FB.field('Competitions', FB.select('lb-comp', FB.labScopeOptions(IX, S.win), S.scope, 'Which competitions count', 'fb-pl-wide')),
     byPos() ? '' : FB.field('Position', FB.select('lb-pos', Object.keys(POS).map(function (k) { return [k, POS[k]]; }), S.pos, 'Position')),
-    FB.field('Chart', FB.select('lb-preset', presets().map(function (pp, i) { return [String(i), pp[2]]; }).concat([['-1', 'Custom axes']]), String(S.preset), 'Preset')),
+    FB.field('Chart', FB.select('lb-preset', presetOpts.concat([['-1', 'Custom axes']]), String(S.preset), 'Preset')),
     FB.field('Min. minutes', '<span class="fb-lb-range"><input type="range" id="lb-min" min="90" max="2000" step="30" value="' + S.min + '" aria-label="Minimum minutes"><b class="fb-num" id="lb-min-v">' + S.min + '\'</b></span>')
   ]) + FB.toolbar([
-    FB.field('X axis', FB.select('lb-x', metricOpts(), S.x, 'X axis')),
+    FB.field('X axis', FB.select('lb-x', metricOpts('', v), S.x, 'X axis')),
     '<button type="button" class="qk-btn fb-lb-swap" id="lb-swap" title="Swap the axes" aria-label="Swap the axes">⇄</button>',
-    FB.field('Y axis', FB.select('lb-y', metricOpts(), S.y, 'Y axis')),
+    FB.field('Y axis', FB.select('lb-y', metricOpts('', v), S.y, 'Y axis')),
     FB.field('Size', FB.select('lb-size', metricOpts('size'), S.size, 'Marker size')),
-    FB.field('Colour', FB.select('lb-color', metricOpts('color'), S.color, 'Marker colour')),
+    FB.field('Colour', FB.select('lb-color', metricOpts('color', v), S.color, 'Marker colour')),
     FB.field('Highlight', '<input class="qk-input" id="lb-q" type="search" placeholder="A player…" value="' + esc(S.q) + '" autocomplete="off">')
   ], 'fb-mt') + '<div class="fb-lb-checks">' +
     '<label class="fb-check"><input type="checkbox" id="lb-shrink"' + (S.shrink ? ' checked' : '') + '> Shrink small samples</label>' +
@@ -316,9 +402,15 @@ function controls(el) {
     /* Broad -> Position: the last role if it is on this line, else the line's main role; the path letter follows the
        role, so going back to Broad lands on the role's line */
     if (w.within === 'pos' && S.within !== 'pos' && roleGroup(S.role).letter !== S.pos) w.pos = LETTER_ROLE[S.pos];
+    var leaving = w.within !== 'pos' && S.within === 'pos';
     S.within = w.within; S.role = w.pos;
     if (S.within === 'pos') S.pos = roleGroup(S.role).letter;
-    S.preset = 0; applyPreset(); S.min = defMin(); controls(el); draw(el);
+    S.min = defMin();
+    // Position (entered, or another role): the role's view; back to Broad: the line's first preset, and the view's colour
+    // handed back to the default
+    if (S.within === 'pos') applyView();
+    else { S.preset = 0; applyPreset(); if (leaving && S.viewColor && S.color === S.viewColor) S.color = S.defColor; S.viewColor = null; }
+    controls(el); draw(el);
   }, { id: 'lb-wn' });
   $('lb-preset').onchange = function (e) { S.preset = parseInt(e.target.value, 10); applyPreset(); controls(el); draw(el); };
   $('lb-x').onchange = function (e) { S.x = e.target.value; S.preset = -1; controls(el); draw(el); };
@@ -351,9 +443,9 @@ function oursNote() {
 function draw(el) {
   if (!FB.alive(el)) return;
   var I = LAB.idx;
-  var base0 = pool();
+  var base0 = pool(), v = posView(), vk = valueKey(v);
   MU = {};
-  [S.x, S.y, S.size, S.color].forEach(function (k) {
+  [S.x, S.y, S.size, S.color, vk].forEach(function (k) {
     if (k && I[k] !== undefined && k !== 'minutes' && k !== 'age') {
       var a = base0.map(function (r) { return rawV(r, k); }).filter(function (v) { return v !== null; });
       if (a.length) MU[k] = FB.median(a);
@@ -411,6 +503,10 @@ function draw(el) {
   } else groups.push({ name: continuous ? label(S.color) : 'Players', rows: rows });
   var cv = continuous ? rows.map(function (r) { return val(r, S.color); }).filter(isNum) : [];
   var clo = cv.length ? Math.min.apply(null, cv) : 0, chi = cv.length ? Math.max.apply(null, cv) : 1;
+  // Position mode: a metric colour is drawn on the kit's percentile scale within the group on screen (better = higher)
+  var cpct = continuous && byPos(), sortedC = cpct ? cv.slice().sort(function (a, b) { return a - b; }) : [];
+  var cpOf = function (x) { if (!isNum(x)) return null; var pp = pctRank(sortedC, x); return lower(S.color) ? 100 - pp : pp; };
+  var cOf = function (r) { return continuous ? (cpct ? cpOf(val(r, S.color)) : val(r, S.color)) : null; };
   var personQ = single() ? { c: S.scope } : S.scope === 'club' ? { scope: 'club' } : S.scope === 'intl' ? { scope: 'intl' } : null;
   var href = function (r) { return FB.href.player(r[I.player_id], personQ); };
   var compLabel = function (r) { return r[I.mix] || ((LAB.comps[r[I.comp]] || {}).name || r[I.comp]) + ' · ' + r[I.minutes] + '\''; };
@@ -422,7 +518,7 @@ function draw(el) {
         type: 'scatter', name: g.name, large: false, itemStyle: continuous ? undefined : { color: c },
         symbolSize: function (v, prm) { return prm.data.sz; },
         data: g.rows.map(function (r) {
-          return { value: [val(r, S.x), val(r, S.y), continuous ? val(r, S.color) : null], name: r[I.name], href: href(r), r: r, sz: sizeOf(r),
+          return { value: [val(r, S.x), val(r, S.y), cOf(r)], name: r[I.name], href: href(r), r: r, sz: sizeOf(r),
             itemStyle: continuous ? { borderColor: T.s1, borderWidth: 0.6, opacity: 0.85 } : { color: QKC.hexA(c, 0.72), borderColor: T.s1, borderWidth: 0.6 },
             label: { show: !!labelled[r[I.player_id]], formatter: FB.surname(r[I.name]), position: 'top', color: T.ink1, fontSize: 10.5, fontWeight: 600, fontFamily: T.fontUI } };
         }),
@@ -447,11 +543,14 @@ function draw(el) {
         var vx = val(r, S.x), vy = val(r, S.y);
         return '<div style="font-weight:700">' + esc(r[I.name]) + '</div><div style="color:' + T.ink3 + ';font-size:11px;max-width:260px;white-space:normal">' + esc(r[I.team] || '') + ' · ' + esc(compLabel(r)) + (r[I.age] ? ' · age ' + r[I.age] : '') + '</div>' +
           QKC.tipRow(prm.color, label(S.x), fmtK(S.x, vx) + ' · pct ' + Math.round(pxOf(vx))) + QKC.tipRow(prm.color, label(S.y), fmtK(S.y, vy) + ' · pct ' + Math.round(pyOf(vy))) +
+          (cpct && isNum(val(r, S.color)) ? QKC.tipRow(prm.color, label(S.color), fmtK(S.color, val(r, S.color)) + ' · pct ' + Math.round(cOf(r))) : '') +
           (S.shrink ? '<div style="color:' + T.ink3 + ';font-size:11px">unshrunk ' + fmtK(S.x, rawV(r, S.x)) + ' · ' + fmtK(S.y, rawV(r, S.y)) + '</div>' : '');
       } }),
       series: series
     };
-    if (continuous) opt.visualMap = { type: 'continuous', dimension: 2, seriesIndex: 0, min: clo, max: chi, right: 0, top: 'middle', itemWidth: 10, itemHeight: 140, calculable: false,
+    if (cpct) opt.visualMap = { type: 'continuous', dimension: 2, seriesIndex: 0, min: 0, max: 100, right: 0, top: 'middle', itemWidth: 10, itemHeight: 140, calculable: false,
+      text: ['better', 'worse'], textStyle: { color: T.ink3, fontSize: 10 }, inRange: { color: [0, 25, 50, 75, 100].map(function (x) { return QK.pctHex(x); }) } };
+    else if (continuous) opt.visualMap = { type: 'continuous', dimension: 2, seriesIndex: 0, min: clo, max: chi, right: 0, top: 'middle', itemWidth: 10, itemHeight: 140, calculable: false,
       text: [lower(S.color) ? 'worse' : 'better', lower(S.color) ? 'better' : 'worse'], textStyle: { color: T.ink3, fontSize: 10 },
       inRange: { color: lower(S.color) ? [T.pos, T.mid, T.neg] : [T.neg, T.mid, T.pos] } };
     return opt;
@@ -459,18 +558,25 @@ function draw(el) {
 
   FB.set('lb-note', 'One dot per player: minutes and rates over ' + esc(single() ? scopeName : scopeName.toLowerCase()) + ' in the view, however many competitions that spans. Dotted lines are the medians of this group (' + esc(groupNoun()) + '). ' + (lower(S.x) || lower(S.y) ? 'Axes where less is better are reversed, so better is always up and to the right. ' : 'Better is up and to the right. ') +
     'Labelled: the twelve players furthest into that corner (sum of standard scores on both axes)' + (hits.length ? ', and your search (blue rings)' : '') + '. Click a dot to open the player.' +
+    (cpct ? ' Colour: ' + esc(label(S.color)) + ' as a percentile within the ' + esc(groupNoun()) + ' on screen.' : '') +
     (adjOn() ? ' Attacking rates marked "adj." are multiplied by the scoring factor from the pooled model: the minutes-weighted blend of the player\'s competitions.' : '') +
     (S.shrink ? ' Rates marked "shrunk" are pulled towards the group median by ' + SHRINK_K + ' minutes of prior, so a player five matches in is not ranked on five matches alone; the tooltip shows the raw figures.' : '') +
     ' <a href="#/model/glossary/shrinkage">Glossary →</a>');
 
-  FB.set('lb-sim', simStrip(base0, hits, personQ));
+  FB.set('lb-sim', simStrip(base0, hits, personQ, v));
+  // Position mode: the view's value column (vk) with its percentile within the group on screen; Broad keeps GAR/90
+  var sortedV = vk ? rows.map(function (r) { return val(r, vk); }).filter(isNum).sort(function (a, b) { return a - b; }) : [];
+  var pvOf = function (x) { if (!isNum(x)) return null; var pp = pctRank(sortedV, x); return lower(vk) ? 100 - pp : pp; };
   var trows = ranked.slice(0, 60).map(function (o, i) {
-    var r = o.r, vx = val(r, S.x), vy = val(r, S.y);
+    var r = o.r, vx = val(r, S.x), vy = val(r, S.y), vv = vk ? val(r, vk) : null;
     return { i: i + 1, name: r[I.name], pid: r[I.player_id], comp: r[I.comp], team: r[I.team], tid: r[I.tid], mix: compLabel(r), age: r[I.age], min: r[I.minutes], vx: vx, px: pxOf(vx), vy: vy, py: pyOf(vy), z: o.z, href: href(r),
       role: I.role !== undefined ? (r[I.role] || '') : '',
-      g90: I.gar90 !== undefined ? r[I.gar90] : null };
+      g90: I.gar90 !== undefined ? r[I.gar90] : null, vv: vv, pv: pvOf(vv) };
   });
-  var garCol = I.gar90 !== undefined && S.x !== 'gar90' && S.y !== 'gar90';
+  var garCol = !v && I.gar90 !== undefined && S.x !== 'gar90' && S.y !== 'gar90';
+  var valCol = vk ? [{ key: 'vv', label: (LAB.meta[vk] || {}).label || vk, num: true, pctl: 'pv', ours: oursOf(vk) ? { name: oursOf(vk).name, about: oursOf(vk).about } : null,
+    tip: 'Overall value, the position view’s value metric' + (specTip(vk, (LAB.meta[vk] || {}).desc || '') ? ': ' + specTip(vk, (LAB.meta[vk] || {}).desc || '') : ''),
+    fmt: function (x) { return isNum(x) ? (vk === 'gar90' ? FB.signed(x, 2) : fmtK(vk, x)) : '—'; } }] : [];
   var oc = function (k) { var o = oursOf(k); return o ? { name: o.name, about: o.about } : null; };
   FB.table(el.querySelector('#lb-table'), [
     { key: 'i', label: '#', num: true },
@@ -482,20 +588,22 @@ function draw(el) {
     { key: 'min', label: 'Min', num: true },
     { key: 'vx', label: (LAB.meta[S.x] || {}).label || S.x, num: true, pctl: 'px', ours: oc(S.x), tip: specTip(S.x, (LAB.meta[S.x] || {}).desc || '') || undefined, fmt: function (v) { return fmtK(S.x, v); } },
     { key: 'vy', label: (LAB.meta[S.y] || {}).label || S.y, num: true, pctl: 'py', ours: oc(S.y), tip: specTip(S.y, (LAB.meta[S.y] || {}).desc || '') || undefined, fmt: function (v) { return fmtK(S.y, v); } }
-  ].concat(garCol ? [{ key: 'g90', label: 'GAR/90', num: true, ours: oc('gar90'), tip: specTip('gar90', OURS[0].tip), fmt: function (v) { return isNum(v) ? FB.signed(v, 2) : '—'; } }] : []).concat([
+  ].concat(garCol ? [{ key: 'g90', label: 'GAR/90', num: true, ours: oc('gar90'), tip: specTip('gar90', OURS[0].tip), fmt: function (v) { return isNum(v) ? FB.signed(v, 2) : '—'; } }] : []).concat(valCol).concat([
     { key: 'z', label: 'Combined', num: true, tip: 'Sum of standard scores on both axes, better direction', fmt: function (v) { return '<b>' + num(v, 2) + '</b>'; } }
   ]), trows, { maxHeight: 620, caption: 'Players ranked on this view' });
 }
 
 /* "Most like": the five players nearest the highlighted one within the group on screen (Broad or Position), on standard
    scores of the group's headline metrics (QK.within.similar), each a link to Compare. */
-function simStrip(rows, hits, personQ) {
+function simStrip(rows, hits, personQ, v) {
   var I = LAB.idx;
   if (!hits.length) return '<p class="fb-cap fb-lb-simhint">Highlight a player to list the five most like them among the ' + esc(groupNoun()) + ' on this chart.</p>';
   var t = hits[0];
   if (rows.indexOf(t) < 0) return '<p class="fb-cap fb-lb-simhint">' + esc(t[I.name]) + ' is under the minimum for this chart, so has no look-alikes here.</p>';
   var head = headlineFor(S.pos);
-  var keys = Object.keys(head).filter(function (k) { return I[k] !== undefined; }).sort(function (a, b) { return head[a] - head[b]; });
+  // Position mode: the view's metrics (about 4 excellence, 4 attacking and 2 value ids the lab carries); Broad: the headline list
+  var keys = v ? [] : Object.keys(head).filter(function (k) { return I[k] !== undefined; }).sort(function (a, b) { return head[a] - head[b]; });
+  if (v) [4, 4, 2].forEach(function (n, i) { v.sets[i].ids.filter(function (k) { return I[k] !== undefined && keys.indexOf(k) < 0; }).slice(0, n).forEach(function (k) { keys.push(k); }); });
   var near = QK.within.similar(rows, t, keys, function (r, k) { return rawV(r, k); }, 5);
   var tid = String(t[I.player_id]);
   return QK.within.simHtml('Most like ' + t[I.name] + ' · ' + groupNoun(), near.map(function (o) {

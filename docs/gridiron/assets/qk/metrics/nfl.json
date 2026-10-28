@@ -777,6 +777,45 @@
     "autocorr": 0.409,
     "target2": "next-season gvar_pg",
     "autocorr2": 0.471
+   },
+   "view": {
+    "excellence": {
+     "label": "Accuracy and decisions",
+     "ids": [
+      "cpoe",
+      "success",
+      "sack_rate",
+      "int_rate",
+      "twp_rate",
+      "epa_pressure",
+      "adot",
+      "ttt"
+     ]
+    },
+    "production": {
+     "label": "Production",
+     "ids": [
+      "epa_db",
+      "anya",
+      "epa_play",
+      "pass_yds",
+      "pass_td"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "composite",
+      "gvar_pg",
+      "value"
+     ]
+    },
+    "default": {
+     "x": "cpoe",
+     "y": "epa_db",
+     "color": "gvar_pg"
+    },
+    "why": "Quarterbacks: completion % over expected against EPA per dropback, coloured by value per game."
    }
   },
   {
@@ -1206,6 +1245,42 @@
     "autocorr": 0.182,
     "target2": "next-season rush_epa",
     "autocorr2": 0.181
+   },
+   "view": {
+    "excellence": {
+     "label": "Running",
+     "ids": [
+      "ryoe",
+      "rush_success",
+      "explosive",
+      "stuff_rate",
+      "box8"
+     ]
+    },
+    "production": {
+     "label": "Production",
+     "ids": [
+      "rush_epa",
+      "ypc",
+      "rush_yds",
+      "rush_td",
+      "rec_epa_tgt",
+      "target_share",
+      "rec_yds"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "gvar_pg"
+     ]
+    },
+    "default": {
+     "x": "ryoe",
+     "y": "rush_epa",
+     "color": "gvar_pg"
+    },
+    "why": "Running backs: rush yards over expected against EPA per rush, coloured by value per game."
    }
   },
   {
@@ -1845,6 +1920,44 @@
     "autocorr": 0.205,
     "target2": "next-season yprr",
     "autocorr2": 0.523
+   },
+   "view": {
+    "excellence": {
+     "label": "Earning the ball",
+     "ids": [
+      "target_share",
+      "tprr",
+      "croe",
+      "separation",
+      "yac_rec",
+      "yacoe",
+      "adot",
+      "drop_rate"
+     ]
+    },
+    "production": {
+     "label": "Production",
+     "ids": [
+      "yptpa",
+      "yprr",
+      "rec_epa_tgt",
+      "wopr",
+      "rec_yds",
+      "rec_td"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "gvar_pg"
+     ]
+    },
+    "default": {
+     "x": "target_share",
+     "y": "yptpa",
+     "color": "gvar_pg"
+    },
+    "why": "Wide receivers: target share against yards per team pass attempt, coloured by value per game."
    }
   },
   {
@@ -2484,6 +2597,44 @@
     "autocorr": 0.218,
     "target2": "next-season yprr",
     "autocorr2": 0.551
+   },
+   "view": {
+    "excellence": {
+     "label": "Earning the ball",
+     "ids": [
+      "target_share",
+      "tprr",
+      "croe",
+      "separation",
+      "yac_rec",
+      "yacoe",
+      "adot",
+      "drop_rate"
+     ]
+    },
+    "production": {
+     "label": "Production",
+     "ids": [
+      "yptpa",
+      "yprr",
+      "rec_epa_tgt",
+      "wopr",
+      "rec_yds",
+      "rec_td"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "gvar_pg"
+     ]
+    },
+    "default": {
+     "x": "target_share",
+     "y": "yptpa",
+     "color": "gvar_pg"
+    },
+    "why": "Tight ends: target share against yards per team pass attempt, coloured by value per game."
    }
   },
   {
@@ -2942,7 +3093,43 @@
     "target2": "next-season splash_epa_snap",
     "autocorr2": 0.323
    },
-   "display_short": "DE/OLB"
+   "display_short": "DE/OLB",
+   "view": {
+    "excellence": {
+     "label": "Pass rush",
+     "ids": [
+      "pressures_pg",
+      "pass_rush_rate",
+      "sacks_pg",
+      "qb_hits",
+      "tfl_run",
+      "splash_pg"
+     ]
+    },
+    "production": {
+     "label": "Plays made",
+     "ids": [
+      "tfl_pg",
+      "tackles_pg",
+      "ff_pg",
+      "pd_pg",
+      "sacks"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "gvar_pg",
+      "def_value"
+     ]
+    },
+    "default": {
+     "x": "pressures_pg",
+     "y": "tfl_pg",
+     "color": "gvar_pg"
+    },
+    "why": "Outside pass rushers: pressures per game against tackles for loss per game, coloured by value per game."
+   }
   },
   {
    "id": "idl",
@@ -3400,6 +3587,42 @@
     "autocorr": 0.483,
     "target2": "next-season splash_epa_snap",
     "autocorr2": 0.394
+   },
+   "view": {
+    "excellence": {
+     "label": "Pass rush",
+     "ids": [
+      "pressures_pg",
+      "pass_rush_rate",
+      "sacks_pg",
+      "qb_hits",
+      "tfl_run",
+      "splash_pg"
+     ]
+    },
+    "production": {
+     "label": "Plays made",
+     "ids": [
+      "tfl_pg",
+      "tackles_pg",
+      "ff_pg",
+      "pd_pg",
+      "sacks"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "gvar_pg",
+      "def_value"
+     ]
+    },
+    "default": {
+     "x": "pressures_pg",
+     "y": "tfl_pg",
+     "color": "gvar_pg"
+    },
+    "why": "Interior linemen: pressures per game against tackles for loss per game, coloured by value per game."
    }
   },
   {
@@ -3829,6 +4052,40 @@
     "autocorr": 0.221,
     "target2": "next-season splash_epa_snap",
     "autocorr2": 0.175
+   },
+   "view": {
+    "excellence": {
+     "label": "Tackling",
+     "ids": [
+      "tackles_pg",
+      "tackle_snap",
+      "tfl_pg",
+      "pressures_pg"
+     ]
+    },
+    "production": {
+     "label": "Plays made",
+     "ids": [
+      "splash_pg",
+      "pd_pg",
+      "ints_pg",
+      "ff_pg",
+      "sacks"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "gvar_pg",
+      "def_value"
+     ]
+    },
+    "default": {
+     "x": "tackles_pg",
+     "y": "splash_pg",
+     "color": "gvar_pg"
+    },
+    "why": "Linebackers: tackles per game against splash plays per game, coloured by value per game."
    }
   },
   {
@@ -4256,6 +4513,38 @@
     "autocorr": 0.255,
     "target2": "next-season splash_epa_snap",
     "autocorr2": 0.159
+   },
+   "view": {
+    "excellence": {
+     "label": "Coverage",
+     "ids": [
+      "pd_pg",
+      "ball_cov",
+      "ints_pg"
+     ]
+    },
+    "production": {
+     "label": "Plays made",
+     "ids": [
+      "splash_pg",
+      "tackles_pg",
+      "tfl_pg",
+      "ff_pg"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "gvar_pg",
+      "def_value"
+     ]
+    },
+    "default": {
+     "x": "pd_pg",
+     "y": "splash_pg",
+     "color": "gvar_pg"
+    },
+    "why": "Cornerbacks: passes defended per game against splash plays per game, coloured by value per game."
    }
   },
   {
@@ -4685,6 +4974,39 @@
     "autocorr": 0.132,
     "target2": "next-season splash_epa_snap",
     "autocorr2": 0.085
+   },
+   "view": {
+    "excellence": {
+     "label": "Coverage",
+     "ids": [
+      "pd_pg",
+      "ints_pg",
+      "ball_cov",
+      "tackles_pg"
+     ]
+    },
+    "production": {
+     "label": "Plays made",
+     "ids": [
+      "splash_pg",
+      "tfl_pg",
+      "ff_pg",
+      "pressures_pg"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "gvar_pg",
+      "def_value"
+     ]
+    },
+    "default": {
+     "x": "pd_pg",
+     "y": "splash_pg",
+     "color": "gvar_pg"
+    },
+    "why": "Safeties: passes defended per game against splash plays per game, coloured by value per game."
    }
   },
   {
@@ -4965,6 +5287,37 @@
     "autocorr": 0.039,
     "target2": null,
     "autocorr2": null
+   },
+   "view": {
+    "excellence": {
+     "label": "Kicking",
+     "ids": [
+      "fg_oe",
+      "fg_50_pct",
+      "avg_dist"
+     ]
+    },
+    "production": {
+     "label": "Scoring",
+     "ids": [
+      "fg_pct",
+      "xp_pct",
+      "fg_50",
+      "pts_oe"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "pts_oe"
+     ]
+    },
+    "default": {
+     "x": "fg_oe",
+     "y": "fg_50_pct",
+     "color": "pts_oe"
+    },
+    "why": "Kickers: field goals over expected against the 50+ yard make rate, coloured by points over expected."
    }
   },
   {
@@ -5218,6 +5571,35 @@
     "autocorr": 0.288,
     "target2": "next-season net",
     "autocorr2": 0.379
+   },
+   "view": {
+    "excellence": {
+     "label": "Punting",
+     "ids": [
+      "gross",
+      "inside20",
+      "touchback_rate"
+     ]
+    },
+    "production": {
+     "label": "Results",
+     "ids": [
+      "net",
+      "punts"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "epa_punt"
+     ]
+    },
+    "default": {
+     "x": "gross",
+     "y": "net",
+     "color": "epa_punt"
+    },
+    "why": "Punters: gross average against net average, coloured by EPA per punt."
    }
   },
   {

@@ -74,8 +74,8 @@ def labels(spec: dict) -> dict:
     """The compact labels file from a sport's metrics spec: {"sport", "generated", "ours": {"models": {key: {name,
     about}}, "metrics": {id: model key}}, "m": {entity: {id: [display, unit, direction, set ("h"/"s"), order, style
     (0/1), explanation]}}, "groups": [{"id", "display", "entity", "headline": [ids in order], "field"?, "codes"?,
-    "min"?: {"field", "value", "unit"}}]} (field/codes: the payload field and codes of the peer group; min: the spec's
-    minimum sample). A metric id that
+    "min"?: {"field", "value", "unit"}, "view"?}]} (field/codes: the payload field and codes of the peer group; min: the
+    spec's minimum sample; view: the Labs' Position default, as in the spec). A metric id that
     appears in several groups of one entity keeps the first headline entry (else the first entry)."""
     m: dict = {}
     groups = []
@@ -107,6 +107,10 @@ def labels(spec: dict) -> dict:
         mn = g.get("minimum") or {}
         if mn.get("field") and mn.get("value") is not None:
             groups[-1]["min"] = {"field": mn["field"], "value": mn["value"], "unit": mn.get("unit") or ""}
+        # the Labs' Position default (QK.within.view): what makes the position excellent, the hitting / attacking /
+        # scoring set, the aggregate value metrics, and the default x, y and colour
+        if g.get("view"):
+            groups[-1]["view"] = g["view"]
     ours = spec.get("our_models") or {}
     return {"sport": spec.get("sport"), "generated": spec.get("generated"),
             "ours": {"models": ours.get("models") or {}, "metrics": ours.get("metrics") or {}}, "m": m, "groups": groups}

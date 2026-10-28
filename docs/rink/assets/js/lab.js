@@ -16,7 +16,15 @@
  * old links keep working. The lab writes its state back with history.replaceState (no re-render).
  * Data: data/<S>/lab.json (column-oriented per kind: {"skaters": {cols, rows}, "goalies": {cols, rows},
  * "teams"?: {cols, rows}, "metrics": {skaters: [METRIC], goalies: [...], teams: [...]} | [METRIC]}), falling
- * back to skaters.json, goalies.json and teams.json. Uses RK.fk. */
+ * back to skaters.json, goalies.json and teams.json. Uses RK.fk.
+ * Round 7 (the Position default view, QK.within.view on the spec group's `view`): under Position each group opens on
+ * what makes a player at the position good (forwards: driving play; defence: defending; goalies: shot-stopping)
+ * against their scoring or results, coloured by value. Entering Position, switching groups, or ?within=pos&pos=
+ * without x/y all open on it; explicit x/y in the address win. A metric counts as available when the payload carries
+ * it and at least 30% of the group on screen has a value (else the default falls back within its set). The pickers
+ * list the view's three sets first, the presets lead with the view's, a "Position view" line sits under the control,
+ * the ranked table gains a value column (the view's colour metric, else the next value metric, when it is not on an
+ * axis) with its percentile, and "Most like" uses the view's metrics (4 excellence, 4 production, 2 value). */
 (function (RK) {
 'use strict';
 
@@ -169,9 +177,37 @@ function posOk(r) {
   if (S0.kind !== 'S' || S0.pos === 'A') return true;
   return K().groupOf(raw(r, 'pos')) === S0.pos;
 }
+/* The Position default view: the spec group's view, its sets kept to the metrics the group on screen has (30%+ of its
+   rows), or null (Broad, teams, no spec, no view). The payload's keys are the spec's ids. */
+let VIEW = null, VIEWK = '';
+function onScreen() { return G().rows.filter(r => S0.kind === 'T' || ((nOf(r) >= S0.min) && posOk(r) && (!S0.qual || G().idx.qualified === undefined || raw(r, 'qualified') !== false))); }
+function posView() {
+  if (!byPos() || !specCat() || !window.QK || !QK.within || !QK.within.view) return null;
+  const sg = specCat().group(pgroup(S0.grp).id);
+  if (!sg || !sg.view) return null;
+  const vk = LABK + '|' + S0.kind + '|' + S0.grp + '|' + S0.min + '|' + S0.qual;
+  if (VIEWK === vk) return VIEW;
+  const g = G(), rows = onScreen(), ok = {};
+  const has = id => {
+    if (ok[id] === undefined) ok[id] = g.idx[id] !== undefined && rows.length > 0 && rows.filter(r => K().isNum(raw(r, id))).length >= 0.3 * rows.length;
+    return ok[id];
+  };
+  const v = QK.within.view(sg, has);
+  if (v) {
+    const d = sg.view['default'] || {}, miss = [d.x, d.y, d.color].filter(id => id && !has(id));
+    const name = id => (g.meta[id] || {}).label || specCat().label(id, 'player', id);
+    v.why = v.why + (miss.length ? ' This season has ' + miss.map(name).join(' or ') + ' for too few of the group (under 30%), so the chart opens on the next metric of the same set.' : '');
+  }
+  VIEW = v; VIEWK = vk;
+  return VIEW;
+}
 function presetList() {
   const k = K(), out = [], seen = {};
   const keys = Object.keys(G().idx);
+  const v = posView();       // Position: the view's presets first (preset 0 is the default view, with its colour)
+  if (v) QK.within.viewPresets(v, id => meta(id).label || id).forEach(p => {
+    if (p.x && p.y && p.x !== p.y && !seen[p.x + '|' + p.y] && G().metrics.some(m => m.key === p.x) && G().metrics.some(m => m.key === p.y)) { seen[p.x + '|' + p.y] = 1; out.push({ x: p.x, y: p.y, color: p.color || null, title: p.label }); }
+  });
   PRESETS.filter(p => p[0] === S0.kind).forEach(p => {
     const x = k.pick(keys, p[1]), y = k.pick(keys, p[2]);
     if (x && y && x !== y && !seen[x + '|' + y] && G().metrics.some(m => m.key === x) && G().metrics.some(m => m.key === y)) { seen[x + '|' + y] = 1; out.push({ x: x, y: y, title: p[3] }); }
@@ -202,7 +238,10 @@ function groupNoun() {
 function metricOptions(sel, scope) {
   const k = K();
   let h = scope === 'color' ? '<option value="team">Team</option>' + (S0.kind === 'S' ? '<option value="pos">Position</option>' : (S0.kind === 'T' ? '<option value="conf">Conference</option>' : '')) + '<option value="">One colour</option>' : '';
-  (RK.ours ? pickerGroups(G().metrics) : k.groups(G().metrics)).forEach(g => { h += '<optgroup label="' + k.esc(g.name) + '">' + g.items.map(m => '<option value="' + k.esc(m.key) + '"' + (m.key === sel ? ' selected' : '') + '>' + k.esc(m.label) + (m.lower ? ' ↓' : '') + '</option>').join('') + '</optgroup>'; });
+  /* Position: the view's three sets first (its labels), then the usual grouping of the rest ("Our models" first) */
+  const v = posView(), vo = v ? QK.within.viewOrder(v, G().metrics, m => m.key) : null;
+  const gs = vo ? vo.sets.map(s => ({ name: s.label, items: s.items })).concat(RK.ours ? pickerGroups(vo.rest) : k.groups(vo.rest)) : (RK.ours ? pickerGroups(G().metrics) : k.groups(G().metrics));
+  gs.forEach(g => { h += '<optgroup label="' + k.esc(g.name) + '">' + g.items.map(m => '<option value="' + k.esc(m.key) + '"' + (m.key === sel ? ' selected' : '') + '>' + k.esc(m.label) + (m.lower ? ' ↓' : '') + '</option>').join('') + '</optgroup>'; });
   return h;
 }
 function sync() {
@@ -212,14 +251,16 @@ function sync() {
   const pg = byPos() ? pgroup(S0.grp) : null;
   $('lab-within').innerHTML = S0.kind === 'T' ? '' : QK.within.html({ within: byPos() ? 'pos' : 'broad', pos: S0.grp }, { id: 'lab-wn', cls: 'rk-lab-within',
     groups: PGROUPS.map(g => [g[0], pgroup(g[0]).name]),
-    note: pg ? 'Minimum: the spec’s floor (' + (pg.code === 'G' ? 'a quarter of the team’s minutes in net' : '250 5v5 minutes, prorated to games played') + '), the qualified flag' : 'Skaters or goalies' });
+    note: pg ? 'Minimum: the spec’s floor (' + (pg.code === 'G' ? 'a quarter of the team’s minutes in net' : '250 5v5 minutes, prorated to games played') + '), the qualified flag' : 'Skaters or goalies' }) + (pg ? '<div id="lab-why"></div>' : '');
   if (S0.kind !== 'T') QK.within.wire($('lab-within'), { within: byPos() ? 'pos' : 'broad', pos: S0.grp }, w => {
     if (w.within === 'pos' && S0.within !== 'pos') w.pos = S0.kind === 'G' ? 'G' : (S0.pos === 'D' ? 'D' : 'F');
-    const was = S0.kind;
+    const was = S0.kind, wasPos = S0.within === 'pos';
     S0.within = w.within; S0.grp = w.pos;
     if (S0.within === 'pos') { S0.kind = S0.grp === 'G' ? 'G' : 'S'; S0.qual = true; }
     else if (S0.kind === 'S') S0.pos = S0.grp === 'D' ? 'D' : S0.grp === 'F' ? 'F' : 'A';
     if (S0.kind !== was) { S0.x = ''; S0.y = ''; S0.preset = 0; S0.min = null; }
+    if (S0.within === 'pos') { S0.x = ''; S0.y = ''; S0.preset = 0; }      // every position group opens on its default view
+    else if (wasPos) { S0.x = ''; S0.y = ''; S0.preset = 0; if (['team', 'pos', 'conf', ''].indexOf(S0.color) < 0) S0.color = 'team'; }   // back to Broad's own opening
     if (LAB_RESET) LAB_RESET();
     sync(); if (LAB_REDRAW) LAB_REDRAW();
   }, { id: 'lab-wn' });
@@ -233,14 +274,18 @@ function sync() {
   $('lab-shrink').parentNode.style.display = S0.kind === 'T' ? 'none' : '';
   $('lab-shrink').checked = S0.shrink; $('lab-q').value = S0.q; $('lab-qual').checked = S0.qual;
 }
-function applyPreset() { const P = presetList(); if (S0.preset < 0 || !P.length) return; const p = P[S0.preset] || P[0]; S0.x = p.x; S0.y = p.y; }
+function applyPreset() { const P = presetList(); if (S0.preset < 0 || !P.length) return; const p = P[S0.preset] || P[0]; S0.x = p.x; S0.y = p.y; if (p.color !== undefined) S0.color = p.color || 'team'; }
 
 function draw(S) {
   const k = K(), C = k.C;
   const team = S0.kind === 'T';
-  const base0 = G().rows.filter(r => team || ((nOf(r) >= S0.min) && posOk(r) && (!S0.qual || G().idx.qualified === undefined || raw(r, 'qualified') !== false)));
+  const base0 = onScreen();
+  const pv = team ? null : posView();
+  k.set('lab-why', pv ? QK.within.viewWhy(pv) : '');
+  /* Position: a value column, the view's colour metric or else the next value metric, when it is on neither axis */
+  const VK = pv ? [pv.color].concat(pv.sets[2].ids).filter(x => x && x !== S0.x && x !== S0.y && G().idx[x] !== undefined)[0] || '' : '';
   Object.keys(MU).forEach(key => delete MU[key]);
-  [S0.x, S0.y, S0.color].forEach(key => { if (key && G().idx[key] !== undefined && shrinkable(key)) MU[key] = k.median(base0.map(r => raw(r, key))); });
+  [S0.x, S0.y, S0.color, VK].forEach(key => { if (key && G().idx[key] !== undefined && shrinkable(key)) MU[key] = k.median(base0.map(r => raw(r, key))); });
   const rows = base0.filter(r => val(r, S0.x) !== null && val(r, S0.y) !== null);
   const noun = groupNoun();
   writeHash();
@@ -259,6 +304,7 @@ function draw(S) {
   const labelled = new Set(team ? rows : ranked.slice(0, 8).map(o => o.r).concat(ranked.slice(-4).map(o => o.r)).concat(hits.slice(0, 20)));
   const sortedX = xs.slice().sort((a, b) => a - b), sortedY = ys.slice().sort((a, b) => a - b);
   const pOf = (sorted, v, dir) => { const p = pctRank(sorted, v); return dir > 0 ? p : 100 - p; };
+  const sortedV = VK ? rows.map(r => val(r, VK)).filter(k.isNum).sort((a, b) => a - b) : [], dirv = VK && lower(VK) ? -1 : 1;
   const ns = rows.map(nOf), lo = Math.min.apply(null, ns), hi = Math.max.apply(null, ns);
   const size = r => (team ? 13 : 6 + 13 * (hi > lo ? Math.sqrt((nOf(r) - lo) / (hi - lo)) : 0.5));
   const href = r => (team ? k.teamHref(idOf(r), S) : k.playerHref(idOf(r), S));
@@ -310,11 +356,14 @@ function draw(S) {
   const oth = kk => (RK.ours && RK.ours.of(kk) ? 'qk-ours-th' : '');
   const host = k.$('lab-table');
   host.innerHTML = k.table([{ label: '#', sortable: false }, { label: team ? 'Team' : (S0.kind === 'G' ? 'Goalie' : 'Skater') }].concat(team ? [] : [{ label: 'Team' }].concat(G().nKey ? [{ label: G().nLabel, align: 'right' }] : []))
-    .concat([{ label: label(S0.x), align: 'right', cls: oth(S0.x) }, { label: 'Pct', align: 'right' }, { label: label(S0.y), align: 'right', cls: oth(S0.y) }, { label: 'Pct', align: 'right' }, { label: 'Combined', align: 'right', title: 'Sum of standard scores in the better direction' }]),
-  ranked.slice(0, 300).map((o, i) => { const r = o.r, vx = val(r, S0.x), vy = val(r, S0.y);
+    .concat([{ label: label(S0.x), align: 'right', cls: oth(S0.x) }, { label: 'Pct', align: 'right' }, { label: label(S0.y), align: 'right', cls: oth(S0.y) }, { label: 'Pct', align: 'right' }])
+    .concat(VK ? [{ label: label(VK), align: 'right', cls: oth(VK), title: 'Overall value; the percentile is within the group on screen' }, { label: 'Pct', align: 'right' }] : [])
+    .concat([{ label: 'Combined', align: 'right', title: 'Sum of standard scores in the better direction' }]),
+  ranked.slice(0, 300).map((o, i) => { const r = o.r, vx = val(r, S0.x), vy = val(r, S0.y), vv = VK ? val(r, VK) : null, pv0 = k.isNum(vv) ? pOf(sortedV, vv, dirv) : null;
     return { _href: href(r), cells: [{ v: i + 1, cls: 'pos-cell' }, { v: nm(r), html: team ? k.teamChip(idOf(r), S) + ' <a href="' + href(r) + '">' + k.esc(nm(r)) + '</a>' : '<a class="ply-link" href="' + href(r) + '">' + k.esc(nm(r)) + '</a>' }]
       .concat(team ? [] : [{ v: tm(r) || '', html: k.teamChip(tm(r), S) }].concat(G().nKey ? [{ v: nOf(r), html: k.int(nOf(r)) }] : []))
-      .concat([{ v: vx, html: fmt(S0.x, vx) }, { v: pOf(sortedX, vx, dirx), html: k.pill(pOf(sortedX, vx, dirx)) }, { v: vy, html: fmt(S0.y, vy) }, { v: pOf(sortedY, vy, diry), html: k.pill(pOf(sortedY, vy, diry)) }, { v: o.z, html: '<strong>' + k.num(o.z, 2) + '</strong>' }]) }; }), { sticky: true, compact: true });
+      .concat([{ v: vx, html: fmt(S0.x, vx) }, { v: pOf(sortedX, vx, dirx), html: k.pill(pOf(sortedX, vx, dirx)) }, { v: vy, html: fmt(S0.y, vy) }, { v: pOf(sortedY, vy, diry), html: k.pill(pOf(sortedY, vy, diry)) }])
+      .concat(VK ? [{ v: vv, html: fmt(VK, vv) }, { v: pv0, html: k.isNum(pv0) ? k.pill(pv0) : '—' }] : []).concat([{ v: o.z, html: '<strong>' + k.num(o.z, 2) + '</strong>' }]) }; }), { sticky: true, compact: true });
   k.sortable(host);
 }
 
@@ -323,8 +372,11 @@ function draw(S) {
 function simStrip(rows, hits, nm, S) {
   const k = K();
   if (!hits.length) return '<p class="pg-note gq-note">Highlight a player to list the five most like them among the ' + k.esc(groupNoun()) + ' on this chart.</p>';
-  const t = hits[0], head = headOrder();
-  const keys = Object.keys(head).filter(x => G().idx[x] !== undefined).sort((a, b) => head[a] - head[b]);
+  const t = hits[0], head = headOrder(), v = posView();
+  /* Position: the view's metrics (the first 4 excellence, 4 production and 2 value ids the group has); Broad: the headline */
+  const vkeys = [];
+  if (v) [4, 4, 2].forEach((n, i) => v.sets[i].ids.filter(x => vkeys.indexOf(x) < 0).slice(0, n).forEach(x => vkeys.push(x)));
+  const keys = vkeys.length >= 2 ? vkeys : Object.keys(head).filter(x => G().idx[x] !== undefined).sort((a, b) => head[a] - head[b]);
   const near = QK.within.similar(rows, t, keys, (r, x) => { const v = raw(r, x); return k.isNum(v) ? Number(v) : null; }, 5);
   return QK.within.simHtml('Most like ' + nm(t) + ' · ' + groupNoun(), near.map(o => ({ name: nm(o.row), href: k.withQ('#/compare/' + encodeURIComponent(idOf(t)) + '/' + encodeURIComponent(idOf(o.row)), S),
     sub: [raw(o.row, 'team') || '', k.posLabel(raw(o.row, 'pos'))].filter(Boolean).join(' · ') + ' · compare' })));
@@ -332,7 +384,7 @@ function simStrip(rows, hits, nm, S) {
 
 function render(el, params, state) {
   const k = K();
-  el.innerHTML = QK.explain('<b>What’s that number?</b> Each dot is a player or a club on the two metrics you pick. The ranked list orders them by the combined standard score on both axes: 0 is average, +1 one standard deviation better on each.', { html: true }) +
+  el.innerHTML = QK.explain('<b>What’s that number?</b> Each dot is a player or a club on the two metrics you pick. The ranked list orders them by the combined standard score on both axes: 0 is average, +1 one standard deviation better on each. Compare within Position opens on what makes a player at that position good, against their scoring (goalies: results), coloured by their overall value.', { html: true }) +
     '<div class="card"><div class="card-header">Lab <span class="card-sub" id="lab-sub">Loading…</span><span class="gq-ctl">' + k.toggle('lab-kind', KINDS, S0.kind) + '</span></div>' +
     '<div id="lab-within" class="rk-lab-within-wrap"></div><div class="lab-controls gq-controls"><label>Preset<select id="lab-preset" class="gq-wide"></select></label><label>Skaters<select id="lab-pos"><option value="A">All</option><option value="F">Forwards</option><option value="D">Defence</option></select></label>' +
     '<label>X axis<select id="lab-x"></select></label><label>Y axis<select id="lab-y"></select></label><label>&nbsp;<button type="button" id="lab-swap" class="gq-btn" title="Swap the axes">⇄ swap</button></label>' +
@@ -359,6 +411,7 @@ function render(el, params, state) {
     if (wq.within === 'pos') { S0.within = 'pos'; S0.grp = wq.pos; S0.kind = wq.pos === 'G' ? 'G' : 'S'; S0.qual = true; }
     else { S0.within = 'broad'; if (/^(F|D|A)$/i.test(qy.pos || '')) S0.pos = String(qy.pos).toUpperCase(); }
     if (!LAB[S0.kind]) S0.kind = Object.keys(LAB)[0];
+    if (byPos()) { S0.x = ''; S0.y = ''; S0.preset = 0; }      // Position opens on its default view (colour too) unless the address names axes
     const reset = () => {
       const g = G();
       const maxN = Math.max.apply(null, g.rows.map(nOf).concat([10]));

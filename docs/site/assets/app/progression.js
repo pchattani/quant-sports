@@ -44,10 +44,11 @@ function toP(doc, scope, keysOf) {
     seasons: xs.map(function (x, i) {
       var r = byX[x], ks = keysOf[r.kd] || [];
       var nm = r.team || (r.tid ? FB.clubName(r.tid) : '');
+      var tot = isNum(r.st) && r.st >= 0.5;     /* mostly Sofascore's season totals (no line-ups behind them) */
       return { key: r.key, x: x, label: r.era, age: QPV.ageAt(doc.dob, x, String(r.era).indexOf('/') >= 0 ? 0 : 6), cy: i + 1,
         team: nm ? { abbr: FB.clubCode(nm), name: nm, colour: r.tid ? FB.clubColour(r.tid) : null } : null, teams: (r.teams || []).length > 1 ? r.teams.map(function (t) { return FB.clubCode(FB.clubName(t) || String(t)); }) : null,
-        group: r.pg || null, n: r.min, nUnit: 'minutes', small: !(r.dp && r.dp.length), values: QPV.zip(ks, r.dv), pct: QPV.zip(ks, r.dp), kd: r.kd,
-        partial: !!curEra && r.era === curEra };
+        group: r.pg || null, n: r.min, nUnit: tot ? 'minutes · Sofascore season totals' : 'minutes', small: !(r.dp && r.dp.length), values: QPV.zip(ks, r.dv), pct: QPV.zip(ks, r.dp), kd: r.kd,
+        totals: tot, partial: !!curEra && r.era === curEra };
     }) };
 }
 function mainKind(doc, scope) {
@@ -55,6 +56,12 @@ function mainKind(doc, scope) {
   return ks.indexOf('gk') >= 0 ? 'gk' : ks.indexOf('out') >= 0 ? 'out' : 'box';
 }
 function groupOf(P) { return (P.seasons.slice().reverse().filter(function (s) { return s.group; })[0] || {}).group; }
+/* which seasons are Sofascore's season totals: "12 seasons (2008/09 to 2019/20)" or '' */
+function totalsText(P) {
+  var t = P.seasons.filter(function (s) { return s.totals; });
+  if (!t.length) return '';
+  return t.length + ' season' + (t.length === 1 ? '' : 's') + ' (' + esc(t[0].label) + (t.length > 1 ? ' to ' + esc(t[t.length - 1].label) : '') + ')';
+}
 function metricsFor(keys, cat, grp) { return QPV.metrics(keys, cat, { head: cat && grp ? cat.headline(grp) : [], labels: LABELS }); }
 function scopeSeg(base, scope, has) {
   return '<div class="qk-seg" role="group" aria-label="Scope">' + ['club', 'intl'].map(function (s) {
@@ -82,16 +89,18 @@ function tab(el, p) {
     var R = QK.prog.ref(ref);
     var base = FB.href.player(doc.id);
     var deepN = P.seasons.filter(function (s) { return s.kd !== 'box'; }).length;
+    var totT = totalsText(P);
     QPV.tab(el, { P: P, metrics: ms, head: head, cat: cat, peer: peer, nUnit: 'minutes',
       tabs: [['overview', 'Overview', base], ['progression', 'Progression', base + '?view=progression']],
       kicker: 'Progression · ' + SCOPE[scope] + (doc.current_club && doc.current_club.name && scope === 'club' ? ' · ' + doc.current_club.name : (doc.national_team && scope === 'intl' ? ' · ' + doc.national_team.name : '')),
       title: esc(doc.name),
       sub: P.seasons.length + ' season' + (P.seasons.length === 1 ? '' : 's') + ' (' + SCOPE[scope].toLowerCase() + ' football) in the data, each against that season’s ' + esc(peer) + ' with 450+ minutes (goalkeepers 900), every competition we follow pooled. Every season has the box numbers (goals, assists, xG, xA, shots, the rating); ' +
-        (deepN ? 'the ' + deepN + ' season' + (deepN === 1 ? '' : 's') + ' our Lab covers add the full set: GAR/90, npxG + xA, progressive actions, duels and more.' : 'the full set (GAR/90, npxG + xA, progressive actions) starts with the seasons our Lab covers.'),
+        (deepN ? 'the ' + deepN + ' season' + (deepN === 1 ? '' : 's') + ' our Lab covers add the full set: GAR/90, npxG + xA, progressive actions, duels and more.' : 'the full set (GAR/90, npxG + xA, progressive actions) starts with the seasons our Lab covers.') +
+        (totT ? ' ' + totT + ' come from Sofascore’s season totals, not our line-ups: box numbers only, with xG, shots and the rating only where Sofascore has them for that season.' : ''),
       actions: scopeSeg(function (s) { return base + '?view=progression' + (s === 'intl' ? '&scope=intl' : ''); }, scope, has),
       key: ms.filter(function (m) { return m.id === 'gar90'; })[0] || ms.filter(function (m) { return m.id === 'xg_xa_90'; })[0] || null,
       ref: function (S, k) { return S.group ? R(S.group, S.key, k) : null; },
-      note: 'Seasons follow the player’s own calendar: “2025/26” in Europe, “2025” in the Americas.',
+      note: 'Seasons follow the player’s own calendar: “2025/26” in Europe, “2025” in the Americas.' + (totT ? ' Seasons marked “Sofascore season totals” in the tooltips have no match log behind them.' : ''),
       compare: { sims: [], href: compareHref(scope) },
       empty: 'No ' + SCOPE[scope].toLowerCase() + ' seasons with 90+ minutes in the data.' });
   });
@@ -124,7 +133,7 @@ function compare(el, p) {
       cyNote: 'Career year counts seasons in our data (' + SCOPE[scope].toLowerCase() + ' football, 90+ minutes).', kicker: 'Compare progression · ' + SCOPE[scope] + ' football',
       actions: '<div class="qk-seg" role="group" aria-label="Scope">' + ['club', 'intl'].map(function (s) { return '<a class="qk-btn' + (s === scope ? ' primary' : '') + '" href="' + esc(compareHref(s)(Ps.map(function (P) { return P.id; }), '')) + '">' + SCOPE[s] + '</a>'; }).join('') + '</div>',
       href: href, names: names,
-      sub: 'Two to four careers on one chart: by season, by age or by career year, club or international football, as the value or as a percentile against that season’s peers. The deep numbers (GAR/90, npxG + xA ...) cover the seasons our Lab holds; goals, assists, xG and xA go back further.' });
+      sub: 'Two to four careers on one chart: by season, by age or by career year, club or international football, as the value or as a percentile against that season’s peers. The deep numbers (GAR/90, npxG + xA ...) cover the seasons our Lab holds; goals, assists, xG and xA go back further, the older seasons from Sofascore’s season totals (marked in the tooltips).' });
   });
 }
 

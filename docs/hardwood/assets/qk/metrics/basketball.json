@@ -813,6 +813,48 @@
     "distance": "weighted euclidean over the features both player-seasons have (pbp-only features dropped pairwise before NBA 2002), divided by the square root of the summed weights",
     "k": 5,
     "constraints": "same league and role, qualified player-seasons, any season, not the player's own seasons"
+   },
+   "view": {
+    "excellence": {
+     "label": "Playmaking",
+     "ids": [
+      "ast_pct",
+      "ast_tov",
+      "pox100",
+      "unassisted_share",
+      "fg3",
+      "stl_pct",
+      "tov_pct"
+     ]
+    },
+    "production": {
+     "label": "Scoring",
+     "ids": [
+      "ts_add",
+      "pts100",
+      "ts",
+      "efg",
+      "fta100",
+      "usg"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "hpm",
+      "hpm_o",
+      "hpm_d",
+      "rapm",
+      "box_impact",
+      "on_off"
+     ]
+    },
+    "default": {
+     "x": "ast_pct",
+     "y": "ts_add",
+     "color": "hpm"
+    },
+    "why": "Guards: assist rate against scoring efficiency added, coloured by total impact (HPM)."
    }
   },
   {
@@ -1584,6 +1626,46 @@
     "distance": "weighted euclidean over the features both player-seasons have (pbp-only features dropped pairwise before NBA 2002), divided by the square root of the summed weights",
     "k": 5,
     "constraints": "same league and role, qualified player-seasons, any season, not the player's own seasons"
+   },
+   "view": {
+    "excellence": {
+     "label": "Two-way wing",
+     "ids": [
+      "hpm_d",
+      "pox100",
+      "fg3",
+      "tpar",
+      "stl_pct",
+      "blk_pct",
+      "drb_pct"
+     ]
+    },
+    "production": {
+     "label": "Scoring",
+     "ids": [
+      "ts_add",
+      "pts100",
+      "ts",
+      "fta100",
+      "usg"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "hpm",
+      "hpm_o",
+      "rapm",
+      "box_impact",
+      "on_off"
+     ]
+    },
+    "default": {
+     "x": "hpm_d",
+     "y": "ts_add",
+     "color": "hpm"
+    },
+    "why": "Wings: defensive impact against scoring efficiency added, coloured by total impact (HPM)."
    }
   },
   {
@@ -2355,6 +2437,47 @@
     "distance": "weighted euclidean over the features both player-seasons have (pbp-only features dropped pairwise before NBA 2002), divided by the square root of the summed weights",
     "k": 5,
     "constraints": "same league and role, qualified player-seasons, any season, not the player's own seasons"
+   },
+   "view": {
+    "excellence": {
+     "label": "Rim and glass",
+     "ids": [
+      "blk_pct",
+      "drb_pct",
+      "orb_pct",
+      "trb_pct",
+      "rim_fg",
+      "opp_rim_fg_on",
+      "putback100",
+      "hpm_d"
+     ]
+    },
+    "production": {
+     "label": "Scoring",
+     "ids": [
+      "ts_add",
+      "pts100",
+      "fg2",
+      "ts",
+      "fta100"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "hpm",
+      "hpm_o",
+      "rapm",
+      "box_impact",
+      "on_off"
+     ]
+    },
+    "default": {
+     "x": "blk_pct",
+     "y": "ts_add",
+     "color": "hpm"
+    },
+    "why": "Bigs: block rate (rim protection) against scoring efficiency added, coloured by total impact (HPM)."
    }
   },
   {
@@ -3151,6 +3274,48 @@
     "distance": "weighted euclidean over the features both player-seasons have (pbp-only features dropped pairwise before NBA 2002), divided by the square root of the summed weights",
     "k": 5,
     "constraints": "same league and role, qualified player-seasons, any season, not the player's own seasons"
+   },
+   "view": {
+    "excellence": {
+     "label": "Playmaking",
+     "ids": [
+      "ast_pct",
+      "ast_tov",
+      "pox100",
+      "unassisted_share",
+      "fg3",
+      "stl_pct",
+      "tov_pct"
+     ]
+    },
+    "production": {
+     "label": "Scoring",
+     "ids": [
+      "ts_add",
+      "pts100",
+      "ts",
+      "efg",
+      "fta100",
+      "usg"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "hpm",
+      "hpm_o",
+      "hpm_d",
+      "rapm",
+      "box_impact",
+      "on_off"
+     ]
+    },
+    "default": {
+     "x": "ast_pct",
+     "y": "ts_add",
+     "color": "hpm"
+    },
+    "why": "Guards: assist rate against scoring efficiency added, coloured by total impact (HPM)."
    }
   },
   {
@@ -3922,6 +4087,46 @@
     "distance": "weighted euclidean over the features both player-seasons have (pbp-only features dropped pairwise before NBA 2002), divided by the square root of the summed weights",
     "k": 5,
     "constraints": "same league and role, qualified player-seasons, any season, not the player's own seasons"
+   },
+   "view": {
+    "excellence": {
+     "label": "Two-way wing",
+     "ids": [
+      "hpm_d",
+      "pox100",
+      "fg3",
+      "tpar",
+      "stl_pct",
+      "blk_pct",
+      "drb_pct"
+     ]
+    },
+    "production": {
+     "label": "Scoring",
+     "ids": [
+      "ts_add",
+      "pts100",
+      "ts",
+      "fta100",
+      "usg"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "hpm",
+      "hpm_o",
+      "rapm",
+      "box_impact",
+      "on_off"
+     ]
+    },
+    "default": {
+     "x": "hpm_d",
+     "y": "ts_add",
+     "color": "hpm"
+    },
+    "why": "Wings: defensive impact against scoring efficiency added, coloured by total impact (HPM)."
    }
   },
   {
@@ -4693,6 +4898,47 @@
     "distance": "weighted euclidean over the features both player-seasons have (pbp-only features dropped pairwise before NBA 2002), divided by the square root of the summed weights",
     "k": 5,
     "constraints": "same league and role, qualified player-seasons, any season, not the player's own seasons"
+   },
+   "view": {
+    "excellence": {
+     "label": "Rim and glass",
+     "ids": [
+      "blk_pct",
+      "drb_pct",
+      "orb_pct",
+      "trb_pct",
+      "rim_fg",
+      "opp_rim_fg_on",
+      "putback100",
+      "hpm_d"
+     ]
+    },
+    "production": {
+     "label": "Scoring",
+     "ids": [
+      "ts_add",
+      "pts100",
+      "fg2",
+      "ts",
+      "fta100"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "hpm",
+      "hpm_o",
+      "rapm",
+      "box_impact",
+      "on_off"
+     ]
+    },
+    "default": {
+     "x": "blk_pct",
+     "y": "ts_add",
+     "color": "hpm"
+    },
+    "why": "Bigs: block rate (rim protection) against scoring efficiency added, coloured by total impact (HPM)."
    }
   },
   {

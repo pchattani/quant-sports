@@ -2026,7 +2026,53 @@
     "k": 5,
     "constraints": "same peer group; MLB 2015 onward; other player-seasons only (not the player's own); qualifying minimum"
    },
-   "pct_field": "pct_role"
+   "pct_field": "pct_role",
+   "view": {
+    "excellence": {
+     "label": "Catching",
+     "ids": [
+      "framing_rate",
+      "framing_runs",
+      "framing_savant",
+      "arm",
+      "fielding_runs"
+     ]
+    },
+    "production": {
+     "label": "Hitting",
+     "ids": [
+      "xwoba_n",
+      "woba",
+      "obp",
+      "slg",
+      "iso",
+      "xslg",
+      "barrel_pct",
+      "hard_pct",
+      "ev90",
+      "bat_speed",
+      "k_pct",
+      "bb_pct",
+      "chase_pct",
+      "dv100"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "war_600",
+      "war",
+      "bsr",
+      "re24_pa"
+     ]
+    },
+    "default": {
+     "x": "framing_rate",
+     "y": "xwoba_n",
+     "color": "war_600"
+    },
+    "why": "Catchers are judged first on framing (runs per called pitch), then the bat; colour is WAR per 600 PA."
+   }
   },
   {
    "id": "hitters_1B",
@@ -2974,7 +3020,56 @@
     "k": 5,
     "constraints": "same peer group; MLB 2015 onward; other player-seasons only (not the player's own); qualifying minimum"
    },
-   "pct_field": "pct_role"
+   "pct_field": "pct_role",
+   "view": {
+    "excellence": {
+     "label": "Power",
+     "ids": [
+      "barrel_pct",
+      "iso",
+      "xslg",
+      "ev90",
+      "hard_pct",
+      "bat_speed",
+      "sra",
+      "fielding_runs"
+     ]
+    },
+    "production": {
+     "label": "Hitting",
+     "ids": [
+      "xwoba_n",
+      "woba",
+      "obp",
+      "slg",
+      "iso",
+      "xslg",
+      "barrel_pct",
+      "hard_pct",
+      "ev90",
+      "bat_speed",
+      "k_pct",
+      "bb_pct",
+      "chase_pct",
+      "dv100"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "war_600",
+      "war",
+      "bsr",
+      "re24_pa"
+     ]
+    },
+    "default": {
+     "x": "barrel_pct",
+     "y": "xwoba_n",
+     "color": "war_600"
+    },
+    "why": "First base carries the least defensive value, so the bar is power: barrels against expected wOBA, coloured by WAR per 600 PA."
+   }
   },
   {
    "id": "hitters_2B",
@@ -3948,7 +4043,53 @@
     "k": 5,
     "constraints": "same peer group; MLB 2015 onward; other player-seasons only (not the player's own); qualifying minimum"
    },
-   "pct_field": "pct_role"
+   "pct_field": "pct_role",
+   "view": {
+    "excellence": {
+     "label": "Fielding at second",
+     "ids": [
+      "sra",
+      "oaa",
+      "fielding_runs",
+      "sprint_speed",
+      "arm"
+     ]
+    },
+    "production": {
+     "label": "Hitting",
+     "ids": [
+      "xwoba_n",
+      "woba",
+      "obp",
+      "slg",
+      "iso",
+      "xslg",
+      "barrel_pct",
+      "hard_pct",
+      "ev90",
+      "bat_speed",
+      "k_pct",
+      "bb_pct",
+      "chase_pct",
+      "dv100"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "war_600",
+      "war",
+      "bsr",
+      "re24_pa"
+     ]
+    },
+    "default": {
+     "x": "sra",
+     "y": "xwoba_n",
+     "color": "war_600"
+    },
+    "why": "Second basemen: range (outs above average per chance) against the bat, coloured by WAR per 600 PA."
+   }
   },
   {
    "id": "hitters_3B",
@@ -4921,7 +5062,52 @@
     "k": 5,
     "constraints": "same peer group; MLB 2015 onward; other player-seasons only (not the player's own); qualifying minimum"
    },
-   "pct_field": "pct_role"
+   "pct_field": "pct_role",
+   "view": {
+    "excellence": {
+     "label": "Fielding at third",
+     "ids": [
+      "sra",
+      "oaa",
+      "fielding_runs",
+      "arm"
+     ]
+    },
+    "production": {
+     "label": "Hitting",
+     "ids": [
+      "xwoba_n",
+      "woba",
+      "obp",
+      "slg",
+      "iso",
+      "xslg",
+      "barrel_pct",
+      "hard_pct",
+      "ev90",
+      "bat_speed",
+      "k_pct",
+      "bb_pct",
+      "chase_pct",
+      "dv100"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "war_600",
+      "war",
+      "bsr",
+      "re24_pa"
+     ]
+    },
+    "default": {
+     "x": "sra",
+     "y": "xwoba_n",
+     "color": "war_600"
+    },
+    "why": "Third basemen: reactions and arm (outs above average per chance, arm strength) against the bat, coloured by WAR per 600 PA."
+   }
   },
   {
    "id": "hitters_SS",
@@ -5894,7 +6080,53 @@
     "k": 5,
     "constraints": "same peer group; MLB 2015 onward; other player-seasons only (not the player's own); qualifying minimum"
    },
-   "pct_field": "pct_role"
+   "pct_field": "pct_role",
+   "view": {
+    "excellence": {
+     "label": "Fielding at short",
+     "ids": [
+      "sra",
+      "oaa",
+      "fielding_runs",
+      "arm",
+      "sprint_speed"
+     ]
+    },
+    "production": {
+     "label": "Hitting",
+     "ids": [
+      "xwoba_n",
+      "woba",
+      "obp",
+      "slg",
+      "iso",
+      "xslg",
+      "barrel_pct",
+      "hard_pct",
+      "ev90",
+      "bat_speed",
+      "k_pct",
+      "bb_pct",
+      "chase_pct",
+      "dv100"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "war_600",
+      "war",
+      "bsr",
+      "re24_pa"
+     ]
+    },
+    "default": {
+     "x": "sra",
+     "y": "xwoba_n",
+     "color": "war_600"
+    },
+    "why": "Shortstops: range and arm (outs above average per chance) against the bat, coloured by WAR per 600 PA."
+   }
   },
   {
    "id": "hitters_CF",
@@ -6867,7 +7099,53 @@
     "k": 5,
     "constraints": "same peer group; MLB 2015 onward; other player-seasons only (not the player's own); qualifying minimum"
    },
-   "pct_field": "pct_role"
+   "pct_field": "pct_role",
+   "view": {
+    "excellence": {
+     "label": "Fielding at centre",
+     "ids": [
+      "sra",
+      "oaa",
+      "sprint_speed",
+      "fielding_runs",
+      "arm"
+     ]
+    },
+    "production": {
+     "label": "Hitting",
+     "ids": [
+      "xwoba_n",
+      "woba",
+      "obp",
+      "slg",
+      "iso",
+      "xslg",
+      "barrel_pct",
+      "hard_pct",
+      "ev90",
+      "bat_speed",
+      "k_pct",
+      "bb_pct",
+      "chase_pct",
+      "dv100"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "war_600",
+      "war",
+      "bsr",
+      "re24_pa"
+     ]
+    },
+    "default": {
+     "x": "sra",
+     "y": "xwoba_n",
+     "color": "war_600"
+    },
+    "why": "Centre fielders: range and speed (outs above average per chance, sprint speed) against the bat, coloured by WAR per 600 PA."
+   }
   },
   {
    "id": "hitters_LFRF",
@@ -7842,7 +8120,53 @@
     "k": 5,
     "constraints": "same peer group; MLB 2015 onward; other player-seasons only (not the player's own); qualifying minimum"
    },
-   "pct_field": "pct_role"
+   "pct_field": "pct_role",
+   "view": {
+    "excellence": {
+     "label": "Fielding at the corners",
+     "ids": [
+      "sra",
+      "oaa",
+      "arm",
+      "fielding_runs",
+      "sprint_speed"
+     ]
+    },
+    "production": {
+     "label": "Hitting",
+     "ids": [
+      "xwoba_n",
+      "woba",
+      "obp",
+      "slg",
+      "iso",
+      "xslg",
+      "barrel_pct",
+      "hard_pct",
+      "ev90",
+      "bat_speed",
+      "k_pct",
+      "bb_pct",
+      "chase_pct",
+      "dv100"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "war_600",
+      "war",
+      "bsr",
+      "re24_pa"
+     ]
+    },
+    "default": {
+     "x": "sra",
+     "y": "xwoba_n",
+     "color": "war_600"
+    },
+    "why": "Corner outfielders: range and arm against the bat, coloured by WAR per 600 PA."
+   }
   },
   {
    "id": "hitters_DH",
@@ -8766,7 +9090,54 @@
     "k": 5,
     "constraints": "same peer group; MLB 2015 onward; other player-seasons only (not the player's own); qualifying minimum"
    },
-   "pct_field": "pct_role"
+   "pct_field": "pct_role",
+   "view": {
+    "excellence": {
+     "label": "Power",
+     "ids": [
+      "barrel_pct",
+      "iso",
+      "xslg",
+      "ev90",
+      "hard_pct",
+      "bat_speed"
+     ]
+    },
+    "production": {
+     "label": "Hitting",
+     "ids": [
+      "xwoba_n",
+      "woba",
+      "obp",
+      "slg",
+      "iso",
+      "xslg",
+      "barrel_pct",
+      "hard_pct",
+      "ev90",
+      "bat_speed",
+      "k_pct",
+      "bb_pct",
+      "chase_pct",
+      "dv100"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "war_600",
+      "war",
+      "bsr",
+      "re24_pa"
+     ]
+    },
+    "default": {
+     "x": "barrel_pct",
+     "y": "xwoba_n",
+     "color": "war_600"
+    },
+    "why": "Designated hitters only hit: barrels against expected wOBA, coloured by WAR per 600 PA."
+   }
   },
   {
    "id": "sp",
@@ -9743,6 +10114,48 @@
     "distance": "weighted euclidean",
     "k": 5,
     "constraints": "same role; MLB 2015 onward; other player-seasons only; qualifying minimum; same throwing hand preferred as a tie-break"
+   },
+   "view": {
+    "excellence": {
+     "label": "Stuff and command",
+     "ids": [
+      "pitching_plus",
+      "stuff_plus",
+      "location_plus",
+      "k_bb_pct",
+      "csw_pct",
+      "k_pct",
+      "bb_pct",
+      "fb_velo",
+      "gb_pct",
+      "chase_pct"
+     ]
+    },
+    "production": {
+     "label": "Run prevention",
+     "ids": [
+      "xra9",
+      "xfip",
+      "fip",
+      "ra9",
+      "xwoba_n",
+      "whip"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "war_200",
+      "war",
+      "war_x"
+     ]
+    },
+    "default": {
+     "x": "pitching_plus",
+     "y": "xra9",
+     "color": "war_200"
+    },
+    "why": "Starters: the pitch model (Pitching+) against expected runs allowed per nine, coloured by WAR per 200 IP."
    }
   },
   {
@@ -10616,6 +11029,45 @@
     "distance": "weighted euclidean",
     "k": 5,
     "constraints": "same role; MLB 2015 onward; other player-seasons only; qualifying minimum; same throwing hand preferred as a tie-break"
+   },
+   "view": {
+    "excellence": {
+     "label": "Bat-missing",
+     "ids": [
+      "stuff_plus",
+      "k_bb_pct",
+      "whiff_pct",
+      "csw_pct",
+      "fb_velo",
+      "pitching_plus",
+      "gb_pct"
+     ]
+    },
+    "production": {
+     "label": "Run prevention",
+     "ids": [
+      "xra9",
+      "xfip",
+      "fip",
+      "ra9",
+      "xwoba_n",
+      "whip"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "war",
+      "war_x",
+      "wpa_li"
+     ]
+    },
+    "default": {
+     "x": "stuff_plus",
+     "y": "xfip",
+     "color": "war"
+    },
+    "why": "Relievers: raw stuff (Stuff+) against expected FIP, coloured by WAR."
    }
   },
   {

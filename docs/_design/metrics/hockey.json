@@ -1647,6 +1647,46 @@
     "distance": "weighted euclidean",
     "k": 6,
     "constraints": "same season, same group, both qualified; missing feature -> 0 (the group mean)"
+   },
+   "view": {
+    "excellence": {
+     "label": "Driving play",
+     "ids": [
+      "ixg60_all",
+      "icf60",
+      "hd_att60",
+      "shooting_talent",
+      "xgf60_rel",
+      "adj_xgf_pct",
+      "rapm_off",
+      "fo_pct"
+     ]
+    },
+    "production": {
+     "label": "Scoring",
+     "ids": [
+      "p60",
+      "g60",
+      "p1_60",
+      "p60_5v5",
+      "pp_p60"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "gar_60",
+      "rapm_net",
+      "war",
+      "gar"
+     ]
+    },
+    "default": {
+     "x": "ixg60_all",
+     "y": "p60",
+     "color": "gar_60"
+    },
+    "why": "Forwards: individual expected goals per 60 against points per 60, coloured by value per 60."
    }
   },
   {
@@ -3013,6 +3053,46 @@
     "distance": "weighted euclidean",
     "k": 6,
     "constraints": "same season, same group, both qualified"
+   },
+   "view": {
+    "excellence": {
+     "label": "Defending",
+     "ids": [
+      "rapm_def",
+      "adj_xga60",
+      "xga60_rel",
+      "adj_xgf_pct",
+      "pk_xga60",
+      "blocks60",
+      "take60"
+     ]
+    },
+    "production": {
+     "label": "Scoring",
+     "ids": [
+      "p60",
+      "p1_60",
+      "p60_5v5",
+      "ixg60_all",
+      "icf60",
+      "rapm_off"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "gar_60",
+      "rapm_net",
+      "war",
+      "gar"
+     ]
+    },
+    "default": {
+     "x": "rapm_def",
+     "y": "p60",
+     "color": "gar_60"
+    },
+    "why": "Defencemen: isolated defence (chances allowed) against points per 60, coloured by value per 60."
    }
   },
   {
@@ -4017,6 +4097,43 @@
     "distance": "weighted euclidean",
     "k": 6,
     "constraints": "same season, both qualified; the skill metrics sit at the 0.2 floor, so similarity mostly reflects style and workload"
+   },
+   "view": {
+    "excellence": {
+     "label": "Shot-stopping",
+     "ids": [
+      "gsax100",
+      "sv_pct_high",
+      "sv_pct_med",
+      "sv_pct_low",
+      "gsax_high",
+      "reb_rate",
+      "dfsv_pct"
+     ]
+    },
+    "production": {
+     "label": "Results",
+     "ids": [
+      "sv_pct",
+      "qs_pct",
+      "gaa",
+      "sv_pct_5v5"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "gsax",
+      "war",
+      "gar"
+     ]
+    },
+    "default": {
+     "x": "gsax100",
+     "y": "qs_pct",
+     "color": "gsax"
+    },
+    "why": "Goaltenders: goals saved above expected per 100 shots against quality-start rate, coloured by total goals saved above expected."
    }
   },
   {

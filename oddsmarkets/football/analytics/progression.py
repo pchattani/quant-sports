@@ -15,8 +15,12 @@ role of the Lab line, else the person's 12-month role, else the listed position 
 gk). Qualified: 450 minutes (goalkeepers 900), the spec's minimum. Pools are per scope and season
 ("club:2025/26"): every competition the site follows, pooled, as the Lab's "club" and "international" views are.
 
+Seasons before the stores come from Sofascore's season totals (the archive's profiled careers and, since 28 October 2026,
+the league-wide season tables: UNIFIED_PAYLOADS 16): box numbers only, never the Lab's deep set. A row's `st` is the
+share of its minutes from those totals (rows with no line-ups behind them); absent when none.
+
 Writes people/<pid>.json `progression` (rows {key, scope, era, min, apps, g, a, tid, team, teams, comps, kd, dv, dp,
-pg}) and `prog` = {"v", "keys_in": "progression_ref.json"}, and data/progression_ref.json, which also carries the
+pg, st}) and `prog` = {"v", "keys_in": "progression_ref.json"}, and data/progression_ref.json, which also carries the
 kinds' key lists (`prog.keys`: one copy instead of one per people file, about 25 MB); a file is rewritten only when
 its content changes.
 """
@@ -109,7 +113,8 @@ def person_rows(p: dict, lab: dict, eras: dict) -> list[dict]:
     frame = p.get("frame") or "split"
     lines: dict[tuple[str, str], list] = {}
     seen = set()
-    for r in list(p.get("seasons") or []) + list(p.get("archive") or []):
+    from oddsmarkets.football.analytics.unified import unpack_hist
+    for r in list(p.get("seasons") or []) + list(p.get("archive") or []) + unpack_hist(p):
         sc = SCOPE.get(r.get("scope"))
         era = r.get("era")
         if not sc or not era:
@@ -149,10 +154,15 @@ def person_rows(p: dict, lab: dict, eras: dict) -> list[dict]:
             gid = ROLE_GROUP.get(ln.get("role") or "") or gid
         if ln:
             kind = "gk" if gid == "gk" else "out"
-        out.append({"key": f"{sc}:{era}", "scope": sc, "era": era, "min": t["min"], "apps": t["apps"], "g": t["g"], "a": t["a"],
-                    "tid": teams[0] if teams else None, "team": names.get(teams[0]) if teams else None, "teams": teams,
-                    "comps": len({r.get("comp") for r in rows}), "_kind": kind, "_gid": gid, "_v": v,
-                    "_q": bool(gid) and t["min"] >= MIN_Q.get(gid or "", MIN_Q_DEFAULT)})
+        row = {"key": f"{sc}:{era}", "scope": sc, "era": era, "min": t["min"], "apps": t["apps"], "g": t["g"], "a": t["a"],
+               "tid": teams[0] if teams else None, "team": names.get(teams[0]) if teams else None, "teams": teams,
+               "comps": len({r.get("comp") for r in rows}), "_kind": kind, "_gid": gid, "_v": v,
+               "_q": bool(gid) and t["min"] >= MIN_Q.get(gid or "", MIN_Q_DEFAULT)}
+        # the share of the season from Sofascore's season totals (archive and season-table rows: no line-ups behind them)
+        tot = sum(_f(r.get("min")) or 0 for r in rows if r.get("source") == "archive")
+        if tot > 0 and t["min"] > 0:
+            row["st"] = round(min(tot / t["min"], 1.0), 2)
+        out.append(row)
     out.sort(key=lambda r: (r["scope"], _era_x(r["era"])))
     return out
 
