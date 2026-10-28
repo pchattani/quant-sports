@@ -616,14 +616,6 @@ function buildCompareRole(el, P, R, ix) {
   var pooled = !!P[0].pooled;
   var adj = {};
   ((ix || {}).adjusted_keys || []).concat(FB.ADJ_EXTRA || []).forEach(function (k) { adj[k] = 1; });
-  var scope = P[0].scope;
-  var inScope = function (comp) {
-    if (scope === 'all') return true;
-    var c = FB.comp(comp) || {};
-    if (scope === 'club') return c.scope !== 'international';
-    if (scope === 'intl') return c.scope === 'international';
-    return comp === scope;
-  };
   /* one ranker per view: the pooled lab view, or each player's competition line */
   var rankers = {};
   var rankerOf = function (x) {
@@ -635,7 +627,9 @@ function buildCompareRole(el, P, R, ix) {
       rk = { floor: V.floor, rows: V.rows, id: function (r) { return String(r[I.player_id]); }, min: function (r) { return r[I.minutes]; },
         role: function (r) { return FB.rowRole(R, I.role === undefined ? null : r[I.role], r[I.player_id], null); },
         val: function (r, k) {
-          if (k === 'gar90') return I.gar90 !== undefined && isNum(r[I.gar90]) ? r[I.gar90] : FB.garOver(R, r[I.player_id], inScope);
+          /* the row's own GAR/90 (value_fields: the value over exactly this line's matches); no lines.json fallback, which
+             would mix each competition's latest edition into another window or scope */
+          if (k === 'gar90') return I.gar90 !== undefined && isNum(r[I.gar90]) ? r[I.gar90] : null;
           var v = I[k] === undefined ? null : r[I[k]];
           return isNum(v) && adj[k] ? v * (r[I.factor] || 1) : v;
         } };

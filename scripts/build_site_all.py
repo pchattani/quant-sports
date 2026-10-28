@@ -2428,7 +2428,8 @@ def build_unified(entries: list[dict], seasons: dict, archive: dict) -> dict[str
                      clubs=u.clubs, factors=factors)
     except Exception as exc:  # noqa: BLE001
         logger.error("people lines failed: %s\n%s", exc, traceback.format_exc())
-    LAST_UNIFIED = {"unified": u, "rows": collector.finish(), "comps": comps_u}
+    lines.release()                       # the Lab is written; the window logic stays for the value step (value_views)
+    LAST_UNIFIED = {"unified": u, "rows": collector.finish(), "comps": comps_u, "lines": lines}
     logger.info("unified: %d people, %d clubs, %d competitions with seasons", counts["people"], counts["clubs"], len(u.manifests))
     return u.competition_fields()
 
@@ -2450,6 +2451,19 @@ def build_value_layer(entries: list[dict], archive: dict) -> dict:
         entries=entries,
     )
     return build_value(ctx, rows)
+
+
+def lab_value_windows(row_gar) -> dict | None:
+    """PeopleLines.value_views over the value model's rows: {"windows": {window: {pid: {slug: [GAR, minutes]}}},
+    "intl": [...]}, tagged as the Lab tags each match (None without the unified step or the value layer)."""
+    last = LAST_UNIFIED or {}
+    u, rows, lines = last.get("unified"), last.get("rows"), last.get("lines")
+    if u is None or rows is None or lines is None or row_gar is None:
+        return None
+    meta = u.season_meta
+    out = lines.value_views(rows, row_gar, lambda slug, key: (meta.get((slug, str(key))) or {}).get("era"), u.frame_of_person)
+    logger.info("value by Lab window: %s", ", ".join(f"{w} {len(v)} people" for w, v in out["windows"].items()))
+    return out
 
 
 def build_fantasy_layer(entries: list[dict], value_score: dict) -> dict:
@@ -2647,8 +2661,11 @@ def main() -> int:
                 if fan:
                     logger.info("fantasy: %d leagues in %.1fs", fan["leagues"], fan["runtime_s"])
     # the value model's role and GAR/90 on players_live, the lab and people files (METRICS_SPEC peer groups)
+    # the value model's GAR over exactly each Lab line's matches (window, scope and the person's frame), so a national
+    # team line carries its own matches' value and never the club figure
+    lab_value = _step("value by Lab window", lambda: lab_value_windows((value or {}).get("_row_gar"))) if value else None
     _step("value fields", lambda: value_fields.apply(DATA_DIR, roles_before, (value or {}).get("_prev_lines"),
-                                                     (value or {}).get("_prev_sid")))
+                                                     (value or {}).get("_prev_sid"), lab_value=lab_value))
     # progression (round 6): every person's seasons, club and international, on the role group's deep set, and the
     # peers' quantiles (data/progression_ref.json); after the value fields so the Lab lines carry GAR/90
     from oddsmarkets.football.analytics import progression as football_progression

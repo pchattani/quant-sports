@@ -42,9 +42,8 @@ MIN_Q_DEFAULT = 450
 MIN_ROW = 90
 LAB_SKIP = {"tid", "age", "matches", "factor", "minutes"}
 LAB_MATCH = 0.2
-# the Lab's international lines carry the club GAR (last season's: the club line's own numbers; this season's: not the
-# line's minutes), so the international rows leave GAR out until value_fields scores international lines on their own
-INTL_SKIP = {"gar90", "gar"}
+# GAR / GAR90 come from the Lab line of the scope: value_fields scores each line over its own matches (28 Oct 2026),
+# so an international row carries the value of its international matches, as a club row its club matches
 
 
 def _read(p: Path) -> Any:
@@ -143,7 +142,7 @@ def person_rows(p: dict, lab: dict, eras: dict) -> list[dict]:
             ln = None                     # the Lab's window is another span (a move between a split and a calendar frame)
         if ln:
             for k, x in ln.items():
-                if k not in v and isinstance(x, (int, float)) and not isinstance(x, bool) and k not in LAB_SKIP                         and not (sc == "intl" and k in INTL_SKIP):
+                if k not in v and isinstance(x, (int, float)) and not isinstance(x, bool) and k not in LAB_SKIP:
                     v[k] = x
             if _f(ln.get("xg_90")) is not None and _f(ln.get("xa_90")) is not None:
                 v["xg_xa_90"] = _f(ln["xg_90"]) + _f(ln["xa_90"])

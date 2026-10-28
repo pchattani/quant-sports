@@ -287,3 +287,66 @@ def test_season_pages_ignore_backfilled_detail_from_last_season() -> None:
     assert st["minutes"] == 90 and st["goals"] == 1
     store["matches"]["2"]["season_id"] = 2
     assert _season_view(store) is store                                  # nothing to filter: no copy
+
+
+def _value_rows(rows: list[tuple]) -> object:
+    """A stand-in for value.Rows: (pid, slug, season key, ISO date, minutes, GAR) per player-match."""
+    from datetime import date
+    from types import SimpleNamespace
+
+    import numpy as np
+
+    comps = sorted({r[1] for r in rows})
+    sids = sorted({r[2] for r in rows})
+    ints = lambda xs: np.array(xs, dtype=np.int64)  # noqa: E731
+    R = SimpleNamespace(pid=ints([int(r[0]) for r in rows]), comp=ints([comps.index(r[1]) for r in rows]),
+                        sid=ints([sids.index(r[2]) for r in rows]), day=ints([date.fromisoformat(r[3]).toordinal() for r in rows]),
+                        mins=np.array([float(r[4]) for r in rows]), comps=comps, sids=sids)
+    return R, np.array([float(r[5]) for r in rows])
+
+
+def test_value_views_tag_each_match_as_the_lab_does() -> None:
+    """The value model's GAR by Lab window (28 Oct 2026): a club edition counts in its season, a national-team match by
+    date in the person's frame, so a qualifying campaign that spans two seasons splits between them, a July World Cup
+    closes a European's season, and an international line never takes club matches (Haaland's international line had
+    repeated his club GAR)."""
+    from datetime import datetime, timezone
+
+    from oddsmarkets.football.analytics import value_fields as VF
+    from oddsmarkets.football.analytics.people_lines import PeopleLines
+
+    comps = {"premier-league": {"scope": "club"}, "world-cup": {"scope": "international"},
+             "nations-league": {"scope": "international"}, "wc-qual-uefa": {"scope": "international"}}
+    pl = PeopleLines(comps, today=datetime(2026, 9, 30, tzinfo=timezone.utc), intl_split_month=8)
+    pl.merge_aliases({"99": "30"})
+    R, gar = _value_rows([
+        ("30", "premier-league", "26", "2026-09-01", 90, 0.5), ("30", "premier-league", "26", "2026-09-15", 90, 0.3),
+        ("99", "premier-league", "26", "2026-09-20", 90, 0.1),                                  # a duplicate id of 30
+        ("30", "premier-league", "25", "2026-03-01", 90, 0.2),
+        ("30", "world-cup", "wc", "2026-07-01", 90, 0.4),                                       # the summer: 2025/26 for a European
+        ("30", "nations-league", "nl", "2026-09-07", 90, -0.1),
+        ("30", "wc-qual-uefa", "q", "2025-10-10", 90, 0.25), ("30", "wc-qual-uefa", "q", "2026-09-05", 90, 0.05),
+        ("30", "premier-league", "23", "2023-09-01", 90, 9.0),                                  # three seasons back: no window
+        ("30", "serie-a", "26", "2026-09-02", 90, 9.0),                                          # not a Lab competition
+        ("40", "world-cup", "wc", "2026-07-01", 90, 0.7), ("40", "nations-league", "nl", "2026-09-07", 90, 0.1),
+    ])
+    era = {("premier-league", "26"): "2026/27", ("premier-league", "25"): "2025/26", ("premier-league", "23"): "2023/24"}
+    out = pl.value_views(R, gar, lambda slug, key: era.get((slug, key)), {"30": "split", "40": "calendar"})
+    w = out["windows"]
+    assert set(out["intl"]) == {"world-cup", "nations-league", "wc-qual-uefa"}
+    assert w["season"]["30"] == {"premier-league": [0.9, 270.0], "nations-league": [-0.1, 90.0], "wc-qual-uefa": [0.05, 90.0]}
+    assert w["last"]["30"] == {"premier-league": [0.2, 90.0], "world-cup": [0.4, 90.0], "wc-qual-uefa": [0.25, 90.0]}
+    assert w["365"]["30"]["wc-qual-uefa"] == [0.3, 180.0] and w["365"]["30"]["premier-league"] == [1.1, 360.0]
+    assert w["ytd"]["30"]["wc-qual-uefa"] == [0.05, 90.0]
+    assert "99" not in w["season"] and "serie-a" not in w["365"]["30"]
+    # a calendar-frame player: the July World Cup and the September Nations League are both his 2026
+    assert w["season"]["40"] == {"world-cup": [0.7, 90.0], "nations-league": [0.1, 90.0]} and "40" not in w["last"]
+    intl = set(out["intl"])
+    s_club = VF.windowed(w["season"]["30"], "club", intl, 270)
+    s_intl = VF.windowed(w["season"]["30"], "intl", intl, 180)
+    l_club = VF.windowed(w["last"]["30"], "club", intl, 90)
+    l_intl = VF.windowed(w["last"]["30"], "intl", intl, 180)
+    assert s_club == (0.3, 0.9) and s_intl == (round(90 * -0.05 / 180, 3), -0.05)
+    assert l_club == (0.2, 0.2) and l_intl == (0.325, 0.65) and l_intl != l_club
+    # GAR/90 reconciles with the line's own minutes
+    assert abs(s_intl[0] * 180 / 90 - s_intl[1]) < 0.01 and abs(l_intl[0] * 180 / 90 - l_intl[1]) < 0.01

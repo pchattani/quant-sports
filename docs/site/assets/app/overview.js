@@ -649,7 +649,8 @@ function drawFan(el) {
         var colour = r.tid ? FB.clubColour(r.tid) : null;
         return { kicker: 'Breakout watch', name: r.name, sub: [r.team, ROLE_NAME[r.role] || r.role, isNum(r.age) ? 'age ' + r.age : ''].filter(Boolean).join(' · '),
           value: '+' + Math.round(b - a), unit: 'percentile points', colour: colour, mark: { name: r.team, logo: r.tid ? FB.crestUrl(r.tid) : null, colour: colour },
-          from: { label: 'Last season', pos: a, value: ORD(a) }, to: { label: 'This season', pos: b, value: ORD(b) }, href: FB.href.player(id),
+          from: { label: 'Last season', pos: a, value: ORD(a) }, to: { label: 'This season', pos: b, value: ORD(b) }, href: FB.href.player(id, { view: 'progression' }),
+          link: { text: 'Progression' },
           html: true, text: 'Value added per 90 ' + QK.ours({ short: true, model: 'Player value model' }) + ' against the ' + esc(lg) + '’s ' + esc(grp) + ': ' + num(prev.gar90, 2) + ' last season, <b>' + num(r.gar90, 2) + '</b> now. ' +
             FB.int(r.minutes) + ' minutes so far' + (r.minutes < 900 ? ': a small sample.' : '.') };
       });
@@ -672,7 +673,7 @@ function drawFan(el) {
         href: FB.href.player(idu),
         headline: 'Top ' + top + '% of the ' + lg + '’s ' + GROUP_NAME[gk] + ' in our value model, with ' + goals + ' goal' + (goals === 1 ? '' : 's') + ' and ' + assists + ' assist' + (assists === 1 ? '' : 's') + ': the kind of season the scoring charts miss.',
         stats: stats, text: 'Percentiles against the ' + lg + '’s ' + GROUP_NAME[gk] + ' with ' + FB.int(floor) + '+ minutes this season; ▼ is last season. ' + FB.int(un.minutes) + ' minutes so far.',
-        links: [{ href: FB.href.player(idu), text: 'Player page' }, { href: '#/players/leaders', text: 'Every leader' }] });
+        links: [{ href: FB.href.player(idu), text: 'Player page' }, { href: FB.href.player(idu, { view: 'progression' }), text: 'Progression' }, { href: '#/players/leaders', text: 'Every leader' }] });
     });
   }
   draw();

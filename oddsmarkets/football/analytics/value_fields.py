@@ -7,12 +7,13 @@ reach the earlier payloads here, in a step that runs once the value files are wr
   CM, AM, W, ST; a coarse DF / MF / FW for substitute-only lines) and `gar90` (goals added above replacement per 90 in
   that competition, from data/value/lines.json; null under the value model's 90 minutes).
 * `lab/<window>/<scope>.json`: three columns appended to `fields` (existing column positions are unchanged): `role`,
-  `gar90` and `gar` (goals above replacement, a total). The "season" window reads this season's lines
-  (data/value/lines.json): one competition's own line, or for `all` / `club` / `intl` the lines of the competitions
-  in that scope summed (GAR adds, GAR/90 = 90 x GAR / minutes, as the Compare page's FB.garOver). The "last" window
-  reads last season's lines the same way when the value layer passes them (`prev_lines`). `365` and `ytd` read the
-  person's 12-month value (data/value/players.json). `role` stays the line's role (one competition) or the 12-month
-  role.
+  `gar90` and `gar` (goals above replacement, a total). GAR is the value model's over exactly the matches of the
+  line (PeopleLines.value_views: each player-match row tagged as the Lab tags it, a club edition by its season, a
+  national-team or world-club match by date in the person's frame, the last 12 months, the calendar year), summed
+  over the scope's competitions (GAR adds, GAR/90 = 90 x GAR / minutes). So an international line carries the value
+  of its own international matches, never the club figure (28 Oct 2026: before, pooled rows summed each competition's
+  latest edition whatever its season, and the 365 / ytd / last windows took the 12-month club value). `role` stays the
+  line's role (one competition) or the 12-month role.
 * `lab/leaders.json`: a `gar` board per scope (all, club, intl): this season's top 15 by goals above replacement
   (rows of lab/season/<scope>.json with 450+ minutes), {id, name, team, tid, comp, mix, value (GAR), minutes, gar90}.
 * `people/<pid>.json` `role`: the 12-month role. The unified step writes it from the value files on disk (the previous
@@ -30,6 +31,12 @@ from typing import Any
 logger = logging.getLogger(__name__)
 LAB_EXTRA = ("role", "gar90", "gar")
 LEAD_MIN = 450
+POOLED = ("all", "club", "intl")
+# a Lab line takes the value model's GAR only when the model scores at least half its minutes (the rows the value
+# collector keeps: a final score and a line-up side), and without the windowed value only a competition line whose
+# minutes are within 20% of the row's (the same edition)
+LAB_COVER = 0.5
+LAB_MATCH = 0.2
 
 
 def _read(path: Path) -> Any:
@@ -84,33 +91,38 @@ def load_full(data_dir: Path) -> tuple[dict[tuple[str, str], tuple], dict[str, t
     return lines, players
 
 
-def _comp_scopes(data_dir: Path) -> dict[str, str]:
-    """{competition slug: 'club' | 'international'} from lab/index.json `comps` (empty when absent)."""
+def _intl_slugs(data_dir: Path) -> set[str]:
+    """The national-team competitions from lab/index.json `comps` (empty when absent)."""
     ix = _read(data_dir / "lab" / "index.json") or {}
-    return {k: (v or {}).get("scope") or "club" for k, v in (ix.get("comps") or {}).items()}
+    return {k for k, v in (ix.get("comps") or {}).items() if (v or {}).get("scope") == "international"}
 
 
-def _in_scope(scope: str, comp: str, scopes: dict[str, str]) -> bool:
+def _in_scope(scope: str, slug: str, intl: set[str]) -> bool:
+    """A competition in a Lab scope: all, club (everything not national-team football), intl, or one competition."""
     if scope == "all":
         return True
     if scope == "club":
-        return scopes.get(comp, "club") != "international"
+        return slug not in intl
     if scope == "intl":
-        return scopes.get(comp) == "international"
-    return comp == scope
+        return slug in intl
+    return slug == scope
 
 
-def _summed(by_pid: dict[str, list], pid: str, scope: str, scopes: dict[str, str]) -> tuple:
-    """(gar90, gar) over a person's lines [(comp, gar, minutes)] in the scope; (None, None) without any."""
+def windowed(per_slug: dict | None, scope: str, intl: set[str], row_minutes) -> tuple:
+    """(gar90, gar) of one Lab row from its person's windowed value ({slug: [GAR, minutes]}, the matches of this
+    window as PeopleLines.value_views tags them): GAR adds over the scope's competitions, GAR/90 = 90 x GAR /
+    minutes; (None, None) when the value model scores under LAB_COVER of the row's minutes (or none)."""
     g = m = 0.0
-    seen = False
-    for comp, t, mins in by_pid.get(pid) or []:
-        if t is None or not mins or not _in_scope(scope, comp, scopes):
+    for slug, v in (per_slug or {}).items():
+        if not _in_scope(scope, slug, intl) or not isinstance(v, (list, tuple)) or len(v) < 2:
+            continue
+        t, mins = _num(v[0]), _num(v[1])
+        if t is None or not mins:
             continue
         g += t
         m += mins
-        seen = True
-    if not seen or m <= 0:
+    rm = _num(row_minutes) or 0.0
+    if m <= 0 or m < LAB_COVER * rm:
         return None, None
     return round(90.0 * g / m, 3), round(g, 2)
 
@@ -145,22 +157,19 @@ def annotate_players_live(data_dir: Path, lines: dict, players: dict) -> int:
     return n
 
 
-def annotate_lab(data_dir: Path, lines: dict, players: dict, full: tuple | None = None, prev_lines: dict | None = None) -> int:
+def annotate_lab(data_dir: Path, lines: dict, players: dict, full: tuple | None = None, prev_lines: dict | None = None,
+                 lab_value: dict | None = None) -> int:
     """role, gar90 and gar appended to every lab file's fields and rows; returns the files rewritten. `full` is
-    load_full()'s pair (read from disk when None); `prev_lines` {(pid, slug): {"role", "gar90", "min"}} is last
-    season's lines for the "last" window."""
+    load_full()'s pair (read from disk when None); `prev_lines` {(pid, slug): {"role", ...}} gives last season's role
+    in one competition; `lab_value` is PeopleLines.value_views ({"windows": {window: {pid: {slug: [GAR, minutes]}}},
+    "intl": [slugs]}), the value over exactly each line's matches. Without it (a build without the value layer) only a
+    "season" row of one competition takes that competition's own line, and only when its minutes are the row's;
+    every other GAR is left empty rather than joined from another window or scope."""
     n = 0
     lf, pf = full if full is not None else load_full(data_dir)
-    scopes = _comp_scopes(data_dir)
-    cur_by: dict[str, list] = {}
-    for (pid, comp), (_r, g90, t, mins) in lf.items():
-        if t is None and _num(g90) is not None and mins:
-            t = g90 * mins / 90.0
-        cur_by.setdefault(pid, []).append((comp, _num(t), mins or 0))
-    prev_by: dict[str, list] = {}
-    for (pid, comp), v in (prev_lines or {}).items():
-        g90, mins = _num((v or {}).get("gar90")), (v or {}).get("min") or 0
-        prev_by.setdefault(pid, []).append((comp, g90 * mins / 90.0 if g90 is not None else None, mins))
+    wins = (lab_value or {}).get("windows") if isinstance(lab_value, dict) else None
+    intl = set((lab_value or {}).get("intl") or []) if wins is not None else set()
+    intl = intl or _intl_slugs(data_dir)
     for path in sorted((data_dir / "lab").glob("*/*.json")):
         lab = _read(path)
         if not isinstance(lab, dict) or not isinstance(lab.get("fields"), list) or "player_id" not in lab["fields"]:
@@ -170,30 +179,32 @@ def annotate_lab(data_dir: Path, lines: dict, players: dict, full: tuple | None 
         for k in LAB_EXTRA:
             if k not in fields:
                 fields.append(k)
-        i_id, i_comp = fields.index("player_id"), fields.index("comp") if "comp" in fields else None
+        i_id = fields.index("player_id")
+        i_min = fields.index("minutes") if "minutes" in fields else None
         i_role, i_g90, i_gar = fields.index("role"), fields.index("gar90"), fields.index("gar")
         window, scope = path.parent.name, path.stem
-        by = cur_by if window == "season" else prev_by if (window == "last" and prev_lines) else None
+        one = scope not in POOLED
+        wv = wins.get(window) if wins is not None else None
         for r in lab.get("rows") or []:
             if not isinstance(r, list) or len(r) < width:
                 continue
             while len(r) < len(fields):
                 r.append(None)
             pid = str(r[i_id])
-            comp = r[i_comp] if i_comp is not None else None
-            p12 = pf.get(pid) or (None, None, None)
-            role = p12[0]
-            if by is not None:
-                g90, gar = _summed(by, pid, scope, scopes)
-                if window == "season" and scope not in ("all", "club", "intl"):
-                    ln = lf.get((pid, scope))
-                    role = (ln[0] if ln else None) or role
-                    if ln and _num(ln[1]) is not None:
-                        g90, gar = ln[1], ln[2] if _num(ln[2]) is not None else gar
-                elif window == "last" and scope not in ("all", "club", "intl"):
-                    role = ((prev_lines or {}).get((pid, scope)) or {}).get("role") or role
+            rmin = r[i_min] if i_min is not None else None
+            role = (pf.get(pid) or (None, None, None))[0]
+            ln = lf.get((pid, scope)) if one and window == "season" else None
+            if ln:
+                role = ln[0] or role
+            elif one and window == "last":
+                role = ((prev_lines or {}).get((pid, scope)) or {}).get("role") or role
+            if wv is not None:
+                g90, gar = windowed(wv.get(pid), scope, intl, rmin)
+            elif ln and _num(ln[1]) is not None and _num(ln[3]) and _num(rmin) and \
+                    abs(ln[3] - rmin) <= LAB_MATCH * max(ln[3], rmin):
+                g90, gar = ln[1], ln[2] if _num(ln[2]) is not None else round(ln[1] * ln[3] / 90.0, 2)
             else:
-                g90, gar = p12[1], p12[2]
+                g90 = gar = None
             r[i_role], r[i_g90], r[i_gar] = role, g90, gar
         n += _write_if_changed(path, lab)
     n += annotate_leaders(data_dir)
@@ -355,16 +366,17 @@ def annotate_people_prev(data_dir: Path, prev_lines: dict[tuple[str, str], dict]
 
 
 def apply(data_dir: Path, roles_before: dict[str, str] | None = None, prev_lines: dict | None = None,
-          prev_sid: dict | None = None) -> dict[str, int]:
+          prev_sid: dict | None = None, lab_value: dict | None = None) -> dict[str, int]:
     """Every annotation above from the value files on disk (and, with `prev_lines` / `prev_sid` from this build's
-    value layer, last season's role percentiles on the people files); returns {what: files rewritten}."""
+    value layer, last season's role percentiles on the people files; with `lab_value`, the Lab's GAR over each line's
+    own matches); returns {what: files rewritten}."""
     lines, players = load(data_dir)
     if not lines and not players:
         logger.info("value fields: no value layer on disk, nothing added")
         _performers(data_dir)
         return {"players_live": 0, "lab": 0, "people": 0}
     out = {"players_live": annotate_players_live(data_dir, lines, players),
-           "lab": annotate_lab(data_dir, lines, players, load_full(data_dir), prev_lines)}
+           "lab": annotate_lab(data_dir, lines, players, load_full(data_dir), prev_lines, lab_value)}
     out["people"] = refresh_people_roles(data_dir, roles_before or {}, {i: r for i, (r, _g) in players.items() if r}) \
         if roles_before is not None else 0
     if prev_lines:

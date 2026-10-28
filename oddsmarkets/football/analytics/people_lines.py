@@ -35,7 +35,7 @@ from __future__ import annotations
 import json
 import logging
 from array import array
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable
 
@@ -127,6 +127,7 @@ class PeopleLines:
         self.votes: dict[str, dict[str, int]] = {}
         self.meta_pos: dict[str, str] = {}
         self.first_detail: dict[str, str] = {}
+        self.aliases: dict[str, str] = {}                                  # alias id -> canonical id (merge_aliases)
 
     # -- one competition ------------------------------------------------------------
 
@@ -248,6 +249,7 @@ class PeopleLines:
 
     def merge_aliases(self, aliases: dict[str, str]) -> None:
         """Fold genuine duplicate ids (Unified.aliases: same exact name, birth date and nationality) into the canonical id."""
+        self.aliases = dict(aliases)
         for alias, canon in aliases.items():
             src = self.acc.pop(alias, None)
             if src:
@@ -281,28 +283,119 @@ class PeopleLines:
         inc = {"yellow": int(vec[X_YC]), "red": int(vec[X_RC]), "pens": int(vec[X_PENS]), "own_goals": int(vec[X_OG])}
         return finalize_player(pid, a, self.meta.get(pid), self._position(pid), inc, self.today)
 
+    def _by_date(self, slug: str) -> bool:
+        """National-team and world-club competitions count in the player's frame by date (`_tags`)."""
+        return (self.comps.get(slug) or {}).get("scope") == "international" or slug in self.neutral
+
+    def window_tags(self, frame: str | None, w: str) -> tuple[str, str]:
+        """(club tag, by-date tag) of a window in a person's frame: the accumulator tags `views` reads."""
+        frame = frame or "calendar"
+        if w in ("season", "last"):
+            cur, prev = self.eras.get(frame, self.eras["calendar"])
+            era = cur if w == "season" else prev
+            return "E:" + era, ("S:" if frame == "split" else "C:") + era
+        return w, w
+
     def views(self, frames: dict[str, str]) -> dict[str, dict[str, dict[str, dict]]]:
         """window -> pid -> scope -> (vector, minutes by competition, latest team per competition)."""
         out: dict[str, dict[str, dict[str, dict]]] = {w: {} for w in WINDOWS}
         for pid, per in self.acc.items():
             frame = frames.get(pid) or "calendar"
-            cur, prev = self.eras.get(frame, self.eras["calendar"])
-            intl_tag = "S:" if frame == "split" else "C:"
             for w in WINDOWS:
-                if w in ("season", "last"):
-                    era = cur if w == "season" else prev
-                    club_tag, nat_tag = "E:" + era, intl_tag + era
-                else:
-                    club_tag = nat_tag = w
+                club_tag, nat_tag = self.window_tags(frame, w)
                 by_slug: dict[str, array] = {}
                 for (slug, tag), vec in per.items():
-                    scope = (self.comps.get(slug) or {}).get("scope")
-                    want = nat_tag if (scope == "international" or slug in self.neutral) else club_tag
+                    want = nat_tag if self._by_date(slug) else club_tag
                     if tag == want:
                         by_slug[slug] = vec
                 if by_slug:
                     out[w][pid] = {"tag": (club_tag, nat_tag), "slugs": by_slug}
         return out
+
+    def release(self) -> None:
+        """Drop the accumulators once `finish` has written the Lab; the window logic (`value_views`) stays."""
+        self.acc = {}
+        self.team = {}
+        self.meta = {}
+        self.names = {}
+        self.votes = {}
+        self.meta_pos = {}
+
+    def value_views(self, R: Any, row_gar: Any, era_of: Callable[[str, str], str | None],
+                    frames: dict[str, str]) -> dict[str, Any]:
+        """The value model's goals above replacement over exactly the matches of each Lab line.
+
+        R is the value model's player-match rows (value.Rows) and row_gar each row's GAR (its value less the
+        replacement level of the player's role for its minutes, so lines add up). Every row is tagged as `add_store`
+        tags a match (a club edition by its season, `era_of(slug, season key)`; a national-team or world-club match by
+        date in both frames; the last 12 months; the calendar year), aliases fold into the canonical id, and each
+        window keeps the tag of the person's frame, as `views` does. Returns {"windows": {window: {pid: {slug: [GAR,
+        minutes]}}}, "intl": [slugs counted as national-team football]}: a Lab row of one competition reads its slug,
+        a pooled row (all, club, intl) sums the slugs of its scope, so an international line carries the value of its
+        own international matches and never a club figure."""
+        import numpy as np
+
+        out: dict[str, dict[str, dict[str, list[float]]]] = {w: {} for w in WINDOWS}
+        n = int(getattr(R, "pid", np.zeros(0)).size)
+        intl = sorted(s for s, c in self.comps.items() if (c or {}).get("scope") == "international")
+        if not n or row_gar is None or len(row_gar) != n:
+            return {"windows": out, "intl": intl}
+        lo = datetime.fromisoformat(min(self.start["365"], self.start["ytd"])).toordinal() - 3 * 366
+        keep = np.flatnonzero(R.day >= lo)
+        if not keep.size:
+            return {"windows": out, "intl": intl}
+        # one tag set per (competition, season, day): the tagging is a property of the match, not the player
+        grp_keys = np.stack([R.comp[keep], R.sid[keep], R.day[keep]], axis=1)
+        uniq, inv = np.unique(grp_keys, axis=0, return_inverse=True)
+        inv = inv.reshape(-1)
+        tagsets: dict[tuple, int] = {}
+        grp_set = np.empty(len(uniq), dtype=np.int64)
+        for g, (ci, si, day) in enumerate(uniq.tolist()):
+            slug = R.comps[ci]
+            if slug not in self.comps:
+                grp_set[g] = -1
+                continue
+            d = date.fromordinal(int(day)).isoformat()
+            era = None if self._by_date(slug) else era_of(slug, R.sids[si])
+            ts = tuple(self._tags(slug, d, era))
+            grp_set[g] = tagsets.setdefault(ts, len(tagsets)) if ts else -1
+        sets = [None] * len(tagsets)
+        for ts, i in tagsets.items():
+            sets[i] = ts
+        row_set = grp_set[inv]
+        ok = row_set >= 0
+        if not ok.any():
+            return {"windows": out, "intl": intl}
+        rows = keep[ok]
+        # sum GAR and minutes per (player, competition, tag set)
+        k3 = np.stack([R.pid[rows], R.comp[rows], row_set[ok]], axis=1)
+        u3, i3 = np.unique(k3, axis=0, return_inverse=True)
+        i3 = i3.reshape(-1)
+        gar = np.bincount(i3, weights=np.asarray(row_gar, dtype=np.float64)[rows], minlength=len(u3))
+        mins = np.bincount(i3, weights=np.asarray(R.mins, dtype=np.float64)[rows], minlength=len(u3))
+        aliases = getattr(self, "aliases", {}) or {}
+        acc: dict[str, dict[tuple[str, str], list[float]]] = {}
+        for (pid, ci, si), g, m in zip(u3.tolist(), gar.tolist(), mins.tolist()):
+            p = str(pid)
+            p = aliases.get(p, p)
+            per = acc.setdefault(p, {})
+            slug = R.comps[ci]
+            for tag in sets[si]:
+                a = per.get((slug, tag))
+                if a is None:
+                    per[(slug, tag)] = [g, m]
+                else:
+                    a[0] += g
+                    a[1] += m
+        for pid, per in acc.items():
+            frame = frames.get(pid) or "calendar"
+            for w in WINDOWS:
+                club_tag, nat_tag = self.window_tags(frame, w)
+                got = {slug: [round(v[0], 4), round(v[1], 1)] for (slug, tag), v in per.items()
+                       if tag == (nat_tag if self._by_date(slug) else club_tag)}
+                if got:
+                    out[w][pid] = got
+        return {"windows": out, "intl": intl}
 
     def finish(self, data_dir: Path, frames: dict[str, str], people: dict[str, dict] | None = None,
                club_of: dict[str, dict | None] | None = None, clubs: dict[str, dict] | None = None,

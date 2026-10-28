@@ -322,6 +322,7 @@ def built_value(tmp_path_factory):
     ctx = VP.ValueContext(data_dir=data, comps=competitions(), pool=pool, people=people, club_of=club_of, clubs=clubs,
                           squads={}, archive={}, entries=[entry], today=datetime(2026, 12, 1, tzinfo=timezone.utc))
     summary = VP.build_value(ctx, R)
+    summary["_R"] = R
     return data, summary
 
 
@@ -344,6 +345,20 @@ def test_value_payloads_have_the_contracted_shapes(built_value) -> None:
     assert abs(p["proj"]) <= abs(p["gar90"]) + 1e-9
     assert p["gar"] == pytest.approx(p["gar90"] * p["min"] / 90, abs=0.02)
     assert {l["comp"] for l in lines} == {"premier-league"}
+
+
+def test_row_gar_adds_up_to_the_lines(built_value) -> None:
+    """Each player-match row's GAR (value less the role's replacement for its minutes; the Lab's windowed value,
+    PeopleLines.value_views) sums to the competition line's GAR in lines.json."""
+    data, summary = built_value
+    R, gar = summary["_R"], summary["_row_gar"]
+    assert len(gar) == len(R)
+    cur = R.sids.index(R.current["premier-league"])
+    lines = _rows(json.loads((data / "value" / "lines.json").read_text(encoding="utf-8")))
+    for ln in lines[:20]:
+        m = (R.pid == int(ln["id"])) & (R.sid == cur)
+        assert float(gar[m].sum()) == pytest.approx(ln["gar"], abs=0.006)
+        assert float(R.mins[m].sum()) == pytest.approx(ln["min"], abs=0.5)
 
 
 def test_sample_floors_are_honoured(built_value) -> None:

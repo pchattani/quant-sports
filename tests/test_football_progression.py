@@ -56,11 +56,17 @@ def test_apply_and_carry(tmp_path):
     assert fresh["progression"] == p["progression"] and (tmp_path / "progression_ref.json").exists()
 
 
-def test_international_rows_leave_gar_out():
+def test_international_rows_carry_their_own_gar():
+    """value_fields scores each Lab line over its own matches (28 Oct 2026), so the international row takes the intl
+    line's GAR/90, which differs from the club line's."""
     p = _person(1)
-    p["seasons"][0].update({"scope": "international", "comp": "world-cup"})
-    lab = {("1", "intl", "last"): {"player_id": "1", "minutes": 1800, "role": "ST", "gar90": 0.3, "npxg_xa_90": 0.5}}
+    p["seasons"].append({"comp": "world-cup", "sid": 3, "scope": "international", "era": "2025/26", "tid": 4705,
+                         "team": "Norway", "apps": 5, "min": 450, "g": 3, "a": 0, "xg": 2.0, "xa": 0.2, "sh": 12, "kp": 3, "rt": 7.4})
+    lab = {("1", "intl", "last"): {"player_id": "1", "minutes": 450, "role": "ST", "gar90": 0.31, "gar": 1.55, "npxg_xa_90": 0.5},
+           ("1", "club", "last"): {"player_id": "1", "minutes": 1980, "role": "ST", "gar90": 0.12, "gar": 2.64, "npxg_xa_90": 0.4}}
     rows, _ref, prog = FP.build({"1": p}, lab, ERAS)
-    r = {x["key"]: x for x in rows["1"]}["intl:2025/26"]
+    r = {x["key"]: x for x in rows["1"]}
     ko = prog["keys"]["out"]
-    assert r["kd"] == "out" and "gar90" not in ko and r["dv"][ko.index("npxg_xa_90")] == 0.5
+    nat, club = r["intl:2025/26"], r["club:2025/26"]
+    assert nat["kd"] == "out" and nat["dv"][ko.index("gar90")] == 0.31 and nat["dv"][ko.index("npxg_xa_90")] == 0.5
+    assert club["dv"][ko.index("gar90")] == 0.12
