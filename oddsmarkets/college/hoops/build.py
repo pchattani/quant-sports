@@ -1181,6 +1181,16 @@ def player_line(r: dict) -> dict:
     return {**pg, "value": r2(r["value"]), "value_pg": r2(r["value_pg"]), "r": r2(r["r"])}
 
 
+def qual_roles(rows: dict) -> tuple:
+    """A season's qualification floor and qualified players (games >= max(5, 0.4 x the most games) and 10+ minutes a
+    game) and the spec's guard / wing / big role of each player: (floor, qual, role_of, role_thr)."""
+    maxgp = max(r["gp"] for r in rows.values())
+    floor = {"gp": max(5, int(0.4 * maxgp)), "mpg": 10.0}
+    qual = {p for p, r in rows.items() if r["gp"] >= floor["gp"] and r["min"] / max(r["gp"], 1) >= floor["mpg"]}
+    role_of, role_thr = PL.classify_roles(rows, qual)
+    return floor, qual, role_of, role_thr
+
+
 def season_percentiles(ctx, s) -> dict | None:
     """A season's player percentiles as the catalogue places them, whether or not the season is an archive one (whose
     players.json leaves them out): {"rows", "lines", "floor", "qual", "role_of", "role_thr", "pcts", "pcts_pos",
@@ -1189,11 +1199,8 @@ def season_percentiles(ctx, s) -> dict | None:
     rows = pr["rows"]
     if not rows:
         return None
-    maxgp = max(r["gp"] for r in rows.values())
-    floor = {"gp": max(5, int(0.4 * maxgp)), "mpg": 10.0}
     lines = {p: player_line(r) for p, r in rows.items()}
-    qual = {p for p, r in rows.items() if r["gp"] >= floor["gp"] and r["min"] / max(r["gp"], 1) >= floor["mpg"]}
-    role_of, role_thr = PL.classify_roles(rows, qual)
+    floor, qual, role_of, role_thr = qual_roles(rows)
     pcts, pcts_pos, pcts_role = defaultdict(dict), defaultdict(dict), defaultdict(dict)
 
     def _rank(sub, k, lower, dest):
@@ -1381,15 +1388,18 @@ def lab_payloads(ctx, s, sdir: Path) -> int:
                                          "metrics": [_metric(*m) for m in TEAM_METRICS], "rows": rows})
     pr = player_rows(ctx, s)["rows"]
     if pr:
-        pf = ["id", "name", "team", "pos", "class", "gp"] + [m[0] for m in PLAYER_METRICS]
+        # role (G / W / B) and qualified: the spec's peer group and minimum, for the Lab's "Compare within: Position"
+        pf = ["id", "name", "team", "pos", "class", "gp"] + [m[0] for m in PLAYER_METRICS] + ["role", "qualified"]
         prow = []
+        _f, qual, role_of, _t = qual_roles(pr)
         old = archive(ctx, s)                         # archive seasons: qualified players only (size budget)
         gmax = max(r["gp"] for r in pr.values())
         for p, r in pr.items():
             if r["gp"] < 5 or (old and (r["gp"] < max(5, int(0.4 * gmax)) or r["min"] / max(r["gp"], 1) < 15.0)):
                 continue
             L = player_line(r)
-            prow.append([p, r["name"], r["team"], r["pos"], r.get("class"), r["gp"]] + [L.get(k) for k, *_ in PLAYER_METRICS])
+            prow.append([p, r["name"], r["team"], r["pos"], r.get("class"), r["gp"]] + [L.get(k) for k, *_ in PLAYER_METRICS] +
+                        [role_of.get(p), p in qual])
         n += write(sdir / "lab_players.json", {"ok": True, "season": s, "kind": "player", "fields": pf,
                                                "metrics": [_metric(*m) for m in PLAYER_METRICS], "rows": prow})
     else:

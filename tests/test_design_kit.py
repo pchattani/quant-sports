@@ -54,7 +54,21 @@ def test_labels_file_carries_display_names_headlines_and_our_models(tmp_path):
     cb = next(g for g in lab["groups"] if g["id"] == "cb")
     want = [m["id"] for m in sorted((m for m in next(g for g in spec["groups"] if g["id"] == "cb")["metrics"] if m["set"] == "headline"), key=lambda m: m["order"])]
     assert cb["headline"] == want and cb["headline"][0] == "gar90"
+    assert cb["field"] == "role" and cb["codes"] == ["CB"] and cb["min"]["value"] == 450
+    gk = next(g for g in lab["groups"] if g["id"] == "gk")
+    assert gk["min"] == {"field": "minutes", "value": 900, "unit": "minutes"}
     assert len((dst / "metrics" / "football.labels.json").read_bytes()) < 40_000
+
+
+def test_labels_carry_the_peer_groups_for_the_labs(tmp_path):
+    """The Labs' "Compare within: Position" reads each group's field, codes and minimum from the labels file:
+    baseball's starters and relievers are separate groups with separate floors."""
+    dst = design_kit.copy_kit(tmp_path / "bullpen")
+    lab = json.loads((dst / "metrics" / "baseball.labels.json").read_text(encoding="utf-8"))
+    g = {x["id"]: x for x in lab["groups"]}
+    assert g["sp"]["codes"] == ["SP"] and g["sp"]["min"]["value"] == 300
+    assert g["rp"]["codes"] == ["RP"] and g["rp"]["min"]["value"] == 120
+    assert "codes" not in g["teams"]
 
 
 def test_every_sport_registers_its_own_models():

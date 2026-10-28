@@ -474,3 +474,8 @@ tr.cut td, .qk-table tr.cut td { border-top: 2px dashed color-mix(in srgb, var(-
 .af-lab-ours .qk-ours { margin-left: 4px; }
 #cmp-view > .qk-explain-ours, .ta-pl-ours { margin-top: 12px; }
 .qkl-ld .qk-pbox { text-align: center; }  /* the league page boards (QKL.leaders): legacy .num right-aligns */
+/* the Lab's "Compare within" (QK.within) and "Most like" strip */
+.ta-lab-within:not(:empty) { padding: 12px 14px 4px; }
+.ta-lab-within .qk-select { height: 34px; }
+.ta-lab-sim { padding: 10px 14px 0; }
+.ta-lab-sim .pg-note { margin: 0; padding: 0; }

@@ -483,3 +483,7 @@ input[type=number],
 @media (max-width: 420px) { .ql-links a { padding: 10px 10px 12px; } .ql-links b { font-size: 1.25rem; } .ql-links b::after { content: none; } .ql-links span { font-size: 11px; } .ql-race { padding: 14px; } }
 /* the league page boards (QKL.leaders): legacy.css right-aligns every .num after the kit; the percentile box stays centred */
 .qkl-ld .qk-pbox { text-align: center; }
+/* the Lab's "Compare within" (QK.within) and its "Most like" strip */
+.bp-lab-within { padding-bottom: var(--sp-3); margin-bottom: var(--sp-3); border-bottom: 1px solid var(--line-2); }
+.bp-lab-sim { margin-top: var(--sp-3); }
+.bp-lab-sim .bp-note { margin: 0; }

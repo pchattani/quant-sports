@@ -452,3 +452,7 @@ td.gi-ours-cell { text-align: left; }
 @media (max-width: 1000px) { .ql-intro { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 720px) { .ql-week .qk-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } .ql-week .qk-stat-v { font-size: 2rem; } .ql-week .qk-stat:last-child:nth-child(odd) { grid-column: 1 / -1; } }
 @media (max-width: 420px) { .ql-links a { padding: 10px 10px 12px; } .ql-links b { font-size: 1.25rem; } .ql-links b::after { content: none; } .ql-links span { font-size: 11px; } .ql-race { padding: 14px; } }
+/* the Lab's "Compare within" bar and "Most like" strip */
+.gi-lab-wn { align-items: center; margin-bottom: var(--sp-3); }
+.gi-lab-sim { margin-top: var(--sp-3); }
+.gi-lab-sim .gi-cap { margin: 0; }

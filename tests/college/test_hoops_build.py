@@ -105,6 +105,22 @@ def test_season_files(built):
     assert set(bx["names"]) <= {str(r[0]) for r in bx["players"]} | {str(x[0]) for x in bx["dnp"]}
 
 
+def test_lab_rows_carry_role_and_qualified(built):
+    """The Lab's "Compare within: Position" (guards / wings / bigs, the spec's peer groups): lab_players.json rows carry
+    the role and the qualified flag players.json has."""
+    out, _res = built
+    d = out / "mbb" / "2026"
+    lab = load(d / "lab_players.json")
+    cat = load(d / "players.json")["players"]
+    f = lab["fields"]
+    assert f[-2:] == ["role", "qualified"]
+    ir, iq, ii = f.index("role"), f.index("qualified"), f.index("id")
+    assert lab["rows"] and all(r[ir] in ("G", "W", "B", None) for r in lab["rows"])
+    hit = [r for r in lab["rows"] if str(r[ii]) in cat]
+    assert hit and all(r[ir] == cat[str(r[ii])]["role"] and r[iq] == cat[str(r[ii])]["qualified"] for r in hit)
+    assert {r[ir] for r in lab["rows"] if r[iq]} >= {"G", "B"}
+
+
 def test_current_preseason(built):
     out, res = built
     d = out / "mbb" / "2027"

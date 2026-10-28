@@ -1,13 +1,18 @@
 /* The Quant Footballer — Lab (#/lab) and Compare (#/compare).
  *
- *   #/lab[/<all|club|intl|comp>/<F|M|D|G|O>][?w=season|last|365|ytd&x=&y=&size=&color=&min=&preset=&shrink=0&adj=0&q=]
+ *   #/lab[/<all|club|intl|comp>/<F|M|D|G|O>][?w=season|last|365|ytd&x=&y=&size=&color=&min=&preset=&shrink=0&adj=0&q=
+ *        &within=pos&pos=GK|CB|FB|DM-CM|AM-W|ST]
  *        the player lab: any two metrics against each other for one position group, one dot per player over every
  *        competition, club football, national-team football or one competition, this season, last season or a
  *        calendar window; presets, size and colour encodings, medians, labelled extremes, a highlight search and the
  *        group ranked on the view (data/lab/<window>/<scope>.json, UNIFIED_PAYLOADS 14). Our model metrics (GAR/90 and
  *        GAR from the player value model, value_fields.py) lead every picker as "Our models", then the metrics spec's
  *        headline set for the position, then the box score by group; names and explanations come from the spec
- *        (QK.spec, assets/qk/metrics/football.labels.json) and our metrics carry the cobalt "Our model" tag
+ *        (QK.spec, assets/qk/metrics/football.labels.json) and our metrics carry the cobalt "Our model" tag.
+ *        "Compare within" (QK.within): Broad (the default) is the position letters, goalkeepers or outfield players by
+ *        line; Position is the spec's formation-role peer groups (GK, CB, FB/WB, DM/CM, AM/W, ST, on the rows' `role`),
+ *        and the scatter, ranks, percentiles, medians, metric order, minimum (the spec's floor: 450 minutes, goalkeepers
+ *        900) and the "Most like" suggestions all follow the group
  *   #/compare/players/<a>/<b>[?p3=<c>&view=classic&scope=]
  *        two or three players side by side (kit v4: two draw the tale of the tape, three the table): QK.compareView on the one metric set the player card
  *        uses (FB.PLAYER_SETS, players.js), percentiles against the shared position group, and where each one sits in
@@ -62,6 +67,32 @@ var OURS = [
 var NO_SHRINK = { gar: 1 };
 /* The spec's headline metrics for the lab's position letters (its groups are formation roles). */
 var POS_GROUPS = { F: ['st', 'am_w'], M: ['dm_cm', 'am_w'], D: ['cb', 'fb'], G: ['gk'], O: ['cb', 'fb', 'dm_cm', 'am_w', 'st'] };
+/* "Compare within: Position": the spec's formation-role peer groups (football.json groups; display, codes and minimum
+   from the labels file when it has them): [address code, spec group, display, role codes, letter, minimum minutes]. */
+var ROLES = [['GK', 'gk', 'Goalkeepers', ['GK'], 'G', 900], ['CB', 'cb', 'Centre-backs', ['CB'], 'D', 450], ['FB', 'fb', 'Full-backs and wing-backs', ['FB'], 'D', 450],
+  ['DM-CM', 'dm_cm', 'Defensive and central midfielders', ['DM', 'CM'], 'M', 450], ['AM-W', 'am_w', 'Attacking midfielders and wingers', ['AM', 'W'], 'F', 450], ['ST', 'st', 'Strikers', ['ST'], 'F', 450]];
+var ROLE_CODES = ROLES.map(function (g) { return g[0]; });
+var LETTER_ROLE = { G: 'GK', D: 'CB', M: 'DM-CM', F: 'ST', O: 'CB' };
+var ROLE_PRESETS = {
+  GK: PRESETS.G,
+  CB: PRESETS.D.filter(function (p) { return p[0] !== 'crosses_90'; }),
+  FB: [['crosses_90', 'xa_90', 'Attacking full-backs: crossing against chance creation'], ['padj_tkl_int_90', 'gar90', 'Value added against defending'], ['prog_actions_90', 'opp_half_passes_90', 'Progression: carrying against passing'],
+    ['npxg_xa_90', 'padj_tkl_int_90', 'Two-way full-backs: attacking output against defending'], ['padj_tkl_int_90', 'duel_pct', 'Defending: activity against success'], ['key_passes_90', 'crosses_90', 'Creation: key passes against crosses']],
+  'DM-CM': PRESETS.M,
+  'AM-W': [['npxg_xa_90', 'gar90', 'Value added against attacking output'], ['npxg_90', 'xa_90', 'Threat: scoring against creating'], ['dribbles_90', 'dribble_pct', 'Dribbling: volume against success'],
+    ['shot_creation_90', 'xa_per_kp', 'Creation volume against chance quality'], ['xa_90', 'key_passes_90', 'Creation: quality against volume'], ['npxg_xa_90', 'def_actions_90', 'Output against work off the ball']],
+  ST: PRESETS.F
+};
+function byPos() { return S && S.within === 'pos'; }
+/* the current role group: { code, id, name, codes, letter, min } (the spec's display, codes and minimum when loaded) */
+function roleGroup(code) {
+  var r = ROLES.filter(function (g) { return g[0] === code; })[0] || ROLES[1];
+  var sg = SPEC && SPEC.group ? SPEC.group(r[1]) : null;
+  return { code: r[0], id: r[1], name: (sg && sg.display) || r[2], codes: (sg && sg.codes && sg.codes.length) ? sg.codes : r[3], letter: r[4],
+    min: sg && sg.min && isNum(sg.min.value) ? sg.min.value : r[5] };
+}
+function groupNoun() { return byPos() ? roleGroup(S.role).name.toLowerCase() : POS[S.pos].toLowerCase(); }
+function curPresets() { return byPos() ? ROLE_PRESETS[S.role] : PRESETS[S.pos]; }
 var SPEC = null;
 function specLoad() {
   if (SPEC || !QK.spec || !QK.spec.load) return Promise.resolve(SPEC);
@@ -85,7 +116,7 @@ function oursOf(key) {
 function oursTag(key) { var o = oursOf(key); return o ? QK.ours({ model: o.name, about: o.about }) : ''; }
 function headlineFor(pos) {
   var out = {}, n = 0;
-  (POS_GROUPS[pos] || []).forEach(function (g) { (SPEC ? SPEC.headline(g) : []).forEach(function (k) { if (out[k] === undefined) out[k] = n++; }); });
+  (byPos() ? [roleGroup(S.role).id] : (POS_GROUPS[pos] || [])).forEach(function (g) { (SPEC ? SPEC.headline(g) : []).forEach(function (k) { if (out[k] === undefined) out[k] = n++; }); });
   return out;
 }
 FB.labOurs = { oursOf: oursOf, tag: oursTag, label: specLabel, tip: specTip, explain: specExplain, load: specLoad, metrics: OURS };
@@ -148,29 +179,35 @@ function lower(key) { return !!(LAB.meta[key] || {}).lower; }
 function fmtK(key, v) { return FB.fmtMetric(v, (LAB.meta[key] || {}).fmt || '2'); }
 /* The default minimum: the view's floor (30% of what its regulars have played), at most 450 when it mixes competitions
    whose seasons are at different points (a European 2026/27 weeks old beside a Brazilian 2026 near its end). */
-function defMin() { var f = LAB.floor || 90; return Math.max(90, single() ? f : Math.min(f, 450)); }
+function defMin() {
+  var f = LAB.floor || 90, m = Math.max(90, single() ? f : Math.min(f, 450));
+  return byPos() ? Math.max(m, roleGroup(S.role).min) : m;
+}
+function inGroup(r) {
+  var I = LAB.idx;
+  if (byPos()) return I.role !== undefined && roleGroup(S.role).codes.indexOf(r[I.role]) >= 0;
+  var p = r[I.position];
+  return S.pos === 'O' ? !(p === 'G' || !p) : p === S.pos;
+}
 function pool() {
   var I = LAB.idx;
-  return LAB.rows.filter(function (r) {
-    var p = r[I.position];
-    if (S.pos === 'O' ? (p === 'G' || !p) : p !== S.pos) return false;
-    return (r[I.minutes] || 0) >= S.min;
-  });
+  return LAB.rows.filter(function (r) { return inGroup(r) && (r[I.minutes] || 0) >= S.min; });
 }
+function isGkView() { return byPos() ? S.role === 'GK' : S.pos === 'G'; }
 /* The position's presets that this view can draw (an older payload without GAR drops the value presets). */
 function presets() {
-  return PRESETS[S.pos].filter(function (pp) { return !LAB || (LAB.idx[pp[0]] !== undefined && LAB.idx[pp[1]] !== undefined); });
+  return curPresets().filter(function (pp) { return !LAB || (LAB.idx[pp[0]] !== undefined && LAB.idx[pp[1]] !== undefined); });
 }
 function applyPreset() {
   if (S.preset < 0) return;
   var ps = presets();
-  var p = ps[S.preset] || ps[0] || PRESETS[S.pos][0];
+  var p = ps[S.preset] || ps[0] || curPresets()[0];
   S.x = p[0]; S.y = p[1];
 }
 function metricOpts(scope) {
   var groups = {}, order = [], head = headlineFor(S.pos), heads = [];
   LAB.metrics.forEach(function (m) {
-    if (S.pos === 'G' ? m.scope === 'out' : m.scope === 'gk') return;
+    if (isGkView() ? m.scope === 'out' : m.scope === 'gk') return;
     if (!m.ours && head[m.key] !== undefined) { heads.push(m); return; }
     var g = m.ours ? 'Our models' : 'Box score · ' + m.group;
     if (!groups[g]) { groups[g] = []; order.push(g); }
@@ -203,25 +240,30 @@ function stateFromRoute(p) {
     min: isNum(q.min) ? Number(q.min) : null, adj: q.adj !== '0', shrink: q.shrink !== '0', preset: isNum(q.preset) ? Number(q.preset) : 0,
     x: q.x || '', y: q.y || '', size: q.size === 'none' ? '' : (q.size || 'minutes'), color: q.color === undefined ? null : (q.color === 'none' ? '' : q.color), q: q.q || '' };
   if (st.x && st.y && q.preset === undefined) st.preset = -1;
+  var w = QK.within.read(q, ROLE_CODES);
+  st.within = w.within;
+  st.role = ROLE_CODES.indexOf(q.pos) >= 0 ? q.pos : LETTER_ROLE[st.pos];
   return st;
 }
 function writeHash() {
   var q = { w: S.win === 'season' ? null : S.win, min: S.min === defMin() ? null : S.min, preset: S.preset >= 0 ? (S.preset ? S.preset : null) : null,
     x: S.preset < 0 ? S.x : null, y: S.preset < 0 ? S.y : null, size: S.size === 'minutes' ? null : (S.size || 'none'), color: S.color === S.defColor ? null : (S.color || 'none'),
     shrink: S.shrink ? null : '0', adj: S.adj ? null : '0', q: S.q || null };
+  var wq = QK.within.query({ within: S.within, pos: S.role });
+  q.within = wq.within; q.pos = wq.pos;
   FB.setHashQuiet('#/lab/' + (S.scope || 'all') + '/' + S.pos + FB.qs(q));
 }
 
 FB.route('lab', function (el, p) {
   S = stateFromRoute(p);
-  el.innerHTML = FB.pageHead('Lab', 'Player lab', 'Chart any two player metrics for one position group. Every player is one dot: matches in the season or window, across every competition, club football only, national-team football only, or one competition. Presets pick the pairs that separate styles of player; medians split the chart into quadrants.') +
+  el.innerHTML = FB.pageHead('Lab', 'Player lab', 'Chart any two player metrics for one position group: broad (goalkeepers, or outfield players by line) or a formation role (centre-backs, full-backs, strikers ...). Every player is one dot: matches in the season or window, across every competition, club football only, national-team football only, or one competition. Presets pick the pairs that separate styles of player; medians split the chart into quadrants.') +
     subnav('lab') +
     '<section class="qk-card fb-lb-ctl"><div class="qk-card-body" id="lb-ctl">' + FB.loading('lines', 3) + '</div></section>' +
     '<div id="lb-cover"></div>' +
-    FB.card('<span id="lb-title">The chart</span>', '<span id="lb-sub"></span>', FB.chartBox('lb-chart', 640, 'Player lab scatter') + '<p class="fb-cap" id="lb-note"></p>', { id: 'lb-chart-card' }) +
+    FB.card('<span id="lb-title">The chart</span>', '<span id="lb-sub"></span>', FB.chartBox('lb-chart', 640, 'Player lab scatter') + '<div id="lb-sim" class="fb-lb-sim"></div><p class="fb-cap" id="lb-note"></p>', { id: 'lb-chart-card' }) +
     '<div id="lb-ours" class="fb-mt"></div>' +
     QK.explain('<b>What’s that number?</b> Every dot is one player, and the top-right corner is better than the middle of the group on both axes. <b>Shrink small samples</b> pulls a player with few minutes towards the group’s middle, so a hot few hundred minutes does not top the chart; <b>league-adjust</b> multiplies attacking rates by the scoring factor of the leagues they came from.', { cls: 'fb-mt' }) +
-    FB.card('Ranked on this view', 'The group ranked by the sum of standard scores on both axes (better direction); percentiles within the group shown. Top 60. A standard score is how many spreads above the group’s average a number sits: +1 is better than about five in six.', '<div id="lb-table"></div>', { flush: true, cls: 'fb-mt' });
+    FB.card('Ranked on this view', 'The group ranked by the sum of standard scores on both axes (better direction); percentiles within the group (Broad or Position, as chosen above) shown. Top 60. A standard score is how many spreads above the group’s average a number sits: +1 is better than about five in six.', '<div id="lb-table"></div>', { flush: true, cls: 'fb-mt' });
   return show(el, true);
 });
 
@@ -243,10 +285,12 @@ function show(el, first) {
 }
 
 function controls(el) {
-  var html = FB.toolbar([
+  var rg = byPos() ? roleGroup(S.role) : null;
+  var html = QK.within.html({ within: S.within, pos: S.role }, { id: 'lb-wn', cls: 'fb-lb-within', groups: ROLES.map(function (g) { return [g[0], roleGroup(g[0]).name]; }),
+    note: rg ? 'Formation role (the one started in most) · minimum ' + FB.int(rg.min) + ' minutes (the metrics spec)' : 'Goalkeepers, or outfield players by line' }) + FB.toolbar([
     FB.field('Season', FB.select('lb-win', winOpts(), S.win, 'Season or window')),
     FB.field('Competitions', FB.select('lb-comp', FB.labScopeOptions(IX, S.win), S.scope, 'Which competitions count', 'fb-pl-wide')),
-    FB.field('Position', FB.select('lb-pos', Object.keys(POS).map(function (k) { return [k, POS[k]]; }), S.pos, 'Position')),
+    byPos() ? '' : FB.field('Position', FB.select('lb-pos', Object.keys(POS).map(function (k) { return [k, POS[k]]; }), S.pos, 'Position')),
     FB.field('Chart', FB.select('lb-preset', presets().map(function (pp, i) { return [String(i), pp[2]]; }).concat([['-1', 'Custom axes']]), String(S.preset), 'Preset')),
     FB.field('Min. minutes', '<span class="fb-lb-range"><input type="range" id="lb-min" min="90" max="2000" step="30" value="' + S.min + '" aria-label="Minimum minutes"><b class="fb-num" id="lb-min-v">' + S.min + '\'</b></span>')
   ]) + FB.toolbar([
@@ -267,7 +311,15 @@ function controls(el) {
     if (!single() && S.color === 'rating') S.color = 'comp';
     show(el, false);
   };
-  $('lb-pos').onchange = function (e) { S.pos = e.target.value; S.preset = 0; applyPreset(); controls(el); draw(el); };
+  if ($('lb-pos')) $('lb-pos').onchange = function (e) { S.pos = e.target.value; S.preset = 0; applyPreset(); controls(el); draw(el); };
+  QK.within.wire(el, { within: S.within, pos: S.role }, function (w) {
+    /* Broad -> Position: the last role if it is on this line, else the line's main role; the path letter follows the
+       role, so going back to Broad lands on the role's line */
+    if (w.within === 'pos' && S.within !== 'pos' && roleGroup(S.role).letter !== S.pos) w.pos = LETTER_ROLE[S.pos];
+    S.within = w.within; S.role = w.pos;
+    if (S.within === 'pos') S.pos = roleGroup(S.role).letter;
+    S.preset = 0; applyPreset(); S.min = defMin(); controls(el); draw(el);
+  }, { id: 'lb-wn' });
   $('lb-preset').onchange = function (e) { S.preset = parseInt(e.target.value, 10); applyPreset(); controls(el); draw(el); };
   $('lb-x').onchange = function (e) { S.x = e.target.value; S.preset = -1; controls(el); draw(el); };
   $('lb-y').onchange = function (e) { S.y = e.target.value; S.preset = -1; controls(el); draw(el); };
@@ -312,7 +364,7 @@ function draw(el) {
   var W = LAB.window;
   FB.set('lb-title', esc(label(S.y)) + oursTag(S.y) + ' against ' + esc(label(S.x)) + oursTag(S.x));
   FB.set('lb-ours', oursNote());
-  FB.set('lb-sub', FB.int(rows.length) + ' ' + POS[S.pos].toLowerCase() + ' · ' + esc(single() ? scopeName : scopeName.toLowerCase()) + ' · ' + esc(FB.labWindowText(W)) + ' · ' + S.min + '+ minutes · one dot per player');
+  FB.set('lb-sub', FB.int(rows.length) + ' ' + esc(groupNoun()) + ' · ' + esc(single() ? scopeName : scopeName.toLowerCase()) + ' · ' + esc(FB.labWindowText(W)) + ' · ' + S.min + '+ minutes · one dot per player');
   if (W && W.start) {
     var present = {};
     rows.forEach(function (r) { present[r[I.comp]] = 1; });
@@ -325,8 +377,8 @@ function draw(el) {
   var box = el.querySelector('#lb-chart');
   if (rows.length < 3) {
     if (box.__qkc) { try { box.__qkc.chart.dispose(); } catch (e) { /* gone */ } box.__qkc = null; }
-    box.innerHTML = FB.empty('Too few players', 'Lower the minutes or widen the competitions.');
-    FB.set('lb-table', ''); FB.set('lb-note', '');
+    box.innerHTML = FB.empty('Too few players', 'Lower the minutes or widen the competitions' + (byPos() ? ', or compare within the broad group.' : '.'));
+    FB.set('lb-table', ''); FB.set('lb-note', ''); FB.set('lb-sim', '');
     return;
   }
   var xs = rows.map(function (r) { return val(r, S.x); }), ys = rows.map(function (r) { return val(r, S.y); });
@@ -405,15 +457,17 @@ function draw(el) {
     return opt;
   }, { label: 'Player lab: ' + label(S.y) + ' against ' + label(S.x) });
 
-  FB.set('lb-note', 'One dot per player: minutes and rates over ' + esc(single() ? scopeName : scopeName.toLowerCase()) + ' in the view, however many competitions that spans. Dotted lines are the medians of this group. ' + (lower(S.x) || lower(S.y) ? 'Axes where less is better are reversed, so better is always up and to the right. ' : 'Better is up and to the right. ') +
+  FB.set('lb-note', 'One dot per player: minutes and rates over ' + esc(single() ? scopeName : scopeName.toLowerCase()) + ' in the view, however many competitions that spans. Dotted lines are the medians of this group (' + esc(groupNoun()) + '). ' + (lower(S.x) || lower(S.y) ? 'Axes where less is better are reversed, so better is always up and to the right. ' : 'Better is up and to the right. ') +
     'Labelled: the twelve players furthest into that corner (sum of standard scores on both axes)' + (hits.length ? ', and your search (blue rings)' : '') + '. Click a dot to open the player.' +
     (adjOn() ? ' Attacking rates marked "adj." are multiplied by the scoring factor from the pooled model: the minutes-weighted blend of the player\'s competitions.' : '') +
     (S.shrink ? ' Rates marked "shrunk" are pulled towards the group median by ' + SHRINK_K + ' minutes of prior, so a player five matches in is not ranked on five matches alone; the tooltip shows the raw figures.' : '') +
     ' <a href="#/model/glossary/shrinkage">Glossary →</a>');
 
+  FB.set('lb-sim', simStrip(base0, hits, personQ));
   var trows = ranked.slice(0, 60).map(function (o, i) {
     var r = o.r, vx = val(r, S.x), vy = val(r, S.y);
     return { i: i + 1, name: r[I.name], pid: r[I.player_id], comp: r[I.comp], team: r[I.team], tid: r[I.tid], mix: compLabel(r), age: r[I.age], min: r[I.minutes], vx: vx, px: pxOf(vx), vy: vy, py: pyOf(vy), z: o.z, href: href(r),
+      role: I.role !== undefined ? (r[I.role] || '') : '',
       g90: I.gar90 !== undefined ? r[I.gar90] : null };
   });
   var garCol = I.gar90 !== undefined && S.x !== 'gar90' && S.y !== 'gar90';
@@ -423,6 +477,7 @@ function draw(el) {
     { key: 'name', label: 'Player', sticky: true, fmt: function (v, r) { return '<a class="fb-link" href="' + esc(r.href) + '">' + esc(v) + '</a>'; } },
     { key: 'team', label: S.scope === 'intl' ? 'National team' : 'Club', fmt: function (v, r) { return r.tid && FB.clubRow(r.tid) ? FB.clubLink(r.tid, v || FB.clubName(r.tid)) : esc(v || ''); } },
     { key: 'mix', label: 'Competitions (minutes)', fmt: function (v) { return '<span class="qk-muted fb-lb-mix">' + esc(v) + '</span>'; } },
+    { key: 'role', label: 'Role', tip: 'Formation role: the one started in most (DF, MF or FW: substitute appearances only)' },
     { key: 'age', label: 'Age', num: true },
     { key: 'min', label: 'Min', num: true },
     { key: 'vx', label: (LAB.meta[S.x] || {}).label || S.x, num: true, pctl: 'px', ours: oc(S.x), tip: specTip(S.x, (LAB.meta[S.x] || {}).desc || '') || undefined, fmt: function (v) { return fmtK(S.x, v); } },
@@ -430,6 +485,24 @@ function draw(el) {
   ].concat(garCol ? [{ key: 'g90', label: 'GAR/90', num: true, ours: oc('gar90'), tip: specTip('gar90', OURS[0].tip), fmt: function (v) { return isNum(v) ? FB.signed(v, 2) : '—'; } }] : []).concat([
     { key: 'z', label: 'Combined', num: true, tip: 'Sum of standard scores on both axes, better direction', fmt: function (v) { return '<b>' + num(v, 2) + '</b>'; } }
   ]), trows, { maxHeight: 620, caption: 'Players ranked on this view' });
+}
+
+/* "Most like": the five players nearest the highlighted one within the group on screen (Broad or Position), on standard
+   scores of the group's headline metrics (QK.within.similar), each a link to Compare. */
+function simStrip(rows, hits, personQ) {
+  var I = LAB.idx;
+  if (!hits.length) return '<p class="fb-cap fb-lb-simhint">Highlight a player to list the five most like them among the ' + esc(groupNoun()) + ' on this chart.</p>';
+  var t = hits[0];
+  if (rows.indexOf(t) < 0) return '<p class="fb-cap fb-lb-simhint">' + esc(t[I.name]) + ' is under the minimum for this chart, so has no look-alikes here.</p>';
+  var head = headlineFor(S.pos);
+  var keys = Object.keys(head).filter(function (k) { return I[k] !== undefined; }).sort(function (a, b) { return head[a] - head[b]; });
+  var near = QK.within.similar(rows, t, keys, function (r, k) { return rawV(r, k); }, 5);
+  var tid = String(t[I.player_id]);
+  return QK.within.simHtml('Most like ' + t[I.name] + ' · ' + groupNoun(), near.map(function (o) {
+    var r = o.row;
+    return { name: r[I.name], href: '#/compare/players/' + tid + '/' + r[I.player_id] + (personQ && personQ.c ? '?scope=' + encodeURIComponent(personQ.c) : (personQ && personQ.scope ? '?scope=' + personQ.scope : '')),
+      sub: [r[I.team] || '', I.role !== undefined ? r[I.role] : '', FB.int(r[I.minutes]) + ' min'].filter(Boolean).join(' · ') + ' · compare' };
+  }));
 }
 
 // ══════════════════════════════════════════════════════════════════════ compare

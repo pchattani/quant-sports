@@ -25,6 +25,7 @@ const POS = ['C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF', 'DH', 'SP', 'RP'];
 const ORDER = ['C', 'SS', 'CF', '2B', '3B', 'RF', 'LF', '1B', 'DH', 'SP', 'RP'];
 const GRADE_CLS = { A: 'vg-a', B: 'vg-b', C: 'vg-c', D: 'vg-d', F: 'vg-f' };
 const CUR = { mlb: 'Bullpen WAR', aaa: 'Bullpen WAR', npb: 'WAR-lite' };
+/* V.kind: 'H' hitters, 'SP' starters, 'RP' relievers (pitchers by role: never one pooled board) */
 const V = { kind: 'H', lg: '', team: '', pos: '', min: null, q: '', L: '', S: null };
 
 function Lof(params) { const l = (params && params.level) || BP.state.level || 'mlb'; return ['mlb', 'aaa', 'npb'].indexOf(l) >= 0 ? l : 'mlb'; }
@@ -58,7 +59,11 @@ function valuePage(el, params) {
     (d.fields || []).forEach((f, i) => { F[f] = i; });
     const rows = d.rows || [];
     const fl = d.floors || { H: 100, P: 80 };
-    if (V.min === null) V.min = fl[V.kind] || 100;
+    const PIT = () => V.kind === 'SP' || V.kind === 'RP';
+    const rk = r => (r[F.kind] === 'P' ? (r[F.pos] === 'RP' ? 'RP' : 'SP') : 'H');      // the row's board
+    const flOf = kd => fl[kd] || (kd === 'H' ? fl.H : fl.P) || 100;                    // older payloads: the pooled P floor
+    if (V.kind === 'P') V.kind = 'SP';
+    if (V.min === null) V.min = flOf(V.kind);
     const teams = Array.from(new Set(rows.map(r => r[F.team]).filter(Boolean))).sort((a, b) => BP.teamAbbr(a).localeCompare(BP.teamAbbr(b)));
     const lgOf = t => (BP.teamInfo(t) || {}).league || '';
     const leagues = Array.from(new Set(teams.map(lgOf).filter(Boolean))).sort();
@@ -67,7 +72,7 @@ function valuePage(el, params) {
     const tile = (lab, r, key, sub, signal) => (r ? { label: lab, value: BP.playerSurname(r[F.pid]) + ' ' + s1(r[F[key]]), signal: !!signal, sub: sub + ' · ' + BP.teamAbbr(r[F.team]), href: phref(L, r[F.pid], S, r[F.kind]) } : null);
     let h = head + '<div class="bp-kpis">' + QK.stats([tile('Most valuable hitter', th, 'war', 'WAR this season', true), tile('Most valuable pitcher', tp, 'war', 'WAR this season'),
       t5 ? tile('Most value over five seasons', t5, 'v5', 'expected WAR, discounted') : null, tn ? tile('Best projected hitter', tn, 'proj', 'next season') : null]) + '</div>' +
-      '<section class="qk-card"><div class="qk-card-body"><div class="bp-ctl">' + U.seg('val-kind', 'Kind', [['H', 'Hitters'], ['P', 'Pitchers']], V.kind) +
+      '<section class="qk-card"><div class="qk-card-body"><div class="bp-ctl">' + U.seg('val-kind', 'Kind', [['H', 'Hitters'], ['SP', 'Starters'], ['RP', 'Relievers']], V.kind) +
       (leagues.length > 1 ? '<label>League<select id="val-lg"><option value="">All</option>' + leagues.map(g => '<option value="' + esc(g) + '"' + (g === V.lg ? ' selected' : '') + '>' + esc(g) + '</option>').join('') + '</select></label>' : '') +
       '<label>Club<select id="val-team"><option value="">All</option>' + teams.map(t => '<option value="' + esc(t) + '"' + (t === V.team ? ' selected' : '') + '>' + esc(BP.teamAbbr(t) + ' · ' + BP.teamShort(t)) + '</option>').join('') + '</select></label>' +
       '<label>Position<select id="val-pos"><option value="">All</option></select></label>' +
@@ -78,25 +83,25 @@ function valuePage(el, params) {
     h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'By position', title: 'The best at each position', sub: 'Players whose primary position it is (most games there; pitchers by role), at least half the leaderboard floor; the percentile is within the position.' }) + '<div class="qk-grid" id="val-best"></div></section>';
     el.innerHTML = h;
     const $ = id => document.getElementById(id);
-    const posOpts = () => { $('val-pos').innerHTML = '<option value="">All</option>' + POS.filter(p => (V.kind === 'P') === (p === 'SP' || p === 'RP')).map(p => '<option value="' + p + '"' + (p === V.pos ? ' selected' : '') + '>' + p + '</option>').join(''); };
+    const posOpts = () => { $('val-pos').innerHTML = '<option value="">All</option>' + POS.filter(p => !PIT() && p !== 'SP' && p !== 'RP').map(p => '<option value="' + p + '"' + (p === V.pos ? ' selected' : '') + '>' + p + '</option>').join(''); };
     const draw = () => {
       posOpts();
-      $('val-min').value = V.min; $('val-min-v').textContent = V.min; $('val-min-u').textContent = V.kind === 'P' ? 'BF' : 'PA';
+      $('val-min').value = V.min; $('val-min-v').textContent = V.min; $('val-min-u').textContent = PIT() ? 'BF' : 'PA'; $('val-pos').parentNode.style.display = PIT() ? 'none' : '';
       const q = V.q.trim().toLowerCase();
-      const sel = rows.filter(r => r[F.kind] === V.kind && (r[F.n] || 0) >= V.min && (!V.team || r[F.team] === V.team) && (!V.lg || lgOf(r[F.team]) === V.lg) &&
+      const sel = rows.filter(r => rk(r) === V.kind && (r[F.n] || 0) >= V.min && (!V.team || r[F.team] === V.team) && (!V.lg || lgOf(r[F.team]) === V.lg) &&
         (!V.pos || r[F.pos] === V.pos || (r[F.elig] || []).indexOf(V.pos) >= 0) && (!q || String(r[F.name] || '').toLowerCase().indexOf(q) >= 0))
         .sort((a, b) => (b[F.war] || 0) - (a[F.war] || 0));
       const pj = d.projection || {};
       const vtxt = ['H', 'P'].map(k => { const v = (pj[k] || {}).validation; if (!v) return ''; const r = v.rmse || {};
         return (k === 'H' ? 'Hitters' : 'Pitchers') + ': out-of-sample RMSE ' + BP.num(r.projection, 2) + ' against ' + BP.num(r.last_season, 2) + ' for last season\'s rate and ' + BP.num(r.league_rate, 2) + ' for the league rate (' + esc(v.unit) + ', ' + (v.targets || []).length + ' target seasons, players with ' + v.min_n + '+).'; }).filter(Boolean).join(' ');
-      $('val-card').innerHTML = U.card2('The leaderboard', sel.length + (V.kind === 'P' ? ' pitchers' : ' hitters') + ' · ' + esc((d.units || {})[V.kind] || '') + ' · the cell colour is the WAR percentile among qualified players of the same kind', '<div id="val-table"></div>',
-        { flush: true, foot: '<span>' + esc((d.notes || []).join(' ')) + (vtxt ? ' Projection check: ' + vtxt : '') + ' Floors: ' + fl.H + ' PA, ' + fl.P + ' BF.</span>' });
+      $('val-card').innerHTML = U.card2('The leaderboard', sel.length + (V.kind === 'SP' ? ' starting pitchers' : V.kind === 'RP' ? ' relief pitchers' : ' hitters') + ' · ' + esc((d.units || {})[PIT() ? 'P' : 'H'] || '') + ' · the cell colour is the WAR percentile among qualified ' + (PIT() ? (V.kind === 'SP' ? 'starters' : 'relievers') + ' (starters and relievers are ranked apart)' : 'hitters') + '', '<div id="val-table"></div>',
+        { flush: true, foot: '<span>' + esc((d.notes || []).join(' ')) + (vtxt ? ' Projection check: ' + vtxt : '') + ' Floors: ' + fl.H + ' PA, ' + (fl.SP ? 'starters ' + fl.SP + ' BF, relievers ' + fl.RP + ' BF' : fl.P + ' BF') + '.</span>' });
       if (!sel.length) $('val-table').innerHTML = QK.empty('Nobody here', 'Lower the floor or widen the filters.');
       else QK.leaderboard($('val-table'), { dense: true, rank: true, maxHeight: 640, rowHref: o => o.href, columns: [
-        { key: 'name', label: V.kind === 'P' ? 'Pitcher' : 'Hitter', type: 'entity', sub: 'sub', mark: o => (o.team ? U.team(o.team, L, S) : null), href: o => o.href },
-        { key: 'n', label: V.kind === 'P' ? 'BF' : 'PA', num: true, fmt: v => BP.int(v) },
-        { key: 'war', label: 'WAR', type: 'pctl', pctl: 'pct', fmt: v => s1(v), tip: 'WAR this season; the colour is the percentile among qualified players of the same kind' },
-        { key: 'rate', label: V.kind === 'P' ? '/700 BF' : '/600 PA', num: true, fmt: v => (isNum(v) ? BP.signed(v, 2) : '—'), tip: 'WAR rate' },
+        { key: 'name', label: PIT() ? 'Pitcher' : 'Hitter', type: 'entity', sub: 'sub', mark: o => (o.team ? U.team(o.team, L, S) : null), href: o => o.href },
+        { key: 'n', label: PIT() ? 'BF' : 'PA', num: true, fmt: v => BP.int(v) },
+        { key: 'war', label: 'WAR', type: 'pctl', pctl: 'pct', fmt: v => s1(v), tip: 'WAR this season; the colour is the percentile among qualified players of the same kind (pitchers: of the same role, starters or relievers)' },
+        { key: 'rate', label: PIT() ? '/700 BF' : '/600 PA', num: true, fmt: v => (isNum(v) ? BP.signed(v, 2) : '—'), tip: 'WAR rate' },
         { key: 'prev', label: 'Last season', num: true, fmt: v => s1(v) },
         { key: 'dd', label: 'Change', num: true, fmt: v => (isNum(v) ? '<span class="' + (v >= 0 ? 'pos' : 'neg') + '">' + BP.signed(v, 1) + '</span>' : '—') },
         { key: 'proj', label: 'Next season', type: 'bar', fmt: v => s1(v), tip: 'Projected WAR next season (Marcel-style rate × playing time)' },
@@ -112,7 +117,7 @@ function valuePage(el, params) {
       return '<div class="qk-span-3">' + U.card2(p, '', list.length ? '<ul class="bp-list bp-lead">' + list.map((r, i) => '<li><span class="n">' + (i + 1) + '</span><span style="min-width:0;flex:1">' + U.playerEnt(r[0], L, BP.teamAbbr(r[2]), (p === 'SP' || p === 'RP') ? 'pitcher' : 'hitter') +
         (r[8] || r[9] ? '<span class="bp-mv-why">' + esc((r[8] || '') + (r[9] ? ' · ' + r[9] : '')) + '</span>' : '') + '</span><span class="v">' + s1(r[3]) + '</span>' + (isNum(r[5]) ? QK.pctlChip(Math.round(r[5])) : '') + '</li>').join('') + '</ul>' : QK.empty('No qualified player'), { flush: true }) + '</div>';
     }).join('');
-    QK.seg($('val-kind'), k => { V.kind = k; V.pos = ''; V.min = fl[k] || 100; draw(); });
+    QK.seg($('val-kind'), k => { V.kind = k; V.pos = ''; V.min = flOf(k); draw(); });
     $('val-team').onchange = e => { V.team = e.target.value; draw(); };
     if ($('val-lg')) $('val-lg').onchange = e => { V.lg = e.target.value; draw(); };
     $('val-pos').onchange = e => { V.pos = e.target.value; draw(); };

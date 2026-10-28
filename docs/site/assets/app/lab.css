@@ -9,6 +9,9 @@
 .fb-lb-checks [hidden] { display: none; }
 .fb-lb-mix { display: inline-block; max-width: 340px; white-space: normal; font-size: var(--fs-xs); line-height: 1.35; }
 #lb-chart { --h: 640px; }
+.fb-lb-within { padding-bottom: var(--sp-3); margin-bottom: var(--sp-3); border-bottom: 1px solid var(--line-2); }
+.fb-lb-sim { margin-top: var(--sp-3); }
+.fb-lb-sim .fb-cap { margin: 0; }
 @media (max-width: 720px) {
   #lb-chart { height: 460px; }
   .fb-lb-ctl .fb-toolbar { gap: 8px 10px; }
@@ -16,6 +19,7 @@
   .fb-lb-ctl .fb-toolbar .qk-select, .fb-lb-ctl .qk-input { width: 100%; max-width: 100%; }
   .fb-lb-range input { width: 100%; }
   .fb-lb-mix { max-width: 200px; }
+  .fb-lb-within .qk-select { flex: 1 1 100%; }
 }
 
 /* side markers */

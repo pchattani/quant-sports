@@ -36,8 +36,10 @@ function fromLab(raw) {
       P[String(r[idx.pid])] = { name: r[idx.name], team: r[idx.team], pos: r[idx.pos], role: kd === 'pitcher' ? r[idx.pos] : undefined, values: v, pct: {}, n: n,
         pa: kd === 'hitter' ? n : undefined, bf: kd === 'pitcher' ? n : undefined, qualified: (n || 0) >= floor };
     });
-    ms.forEach(m => {
-      const ids = Object.keys(P).filter(id => P[id].qualified && k.isNum(P[id].values[m.key]));
+    /* pitchers rank within their role (pos SP / RP): starters and relievers are never pooled */
+    const grpOf = id => (/pit/.test(kd) ? String(P[id].pos || '') : '');
+    ms.forEach(m => Array.from(new Set(Object.keys(P).map(grpOf))).forEach(gk => {
+      const ids = Object.keys(P).filter(id => grpOf(id) === gk && P[id].qualified && k.isNum(P[id].values[m.key]));
       if (ids.length < 3) return;
       const vals = ids.map(id => Number(P[id].values[m.key])).sort((a, b) => a - b);
       ids.forEach(id => {
@@ -47,7 +49,7 @@ function fromLab(raw) {
         const pc = 100 * (lo + eq / 2) / vals.length;
         P[id].pct[m.key] = m.lower ? 100 - pc : pc;
       });
-    });
+    }));
     if (/team|club/.test(kd)) out.tc = { teams: P, metrics: ms };
     else if (/pit/.test(kd)) out.pc = { players: P, metrics: ms };
     else out.hc = { players: P, metrics: ms };
@@ -69,7 +71,8 @@ function entity(kind, id, hc, pc, tc) {
   if (kind === 'team') { const t = (tc && tc.teams[s]) || null; return t ? { id: s, name: k.teamName(s), values: t.values || {}, pct: t.pct || {}, team: s, colour: k.teamColour(s) } : null; }
   const c = kind === 'pitcher' ? pc : hc;
   const p = c && c.players[s];
-  return p ? { id: s, name: p.name || k.name(s), values: p.values || {}, pct: p.pct || {}, pctRole: p.pct_role || {}, team: p.team, pos: kind === 'pitcher' ? k.roleOf(p) : p.pos, age: p.age, n: k.sampleOf(p, kind), qualified: p.qualified } : null;
+  /* pitchers: percentiles within the role (pct_role: starters with starters, relievers with relievers), never pooled */
+  return p ? { id: s, name: p.name || k.name(s), values: p.values || {}, pct: (kind === 'pitcher' ? (p.pct_role || p.pct) : p.pct) || {}, pctRole: p.pct_role || {}, team: p.team, pos: kind === 'pitcher' ? k.roleOf(p) : p.pos, age: p.age, n: k.sampleOf(p, kind), qualified: p.qualified } : null;
 }
 
 function render(el, params, state) {
@@ -126,8 +129,10 @@ function nearest(kind, A, cat) {
     if (id === A.id) return;
     const p = P[id];
     if (kind !== 'team' && p.qualified === false) return;
+    if (kind === 'pitcher' && k.roleOf(p) !== A.pos) return;           // the nearest in the same role
+    const pp = (kind === 'pitcher' ? (p.pct_role || p.pct) : p.pct) || {};
     let d = 0, n = 0;
-    heads.forEach(m => { const x = A.pct[m.key], y = (p.pct || {})[m.key]; if (k.isNum(x) && k.isNum(y)) { d += (x - y) * (x - y); n++; } });
+    heads.forEach(m => { const x = A.pct[m.key], y = pp[m.key]; if (k.isNum(x) && k.isNum(y)) { d += (x - y) * (x - y); n++; } });
     if (n >= 3 && d / n < bd) { bd = d / n; best = id; }
   });
   return best;

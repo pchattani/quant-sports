@@ -44,6 +44,7 @@
  *   QK.color.deep / block / blockPair / markOutline     block contrast (white type >= 4.5:1) and the team-colour rules
  *   QK.scorebug(g, { size: 'xl' })                      the scoreboard bug: both team blocks, the start or the clock
  *   QK.spec.load(sport) QK.ours(o) QK.oursExplain(html)  the spec's labels (<sport>.labels.json) and the "Our model" tag
+ *   QK.within.html/wire/read/query/floor, cat.groups()   the Labs' "Compare within: Broad | Position" (spec peer groups)
  * Round 6 (the hub experience; the market quiet beside ours):
  *   QK.gameCard / previewCard / scorebug(xl) / ticker with market: 'quiet'   the market small and grey, source on hover
  *   QK.marketSource(src) QK.marketSides(g) QK.marketGap(g) QK.marketMark(g) QK.marketLine(g)   the quiet market's parts
@@ -2378,6 +2379,16 @@ SpecCat.prototype.headline = function (groupId) {
   return g ? (g.headline || []).slice() : [];
 };
 SpecCat.prototype.isHeadline = function (id, entity) { var m = this.metric(id, entity); return m && m.set === 'h' ? (m.order || 99) : 0; };
+/* The spec's peer groups ({ id, display, entity, headline, field?, codes?, min?: { field, value, unit }, league?, tour?,
+ * surface? }): o.entity (default 'player'), o.league, o.tour filter; cat.group(id) is one group. */
+SpecCat.prototype.groups = function (o) {
+  o = o || {};
+  var ent = o.entity || 'player';
+  return (this.j.groups || []).filter(function (g) {
+    return (g.entity || 'player') === ent && (!o.league || !g.league || g.league === o.league) && (!o.tour || !g.tour || g.tour === o.tour);
+  });
+};
+SpecCat.prototype.group = function (id) { return (this.j.groups || []).filter(function (g) { return g.id === id; })[0] || null; };
 SpecCat.prototype.order = function (items, o) {
   o = o || {};
   var self = this, ent = o.entity || 'player';
@@ -2428,6 +2439,79 @@ QK.optgroups = function (items, cat, o) {
   };
   if (!cat) return (items || []).map(opt).join('');
   return cat.order(items, o).map(function (g) { return '<optgroup label="' + esc(g.label) + '">' + g.items.map(opt).join('') + '</optgroup>'; }).join('');
+};
+
+/* ─────────────────────────────────────── the Labs' "Compare within": Broad | Position */
+/* A Lab compares players within a peer group: "Broad" (the site's coarse split, goalkeepers v outfield, pitchers v
+ * hitters ...) or "Position" (the spec's position or role groups, cat.groups()). The page owns the groups and the
+ * filtering; the kit draws the control and reads and writes the address (?within=pos&pos=CB, so links share).
+ *   QK.within.read(query, codes)  -> { within: 'broad'|'pos', pos } (pos kept only when it is one of codes, else codes[0])
+ *   QK.within.query(st)           -> { within: 'pos'|null, pos: code|null }, to merge into the page's query
+ *   QK.within.html(st, o)         -> the control: "Compare within" + a .qk-seg (Broad | Position) and, in Position mode,
+ *        a position <select>. o: { id ('qk-wn'), groups: [[code, label]] or [{ group, items: [[code, label]] }],
+ *        broad ('Broad'), pos ('Position'), label ('Compare within'), note (short text after the picker), cls }
+ *   QK.within.wire(root, st, cb, o) -> wires it: sets st.within / st.pos and calls cb(st) on a change
+ *   QK.within.floor(group, scale)  -> the spec minimum (group.min.value) x scale (prorating), or null
+ *   QK.within.similar(rows, target, keys, val, n) -> the n rows most like target within the group: [{ row, d }]
+ *   QK.within.simHtml(label, [{ name, href, sub }]) -> the "Most like" chip strip */
+QK.within = {
+  read: function (q, codes) {
+    q = q || {}; codes = codes || [];
+    var pos = codes.indexOf(q.pos) >= 0 ? q.pos : (codes[0] || null);
+    return { within: q.within === 'pos' && codes.length ? 'pos' : 'broad', pos: pos };
+  },
+  query: function (st) { var on = st && st.within === 'pos'; return { within: on ? 'pos' : null, pos: on ? st.pos : null }; },
+  html: function (st, o) {
+    o = o || {};
+    var id = o.id || 'qk-wn', on = st.within === 'pos';
+    var b = function (v, t) { return '<button type="button" data-value="' + v + '" aria-pressed="' + ((v === 'pos') === on ? 'true' : 'false') + '">' + esc(t) + '</button>'; };
+    var o1 = function (x) { return '<option value="' + esc(x[0]) + '"' + (String(x[0]) === String(st.pos) ? ' selected' : '') + '>' + esc(x[1]) + '</option>'; };
+    var opts = (o.groups || []).map(function (x) { return x && x.group ? '<optgroup label="' + esc(x.group) + '">' + x.items.map(o1).join('') + '</optgroup>' : o1(x); }).join('');
+    return '<div class="qk-within' + (o.cls ? ' ' + o.cls : '') + '" id="' + esc(id) + '"><span class="qk-within-l">' + esc(o.label || 'Compare within') + '</span>' +
+      '<div class="qk-seg" id="' + esc(id) + '-seg" role="group" aria-label="' + esc(o.label || 'Compare within') + '">' + b('broad', o.broad || 'Broad') + b('pos', o.pos || 'Position') + '</div>' +
+      (on ? '<select class="qk-select" id="' + esc(id) + '-pos" aria-label="Position group">' + opts + '</select>' : '') +
+      (o.note ? '<span class="qk-within-n">' + o.note + '</span>' : '') + '</div>';
+  },
+  wire: function (root, st, cb, o) {
+    o = o || {};
+    var id = o.id || 'qk-wn', r = root || document;
+    var seg = r.querySelector('#' + id + '-seg'), sel = r.querySelector('#' + id + '-pos');
+    if (seg) QK.seg(seg, function (v) { if (v === st.within) return; st.within = v === 'pos' ? 'pos' : 'broad'; if (cb) cb(st); });
+    if (sel) sel.addEventListener('change', function () { st.pos = sel.value; if (cb) cb(st); });
+  },
+  floor: function (g, scale) { var v = g && g.min ? g.min.value : null; return typeof v === 'number' ? v * (typeof scale === 'number' ? scale : 1) : null; },
+  /* The n rows most like the target within rows (the peer group on screen): distance on standard scores of keys (the
+     group's headline metrics), averaged over the keys both have (at least half of them, and 2). val(row, key) ->
+     number | null. Nearest first: [{ row, d }]. */
+  similar: function (rows, target, keys, val, n) {
+    var fin = function (v) { return typeof v === 'number' && isFinite(v); };
+    var st = {};
+    keys.forEach(function (k) {
+      var a = rows.map(function (r) { return val(r, k); }).filter(fin);
+      if (a.length < 5) return;
+      var m = a.reduce(function (s, v) { return s + v; }, 0) / a.length;
+      var sd = Math.sqrt(a.reduce(function (s, v) { return s + (v - m) * (v - m); }, 0) / a.length);
+      if (sd > 0) st[k] = { m: m, s: sd };
+    });
+    var ks = keys.filter(function (k) { return st[k]; });
+    var need = Math.max(2, Math.ceil(ks.length / 2));
+    var z = function (r) { return ks.map(function (k) { var v = val(r, k); return fin(v) ? (v - st[k].m) / st[k].s : null; }); };
+    var zt = z(target), out = [];
+    rows.forEach(function (r) {
+      if (r === target) return;
+      var zr = z(r), s = 0, c = 0;
+      for (var i = 0; i < ks.length; i++) if (zt[i] !== null && zr[i] !== null) { s += (zt[i] - zr[i]) * (zt[i] - zr[i]); c++; }
+      if (c >= need) out.push({ row: r, d: Math.sqrt(s / c) });
+    });
+    return out.sort(function (a, b) { return a.d - b.d; }).slice(0, n || 5);
+  },
+  /* the "Most like" strip: label (text) and items [{ name, href, sub? }] as chips; empty without items */
+  simHtml: function (label, items) {
+    if (!items || !items.length) return '';
+    return '<div class="qk-within-sim"><span class="qk-within-l">' + esc(label) + '</span><div class="qk-chips">' + items.map(function (x) {
+      return '<a class="qk-chip" href="' + esc(x.href) + '"' + (x.sub ? ' title="' + esc(x.sub) + '"' : '') + '>' + esc(x.name) + '</a>';
+    }).join('') + '</div></div>';
+  }
 };
 
 root.QK = QK;

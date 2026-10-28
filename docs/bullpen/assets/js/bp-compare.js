@@ -3,8 +3,9 @@
  * solid, and where each sits in the peer distribution (loaded on request).
  *
  * Peers: when every player is in the same position group (hitters) or role (pitchers), the percentiles are against that
- * group (pct_role) and the set is the group's; otherwise against all MLB hitters (or all starters / relievers mixed:
- * the payload's league-wide pct) on the all-hitters set, and the page says so. Data: data/players/<pid>.json for each
+ * group (pct_role) and the set is the group's; hitters of different positions are against all MLB hitters (pct) on the
+ * all-hitters set. Starters and relievers are never pooled: a starter beside a reliever is each against his own role
+ * (pct_role) on the first player's role set, and the distribution shows that role, as the page says. Data: data/players/<pid>.json for each
  * (the current season's values, pct and pct_role are in the player file), glossary.json; the season catalogue loads only
  * for the distribution. Teams, other levels and seasons, and the classic every-metric view: ?view=classic.
  *
@@ -41,9 +42,10 @@ function render(el, params, state) {
     const E = P.filter(x => x.b && x.b.values);
     const sets = E.map(x => U.setFor(KIND, x.b));
     const same = sets.length && sets.every(s => s === sets[0]);
-    const setKey = same ? sets[0] : (KIND === 'pitcher' ? 'SP' : 'ALL');
-    const peer = same ? U.peerName(setKey) : (KIND === 'pitcher' ? 'all MLB pitchers' : 'all MLB hitters');
-    const why = same ? '' : ' (they play different ' + (KIND === 'pitcher' ? 'roles' : 'positions') + ', so the percentiles are league-wide)';
+    const pit = KIND === 'pitcher', byRole = same || pit;           // pitchers always rank within their own role
+    const setKey = same ? sets[0] : (pit ? (sets[0] || 'SP') : 'ALL');
+    const peer = same ? U.peerName(setKey) : (pit ? 'each pitcher\'s own role' : 'all MLB hitters');
+    const why = same ? '' : pit ? ' (a starter and a reliever are never pooled: starters rank with starters, relievers with relievers, on the ' + U.peerName(setKey) + '\' set)' : ' (they play different positions, so the percentiles are against all hitters)';
     const href = (a, b, c) => BP.compareHref(a, b) + (c ? '?c=' + encodeURIComponent(c) : '');
     const sn = E.map(x => BP.playerSurname(x.id));
     let h = U.head({ kicker: 'Compare · ' + BP.levelName(L) + ' ' + S, title: E.length >= 2 ? sn.slice(0, -1).join(', ') + ' or ' + sn[sn.length - 1] + '?' : 'Compare players',
@@ -58,10 +60,10 @@ function render(el, params, state) {
       ((U.SETS[setKey] || {})[which] || []).forEach(g => groups.push({ label: g[0], keys: g[1].map(x => x[0]) }));
       const extra = flat.filter(x => !groups.some(g => g.keys.indexOf(x[0]) >= 0)).map(x => x[0]);
       if (extra.length) groups.push({ label: 'More', keys: extra });
-      const pk = same ? 'pct_role' : 'pct';
+      const pk = byRole ? 'pct_role' : 'pct';
       const cgroups = groups.map(g => ({ label: g.label, rows: g.keys.map(k => {
         const m = U.metaOf(KIND, k, gl);
-        return { key: k, label: m.label, tip: m.tip, values: E.map(x => (x.b.values || {})[k]), pctls: E.map(x => (U.metricOk(x.b, k, same ? setKey : 'ALL', null) && U.meets(x.b, U.setFor(KIND, x.b), null) ? (x.b[pk] || {})[k] : null)), better: m.lower ? 'low' : 'high', fmt: val => U.fmtBy(m, val) };
+        return { key: k, label: m.label, tip: m.tip, values: E.map(x => (x.b.values || {})[k]), pctls: E.map(x => (U.metricOk(x.b, k, same ? setKey : pit ? U.setFor(KIND, x.b) : 'ALL', null) && U.meets(x.b, U.setFor(KIND, x.b), null) ? (x.b[pk] || {})[k] : null)), better: m.lower ? 'low' : 'high', fmt: val => U.fmtBy(m, val) };
       }) }));
       /* verdicts: for each player, the metric where the player's percentile beats the others' by the most */
       const verd = E.map((x, i) => {
@@ -78,7 +80,7 @@ function render(el, params, state) {
         groups: cgroups
       }) + QK.verdicts(verd);
       h += '<section class="qk-section"><div class="qk-grid"><div class="qk-span-7">' + U.card2(E.length === 2 ? 'Tale of the tape' : 'Side by side', 'Peers: ' + esc(peer) + why + (E.length === 2 ? '. Bar length = percentile (100 = best); the better number in each row is solid.' : '. The pill is the percentile (100 = best); the best value in each row is highlighted.'), cv) + '</div>' +
-        '<div class="qk-span-5"><div class="bp-stack">' + U.card2('Where they sit', 'Every ' + esc(peer.replace(/^MLB /, '')) + ' past the floor this season', U.seg('cmp-dseg', 'Metric', flat.slice(0, 5).map(x => [x[0], U.metaOf(KIND, x[0], gl).label]), '') + '<div id="cmp-dist" style="margin-top:10px">' + QK.empty('Pick a metric', 'The peer group loads on request (the season catalogue is several megabytes).') + '</div>') +
+        '<div class="qk-span-5"><div class="bp-stack">' + U.card2('Where they sit', 'All ' + esc((same ? peer : pit ? U.peerName(setKey) : peer).replace(/^MLB /, '')) + ' past the floor this season', U.seg('cmp-dseg', 'Metric', flat.slice(0, 5).map(x => [x[0], U.metaOf(KIND, x[0], gl).label]), '') + '<div id="cmp-dist" style="margin-top:10px">' + QK.empty('Pick a metric', 'The peer group loads on request (the season catalogue is several megabytes).') + '</div>') +
         U.card2('Samples', 'Percentiles need ' + (U.floorOf(setKey, null) || {}).full + '+ ' + ((U.floorOf(setKey, null) || {}).unit || '') + ' over a full season (prorated in season)', '<ul class="bp-list">' + E.map((x, i) => '<li><span class="bp-dot" style="background:' + COLS[i] + '"></span>' + U.playerEnt(x.id, L, null, KIND) + '<span class="v" style="font:600 var(--fs-xs) var(--font-num)">' + esc(U.sampleLine(x.b, KIND, U.setFor(KIND, x.b), null).split(' · peers')[0]) + '</span></li>').join('') + '</ul>', { flush: true }) +
         '</div></div></div></section>';
     }
@@ -99,7 +101,7 @@ function render(el, params, state) {
       BP.loadYear(KIND === 'pitcher' ? 'pitchers.json' : 'hitters.json', L, S).then(cat => {
         if (!U.alive(el)) return;
         if (!BP.ok(cat) || !cat.players) { box.innerHTML = QK.empty('Not available', 'The season catalogue did not load.'); return; }
-        const peers = Object.keys(cat.players).map(id => cat.players[id]).filter(x => x && (!same || U.setFor(KIND, x) === setKey) && U.meets(x, U.setFor(KIND, x), cat.team_games));
+        const peers = Object.keys(cat.players).map(id => cat.players[id]).filter(x => x && (!byRole || U.setFor(KIND, x) === setKey) && U.meets(x, U.setFor(KIND, x), cat.team_games));
         const m = U.metaOf(KIND, key, gl);
         const vals = peers.map(x => (x.values || {})[key]).filter(isNum).sort((a, b) => a - b);
         if (vals.length < 5) { box.innerHTML = QK.empty('Too few peers yet'); return; }

@@ -1,6 +1,11 @@
 /* The Quant Campus — Lab (#/<L>/lab) and Model (#/<L>/model?tab=method|calibration|glossary|terms).
  * Lab: build-your-own scatter and table over lab_teams.json / lab_players.json (pick x, y, filter, colour by
- * conference or position; the table beside the chart holds the same rows).
+ * conference or position; the table beside the chart holds the same rows). Players: "Compare within" (QK.within,
+ * &within=pos&pos=QB|RB|WR|TE|DL|LB|DB|K|P in football, G|W|B in basketball): Broad (the default) is every player, or one
+ * listed position; Position is the metrics spec's peer group (CC.METRICS: football by position, basketball by the
+ * guard / wing / big role), qualified players only by the spec's minimum (the rows' qualified_rate / qualified; from the
+ * games played where an older payload lacks them). Medians, the table's percentile chips, the picker's headline order
+ * and the "Most like" strip (QK.within.similar, for a highlighted player) follow the group on screen.
  * Model: the "How we're doing" tab (?tab=calibration; round 6: QK.doing, our favourites' record this week and QK.howSure from
  * <L>/calibration.json, shown only when the file is there, then the backtest), methodology (docs/campus/MODELS_CFB.md or MODELS_HOOPS.md rendered), the walk-forward backtest against
  * closing lines (calibration.json), the glossary (data/glossary.json) and the terms.
@@ -24,6 +29,14 @@ var CMP_TYPE = { value_pg: 'The most valuable', epa_play: 'The efficient one', s
   sr_rush: 'The steady runner', ypc: 'The big-play runner', rush_share: 'The workhorse', tgt_share: 'The go-to target', yptpa: 'The yardage machine', ypr: 'The deep threat', sr_tgt: 'The reliable target', havoc_pg: 'The disruptor', sacks_pg: 'The pass rusher',
   hurries_pg: 'The pass rusher', tkl_pg: 'The tackler', pd_pg: 'The ball hawk', tfl_pg: 'The backfield wrecker', def_int_pg: 'The ball hawk', fg_pct: 'The accurate kicker', r: 'The difference-maker', pts100: 'The scorer', ts_add: 'The efficient scorer',
   ast_pct: 'The playmaker', tov_pct: 'The careful one', fta100: 'The rim attacker', stl_pct: 'The pickpocket', trb_pct: 'The rebounder', orb_pct: 'The glass cleaner', blk_pct: 'The rim protector' };
+/* the spec's player peer groups of a level, with an address code (the group's first payload code) */
+function posGroups(L) {
+  return (CC.METRICS || []).filter(function (g) { return g.L === L && g.e === 'player' && g.pc && g.pc.length; })
+    .map(function (g) { return { code: g.pc[0], g: g }; });
+}
+var LISTED_ROLE = { G: 'G', C: 'B', F: 'W' };
+/* football's rate minimums (players.RATE_MIN) for a payload without qualified_rate: [the lab field, per game played] */
+var CFB_RATE_MIN = { QB: ['db', 12.5], RB: ['rush_car', 6.25], WR: ['tgt', 2.5], TE: ['tgt', 1.67], K: ['fga', 0.67] };      // basketball without the payload's role: the listed position, roughly
 function labSeg(kind) {
   return '<div class="qk-seg" id="lab-kind" role="group" aria-label="View">' + [['teams', 'Teams chart'], ['players', 'Players chart'], ['compare', 'Compare players']].map(function (x) {
     return '<button type="button" data-value="' + x[0] + '" aria-pressed="' + (kind === x[0]) + '">' + x[1] + '</button>'; }).join('') + '</div>';
@@ -154,15 +167,75 @@ CC.route('lab', function (el, p) {
     var gk = Object.keys(groups).sort(function (x, y) { return groups[y] - groups[x]; });
     var opt = function (sel) { return ordered.map(function (g) { return '<optgroup label="' + esc(g.label) + '">' + g.items.map(function (m) { return '<option value="' + esc(m.key) + '"' + (m.key === sel ? ' selected' : '') + '>' + esc(m.label) + '</option>'; }).join('') + '</optgroup>'; }).join(''); };
     var minGp = kind === 'players' && ix.gp !== undefined;
+    /* Compare within: Broad (every player, or one listed position) or Position (the spec's peer group) */
+    var PG = kind === 'players' ? posGroups(L) : [];
+    var wn = QK.within.read(q, PG.map(function (x) { return x.code; }));
+    var byPos = kind === 'players' && wn.within === 'pos';
+    var PGc = byPos ? PG.filter(function (x) { return x.code === wn.pos; })[0] : null, grp = PGc ? PGc.g : null;
+    var pf = grp ? grp.pf : null, approxRole = !!(grp && pf === 'role' && ix.role === undefined);
+    var gmax = Math.max.apply(null, d.rows.map(function (r) { return r[ix.gp] || 0; }).concat([1]));
+    var inGroup = function (r) {
+      if (!grp) return true;
+      var v = pf === 'role' && ix.role === undefined ? LISTED_ROLE[r[ix.pos]] : r[ix[pf]];
+      return grp.pc.indexOf(v) >= 0;
+    };
+    /* the spec's minimum: the payload's flag (qualified_rate in football, qualified in basketball), else the games */
+    var qualOf = function (r) {
+      var f = grp && grp.min ? grp.min.f : null;
+      if (f && ix[f] !== undefined) return r[ix[f]] === true;
+      if (ix.qualified !== undefined) return r[ix.qualified] === true;
+      if (CC.fb(L)) {                                 // the spec's volume per game played (players.rate_qualified), defenders on games
+        var rm = CFB_RATE_MIN[r[ix.pos]], gpv = r[ix.gp] || 0;
+        if (rm && ix[rm[0]] !== undefined) return (r[ix[rm[0]]] || 0) >= rm[1] * gpv && gpv >= (r[ix.pos] === 'K' ? 0.6 * gmax : 1);
+        return gpv >= (/^(DL|LB|DB)$/.test(r[ix.pos]) ? Math.max(4, 0.6 * gmax) : 4);
+      }
+      return (r[ix.gp] || 0) >= Math.max(5, Math.floor(0.4 * gmax)) && (ix.min === undefined || (r[ix.min] || 0) >= 10);
+    };
+    var heads = grp ? grp.m.filter(function (m) { return m.set === 'h' && mk[m.id]; }).map(function (m) { return m.id; }) : [];
+    if (grp) {
+      var restM = num.filter(function (m) { return heads.indexOf(m.key) < 0; });
+      ordered = [{ label: grp.d + ': headline', items: heads.map(function (k) { return mk[k]; }) }].concat(CC.orderMetrics(L, ent, restM));
+      if (!mk[q.x] && heads[1]) xk = heads[1];
+      if (!mk[q.y] && heads[0]) yk = heads[0];
+    }
+    var wnHtml = kind === 'players' && PG.length ? QK.within.html({ within: wn.within, pos: wn.pos }, { id: 'lab-wn', cls: 'cc-lab-wn', groups: PG.map(function (x) { return [x.code, x.g.d]; }),
+      note: grp ? 'The metrics spec\'s peer group · qualified players (' + esc(grp.min && grp.min.u ? grp.min.u : 'games') + ') by default' + (approxRole ? ' · roles from the listed position until the next build' : '') : (CC.fb(L) ? 'Every player, or one listed position' : 'Every player, or one listed position (G, F, C)') }) : '';
     el.innerHTML = U.head('Lab', 'Pick any two numbers and see every ' + (kind === 'players' ? 'player' : 'team') + ' at once. Click a point to open its page; the table below holds the same rows.', U.kicker(L, S)) +
-      '<div class="cc-toolbar">' + segHtml + '<label class="cc-lab-sel">X <select class="qk-select" id="lab-x">' + opt(xk) + '</select></label><label class="cc-lab-sel">Y <select class="qk-select" id="lab-y">' + opt(yk) + '</select></label>' +
-      '<select class="qk-select" id="lab-g" aria-label="' + (kind === 'players' ? 'Position' : 'Conference') + '"><option value="">' + (kind === 'players' ? 'All positions' : 'All conferences') + '</option>' + gk.map(function (g) { return '<option value="' + esc(g) + '">' + esc(kind === 'players' ? g : CC.cname(L, g)) + '</option>'; }).join('') + '</select>' +
-      (minGp ? '<label class="cc-lab-sel">Min games <input class="qk-input" type="number" id="lab-gp" min="0" value="' + (kind === 'players' ? 3 : 0) + '" style="width:72px"></label>' : '') + '</div>' +
-      U.card('Chart', '<span id="lab-t"></span>', U.chart('lab-sc', 460, 'Scatter of the chosen metrics') + '<div id="lab-ours" class="cc-lab-ours"></div>') + '<div id="lab-tbl"></div>';
+      '<div class="cc-toolbar">' + segHtml + '</div>' + (wnHtml ? '<div class="cc-toolbar">' + wnHtml + '</div>' : '') +
+      '<div class="cc-toolbar"><label class="cc-lab-sel">X <select class="qk-select" id="lab-x">' + opt(xk) + '</select></label><label class="cc-lab-sel">Y <select class="qk-select" id="lab-y">' + opt(yk) + '</select></label>' +
+      (byPos ? '' : '<select class="qk-select" id="lab-g" aria-label="' + (kind === 'players' ? 'Position' : 'Conference') + '"><option value="">' + (kind === 'players' ? 'All positions' : 'All conferences') + '</option>' + gk.map(function (g) { return '<option value="' + esc(g) + '">' + esc(kind === 'players' ? g : CC.cname(L, g)) + '</option>'; }).join('') + '</select>') +
+      (minGp ? '<label class="cc-lab-sel">Min games <input class="qk-input" type="number" id="lab-gp" min="0" value="' + (kind === 'players' && !byPos ? 3 : 0) + '" style="width:72px"></label>' : '') +
+      (byPos ? '<label class="cc-lab-sel cc-lab-chk"><input type="checkbox" id="lab-qual" checked> Qualified only</label>' : '') +
+      (kind === 'players' ? '<label class="cc-lab-sel">Highlight <input class="qk-input" type="search" id="lab-q" placeholder="A player…" value="' + esc(q.q || '') + '" autocomplete="off"></label>' : '') + '</div>' +
+      U.card('Chart', '<span id="lab-t"></span>', U.chart('lab-sc', 460, 'Scatter of the chosen metrics') + '<div id="lab-sim" class="cc-lab-sim"></div><p class="cc-note" id="lab-n"></p><div id="lab-ours" class="cc-lab-ours"></div>') + '<div id="lab-tbl"></div>';
+    var med = function (a) { var b = a.slice().sort(function (u, v) { return u - v; }), n = b.length; return n ? (n % 2 ? b[(n - 1) / 2] : (b[n / 2 - 1] + b[n / 2]) / 2) : null; };
+    var pctRank = function (sorted, v) { var lo = 0, hi = sorted.length; while (lo < hi) { var mid = (lo + hi) >> 1; if (sorted[mid] < v) lo = mid + 1; else hi = mid; } var up = lo; while (up < sorted.length && sorted[up] === v) up++; return sorted.length ? 100 * ((lo + up) / 2) / sorted.length : null; };
     function paint() {
-      var x = QK.$('#lab-x', el).value, y = QK.$('#lab-y', el).value, g = QK.$('#lab-g', el).value, gp = minGp ? Number(QK.$('#lab-gp', el).value || 0) : 0;
-      var rs = d.rows.filter(function (r) { return isNum(r[ix[x]]) && isNum(r[ix[y]]) && (!g || String(r[ix[grpKey]]) === g) && (!minGp || (r[ix.gp] || 0) >= gp); });
+      var x = QK.$('#lab-x', el).value, y = QK.$('#lab-y', el).value, g = byPos ? '' : QK.$('#lab-g', el).value, gp = minGp ? Number(QK.$('#lab-gp', el).value || 0) : 0;
+      var qo = QK.$('#lab-qual', el), qualOnly = byPos && (!qo || qo.checked);
+      var base = d.rows.filter(function (r) { return (!g || String(r[ix[grpKey]]) === g) && inGroup(r) && (!qualOnly || qualOf(r)) && (!minGp || (r[ix.gp] || 0) >= gp); });
+      var rs = base.filter(function (r) { return isNum(r[ix[x]]) && isNum(r[ix[y]]); });
       rs.sort(function (r1, r2) { return mk[y].lower ? r1[ix[y]] - r2[ix[y]] : r2[ix[y]] - r1[ix[y]]; });
+      var noun = kind !== 'players' ? 'teams' : grp ? grp.d.toLowerCase() : (g ? 'players listed ' + g : 'players');
+      var sX = rs.map(function (r) { return r[ix[x]]; }).sort(function (a1, b1) { return a1 - b1; }), sY = rs.map(function (r) { return r[ix[y]]; }).sort(function (a1, b1) { return a1 - b1; });
+      var pOf = function (sorted, v, low) { var p0 = pctRank(sorted, v); return p0 === null ? null : (low ? 100 - p0 : p0); };
+      var qq = String((QK.$('#lab-q', el) || {}).value || '').trim().toLowerCase();
+      var hits = qq.length > 1 ? rs.filter(function (r) { return String(r[ix.name] || '').toLowerCase().indexOf(qq) >= 0; }) : [];
+      var nn = QK.$('#lab-n', el);
+      if (nn) nn.innerHTML = rs.length + ' ' + esc(noun) + ' on the chart. Dashed lines are the medians of the ' + esc(noun) + '; the table\'s chips are each one\'s percentile among them (100 = best).' + (byPos && qualOnly ? ' Qualified players only (the spec\'s minimum).' : '');
+      var sm = QK.$('#lab-sim', el);
+      if (sm && kind === 'players') {
+        if (!hits.length) sm.innerHTML = '<p class="cc-note">Highlight a player to list the five most like them among the ' + esc(noun) + ' on this chart.</p>';
+        else {
+          var t = hits[0];
+          var tg = grp || (posGroups(L).filter(function (z) { var v = z.g.pf === 'role' ? (ix.role !== undefined ? t[ix.role] : LISTED_ROLE[t[ix.pos]]) : t[ix[z.g.pf]]; return z.g.pc.indexOf(v) >= 0; })[0] || {}).g;
+          var keys = tg ? tg.m.filter(function (m) { return m.set === 'h' && ix[m.id] !== undefined; }).map(function (m) { return m.id; }) : [x, y];
+          var near = QK.within.similar(base, t, keys, function (r, k) { var v = r[ix[k]]; return isNum(v) ? v : null; }, 5);
+          sm.innerHTML = QK.within.simHtml('Most like ' + t[ix.name] + ' · ' + noun, near.map(function (o) {
+            return { name: o.row[ix.name], href: CC.href(L, 'lab', null, S, 'kind=compare&p=' + t[ix.id] + ',' + o.row[ix.id]), sub: [CC.tabbr(L, o.row[ix.team]), o.row[ix.pos], (o.row[ix.gp] || 0) + ' games'].join(' · ') + ' · compare' };
+          })) || '<p class="cc-note">No close match among the ' + esc(noun) + ' on this chart.</p>';
+        }
+      }
       var tn = QK.$('#lab-t', el); if (tn) tn.innerHTML = esc(mk[y].label) + CC.oursTag(y, false, mk[y].desc) + ' against ' + esc(mk[x].label) + CC.oursTag(x, false, mk[x].desc) + (mk[y].lower ? ' (lower is better on the vertical axis, so it is flipped: better is up)' : '') + '.';
       var models = [];
       [CC.ours(x), CC.ours(y)].forEach(function (o) { if (o && models.every(function (z) { return z.key !== o.key; })) models.push(o); });
@@ -171,19 +244,38 @@ CC.route('lab', function (el, p) {
         : QK.explain('Neither axis comes from our models. ' + (kind === 'teams' ? 'Our rating and its offence and defence split' : CC.fb(L) ? 'Value and EPA' : 'Value and the box rating') + ' are ours: they lead the metric lists, tagged ' + QK.ours({ short: true }) + '.');
       var href = function (r) { return kind === 'players' ? CC.playerHref(L, r[ix.id], S) : CC.teamHref(L, r[ix.id], S); };
       var col = function (r) { return kind === 'players' ? CC.tcol(L, r[ix.team]) : CC.tcol(L, r[ix.id]); };
-      QKC.scatter('#lab-sc', { points: rs.map(function (r) { return { x: r[ix[x]], y: r[ix[y]], name: r[ix.name] + (kind === 'players' ? ' · ' + CC.tabbr(L, r[ix.team]) : ''), label: kind === 'players' ? String(r[ix.name]).split(' ').slice(-1)[0] : CC.tabbr(L, r[ix.id]), color: col(r), href: href(r), size: rs.length > 300 ? 7 : 10 }; }),
-        xName: mk[x].label, yName: mk[y].label, xFmt: function (v) { return CC.fmtMetric(mk[x], v); }, yFmt: function (v) { return CC.fmtMetric(mk[y], v); }, labelTop: 10, xInverse: false, yInverse: !!mk[y].lower });
-      var cols = ['Name'].concat(kind === 'players' ? ['Team', 'Pos'] : ['Conf.']).concat(num.map(function (m) { return { label: m.label, align: 'right', title: m.desc || '' }; }));
-      QK.$('#lab-tbl', el).innerHTML = U.card(rs.length + ' rows', '', U.table(cols, rs.slice(0, 600).map(function (r) {
-        return { cells: [{ html: '<a href="' + esc(href(r)) + '">' + esc(r[ix.name]) + '</a>', v: r[ix.name] }].concat(kind === 'players' ? [{ html: U.teamEnt(L, r[ix.team], { abbr: true, season: S }), v: CC.tname(L, r[ix.team]) }, esc(r[ix.pos] || '—')] : [esc(CC.cname(L, r[ix.conference]))])
-          .concat(num.map(function (m) { var v = r[ix[m.key]]; return { v: isNum(v) ? v : null, html: CC.fmtMetric(m, v) }; })), _href: href(r) };
+      QKC.scatter('#lab-sc', { points: rs.map(function (r) { var hit = hits.indexOf(r) >= 0; return { x: r[ix[x]], y: r[ix[y]], name: r[ix.name] + (kind === 'players' ? ' · ' + CC.tabbr(L, r[ix.team]) : ''), label: kind === 'players' ? String(r[ix.name]).split(' ').slice(-1)[0] : CC.tabbr(L, r[ix.id]), color: col(r), href: href(r), size: hit ? 20 : (rs.length > 300 ? 7 : 10) }; }),
+        xName: mk[x].label, yName: mk[y].label, xFmt: function (v) { return CC.fmtMetric(mk[x], v); }, yFmt: function (v) { return CC.fmtMetric(mk[y], v); }, labelTop: 10, xInverse: false, yInverse: !!mk[y].lower,
+        refX: rs.length > 2 ? med(sX) : null, refY: rs.length > 2 ? med(sY) : null });
+      var hasRole = kind === 'players' && ix.role !== undefined && !CC.fb(L);
+      var lead = [mk[x], mk[y]].filter(function (m, i, a) { return a.indexOf(m) === i; });
+      var cols = ['Name'].concat(kind === 'players' ? ['Team', 'Pos'].concat(hasRole ? [{ label: 'Role', title: 'The spec\'s peer group: guard, wing or big' }] : []) : ['Conf.'])
+        .concat(lead.map(function (m) { return { label: m.label, align: 'right', title: (m.desc || '') + ' Chip: percentile among the ' + noun + ' on the chart (100 = best).' }; }))
+        .concat(num.filter(function (m) { return lead.indexOf(m) < 0; }).map(function (m) { return { label: m.label, align: 'right', title: m.desc || '' }; }));
+      QK.$('#lab-tbl', el).innerHTML = U.card(rs.length + ' rows', 'Sorted by ' + esc(mk[y].label) + '; the first two value columns carry each one\'s percentile among the ' + esc(noun) + ' on the chart.', U.table(cols, rs.slice(0, 600).map(function (r) {
+        return { cells: [{ html: '<a href="' + esc(href(r)) + '">' + esc(r[ix.name]) + '</a>', v: r[ix.name] }].concat(kind === 'players' ? [{ html: U.teamEnt(L, r[ix.team], { abbr: true, season: S }), v: CC.tname(L, r[ix.team]) }, esc(r[ix.pos] || '—')].concat(hasRole ? [esc(r[ix.role] || '—')] : []) : [esc(CC.cname(L, r[ix.conference]))])
+          .concat(lead.map(function (m) { var v = r[ix[m.key]]; var p0 = isNum(v) ? pOf(m === mk[x] ? sX : sY, v, !!m.lower) : null; return { v: isNum(v) ? v : null, html: CC.fmtMetric(m, v) + (isNum(p0) ? ' ' + QK.pctlChip(p0) : '') }; }))
+          .concat(num.filter(function (m) { return lead.indexOf(m) < 0; }).map(function (m) { var v = r[ix[m.key]]; return { v: isNum(v) ? v : null, html: CC.fmtMetric(m, v) }; })), _href: href(r) };
       }), { maxHeight: 560 }));
       U.wire(QK.$('#lab-tbl', el));
       var hm = {}; num.forEach(function (m) { hm[m.label] = m.key; });
       CC.oursHeads(QK.$('#lab-tbl', el), hm);
     }
-    ['#lab-x', '#lab-y', '#lab-g', '#lab-gp'].forEach(function (s) { var n = QK.$(s, el); if (n) n.addEventListener(s === '#lab-gp' ? 'input' : 'change', paint); });
+    ['#lab-x', '#lab-y', '#lab-g', '#lab-gp', '#lab-qual', '#lab-q'].forEach(function (s) { var n = QK.$(s, el); if (n) n.addEventListener(s === '#lab-gp' || s === '#lab-q' ? 'input' : 'change', paint); });
     QK.seg(QK.$('#lab-kind', el), function (v) { CC.go(CC.href(L, 'lab', null, S, 'kind=' + v)); });
+    /* a change of group re-routes, so the address carries it (?within=pos&pos=QB) and links share */
+    QK.within.wire(el, { within: wn.within, pos: wn.pos }, function (w) {
+      var g0 = QK.$('#lab-g', el), lp = g0 ? g0.value : '';
+      if (w.within === 'pos' && !byPos && lp) {                 // Broad -> Position: the listed position's group when there is one
+        var hit = PG.filter(function (z) { return z.code === lp || z.g.pc.indexOf(CC.fb(L) ? lp : LISTED_ROLE[lp]) >= 0; })[0];
+        if (hit) w.pos = hit.code;
+      }
+      var qw = QK.within.query(w), qs = ['kind=players'];
+      if (qw.within) qs.push('within=pos', 'pos=' + encodeURIComponent(qw.pos));
+      var hq = String((QK.$('#lab-q', el) || {}).value || '').trim();
+      if (hq) qs.push('q=' + encodeURIComponent(hq));
+      CC.go(CC.href(L, 'lab', null, S, qs.join('&')));
+    }, { id: 'lab-wn' });
     paint();
   });
 });

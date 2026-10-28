@@ -6,7 +6,9 @@
  * league's distribution drawn behind the leaders. "At a glance" shows the builder's own
  * pre-filtered boards (leaders.json) when they exist.
  *
- * Address: ?k=hitter|pitcher|pitch&m=<metric>&pt=<pitch type> presets the board.
+ * Address: ?k=hitter|sp|rp|pitch&m=<metric>&pt=<pitch type> presets the board (the old k=pitcher opens the starters).
+ * Starters and relievers are separate boards (the spec's SP and RP groups): never one pooled pitcher board; the
+ * percentile cells are the payload's pct_role (within the role) and the top-five cards come per role.
  * Data: data/<L>/<S>/hitters.json, pitchers.json ("arsenal"), leaders.json. Uses BP.gk.
  * Round 5: the metric picker lists our model metrics first (BP.ui.metricOpts), the board and its head carry the cobalt
  * "Our model" tag with a strip naming the model, and the top-five cards lead with Bullpen WAR and Stuff+. */
@@ -15,6 +17,9 @@
 
 const K = () => BP.gk;
 const S0 = { kind: 'hitter', metric: '', pt: 'FF', floor: null, qual: true, team: '', dir: 'best', n: 50 };
+/* the board's catalogue kind and pitcher role: 'sp' / 'rp' are pitcher boards for one role */
+const KD = () => (S0.kind === 'sp' || S0.kind === 'rp' ? 'pitcher' : S0.kind);
+const ROLE = () => (S0.kind === 'sp' ? 'SP' : S0.kind === 'rp' ? 'RP' : null);
 const ARS_METRICS = [['stuff_plus', 'Stuff+', 'plus'], ['location_plus', 'Location+', 'plus'], ['pitching_plus', 'Pitching+', 'plus'], ['velo', 'Velocity', '1'], ['ivb', 'Induced vertical break', '1'], ['hb', 'Horizontal break', '1'],
   ['spin', 'Spin rate', 'rpm'], ['vaa', 'Vertical approach angle', '1'], ['ext', 'Extension', '1'], ['whiff_pct', 'Whiff%', 'pct'], ['csw_pct', 'CSW%', 'pct'], ['rv', 'Run value', 'signed'], ['rv100', 'Run value per 100', 'signed2'], ['usage', 'Usage', 'pct'], ['xwoba_plus', 'xwOBA+ against', '3']];
 const ALIAS = { stuff_plus: ['stuff_plus', 'stuff'], location_plus: ['location_plus', 'location'], pitching_plus: ['pitching_plus', 'pitching'], velo: ['velo', 'velocity', 'release_speed'], ivb: ['ivb', 'induced_vb'], hb: ['hb', 'horz_break'],
@@ -32,14 +37,14 @@ function render(el, params, state) {
   const U = BP.ui;
   const L = k.L(params, state);
   const q = params.query || {};
-  if (q.k && /^(hitter|pitcher|pitch)$/.test(q.k)) S0.kind = q.k;
+  if (q.k && /^(hitter|pitcher|sp|rp|pitch)$/.test(q.k)) S0.kind = q.k === 'pitcher' ? 'sp' : q.k;
   if (q.m) S0.metric = q.m;
   if (q.pt) S0.pt = q.pt;
-  el.innerHTML = QK.sectionHead({ kicker: 'Leaderboards · ' + k.LN(L), title: 'Leaderboards', sub: 'Any metric for hitters, pitchers or one pitch type, best or worst first, with the sample floor in your hands. Percentile cells rank each player against everyone past the floor (100 = best).' }) +
+  el.innerHTML = QK.sectionHead({ kicker: 'Leaderboards · ' + k.LN(L), title: 'Leaderboards', sub: 'Any metric for hitters, starters, relievers or one pitch type, best or worst first, with the sample floor in your hands. Percentile cells rank each player against his own peer group past its floor (starters with starters, relievers with relievers; 100 = best).' }) +
     QK.note('A <b>90th percentile</b> means better than 90 in 100 of the players past the floor. Rates need a sample: early in a season the floor is prorated, so small samples are kept out.') +
     hotBand(L) +
     '<section class="qk-card"><div class="qk-card-body"><div class="bp-ctl">' +
-    U.seg('ld-kind', 'Board', [['hitter', 'Hitters'], ['pitcher', 'Pitchers'], ['pitch', 'Pitch types']], S0.kind) +
+    U.seg('ld-kind', 'Board', [['hitter', 'Hitters'], ['sp', 'Starters'], ['rp', 'Relievers'], ['pitch', 'Pitch types']], S0.kind) +
     '<label id="ld-pt-l">Pitch type<select id="ld-pt"></select></label>' +
     '<label>Metric<select id="ld-metric" class="gq-wide"></select></label>' +
     '<label>Team<select id="ld-team"><option value="">All teams</option></select></label>' +
@@ -49,7 +54,7 @@ function render(el, params, state) {
     '<label class="bp-check"><input type="checkbox" id="ld-qual"> past the floor for the position or role</label>' +
     '</div></div></section>' +
     '<div id="ld-ours" style="margin-top:var(--sp-4)"></div><div class="qk-grid" style="margin-top:var(--sp-4)"><div class="qk-span-5"><div id="ld-chart-card"></div></div><div class="qk-span-7"><div id="ld-board-card"></div></div></div>' +
-    '<section class="qk-section">' + QK.sectionHead({ kicker: 'At a glance', title: 'Top five', sub: 'Our models first (Bullpen WAR, Stuff+), then the headline metrics from the metrics spec; players past the floor for their position or role.' }) + '<div class="qk-grid" id="ld-glance"></div></section>';
+    '<section class="qk-section">' + QK.sectionHead({ kicker: 'At a glance', title: 'Top five', sub: 'Hitters, starters and relievers apart: our models first (Bullpen WAR, Stuff+), then the headline metrics from the metrics spec; players past the floor for their position or role.' }) + '<div class="qk-grid" id="ld-glance"></div></section>';
   return k.ready().then(() => {
     const S = k.S(params, state);
     return Promise.all([k.loadY(L, S, 'hitters.json'), k.loadY(L, S, 'pitchers.json'), k.loadY(L, S, 'leaders.json'), k.loadNames(), U.specReady()]).then(res => ({ S: S, res: res }));
@@ -71,7 +76,7 @@ function render(el, params, state) {
     $('ld-team').innerHTML = '<option value="">All teams</option>' + Object.keys(teams).sort((a, b) => k.teamAbbr(a).localeCompare(k.teamAbbr(b))).map(t => '<option value="' + k.esc(t) + '">' + k.esc(k.teamAbbr(t)) + '</option>').join('');
     $('ld-qual').checked = S0.qual;
     const sync = () => {
-      const kind = S0.kind;
+      const kind = KD(), role = ROLE();
       $('ld-pt-l').style.display = kind === 'pitch' ? '' : 'none';
       if (kind === 'pitch') {
         if (ptList.indexOf(S0.pt) < 0) S0.pt = ptList[0];
@@ -83,8 +88,8 @@ function render(el, params, state) {
       } else {
         const cat = kind === 'pitcher' ? pc : hc;
         const ms = (cat && cat.metrics) || [];
-        if (!ms.find(m => m.key === S0.metric)) S0.metric = (k.headline(ms, kind === 'pitcher' ? k.PIT_PREFS : k.HIT_PREFS, 1)[0] || {}).key || '';
-        $('ld-metric').innerHTML = U.metricOpts(ms, S0.metric, kind);
+        if (!ms.find(m => m.key === S0.metric)) S0.metric = (k.headline(ms, role === 'RP' ? U.flat('RP', 'head').map(x => x[0]) : kind === 'pitcher' ? k.PIT_PREFS : k.HIT_PREFS, 1)[0] || {}).key || '';
+        $('ld-metric').innerHTML = U.metricOpts(ms, S0.metric, kind, { set: role || undefined });
         $('ld-floor-u').textContent = kind === 'pitcher' ? 'BF' : 'PA';
       }
       const maxN = kind === 'pitch' ? Math.max.apply(null, Object.keys(ars).map(pid => { const r = (ars[pid] || {})[S0.pt]; return r ? (k.val(r, ['n', 'pitches', 'count']) || 0) : 0; }).concat([100]))
@@ -113,7 +118,7 @@ function render(el, params, state) {
 function drawBoard(L, S, hc, pc) {
   const k = K();
   const U = BP.ui;
-  const kind = S0.kind;
+  const kind = KD(), role = ROLE();
   let rows = [], m, lower = false, fmt = '';
   if (kind === 'pitch') {
     const ars = (pc && pc.arsenal) || {};
@@ -139,10 +144,12 @@ function drawBoard(L, S, hc, pc) {
     Object.keys(cat.players).forEach(pid => {
       const p = cat.players[pid], v = (p.values || {})[m.key], n = k.sampleOf(p, kind);
       if (!k.isNum(v) || n < S0.floor) return;
+      if (role && k.roleOf(p) !== role) return;                       // one role per board: never pooled
       const okp = U.meets(p, U.setFor(kind, p), cat.team_games);
       if (S0.qual && !okp) return;
       if (S0.team && String(p.team) !== S0.team) return;
-      const pc0 = okp && U.metricOk(p, m.key, 'ALL', cat.team_games) ? (p.pct || {})[m.key] : null;
+      /* pitchers: the percentile within the role (pct_role); hitters: against all hitters (pct) */
+      const pc0 = okp && U.metricOk(p, m.key, role || 'ALL', cat.team_games) ? ((role ? p.pct_role : p.pct) || {})[m.key] : null;
       rows.push({ pid: pid, v: v, n: n, team: p.team, pct: pc0, name: p.name || k.name(pid), sub: (kind === 'pitcher' ? k.roleOf(p) : (p.pos || '')) + ' · ' + BP.teamAbbr(p.team), href: kind === 'pitcher' ? k.pitcherHref(L, pid, S) : k.hitterHref(L, pid, S) });
     });
   }
@@ -152,7 +159,7 @@ function drawBoard(L, S, hc, pc) {
   const shown = rows.slice(0, S0.n);
   const unit = kind === 'pitch' ? 'Pitches' : kind === 'pitcher' ? 'BF' : 'PA';
   const med = k.median(all);
-  const sub = rows.length + ' with a value · ' + (S0.dir === 'best' ? 'best' : 'worst') + ' first · median ' + k.fmtV(med, fmt) + (lower ? ' · lower is better' : '');
+  const sub = (role ? (role === 'SP' ? 'Starting pitchers' : 'Relief pitchers') + ' · ' : '') + rows.length + ' with a value · ' + (S0.dir === 'best' ? 'best' : 'worst') + ' first · median ' + k.fmtV(med, fmt) + (lower ? ' · lower is better' : '');
   document.getElementById('ld-board-card').innerHTML = U.card2(m.label, U.oursTag(m.key) + (U.ours(m.key) ? ' ' : '') + esc0(sub) + (m.desc ? ' · ' + esc0(m.desc) : ''), '<div id="ld-table"></div>', { flush: true });
   const oursBox = document.getElementById('ld-ours');
   if (oursBox) oursBox.innerHTML = U.oursNote(kind === 'pitch' ? 'pitcher' : kind, [m.key]);
@@ -161,7 +168,7 @@ function drawBoard(L, S, hc, pc) {
   else QK.leaderboard(host, { dense: true, rank: true, maxHeight: 640, rowHref: r => r.href, columns: [
     { key: 'name', label: kind === 'hitter' ? 'Hitter' : 'Pitcher', type: 'entity', sub: 'sub', mark: r => U.team(r.team, L, S), href: r => r.href },
     { key: 'n', label: unit, num: true, fmt: x => k.int(x) },
-    { key: 'v', label: m.label.split(' · ')[0] + (lower ? ' ↓' : ''), type: 'pctl', pctl: 'pct', fmt: x => k.fmtV(x, fmt), tip: (m.desc || '') + ' The cell colour is the percentile (100 = best).' }],
+    { key: 'v', label: m.label.split(' · ')[0] + (lower ? ' ↓' : ''), type: 'pctl', pctl: 'pct', fmt: x => k.fmtV(x, fmt), tip: (m.desc || '') + ' The cell colour is the percentile (100 = best)' + (role ? ' among ' + (role === 'SP' ? 'starters' : 'relievers') + ' past the floor.' : '.') }],
     rows: shown.slice() });
   if (shown.length) U.tagHeads(host, { v: m.key });
   const top = shown.slice(0, 15);
@@ -179,19 +186,21 @@ function glance(L, S, lead, hc, pc) {
   if (!host) return;
   const boards = [];
   const want = kind0 => (kind0 === 'pitcher' ? ['war', 'stuff_plus'] : ['war']).concat((kind0 === 'pitcher' ? k.PIT_PREFS : k.HIT_PREFS).filter(x => typeof x === 'string')).slice(0, 7);
-  [[hc, 'hitter'], [pc, 'pitcher']].forEach(x => {
+  /* [catalogue, kind, role, how many boards]: starters and relievers on their own boards, each on its role's headline */
+  [[hc, 'hitter', null, 4], [pc, 'pitcher', 'SP', 4], [pc, 'pitcher', 'RP', 4]].forEach(x => {
     if (!x[0]) return;
-    k.headline(x[0].metrics, want(x[1]), 6).map(m0 => Object.assign({}, m0, { label: U.label(x[1], m0.key, m0.label) })).forEach(m => {
-      const rows = Object.keys(x[0].players).filter(pid => U.meets(x[0].players[pid], U.setFor(x[1], x[0].players[pid]), x[0].team_games) && k.isNum((x[0].players[pid].values || {})[m.key]))
+    const prefs = x[2] === 'RP' ? ['war', 'stuff_plus'].concat(U.flat('RP', 'head').map(y => y[0])) : want(x[1]);
+    k.headline(x[0].metrics, prefs, x[3]).map(m0 => Object.assign({}, m0, { label: U.label(x[1], m0.key, m0.label) })).forEach(m => {
+      const rows = Object.keys(x[0].players).filter(pid => (!x[2] || k.roleOf(x[0].players[pid]) === x[2]) && U.meets(x[0].players[pid], U.setFor(x[1], x[0].players[pid]), x[0].team_games) && k.isNum((x[0].players[pid].values || {})[m.key]))
         .map(pid => ({ pid: pid, v: x[0].players[pid].values[m.key] })).sort((a, b) => (m.lower ? a.v - b.v : b.v - a.v)).slice(0, 5);
-      if (rows.length) boards.push({ m: m, kind: x[1], rows: rows });
+      if (rows.length) boards.push({ m: m, kind: x[1], role: x[2], rows: rows });
     });
   });
   if (!boards.length && lead && lead.ok !== false) {
     const src = lead.leaders || lead;
     Object.keys(src).filter(key => Array.isArray(src[key]) && src[key].length).slice(0, 8).forEach(key => boards.push({ m: { key: key, label: key, fmt: '' }, kind: /^p_/.test(key) ? 'pitcher' : 'hitter', rows: src[key].slice(0, 5).map(r => ({ pid: String(r[0]), v: r[1] })) }));
   }
-  host.innerHTML = boards.length ? boards.map(b => '<div class="qk-span-3">' + U.card2(b.m.label || b.m.key, (b.kind === 'pitcher' ? 'Pitchers' : 'Hitters') + U.oursTag(b.m.key), '<ul class="bp-list bp-lead">' +
+  host.innerHTML = boards.length ? boards.map(b => '<div class="qk-span-3">' + U.card2(b.m.label || b.m.key, (b.role === 'RP' ? 'Relievers' : b.role === 'SP' ? 'Starters' : b.kind === 'pitcher' ? 'Pitchers' : 'Hitters') + U.oursTag(b.m.key), '<ul class="bp-list bp-lead">' +
     b.rows.map((r, i) => '<li><span class="n">' + (i + 1) + '</span>' + U.playerEnt(r.pid, L, BP.teamAbbr(BP.player(r.pid).team), b.kind) + '<span class="v">' + k.fmtV(r.v, b.m.fmt) + '</span></li>').join('') + '</ul>', { flush: true }) + '</div>').join('')
     : '<div class="qk-span-12">' + QK.empty('No leaderboards yet') + '</div>';
 }

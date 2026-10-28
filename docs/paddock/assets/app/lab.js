@@ -2,7 +2,10 @@
  * other for one season (or every season since 2018), with presets, size and colour by any metric
  * (or team / season), medians splitting the chart into quadrants, the drivers furthest into the good
  * corner labelled, a search highlight, and the whole group ranked underneath. Small samples can be
- * shrunk towards the group median (3 races of prior). Shareable axes: ?x=&y=. Reads lab.json. */
+ * shrunk towards the group median (3 races of prior). Shareable axes: ?x=&y=, and ?q= highlights. Reads lab.json.
+ * F1 has one peer group (the spec's "drivers"), so this Lab has no "Compare within" control; a highlighted driver gets
+ * the other Labs' "Most like" strip: the five nearest driver-seasons on the group's headline metrics
+ * (QK.within.similar), each a link to Compare. */
 (function (PD) {
 'use strict';
 
@@ -94,9 +97,9 @@ function draw() {
   Object.keys(MU).forEach(function (k) { delete MU[k]; });
   [S.x, S.y, S.size, S.color].forEach(function (k) { if (k && I[k] !== undefined && k !== 'races' && k !== 'year' && k !== 'team') { var a = base0.map(function (r) { return raw(r, k); }).filter(function (v) { return v !== null; }); if (a.length) MU[k] = PD.median(a); } });
   var rows = base0.filter(function (r) { return val(r, S.x) !== null && val(r, S.y) !== null; });
-  PD.setHashQuiet('#/lab' + PD.qs({ x: S.x, y: S.y }));
+  PD.setHashQuiet('#/lab' + PD.qs({ x: S.x, y: S.y, q: S.q.trim() || null }));
   PD.set('lab-sub', rows.length + ' driver-seasons' + (S.year === 'all' ? ' since ' + (LAB.years[LAB.years.length - 1] || '') : ' in ' + S.year) + ' with ' + S.min + '+ races');
-  if (rows.length < 3) { PD.ch.none('lab-chart', 'Too few drivers for this view; lower the race minimum or pick another season.'); PD.set('lab-table', ''); return; }
+  if (rows.length < 3) { PD.ch.none('lab-chart', 'Too few drivers for this view; lower the race minimum or pick another season.'); PD.set('lab-table', ''); PD.set('lab-sim', ''); return; }
   var xs = rows.map(function (r) { return val(r, S.x); }), ys = rows.map(function (r) { return val(r, S.y); });
   var mx = PD.median(xs), my = PD.median(ys), sx = stats(xs), sy = stats(ys);
   var dx = lower(S.x) ? -1 : 1, dy = lower(S.y) ? -1 : 1;
@@ -107,6 +110,7 @@ function draw() {
   var sortedX = xs.slice().sort(function (a, b) { return a - b; }), sortedY = ys.slice().sort(function (a, b) { return a - b; });
   var pOf = function (sorted, v, dir) { var p = pctRank(sorted, v); return dir > 0 ? p : 100 - p; };
   var nm = function (r) { return r[I.name] || PD.driverName(r[I.driver]); };
+  PD.set('lab-sim', simStrip(base0, q, nm));
   var sizes = S.size ? rows.map(function (r) { return S.size === 'races' ? r[I.races] : val(r, S.size); }).filter(function (v) { return v !== null; }) : [];
   var slo = sizes.length ? Math.min.apply(null, sizes) : 0, shi = sizes.length ? Math.max.apply(null, sizes) : 1;
   var sizeOf = function (r) { if (!S.size) return 11; var x = S.size === 'races' ? r[I.races] : val(r, S.size); if (x === null) return 6; if (lower(S.size)) x = shi - (x - slo); return 7 + 15 * (shi > slo ? (x - slo) / (shi - slo) : 0.5); };
@@ -146,6 +150,21 @@ function draw() {
   PD.v2.oursHeads(document.getElementById('lab-table'), { vx: S.x, vy: S.y });
 }
 
+/* "Most like": the driver the search names, against the drivers over the race minimum in this view */
+function simStrip(rows, q, nm) {
+  var I = LAB.idx;
+  var yr = function (r) { return S.year === 'all' ? ' ' + r[I.year] : ''; };
+  var who = q ? rows.filter(function (r) { return String(nm(r) || '').toLowerCase().indexOf(q) >= 0; })[0] : null;
+  if (!who) return '<p class="pd-cap pd-lab-simhint">Highlight a driver to list the five most like them on this chart.</p>';
+  var c = PD.v2 && PD.v2.spec;
+  var keys = (c ? c.headline('drivers') : []).filter(function (k) { return I[k] !== undefined; });
+  var near = QK.within.similar(rows, who, keys, function (r, k) { return raw(r, k); }, 5);
+  return QK.within.simHtml('Most like ' + nm(who) + yr(who) + ' · drivers', near.map(function (o) {
+    var r = o.row;
+    return { name: nm(r) + yr(r), href: '#/compare/drivers/' + encodeURIComponent(who[I.driver]) + '/' + encodeURIComponent(r[I.driver]), sub: PD.teamName(r[I.team]) + ' · ' + r[I.year] + ' · ' + (r[I.races] || 0) + ' races · compare' };
+  })) || '<p class="pd-cap pd-lab-simhint">Too few drivers share the headline metrics with ' + esc(nm(who)) + ' here.</p>';
+}
+
 function render(el, params, state) {
   el.innerHTML = PD.pageHead('Lab', 'Build your own chart', '<span id="lab-sub">Loading…</span>') + labNav('lab') +
     PD.card('', '', '<div class="pd-toolbar pd-lab-ctl">' +
@@ -157,7 +176,7 @@ function render(el, params, state) {
       '<label>Min races <b id="lab-min-v"></b><input id="lab-min" type="range" min="1" max="20" step="1"></label>' +
       '<label class="pd-check"><input id="lab-shrink" type="checkbox"> Shrink small samples</label>' +
       '<label>Highlight<input class="qk-input" id="lab-q" type="search" placeholder="Driver or team…"></label></div>' +
-      PD.chartBox('lab-chart', 600) + '<p class="pd-cap" id="lab-note"></p><div id="lab-ours" class="pd-lab-ours"></div>') +
+      PD.chartBox('lab-chart', 600) + '<div id="lab-sim" class="pd-lab-sim"></div><p class="pd-cap" id="lab-note"></p><div id="lab-ours" class="pd-lab-ours"></div>') +
     PD.card('Ranked', 'The whole group by the combined standard score on both axes.', '<div id="lab-table"></div>', { flush: true, cls: 'pd-mt' });
   return Promise.all([PD.load('lab.json'), PD.v2.specP]).then(function (got) {
     var rawLab = got[0];
@@ -166,6 +185,7 @@ function render(el, params, state) {
     LAB = prep(rawLab);
     if (S.year === null || (S.year !== 'all' && LAB.years.indexOf(S.year) < 0)) { var want = (rawLab.windows || {}).season || state.year; S.year = LAB.years.indexOf(want) >= 0 ? want : LAB.years[0]; }
     var q = params.query || {};
+    if (typeof q.q === 'string') S.q = q.q;
     if (q.x && LAB.idx[q.x] !== undefined) { S.x = q.x; S.preset = -1; }
     if (q.y && LAB.idx[q.y] !== undefined) { S.y = q.y; S.preset = -1; }
     if (!S.x || LAB.idx[S.x] === undefined || !S.y || LAB.idx[S.y] === undefined) { if (S.preset < 0) S.preset = 0; applyPreset(); }

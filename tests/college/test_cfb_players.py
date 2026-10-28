@@ -266,3 +266,17 @@ def test_career_files_carry_the_jersey_number(built):
     nums = [_load(f).get("number") for f in files]
     assert all(n is None or (isinstance(n, str) and n.isdigit() and len(n) <= 2) for n in nums)
     assert any(n is not None for n in nums)
+
+
+def test_lab_rows_carry_the_spec_minimums(built):
+    """The Lab's "Compare within: Position" ranks qualified players of the spec group: lab_players.json rows carry the
+    same `qualified` and `qualified_rate` flags as players.json."""
+    lab = _load(built["out"] / "2024" / "lab_players.json")
+    cat = _load(built["out"] / "2024" / "players.json")["players"]
+    f = lab["fields"]
+    assert f[-2:] == ["qualified", "qualified_rate"]
+    iq, ir, ii = f.index("qualified"), f.index("qualified_rate"), f.index("id")
+    assert lab["rows"] and all(isinstance(r[iq], bool) and isinstance(r[ir], bool) for r in lab["rows"])
+    hit = [r for r in lab["rows"] if str(r[ii]) in cat]
+    assert hit and all(r[iq] == cat[str(r[ii])]["qualified"] and r[ir] == cat[str(r[ii])]["qualified_rate"] for r in hit)
+    assert any(r[ir] for r in lab["rows"])

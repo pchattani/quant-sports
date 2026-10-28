@@ -396,11 +396,13 @@ function breakoutOf(p, kind, S) {
   return { p: p, kind: kind, cur: cur, prev: prev, gain: cur.war - prev.war, line: yrs.map(y => by[y]), yrs: yrs };
 }
 const JUMP = ['Biggest jump', 'Second biggest', 'Third biggest'];
+/* pitchers' percentiles are within the role (pct_role): say which */
+const roleOf = blk => (blk.pct_role ? (blk.role === 'RP' ? ' of relievers' : ' of starters') : '');
 function breakoutCard(b, L, S, i) {
   const blk = curBlock(b.p, b.kind, S) || {}, pc = blk.pct_role || blk.pct || {};
   const tm = blk.team || b.cur.team, pos = blk.pos || b.cur.pos || (b.kind === 'pitcher' ? 'P' : '');
   const deep = b.kind === 'hitter' ? (isNum(pc.woba) && pc.woba >= 80 ? 'a wOBA in the ' + QK.ordinal(Math.round(pc.woba)) + ' percentile of his position' : '')
-    : (isNum(pc.stuff_plus) && pc.stuff_plus >= 80 ? 'Stuff+ in the ' + QK.ordinal(Math.round(pc.stuff_plus)) + ' percentile' : (isNum(pc.ra9) && pc.ra9 >= 80 ? 'runs allowed in the ' + QK.ordinal(Math.round(pc.ra9)) + ' percentile' : ''));
+    : (isNum(pc.stuff_plus) && pc.stuff_plus >= 80 ? 'Stuff+ in the ' + QK.ordinal(Math.round(pc.stuff_plus)) + ' percentile' + roleOf(blk) : (isNum(pc.ra9) && pc.ra9 >= 80 ? 'runs allowed in the ' + QK.ordinal(Math.round(pc.ra9)) + ' percentile' + roleOf(blk) : ''));
   const work = b.kind === 'hitter' ? BP.int(b.cur.pa) + ' plate appearances' : 'about ' + Math.round(b.cur.ip) + ' innings';
   return { kicker: JUMP[i] || 'Breakout watch', sport: 'baseball', name: b.p.name, sub: [BP.teamAbbr(tm), pos, isNum(blk.age) ? 'age ' + Math.floor(blk.age) : ''].filter(Boolean).join(' · '),
     value: U.signed(b.gain, 1), unit: 'WAR on ' + (S - 1), colour: U.raw(tm), mark: U.team(tm, L, S),

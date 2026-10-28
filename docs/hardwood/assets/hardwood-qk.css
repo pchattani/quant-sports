@@ -495,3 +495,9 @@ input[type=number],
 @media (max-width: 720px) { .ql-week .qk-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } .ql-week .qk-stat-v { font-size: 2rem; } .ql-week .qk-stat:last-child:nth-child(odd) { grid-column: 1 / -1; } }
 @media (max-width: 420px) { .ql-links a { padding: 10px 10px 12px; } .ql-links b { font-size: 1.25rem; } .ql-links b::after { content: none; } .ql-links span { font-size: 11px; } .ql-race { padding: 14px; } }
 .hw-ticker + .ql-intro { margin-top: var(--sp-6); }
+/* Lab: "Compare within" (QK.within) and the "Most like" strip */
+.hw-lab-within-wrap:not(:empty) { padding: 10px 14px; border-bottom: 1px solid var(--line-2); }
+.hw-lab-within .qk-select { max-width: 260px; }
+.hw-lab-sim { padding: 8px 14px 0; }
+.hw-lab-sim .pg-note { margin: 0; }
+@media (max-width: 600px) { .hw-lab-within .qk-select { flex: 1 1 100%; max-width: 100%; } }

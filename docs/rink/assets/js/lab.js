@@ -7,7 +7,13 @@
  * metric's stabilisation point: shrunk = (n·x + k·median)/(n + k), with k = 3/7 of the sample at which
  * split-half reliability reaches 0.7 (r(n) = n/(n + k), so n₀.₇ = 7k/3).
  *
- * Address: #/lab?kind=S|G|T&pos=F|D&x=<key>&y=<key> (&s=<season>).
+ * Address: #/lab?kind=S|G|T&pos=F|D&x=<key>&y=<key> (&s=<season>), or #/lab?within=pos&pos=F|D|G&x=&y=.
+ * "Compare within" (QK.within): Broad (the default) is today's split, skaters (all, forwards or defence: the old
+ * `pos=F|D` filter) or goalies; Position is the metrics spec's peer groups (hockey.json forwards, defence, goalies,
+ * on the row's position group) at the spec's floor (the payload's `qualified`: 250 5v5 minutes prorated, goalies a
+ * quarter of the team's minutes), and the scatter, ranks, percentiles, medians, metric order and the "Most like"
+ * strip follow the group. In the address `pos` is the old skater filter under Broad and the group under Position, so
+ * old links keep working. The lab writes its state back with history.replaceState (no re-render).
  * Data: data/<S>/lab.json (column-oriented per kind: {"skaters": {cols, rows}, "goalies": {cols, rows},
  * "teams"?: {cols, rows}, "metrics": {skaters: [METRIC], goalies: [...], teams: [...]} | [METRIC]}), falling
  * back to skaters.json, goalies.json and teams.json. Uses RK.fk. */
@@ -37,8 +43,44 @@ const PRESETS = [
   ['T', ['xga_g'], ['ga_g'], 'Expected goals against goals allowed per game: goaltending and luck']
 ];
 const NO_SHRINK = /^(gp|gs|games|age|season|toi|toi\d*_gp|toi5|value|gar|war|gar_.*|rapm_.*|.*_se|g|a|a1|a2|p|pts|sog|iff|icf|shots|ixg|gax|xgf|xga|gsax|gsax_.*|shots_faced|sa|ga|w|l|otl|so|edge_.*|.*speed.*|bursts.*|ozs_pct|dzs_share|oz_start_pct|dz_start_pct|qo[ct]_.*|proj_.*|pts_pace|hits|blocks|pim|pp_p|sh_p|fo_taken|fo_net|pen_net)$/;
-let LAB = null, LABK = '';
-const S0 = { kind: 'S', pos: 'A', min: null, shrink: true, preset: 0, x: '', y: '', color: 'team', q: '', qual: true };
+let LAB = null, LABK = '', LAB_RESET = null, LAB_REDRAW = null;
+const S0 = { kind: 'S', pos: 'A', min: null, shrink: true, preset: 0, x: '', y: '', color: 'team', q: '', qual: true, within: 'broad', grp: 'F' };
+/* "Compare within: Position": [address code, spec group id, fallback display] */
+const PGROUPS = [['F', 'forwards', 'Forwards'], ['D', 'defence', 'Defence'], ['G', 'goalies', 'Goaltenders']];
+const PCODES = PGROUPS.map(g => g[0]);
+const byPos = () => S0.within === 'pos' && S0.kind !== 'T';
+const specCat = () => (RK.ours && RK.ours.cat ? RK.ours.cat() : null);
+function pgroup(code) {
+  const g = PGROUPS.find(x => x[0] === code) || PGROUPS[0];
+  const sg = specCat() && specCat().group ? specCat().group(g[1]) : null;
+  return { code: g[0], id: g[1], name: (sg && sg.display) || g[2], min: sg && sg.min ? sg.min : null };
+}
+/* the spec group(s) whose headline metrics lead the pickers and drive "Most like" */
+function groupIds() {
+  if (S0.kind === 'T') return [];
+  if (byPos()) return [pgroup(S0.grp).id];
+  if (S0.kind === 'G') return ['goalies'];
+  return S0.pos === 'F' ? ['forwards'] : S0.pos === 'D' ? ['defence'] : ['forwards', 'defence'];
+}
+function headOrder() {
+  const out = {}, c = specCat();
+  let n = 1;
+  groupIds().forEach(id => { (c ? c.headline(id) : []).forEach(k => { if (out[k] === undefined) out[k] = n++; }); });
+  return out;
+}
+/* the address: kind, the within choice (or the old skater filter under Broad), the axes; other keys kept */
+function writeHash() {
+  try {
+    const h = String(location.hash || '#/lab'), qi = h.indexOf('?');
+    const path = qi >= 0 ? h.slice(0, qi) : h, keep = [];
+    (qi >= 0 ? h.slice(qi + 1).split('&') : []).forEach(kv => { const k = kv.split('=')[0]; if (kv && ['kind', 'g', 'pos', 'within', 'x', 'y', 'q'].indexOf(k) < 0) keep.push(kv); });
+    const wq = QK.within.query({ within: byPos() ? 'pos' : 'broad', pos: S0.grp });
+    const add = { kind: S0.kind !== 'S' && !byPos() ? S0.kind : null, within: wq.within, pos: wq.pos || (!byPos() && S0.kind === 'S' && S0.pos !== 'A' ? S0.pos : null), x: S0.x || null, y: S0.y || null, q: S0.q.trim() || null };
+    Object.keys(add).forEach(k => { if (add[k]) keep.push(k + '=' + encodeURIComponent(add[k])); });
+    const nh = path + (keep.length ? '?' + keep.join('&') : '');
+    if (nh !== h && window.history && history.replaceState) history.replaceState(null, '', nh);
+  } catch (e) { /* the address is a convenience */ }
+}
 const MU = {};
 const KINDS = [['S', 'Skaters'], ['G', 'Goalies'], ['T', 'Teams']];
 
@@ -122,7 +164,11 @@ function val(r, key) {
   const n = nFor(r, key), kk = kOf(key);
   return (n * v + kk * mu) / (n + kk);
 }
-function posOk(r) { if (S0.kind !== 'S' || S0.pos === 'A') return true; return K().groupOf(raw(r, 'pos')) === S0.pos; }
+function posOk(r) {
+  if (byPos()) return S0.grp === 'G' ? true : K().groupOf(raw(r, 'pos')) === S0.grp;
+  if (S0.kind !== 'S' || S0.pos === 'A') return true;
+  return K().groupOf(raw(r, 'pos')) === S0.pos;
+}
 function presetList() {
   const k = K(), out = [], seen = {};
   const keys = Object.keys(G().idx);
@@ -135,16 +181,48 @@ function presetList() {
 function zs(a) { const n = a.length; if (!n) return { m: 0, s: 1 }; const m = a.reduce((x, y) => x + y, 0) / n; const v = a.reduce((x, y) => x + (y - m) * (y - m), 0) / n; return { m: m, s: Math.sqrt(v) || 1 }; }
 function pctRank(sorted, v) { let lo = 0, hi = sorted.length; while (lo < hi) { const mid = (lo + hi) >> 1; if (sorted[mid] < v) lo = mid + 1; else hi = mid; } let up = lo; while (up < sorted.length && sorted[up] === v) up++; return sorted.length ? 100 * ((lo + up) / 2) / sorted.length : null; }
 
+/* The pickers: "Our models", then the peer group's spec headline metrics ("Key numbers · <group>", in the spec's order),
+   then the payload's groups. Teams keep the generic order. */
+function pickerGroups(ms) {
+  if (S0.kind === 'T') return RK.ours.groups(ms, { entity: 'team' });
+  const head = headOrder(), ours = [], key = [], rest = [];
+  ms.forEach((m, i) => { const h = head[m.key] || 0, x = { m: m, h: h, i: i }; if (RK.ours.of(m.key)) ours.push(x); else if (h) key.push(x); else rest.push(x); });
+  const cmp = (a, b) => ((a.h || 1e3) - (b.h || 1e3)) || (a.i - b.i);
+  const out = [];
+  if (ours.length) out.push({ name: 'Our models', items: ours.sort(cmp).map(x => x.m) });
+  if (key.length) out.push({ name: 'Key numbers · ' + groupNoun(), items: key.sort(cmp).map(x => x.m) });
+  rest.forEach(x => { const g = 'Box score · ' + (x.m.group || 'Other'); let b = out.find(y => y.name === g); if (!b) { b = { name: g, items: [] }; out.push(b); } b.items.push(x.m); });
+  return out;
+}
+function groupNoun() {
+  if (S0.kind === 'T') return 'teams';
+  if (byPos()) return pgroup(S0.grp).name.toLowerCase();
+  return S0.kind === 'G' ? 'goalies' : ({ F: 'forwards', D: 'defencemen', A: 'skaters' })[S0.pos];
+}
 function metricOptions(sel, scope) {
   const k = K();
   let h = scope === 'color' ? '<option value="team">Team</option>' + (S0.kind === 'S' ? '<option value="pos">Position</option>' : (S0.kind === 'T' ? '<option value="conf">Conference</option>' : '')) + '<option value="">One colour</option>' : '';
-  (RK.ours ? RK.ours.groups(G().metrics, { entity: S0.kind === 'T' ? 'team' : 'player' }) : k.groups(G().metrics)).forEach(g => { h += '<optgroup label="' + k.esc(g.name) + '">' + g.items.map(m => '<option value="' + k.esc(m.key) + '"' + (m.key === sel ? ' selected' : '') + '>' + k.esc(m.label) + (m.lower ? ' ↓' : '') + '</option>').join('') + '</optgroup>'; });
+  (RK.ours ? pickerGroups(G().metrics) : k.groups(G().metrics)).forEach(g => { h += '<optgroup label="' + k.esc(g.name) + '">' + g.items.map(m => '<option value="' + k.esc(m.key) + '"' + (m.key === sel ? ' selected' : '') + '>' + k.esc(m.label) + (m.lower ? ' ↓' : '') + '</option>').join('') + '</optgroup>'; });
   return h;
 }
 function sync() {
   const k = K(), $ = k.$, P = presetList();
   $('lab-kind').querySelectorAll('button').forEach(b => { b.classList.toggle('on', b.dataset.v === S0.kind); b.disabled = !LAB[b.dataset.v]; });
-  $('lab-pos').value = S0.pos; $('lab-pos').parentNode.style.display = S0.kind === 'S' ? '' : 'none';
+  $('lab-pos').value = S0.pos; $('lab-pos').parentNode.style.display = S0.kind === 'S' && !byPos() ? '' : 'none';
+  const pg = byPos() ? pgroup(S0.grp) : null;
+  $('lab-within').innerHTML = S0.kind === 'T' ? '' : QK.within.html({ within: byPos() ? 'pos' : 'broad', pos: S0.grp }, { id: 'lab-wn', cls: 'rk-lab-within',
+    groups: PGROUPS.map(g => [g[0], pgroup(g[0]).name]),
+    note: pg ? 'Minimum: the spec’s floor (' + (pg.code === 'G' ? 'a quarter of the team’s minutes in net' : '250 5v5 minutes, prorated to games played') + '), the qualified flag' : 'Skaters or goalies' });
+  if (S0.kind !== 'T') QK.within.wire($('lab-within'), { within: byPos() ? 'pos' : 'broad', pos: S0.grp }, w => {
+    if (w.within === 'pos' && S0.within !== 'pos') w.pos = S0.kind === 'G' ? 'G' : (S0.pos === 'D' ? 'D' : 'F');
+    const was = S0.kind;
+    S0.within = w.within; S0.grp = w.pos;
+    if (S0.within === 'pos') { S0.kind = S0.grp === 'G' ? 'G' : 'S'; S0.qual = true; }
+    else if (S0.kind === 'S') S0.pos = S0.grp === 'D' ? 'D' : S0.grp === 'F' ? 'F' : 'A';
+    if (S0.kind !== was) { S0.x = ''; S0.y = ''; S0.preset = 0; S0.min = null; }
+    if (LAB_RESET) LAB_RESET();
+    sync(); if (LAB_REDRAW) LAB_REDRAW();
+  }, { id: 'lab-wn' });
   $('lab-preset').innerHTML = P.map((p, i) => '<option value="' + i + '"' + (i === S0.preset ? ' selected' : '') + '>' + k.esc(p.title) + '</option>').join('') + '<option value="-1"' + (S0.preset < 0 || !P.length ? ' selected' : '') + '>Custom axes</option>';
   $('lab-x').innerHTML = metricOptions(S0.x); $('lab-y').innerHTML = metricOptions(S0.y);
   $('lab-x').value = S0.x; $('lab-y').value = S0.y;
@@ -164,9 +242,10 @@ function draw(S) {
   Object.keys(MU).forEach(key => delete MU[key]);
   [S0.x, S0.y, S0.color].forEach(key => { if (key && G().idx[key] !== undefined && shrinkable(key)) MU[key] = k.median(base0.map(r => raw(r, key))); });
   const rows = base0.filter(r => val(r, S0.x) !== null && val(r, S0.y) !== null);
-  const noun = team ? 'teams' : S0.kind === 'G' ? 'goalies' : ({ F: 'forwards', D: 'defencemen', A: 'skaters' })[S0.pos];
+  const noun = groupNoun();
+  writeHash();
   k.set('lab-sub', rows.length + ' ' + noun + ' · ' + k.sLabel(S) + (team || !G().nKey ? '' : ' · ' + k.int(S0.min) + '+ ' + G().nLabel.toLowerCase() + (S0.qual ? ' · qualified' : '')));
-  if (rows.length < 3) { k.set('lab-chart', k.muted('Too few for this view: lower the floor, untick qualified only, or pick metrics these players have (puck and player tracking starts in 2021–22, shift-based metrics in 2010–11).')); k.set('lab-table', ''); k.set('lab-note', ''); return; }
+  if (rows.length < 3) { k.set('lab-chart', k.muted('Too few for this view: lower the floor, untick qualified only, or pick metrics these players have (puck and player tracking starts in 2021–22, shift-based metrics in 2010–11).')); k.set('lab-table', ''); k.set('lab-note', ''); k.set('lab-sim', ''); return; }
   const xs = rows.map(r => val(r, S0.x)), ys = rows.map(r => val(r, S0.y));
   const mx = k.median(xs), my = k.median(ys), sx = zs(xs), sy = zs(ys);
   const dirx = lower(S0.x) ? -1 : 1, diry = lower(S0.y) ? -1 : 1;
@@ -220,9 +299,10 @@ function draw(S) {
     shapes: [{ type: 'line', x0: mx, x1: mx, yref: 'paper', y0: 0, y1: 1, line: { color: '#3d444d', dash: 'dot', width: 1 } }, { type: 'line', y0: my, y1: my, xref: 'paper', x0: 0, x1: 1, line: { color: '#3d444d', dash: 'dot', width: 1 } }]
   }));
   k.clickThrough(node);
+  k.set('lab-sim', team ? '' : simStrip(base0, hits, nm, S));
   const mX = meta(S0.x), mY = meta(S0.y);
   const unit = m => k.esc(m.unit || (S0.kind === 'G' ? 'shots' : 'minutes'));
-  k.set('lab-note', 'Correlation on screen r = ' + k.num(rr, 2) + ' (' + rows.length + ' ' + noun + '). Dotted lines are medians. ' + (lower(S0.x) || lower(S0.y) ? 'Axes where less is better are reversed, so better is always up and to the right. ' : 'Better is up and to the right. ') +
+  k.set('lab-note', 'Correlation on screen r = ' + k.num(rr, 2) + ' (' + rows.length + ' ' + noun + '). Dotted lines are the medians of the ' + noun + ' on screen' + (byPos() ? ' (compared within the position group)' : '') + '. ' + (lower(S0.x) || lower(S0.y) ? 'Axes where less is better are reversed, so better is always up and to the right. ' : 'Better is up and to the right. ') +
     (team ? '' : 'Labelled: the eight furthest into the good corner, the four furthest from it' + (hits.length ? ', and your search' : '') + '. Marker size is the sample. ') + 'Click a dot to open the page.' +
     (S0.shrink && !team ? ' Rates marked "shrunk" are pulled to the median of the ' + noun + ' on screen by their own stabilisation point: (n·x + k·median)/(n + k) with k = 3/7 of the sample at which the metric reaches 0.7 split-half reliability' + (shrinkable(S0.x) ? ' (' + k.esc(mX.label) + ' k = ' + k.int(kOf(S0.x)) + ' ' + unit(mX) + ')' : '') + (shrinkable(S0.y) ? ' (' + k.esc(mY.label) + ' k = ' + k.int(kOf(S0.y)) + ' ' + unit(mY) + ')' : '') + '. Totals, RAPM, values and tracking figures are never shrunk here: the models regularise them already or they are not rates.' : '') +
     (mX.desc ? '<br><strong>' + k.esc(mX.label) + '</strong>: ' + k.esc(k.cleanDesc(mX.desc)) : '') + (mY.desc ? '<br><strong>' + k.esc(mY.label) + '</strong>: ' + k.esc(k.cleanDesc(mY.desc)) : ''));
@@ -238,15 +318,27 @@ function draw(S) {
   k.sortable(host);
 }
 
+/* "Most like": the five nearest the highlighted player within the group on screen, on standard scores of the group's
+   spec headline metrics (QK.within.similar), each a link to Compare. */
+function simStrip(rows, hits, nm, S) {
+  const k = K();
+  if (!hits.length) return '<p class="pg-note gq-note">Highlight a player to list the five most like them among the ' + k.esc(groupNoun()) + ' on this chart.</p>';
+  const t = hits[0], head = headOrder();
+  const keys = Object.keys(head).filter(x => G().idx[x] !== undefined).sort((a, b) => head[a] - head[b]);
+  const near = QK.within.similar(rows, t, keys, (r, x) => { const v = raw(r, x); return k.isNum(v) ? Number(v) : null; }, 5);
+  return QK.within.simHtml('Most like ' + nm(t) + ' · ' + groupNoun(), near.map(o => ({ name: nm(o.row), href: k.withQ('#/compare/' + encodeURIComponent(idOf(t)) + '/' + encodeURIComponent(idOf(o.row)), S),
+    sub: [raw(o.row, 'team') || '', k.posLabel(raw(o.row, 'pos'))].filter(Boolean).join(' · ') + ' · compare' })));
+}
+
 function render(el, params, state) {
   const k = K();
   el.innerHTML = QK.explain('<b>What’s that number?</b> Each dot is a player or a club on the two metrics you pick. The ranked list orders them by the combined standard score on both axes: 0 is average, +1 one standard deviation better on each.', { html: true }) +
     '<div class="card"><div class="card-header">Lab <span class="card-sub" id="lab-sub">Loading…</span><span class="gq-ctl">' + k.toggle('lab-kind', KINDS, S0.kind) + '</span></div>' +
-    '<div class="lab-controls gq-controls"><label>Preset<select id="lab-preset" class="gq-wide"></select></label><label>Skaters<select id="lab-pos"><option value="A">All</option><option value="F">Forwards</option><option value="D">Defence</option></select></label>' +
+    '<div id="lab-within" class="rk-lab-within-wrap"></div><div class="lab-controls gq-controls"><label>Preset<select id="lab-preset" class="gq-wide"></select></label><label>Skaters<select id="lab-pos"><option value="A">All</option><option value="F">Forwards</option><option value="D">Defence</option></select></label>' +
     '<label>X axis<select id="lab-x"></select></label><label>Y axis<select id="lab-y"></select></label><label>&nbsp;<button type="button" id="lab-swap" class="gq-btn" title="Swap the axes">⇄ swap</button></label>' +
     '<label>Colour<select id="lab-color"></select></label><label><span>Min <span id="lab-min-u"></span> <span id="lab-min-v"></span></span><input id="lab-min" type="range" min="0" max="2000" step="10"></label>' +
     '<label class="inline"><input id="lab-qual" type="checkbox"> qualified only</label><label class="inline"><input id="lab-shrink" type="checkbox"> shrink by stabilisation</label><label>Highlight<input id="lab-q" class="gq-search" type="search" placeholder="player or team…"></label>' +
-    '</div><div id="lab-ours" class="rk-lab-ours"></div><div id="lab-chart" class="gq-lab-chart"></div><div class="pg-note gq-note" id="lab-note"></div></div>' +
+    '</div><div id="lab-ours" class="rk-lab-ours"></div><div id="lab-chart" class="gq-lab-chart"></div><div id="lab-sim" class="rk-lab-sim"></div><div class="pg-note gq-note" id="lab-note"></div></div>' +
     '<div class="card"><div class="card-header">Ranked <span class="card-sub">By the combined standard score on both axes (top 300). Click a row for the page.</span></div><div id="lab-table"></div></div>';
   return k.ready().then(() => {
     const S = k.S(params, state);
@@ -263,7 +355,9 @@ function render(el, params, state) {
     const qy = params.query || {};
     const qk = String(qy.kind || qy.g || '').toUpperCase().charAt(0);
     if (qk && LAB[qk]) S0.kind = qk;
-    if (/^(F|D|A)$/i.test(qy.pos || '')) S0.pos = String(qy.pos).toUpperCase();
+    const wq = QK.within.read(qy, PCODES);
+    if (wq.within === 'pos') { S0.within = 'pos'; S0.grp = wq.pos; S0.kind = wq.pos === 'G' ? 'G' : 'S'; S0.qual = true; }
+    else { S0.within = 'broad'; if (/^(F|D|A)$/i.test(qy.pos || '')) S0.pos = String(qy.pos).toUpperCase(); }
     if (!LAB[S0.kind]) S0.kind = Object.keys(LAB)[0];
     const reset = () => {
       const g = G();
@@ -278,12 +372,20 @@ function render(el, params, state) {
       if (S0.color === 'conf' && S0.kind !== 'T') S0.color = 'team';
     };
     reset();
+    LAB_RESET = reset;
+    if (qy.q !== undefined) S0.q = String(qy.q);
     if (qy.x && G().idx[qy.x] !== undefined) { S0.x = qy.x; S0.preset = -1; }
     if (qy.y && G().idx[qy.y] !== undefined) { S0.y = qy.y; S0.preset = -1; }
     if (S0.x === S0.y) { const alt = G().metrics.find(m => m.key !== S0.x); if (alt) S0.y = alt.key; }
     sync();
     const redraw = () => draw(S);
-    $('lab-kind').querySelectorAll('button').forEach(b => b.addEventListener('click', () => { if (!LAB[b.dataset.v]) return; S0.kind = b.dataset.v; S0.x = ''; S0.y = ''; S0.preset = 0; S0.min = null; reset(); sync(); redraw(); }));
+    LAB_REDRAW = redraw;
+    $('lab-kind').querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+      if (!LAB[b.dataset.v]) return;
+      S0.kind = b.dataset.v; S0.x = ''; S0.y = ''; S0.preset = 0; S0.min = null;
+      if (S0.within === 'pos') { if (S0.kind === 'T') S0.within = 'broad'; else if (S0.kind === 'G') S0.grp = 'G'; else if (S0.grp === 'G') S0.grp = 'F'; }
+      reset(); sync(); redraw();
+    }));
     $('lab-pos').onchange = e => { S0.pos = e.target.value; redraw(); };
     $('lab-preset').onchange = e => { S0.preset = parseInt(e.target.value, 10); applyPreset(); sync(); redraw(); };
     $('lab-x').onchange = e => { S0.x = e.target.value; S0.preset = -1; sync(); redraw(); };

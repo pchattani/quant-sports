@@ -31,3 +31,17 @@ def test_lab_payload_without_value_is_unchanged():
     cats = {2026: _cat({"101": {"name": "A", "min": 300, "values": {}}})}
     out = SN.lab_payload("nba", cats)
     assert "war" not in out["fields"] and all(m["key"] != "war" for m in out["metrics"])
+
+
+def test_lab_rows_carry_the_role_peer_group():
+    """The Lab's "Compare within: Position" reads `role` (G / W / B): the catalogue's, else classify_roles' rule."""
+    cats = {2025: _cat({"101": {"name": "A", "pool": "G", "min": 300, "qualified": True, "role": "G", "values": {}},
+                        "102": {"name": "B", "pool": "F", "min": 300, "qualified": True, "role": "B", "values": {}}}),
+            2026: _cat({"201": {"name": "C", "pool": "G", "min": 300, "qualified": True, "values": {}},
+                        "202": {"name": "D", "pool": "C", "min": 300, "qualified": True, "values": {}},
+                        "203": {"name": "E", "pool": "F", "min": 300, "qualified": True, "values": {}}})}
+    out = SN.lab_payload("nba", cats)
+    i = out["fields"].index("role")
+    assert i == out["fields"].index("qualified") + 1
+    got = {r[0]: r[i] for r in out["rows"]}
+    assert got == {"101": "G", "102": "B", "201": "G", "202": "B", "203": "W"}

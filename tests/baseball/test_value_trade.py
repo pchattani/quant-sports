@@ -104,6 +104,20 @@ def test_value_payload_floors_and_best():
     assert all(x[0] != "small" for x in d["best"]["LF"])               # under half the floor
 
 
+def test_value_payload_ranks_starters_and_relievers_apart():
+    """Pitchers' WAR percentiles are within the role (starters with starters, relievers with relievers), each with the
+    spec's floor (300 / 120 BF x team games / 162): a reliever is never ranked against starters' innings."""
+    rows = [P("s1", "A", "SP", 5.0, bf=800), P("s2", "B", "SP", 1.0, bf=700), P("r1", "A", "RP", 1.5, bf=280),
+            P("r2", "B", "RP", 0.2, bf=250), P("rsmall", "C", "RP", 0.1, bf=100)]
+    d = V.value_payload("mlb", 2026, rows, None, None, 162, "offseason")
+    assert d["floors"]["SP"] == 300 and d["floors"]["RP"] == 120 and V.floors("mlb", 81)["RP"] == 60
+    F = {f: i for i, f in enumerate(d["fields"])}
+    by = {r[F["pid"]]: r for r in d["rows"]}
+    assert by["r1"][F["pct"]] == 75 and by["r2"][F["pct"]] == 25      # top and bottom of the two qualified relievers
+    assert by["s1"][F["pct"]] == 75 and by["s2"][F["pct"]] == 25
+    assert by["rsmall"][F["pct"]] is None                              # under the relievers' 120 BF
+
+
 # ── projections ─────────────────────────────────────────────────────────────
 
 def test_marcel_weights_and_regression():

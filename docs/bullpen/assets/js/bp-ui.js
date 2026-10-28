@@ -295,15 +295,16 @@ U.label = (kind, key, fallback) => {
   const d = (U.MDESC[kind === 'pitcher' ? 'pitcher' : kind === 'team' ? 'team' : 'hitter'] || {})[key];
   return d && d[0] ? d[0] : String(fallback || key).replace(/ \(ours\)$/, '');
 };
-U.headIds = kind => {
-  const keys = kind === 'pitcher' ? ['SP', 'RP'] : kind === 'team' ? ['TEAM'] : ['ALL', 'C', '1B', '2B', '3B', 'SS', 'CF', 'LF/RF', 'DH'];
+U.headIds = (kind, setKey) => {
+  let keys = kind === 'pitcher' ? ['SP', 'RP'] : kind === 'team' ? ['TEAM'] : ['ALL', 'C', '1B', '2B', '3B', 'SS', 'CF', 'LF/RF', 'DH'];
+  if (setKey && keys.indexOf(setKey) >= 0) keys = [setKey].concat(keys.filter(x => x !== setKey));   // o.set: one group's headline first (the Lab's peer group)
   const out = [];
   keys.forEach(k => U.flat(k, 'head').forEach(x => { if (out.indexOf(x[0]) < 0) out.push(x[0]); }));
   return out;
 };
 U.metricOpts = (metrics, sel, kind, o) => {
   o = o || {};
-  const heads = U.headIds(kind), pos = key => { const i = heads.indexOf(key); return i < 0 ? 999 : i; };
+  const heads = U.headIds(kind, o.set), pos = key => { const i = heads.indexOf(key); return i < 0 ? 999 : i; };
   const opt = m => '<option value="' + esc(m.key) + '"' + (m.key === sel ? ' selected' : '') + '>' + esc(U.label(kind, m.key, m.label)) + (m.lower ? ' ↓' : '') + '</option>';
   const ms = (metrics || []).map((m, i) => ({ m: m, i: i }));
   const ours = ms.filter(x => U.ours(x.m.key)).sort((a, b) => (pos(a.m.key) - pos(b.m.key)) || (a.i - b.i));

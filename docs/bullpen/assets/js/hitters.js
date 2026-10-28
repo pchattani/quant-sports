@@ -780,7 +780,7 @@ const HIT_PREFS = BP.ui && BP.ui.flat && BP.ui.flat('ALL', 'head').length ? BP.u
 const PIT_PREFS = BP.ui && BP.ui.flat && BP.ui.flat('SP', 'head').length ? BP.ui.flat('SP', 'head').map(x => x[0]) : ['pitching_plus', 'stuff_plus', 'location_plus', 'war', 'k_bb_pct', 'xwoba_plus', 'ra9', 'fip', 'csw_pct', 'whiff_pct'];
 K.HIT_PREFS = HIT_PREFS; K.PIT_PREFS = PIT_PREFS;
 const STATE = { hitter: { q: '', team: '', pos: '', role: '', floor: null, basis: 'role', extra: [], level: '', season: null, sort: null },
-  pitcher: { q: '', team: '', pos: '', role: '', floor: null, basis: 'role', extra: [], level: '', season: null, sort: null } };
+  pitcher: { q: '', team: '', pos: '', role: 'SP', floor: null, basis: 'role', extra: [], level: '', season: null, sort: null } };
 /* The spec's metric set for the filter in force (BP.ui.SETS, docs/METRICS_SPEC.md): a position's set when a position is
    picked, the starters' or relievers' set by role, else all hitters / starters. Falls back to the old preferences. */
 function specKey(kind, st) {
@@ -808,10 +808,11 @@ K.renderCatalogue = function (el, params, state, kind) {
     '<div class="lab-controls gq-controls">' +
     '<label>Search<input id="cat-q" class="gq-search" type="search" placeholder="name or team…"></label>' +
     '<label>Team<select id="cat-team"><option value="">All teams</option></select></label>' +
-    (pit ? '<label>Role<select id="cat-role"><option value="">Starters and relievers</option><option value="SP">Starters</option><option value="RP">Relievers</option></select></label>'
+    (pit ? '<label>Role<select id="cat-role"><option value="SP">Starters</option><option value="RP">Relievers</option></select></label>'
       : '<label>Position<select id="cat-pos"><option value="">All positions</option></select></label>') +
     '<label>Min ' + (pit ? 'batters faced' : 'PA') + ' <span id="cat-floor-v"></span><input id="cat-floor" type="range" min="0" max="700" step="5"></label>' +
-    '<label>Percentiles<select id="cat-basis"><option value="role">against ' + (pit ? 'the same role (starters or relievers)' : 'the same position') + '</option><option value="all">against all ' + K.LN(L) + ' ' + (pit ? 'pitchers' : 'hitters') + '</option></select></label>' +
+    /* starters and relievers are separate peer groups (docs/METRICS_SPEC.md): pitchers rank within their role only */
+    '<label>Percentiles<select id="cat-basis"><option value="role">against ' + (pit ? 'the same role (starters or relievers)' : 'the same position') + '</option>' + (pit ? '' : '<option value="all">against all ' + K.LN(L) + ' hitters</option>') + '</select></label>' +
     '<label>Add a metric<select id="cat-extra"><option value="">—</option></select></label>' +
     '<label>&nbsp;<button type="button" id="cat-clear" class="gq-btn">Clear added</button></label>' +
     '</div><div id="cat-chips" class="gq-chips"></div><div id="cat-table">' + K.muted('Loading…') + '</div><div class="pg-note gq-note" id="cat-note"></div></div>';
@@ -825,6 +826,7 @@ K.renderCatalogue = function (el, params, state, kind) {
     if (!cat) { $('cat-table').innerHTML = K.notBuilt('The ' + K.LN(L) + ' ' + S + ' ' + (pit ? 'pitcher' : 'hitter') + ' catalogue', o.raw); $('cat-sub').textContent = ''; return; }
     K.learnCat(cat);
     const st = STATE[kind];
+    if (pit) { st.basis = 'role'; if (st.role !== 'RP') st.role = 'SP'; }
     if (st.level !== L || st.season !== S) { st.level = L; st.season = S; st.floor = null; st.team = ''; }
     const P = cat.players, metrics = cat.metrics || [], meta = K.metaOf(metrics);
     const ids = Object.keys(P);

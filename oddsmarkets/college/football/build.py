@@ -1226,13 +1226,17 @@ def fantasy_payload(ctx: dict, season: int) -> dict:
 # ── labs ────────────────────────────────────────────────────────────────────
 
 def lab_players(season: int, val: pd.DataFrame, mem: list[str], light: bool = False) -> dict:
+    """The Lab's player rows. `qualified` (games >= the position's floor) and `qualified_rate` (the volume for the
+    position's rates, players.rate_qualified) are the spec's minimums, as players.json has them: the Lab's "Compare
+    within: Position" (the spec's QB ... P peer groups) ranks only qualified players by default."""
     keys = [k for k, *_ in PLAYER_METRICS]
-    fields = ["id", "name", "team", "pos", "class", "gp"] + keys
+    fields = ["id", "name", "team", "pos", "class", "gp"] + keys + ["qualified", "qualified_rate"]
     v = _catalogue(val, mem, light)
     rows = []
     for r in (v.to_dict("records") if len(v) else []):
         rows.append([r["pid"], r.get("name"), r["team"], r["pos"], r.get("class"), int(r["gp"])] +
-                    [r2(r[k], _DP.get(k, 1)) for k in keys])
+                    [r2(r[k], _DP.get(k, 1)) for k in keys] +
+                    [bool(r["gp"] >= MIN_FLOOR.get(r["pos"], 4)), bool(players.rate_qualified(r))])
     return {"ok": True, "kind": "player", "season": season, "fields": fields, "metrics": metric_list(PLAYER_METRICS), "rows": rows}
 
 

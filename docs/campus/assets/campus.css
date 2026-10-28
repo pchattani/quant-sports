@@ -333,3 +333,8 @@ a.cc-bt:hover .nm { color: var(--accent); }
   .cc-tp-row .qk-segs { display: none; }
   .cc-tp-rank { grid-column: 1 / -1; text-align: left; }
 }
+/* the Lab's "Compare within" and "Most like" strip */
+.cc-lab-sim { margin-top: var(--sp-3); }
+.cc-lab-sim .cc-note { margin: 0; }
+.cc-lab-sel .qk-input { min-width: 0; max-width: calc(100vw - 110px); }
+.cc-lab-chk input { accent-color: var(--signal); }

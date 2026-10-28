@@ -396,10 +396,24 @@ def marcel_time(h: dict[int, dict], s: int, kind: str, level: str) -> float:
 FIELDS = ["pid", "name", "team", "kind", "pos", "elig", "age", "g", "n", "war", "rate", "pct", "war_prev", "proj", "why"]
 
 
+# The spec's minimum sample for the pitcher peer groups (docs/METRICS_SPEC.md, baseball.json sp / rp): batters faced over
+# a 162-game season, prorated by team games.
+ROLE_FLOOR = {"SP": 300, "RP": 120}
+
+
 def floors(level: str, team_games: int) -> dict:
-    """Leaderboard and percentile floors: 2.1 PA and 1.25 BF per team game (the catalogues' reference rules)."""
+    """Leaderboard and percentile floors: 2.1 PA and 1.25 BF per team game (the catalogues' reference rules); "SP" and
+    "RP" are the starters' and relievers' percentile floors (300 and 120 BF x team games / 162)."""
     tg = max(team_games or 0, 20)
-    return {"H": max(50, int(round(2.1 * tg))), "P": max(40, int(round(1.25 * tg)))}
+    out = {"H": max(50, int(round(2.1 * tg))), "P": max(40, int(round(1.25 * tg)))}
+    out.update({r: max(10, int(round(v * min(tg, 162) / 162))) for r, v in ROLE_FLOOR.items()})
+    return out
+
+
+def pct_group(r: dict) -> str:
+    """The percentile pool of a value row: hitters together, pitchers within their role (starters and relievers are
+    never pooled)."""
+    return r.get("pos") if r["kind"] == "P" and r.get("pos") in PIT_POS else r["kind"]
 
 
 def why(r: dict) -> str:
@@ -415,14 +429,19 @@ def value_payload(level: str, season: int, rows: list[dict], prev: list[dict] | 
     """<L>/<S>/value.json: the leaderboard and the best at each position."""
     fl = floors(level, team_games)
     prev_by = {(r["kind"], r["pid"]): r for r in (prev or [])}
-    pool = {k: [r["war"] for r in rows if r["kind"] == k and (r.get("n") or 0) >= fl[k] and r.get("war") is not None] for k in ("H", "P")}
+    pool: dict[str, list] = {}
+    for r in rows:
+        g = pct_group(r)
+        if (r.get("n") or 0) >= fl[g] and r.get("war") is not None:
+            pool.setdefault(g, []).append(r["war"])
     out_rows = []
     for r in rows:
         if (r.get("n") or 0) < 10:
             continue
         p = prev_by.get((r["kind"], r["pid"]))
         pj = ((proj or {}).get(r["kind"]) or {}).get(r["pid"])
-        pct = pct_rank(pool[r["kind"]], r["war"]) if (r.get("n") or 0) >= fl[r["kind"]] else None
+        g = pct_group(r)
+        pct = pct_rank(pool.get(g) or [], r["war"]) if (r.get("n") or 0) >= fl[g] else None
         out_rows.append([r["pid"], r.get("name"), r.get("team"), r["kind"], r.get("pos"), eligible(r), an.rnd(r.get("age"), 1), r.get("g"),
                          r.get("n"), an.rnd(r.get("war"), 1), an.rnd(r.get("rate"), 2), an.rnd(pct, 0),
                          an.rnd(p.get("war"), 1) if p else None, an.rnd(pj.get("war"), 1) if pj else None, why(r)])

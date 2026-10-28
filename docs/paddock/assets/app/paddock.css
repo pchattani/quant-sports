@@ -355,6 +355,8 @@
 
 /* round 5: our model metrics (the cobalt tag and explain strip) */
 .pd-lab-ours { margin-top: 12px; }
+.pd-lab-sim { margin-top: 12px; }
+.pd-lab-sim .pd-cap { margin: 0; }
 .pd-ours { margin-top: 16px; }
 
 /* Constructor page: top performers against the grid (constructors.js topPerformers) */

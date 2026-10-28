@@ -281,6 +281,12 @@ body.qk::before { content: none; }
 .qk-seg button:hover { color: var(--ink-1); }
 .qk-seg button[aria-pressed="true"] { background: var(--ink-1); color: var(--ink-inv); }
 .qk-seg button:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+/* the Labs' "Compare within" (QK.within) */
+.qk-within { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.qk-within-l { font: 700 12px/1 var(--font-cond); text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-3); }
+.qk-within .qk-select { max-width: 100%; min-width: 0; }
+.qk-within-n { font-size: var(--fs-sm); color: var(--ink-3); }
+.qk-within-sim { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .qk-chips { display: flex; gap: 6px; flex-wrap: wrap; }
 .qk-chips.scroll { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
 .qk-chip {

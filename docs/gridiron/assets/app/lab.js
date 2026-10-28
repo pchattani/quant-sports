@@ -7,7 +7,13 @@
  * reliability reaches 0.7. Reads <S>/lab.json (players.json and teams.json as the fallback) and <S>/value.json (Gridiron
  * Value per game and in total, joined by player id). Round 5: the pickers list our model metrics first ("Our models",
  * then the spec's headline box-score metrics, then the payload's groups), and our metrics carry the cobalt tag on the
- * axes line and in the ranked table's heads, with a cobalt strip naming the model. */
+ * axes line and in the ranked table's heads, with a cobalt strip naming the model.
+ * "Compare within" (QK.within, &within=pos&pos=QB|RB|WR|TE|EDGE|DL|LB|CB|S|K|P): Broad (the default) is the lab's groups,
+ * with every defender in one pool; Position is the metrics spec's peer groups (nfl.json), the defenders split into outside
+ * pass rushers, interior linemen, linebackers, corners and safeties by value.json's role (the roster position when a
+ * player has no value row). The scatter, ranks, percentiles, medians, presets, the picker's headline order, the
+ * qualified floor and the "Most like" strip follow the group. Defender counts get per-game rates in the page (tackles,
+ * tackles for loss, passes defensed, interceptions, forced fumbles over games) for the spec's per-game headline. */
 (function (GI) {
 'use strict';
 
@@ -28,7 +34,33 @@ const PRESETS = [
 ];
 const NO_SHRINK = /^(n|g|games|age|season|composite|value|def_value|pts_oe|fg_oe|epa_total|rec_epa|scramble_epa|rush_epa_qb|.*_yds|.*_td|ints|sacks|qb_hits|tfl|tackles|pd|ff|att|carries|targets|rec|fga|fgm|fg_50|punts)$/;
 let LAB = null, LABK = '';
-const S0 = { kind: 'QB', min: null, shrink: true, preset: 0, x: '', y: '', color: 'team', q: '', qual: true };
+const S0 = { kind: 'QB', min: null, shrink: true, preset: 0, x: '', y: '', color: 'team', q: '', qual: true, within: 'broad', pos: 'QB' };
+/* "Compare within: Position": [address code, lab group, spec group] */
+const POSG = [['QB', 'QB', 'qb'], ['RB', 'RB', 'rb'], ['WR', 'WR', 'wr'], ['TE', 'TE', 'te'], ['EDGE', 'DEF', 'edge'], ['DL', 'DEF', 'idl'], ['LB', 'DEF', 'lb'], ['CB', 'DEF', 'cb'], ['S', 'DEF', 's'], ['K', 'K', 'k'], ['P', 'P', 'p']];
+const POS_CODES = POSG.map(p => p[0]);
+const posOf = code => POSG.find(p => p[0] === code) || POSG[0];
+const byPos = () => S0.within === 'pos';
+const posName = code => ((GI.SP.BY[posOf(code)[2]] || {}).name || code);
+/* the defenders' own presets in Position mode (before the lab's defence presets) */
+const ROLE_PRESETS = {
+  EDGE: [['pressures_pg', 'gvar_pg', 'Sacks and hits per game against value per game'], ['tfl_pg', 'pressures_pg', 'Against the run and the pass: tackles for loss against sacks and hits']],
+  DL: [['pressures_pg', 'gvar_pg', 'Sacks and hits per game against value per game'], ['tfl_pg', 'pressures_pg', 'Against the run and the pass: tackles for loss against sacks and hits']],
+  LB: [['tackles_pg', 'gvar_pg', 'Tackles per game against value per game'], ['tfl_pg', 'pressures_pg', 'Downhill: tackles for loss against sacks and hits']],
+  CB: [['pd_pg', 'gvar_pg', 'Passes defensed per game against value per game'], ['tackles_pg', 'pd_pg', 'Run support against coverage']],
+  S: [['pd_pg', 'gvar_pg', 'Passes defensed per game against value per game'], ['tackles_pg', 'pd_pg', 'Run support against coverage']]
+};
+/* per-game rates for the defenders from the payload's counts (the spec's per-game headline metrics) */
+const PER_GAME = [['tackles_pg', 'tackles', 'Tackles per game'], ['tfl_pg', 'tfl', 'Tackles for loss per game'], ['pd_pg', 'pd', 'Passes defensed per game'], ['ints_pg', 'ints', 'Interceptions per game'], ['ff_pg', 'ff', 'Forced fumbles per game']];
+/* A defender's spec group: value.json's role, else the roster position (GI.SP.groupOf's rule) */
+function defGroup(pos, vrow) { const g = GI.SP.groupOf({ pos: pos, group: 'DEF', role: vrow && vrow.pos }, null, null); return g ? g.id : null; }
+function withDefRoles(G0, vr) {
+  const ip = G0.cols.indexOf('pid'), ipos = G0.cols.indexOf('pos'), ig = G0.cols.indexOf('games');
+  const add = PER_GAME.filter(p => G0.cols.indexOf(p[0]) < 0 && G0.cols.indexOf(p[1]) >= 0);
+  const ic = add.map(p => G0.cols.indexOf(p[1]));
+  return { cols: G0.cols.concat(['_grp']).concat(add.map(p => p[0])), add: add,
+    rows: G0.rows.map(r => { const g = ig >= 0 && isNum(r[ig]) && r[ig] > 0 ? r[ig] : null;
+      return r.concat([defGroup(ipos >= 0 ? r[ipos] : null, ip >= 0 ? vr[String(r[ip])] : null)]).concat(ic.map(i => (g && isNum(r[i]) ? r[i] / g : null))); }) };
+}
 const MU = {};
 
 /* Gridiron Value per game and in total (value.json, joined by player id) so the lab can plot our value model too. */
@@ -53,8 +85,10 @@ function prep(raw, vraw) {
   if (GI.ok(raw) && raw.groups) {
     GI.cleanMetrics(raw.metrics); GI.cleanMetrics(raw.team_metrics);
     Object.keys(raw.groups).forEach(g => { const G0 = raw.groups[g] || {}; if (!Array.isArray(G0.cols) || !(G0.rows || []).length) return;
-      const G = withValue(G0, vr), ms0 = GI.metricsFor(raw, g).length ? GI.metricsFor(raw, g) : (raw.metrics || []);
-      mk(g, G.cols, G.rows, G.cols.length > G0.cols.length ? ms0.concat(VMETRICS()) : ms0); });
+      let G = withValue(G0, vr), ms0 = GI.metricsFor(raw, g).length ? GI.metricsFor(raw, g) : (raw.metrics || []);
+      if (G.cols.length > G0.cols.length) ms0 = ms0.concat(VMETRICS());
+      if (g === 'DEF') { G = withDefRoles(G, vr); ms0 = ms0.concat(G.add.map(p => ({ key: p[0], label: GI.SP.specLabel(p[0], p[2]), group: 'Per game', fmt: '2', lower: false, desc: p[2] + ': the season count over games played (computed on this page).' }))); }
+      mk(g, G.cols, G.rows, ms0); });
     if (raw.teams && Array.isArray(raw.teams.cols) && (raw.teams.rows || []).length) mk('TEAM', raw.teams.cols, raw.teams.rows, raw.team_metrics || []);
   }
   return kinds;
@@ -79,26 +113,39 @@ function val(r, key) {
 }
 function presetList() {
   const out = [], seen = {};
-  PRESETS.filter(p => p[0] === S0.kind).forEach(p => { if (G().idx[p[1]] !== undefined && G().idx[p[2]] !== undefined && !seen[p[1] + p[2]]) { seen[p[1] + p[2]] = 1; out.push({ x: p[1], y: p[2], title: p[3] }); } });
+  (byPos() ? (ROLE_PRESETS[S0.pos] || []).map(p => [S0.kind, p[0], p[1], p[2]]) : []).concat(PRESETS.filter(p => p[0] === S0.kind)).forEach(p => { if (G().idx[p[1]] !== undefined && G().idx[p[2]] !== undefined && !seen[p[1] + p[2]]) { seen[p[1] + p[2]] = 1; out.push({ x: p[1], y: p[2], title: p[3] }); } });
   return out;
 }
 function zs(a) { const n = a.length; if (!n) return { m: 0, s: 1 }; const m = a.reduce((x, y) => x + y, 0) / n; return { m: m, s: Math.sqrt(a.reduce((x, y) => x + (y - m) * (y - m), 0) / n) || 1 }; }
 function pctRank(sorted, v) { let lo = 0, hi = sorted.length; while (lo < hi) { const mid = (lo + hi) >> 1; if (sorted[mid] < v) lo = mid + 1; else hi = mid; } let up = lo; while (up < sorted.length && sorted[up] === v) up++; return sorted.length ? 100 * ((lo + up) / 2) / sorted.length : null; }
 function metricOpts(sel, colour) {
   return (colour ? '<option value="team">Team</option>' + (S0.kind !== 'TEAM' ? '<option value="pos">Position</option>' : '<option value="conf">Conference</option>') + '<option value="">One colour</option>' : '') +
-    GI.SP.orderOpts(G().metrics.map(m => ({ key: m.key, label: m.label, lower: m.lower, group: m.group })), sel, GI.SP.headIds(S0.kind));
+    GI.SP.orderOpts(G().metrics.map(m => ({ key: m.key, label: m.label, lower: m.lower, group: m.group })), sel, headKeys());
+}
+/* the spec's headline ids of the group on screen: the position's group, or the broad group's */
+function headKeys() { return GI.SP.headIds(byPos() ? posOf(S0.pos)[2] : S0.kind); }
+const inGroup = r => !byPos() || posOf(S0.pos)[1] !== 'DEF' || raw(r, '_grp') === posOf(S0.pos)[2];
+/* "Most like": the five nearest the highlighted player within the group on screen, on the group's headline metrics */
+function simStrip(rows, hits, S, nm) {
+  if (S0.kind === 'TEAM') return '';
+  const noun = byPos() ? posName(S0.pos).toLowerCase() : (GI.GROUP_NAME[S0.kind] || 'players').toLowerCase();
+  if (!hits.length) return '<p class="gi-cap">Highlight a player to list the five most like them among the ' + esc(noun) + ' on this chart.</p>';
+  const t = hits[0], keys = headKeys().filter(k => G().idx[k] !== undefined);
+  const near = QK.within.similar(rows, t, keys, (r, k) => raw(r, k), 5);
+  return QK.within.simHtml('Most like ' + nm(t) + ' · ' + noun, near.map(o => ({ name: nm(o.row), href: GI.compareHref(idOf(t), idOf(o.row)) + (S && Number(S) !== GI.currentSeason() ? '?s=' + S : ''),
+    sub: [raw(o.row, 'team') || '', GI.int(nOf(o.row)) + ' ' + G().nLabel.toLowerCase()].filter(Boolean).join(' · ') + ' · compare' })));
 }
 
 function draw(S) {
   const team = S0.kind === 'TEAM';
-  const base0 = G().rows.filter(r => team || (nOf(r) >= S0.min && (!S0.qual || G().idx.qualified === undefined || raw(r, 'qualified') !== false)));
+  const base0 = G().rows.filter(r => team || (inGroup(r) && nOf(r) >= S0.min && (!S0.qual || G().idx.qualified === undefined || raw(r, 'qualified') !== false)));
   Object.keys(MU).forEach(k => delete MU[k]);
   [S0.x, S0.y, S0.color].forEach(k => { if (k && G().idx[k] !== undefined && shrinkable(k)) MU[k] = GI.median(base0.map(r => raw(r, k))); });
   const rows = base0.filter(r => val(r, S0.x) !== null && val(r, S0.y) !== null);
-  const noun = team ? 'teams' : (GI.GROUP_NAME[S0.kind] || 'players').toLowerCase();
+  const noun = team ? 'teams' : (byPos() ? posName(S0.pos) : (GI.GROUP_NAME[S0.kind] || 'players')).toLowerCase();
   GI.set('lab-sub', rows.length + ' ' + noun + ' · ' + S + (team ? '' : ' · ' + S0.min + '+ ' + G().nLabel.toLowerCase() + (S0.qual ? ' · qualified' : '')));
   GI.set('lab-ours', GI.SP.ours(S0.x) || GI.SP.ours(S0.y) ? '<p class="gi-lab-axes">' + [['X', S0.x], ['Y', S0.y]].map(a => a[0] + ': <b>' + esc(meta(a[1]).label || a[1]) + '</b>' + GI.SP.oursTag(a[1])).join(' &nbsp;·&nbsp; ') + '</p>' + GI.SP.oursNote([[S0.x, meta(S0.x).label, team ? 'team' : 'player'], [S0.y, meta(S0.y).label, team ? 'team' : 'player']]) : '');
-  if (rows.length < 3) { GI.ch.none('lab-chart', 'Too few for this view: lower the floor, untick qualified only, or pick metrics these players have (FTN charting starts in 2022, NGS in 2016).'); GI.set('lab-table', ''); GI.set('lab-note', ''); GI.set('lab-kpis', ''); return; }
+  if (rows.length < 3) { GI.ch.none('lab-chart', 'Too few for this view: lower the floor, untick qualified only, or pick metrics these players have (FTN charting starts in 2022, NGS in 2016).'); GI.set('lab-table', ''); GI.set('lab-note', ''); GI.set('lab-kpis', ''); GI.set('lab-sim', ''); return; }
   const xs = rows.map(r => val(r, S0.x)), ys = rows.map(r => val(r, S0.y));
   const mx = GI.median(xs), my = GI.median(ys), sx = zs(xs), sy = zs(ys);
   const dirx = lower(S0.x) ? -1 : 1, diry = lower(S0.y) ? -1 : 1;
@@ -142,8 +189,9 @@ function draw(S) {
         .concat(hits.length ? [{ type: 'scatter', silent: true, symbol: 'circle', symbolSize: 22, z: 5, itemStyle: { color: 'transparent', borderColor: T.model, borderWidth: 2 }, data: hits.map(r => [val(r, S0.x), val(r, S0.y)]) }] : [])
     };
   }, 'Scatter of ' + label(S0.x) + ' against ' + label(S0.y));
+  GI.set('lab-sim', simStrip(base0, hits, S, nm));
   const rr = GI.corr(xs, ys), mX = meta(S0.x), mY = meta(S0.y);
-  GI.set('lab-note', 'Correlation on screen r = ' + GI.num(rr, 2) + ' (' + rows.length + ' ' + noun + '). Dashed lines are medians; ' + (lower(S0.x) || lower(S0.y) ? 'axes where less is better are reversed, so ' : '') + 'better is up and to the right. ' +
+  GI.set('lab-note', 'Correlation on screen r = ' + GI.num(rr, 2) + ' (' + rows.length + ' ' + noun + '). Dashed lines are the medians of the ' + esc(noun) + '; ' + (lower(S0.x) || lower(S0.y) ? 'axes where less is better are reversed, so ' : '') + 'better is up and to the right. ' +
     (team ? '' : 'Labelled: the eight furthest into the good corner, the four furthest from it' + (hits.length ? ', and your search' : '') + '. Dot size is the sample. ') + 'Tap a dot for the page.' +
     (S0.shrink && !team ? ' "Shrunk" rates are pulled towards the median by their stabilisation point' + (shrinkable(S0.x) ? ' (' + esc(mX.label) + ' k = ' + GI.int(kOf(S0.x)) + ')' : '') + (shrinkable(S0.y) ? ' (' + esc(mY.label) + ' k = ' + GI.int(kOf(S0.y)) + ')' : '') + '.' : '') +
     (mX.desc ? '<br><b>' + esc(mX.label) + '</b>: ' + esc(mX.desc) : '') + (mY.desc ? '<br><b>' + esc(mY.label) + '</b>: ' + esc(mY.desc) : ''));
@@ -152,14 +200,16 @@ function draw(S) {
     best ? GI.kpi('Best on both', esc(team ? GI.teamAbbr(idOf(best)) : GI.surnameOf(nm(best))), 'the furthest into the good corner (combined standard score ' + GI.num(ranked[0].z, 2) + ')', { signal: true, href: href(best) }) : '',
     GI.kpi('Medians', fmt(S0.x, mx) + ' · ' + fmt(S0.y, my), esc(label(S0.x)) + ' · ' + esc(label(S0.y)), { text: true })]));
   const lrows = ranked.slice(0, 300).map(o => { const r = o.r, vx = val(r, S0.x), vy = val(r, S0.y);
-    return { id: idOf(r), name: nm(r), team: tm(r) || (team ? idOf(r) : null), sub: team ? (GI.teamInfo(idOf(r)).division || '') : [raw(r, 'pos') ? GI.posLabel(raw(r, 'pos')) : '', GI.teamAbbr(tm(r))].filter(Boolean).join(' · '), n: nOf(r), vx: vx, px: pOf(sX, vx, dirx), vy: vy, py: pOf(sY, vy, diry), z: o.z }; });
+    const grp = raw(r, '_grp'), gn = grp && GI.SP.BY[grp] ? GI.SP.BY[grp].code : '';
+    return { id: idOf(r), name: nm(r), team: tm(r) || (team ? idOf(r) : null), sub: team ? (GI.teamInfo(idOf(r)).division || '') : [raw(r, 'pos') ? GI.posLabel(raw(r, 'pos')) + (gn && gn !== raw(r, 'pos') ? ' (' + ({ ED: 'pass rusher', IDL: 'interior' }[gn] || gn) + ')' : '') : '', GI.teamAbbr(tm(r))].filter(Boolean).join(' · '), n: nOf(r), vx: vx, px: pOf(sX, vx, dirx), vy: vy, py: pOf(sY, vy, diry), z: o.z }; });
   QK.leaderboard(document.getElementById('lab-table'), { dense: true, rank: true, maxHeight: 600, rows: lrows, rowHref: r => (team ? GI.teamHref(r.id, S) : GI.playerHref(r.id, S)),
     columns: [{ key: 'name', label: team ? 'Team' : 'Player', type: 'entity', sub: 'sub', mark: r => ({ name: GI.teamName(r.team), abbr: GI.teamAbbr(r.team), colour: GI.teamInfo(r.team).colour }), href: r => (team ? GI.teamHref(r.id, S) : GI.playerHref(r.id, S)) }]
       .concat(team ? [] : [{ key: 'n', label: G().nLabel, num: true }])
       .concat([{ key: 'px', label: label(S0.x), type: 'pctl', pctl: 'px', fmt: (v, r) => fmt(S0.x, r.vx), tip: 'Cell colour: percentile on screen (100 = best)' }, { key: 'py', label: label(S0.y), type: 'pctl', pctl: 'py', fmt: (v, r) => fmt(S0.y, r.vy), tip: 'Cell colour: percentile on screen (100 = best)' },
         { key: 'z', label: 'Combined', type: 'bar', fmt: v => '<b>' + GI.num(v, 2) + '</b>', tip: 'Sum of standard scores in the better direction' }]) });
   GI.SP.tagHeads(document.getElementById('lab-table'), { px: S0.x, py: S0.y });
-  GI.setHashQuiet(GI.ghref('lab', S, { g: S0.kind, x: S0.x, y: S0.y }));
+  const wq = QK.within.query(S0);
+  GI.setHashQuiet(GI.ghref('lab', S, { g: S0.kind, x: S0.x, y: S0.y, within: wq.within || undefined, pos: wq.pos || undefined }));
 }
 
 GI.route('lab', function (el, params) {
@@ -172,13 +222,17 @@ GI.route('lab', function (el, params) {
     if (!Object.keys(LAB).length) { el.innerHTML = head + GI.notBuilt('The ' + S + ' lab file', rawD); return; }
     const qy = params.query || {};
     if (qy.g && LAB[String(qy.g).toUpperCase()]) S0.kind = String(qy.g).toUpperCase();
+    const wn = QK.within.read(qy, POS_CODES.filter(c => LAB[posOf(c)[1]]));
+    S0.within = wn.within;
+    if (byPos()) { S0.pos = wn.pos; S0.kind = posOf(S0.pos)[1]; }
+    if (qy.q) S0.q = String(qy.q);
     if (!LAB[S0.kind]) S0.kind = Object.keys(LAB)[0];
-    el.innerHTML = head + '<div id="lab-kpis"></div><div class="gi-toolbar">' + GI.seg('lab-kind', GI.GROUPS.concat(['TEAM']).map(g => [g, g === 'TEAM' ? 'Teams' : g, !LAB[g]]), S0.kind, 'Group') + '</div>' +
+    el.innerHTML = head + '<div id="lab-kpis"></div><div class="gi-toolbar gi-lab-wn" id="lab-wn-bar"></div>' +
       GI.card('<span id="lab-title">Scatter</span>', '<span id="lab-sub"></span>', '<div class="gi-toolbar" style="margin-bottom:12px">' + GI.field('Preset', '<select id="lab-preset" class="qk-select"></select>') +
         GI.field('X axis', '<select id="lab-x" class="qk-select"></select>') + GI.field('Y axis', '<select id="lab-y" class="qk-select"></select>') + '<button type="button" class="qk-btn" id="lab-swap" aria-label="Swap the axes">⇄ Swap</button>' +
         GI.field('Colour', '<select id="lab-color" class="qk-select"></select>') + '<label class="gi-field" id="lab-min-w"><span>Min <span id="lab-min-u"></span> <b id="lab-min-v"></b></span><input id="lab-min" type="range" min="0" max="700" step="1"></label>' +
         '<label class="gi-check" id="lab-qual-w"><input id="lab-qual" type="checkbox"> qualified only</label><label class="gi-check" id="lab-shrink-w"><input id="lab-shrink" type="checkbox"> shrink by stabilisation</label>' +
-        GI.field('Highlight', '<input id="lab-q" class="qk-input" type="search" placeholder="Player or team">') + '</div>' + '<div id="lab-ours"></div>' + GI.chartBox('lab-chart', 520, 'Scatter') + '<p class="gi-cap" id="lab-note"></p>') +
+        GI.field('Highlight', '<input id="lab-q" class="qk-input" type="search" placeholder="Player or team">') + '</div>' + '<div id="lab-ours"></div>' + GI.chartBox('lab-chart', 520, 'Scatter') + '<div id="lab-sim" class="gi-lab-sim"></div><p class="gi-cap" id="lab-note"></p>') +
       GI.card('Ranked', 'By the combined standard score on both axes (top 300); cells coloured by percentile on screen', '<div id="lab-table"></div>', { flush: true });
     const $ = id => document.getElementById(id);
     const applyPreset = () => { const P = presetList(); if (S0.preset < 0 || !P.length) return; const p = P[S0.preset] || P[0]; S0.x = p.x; S0.y = p.y; };
@@ -210,7 +264,23 @@ GI.route('lab', function (el, params) {
     reset();
     sync();
     const redraw = () => { sync(); draw(S); };
-    GI.wireSeg(el, 'lab-kind', v => { if (!LAB[v]) return; S0.kind = v; S0.x = ''; S0.y = ''; S0.preset = 0; S0.min = null; reset(); redraw(); });
+    const toKind = k => { S0.kind = k; S0.x = ''; S0.y = ''; S0.preset = 0; S0.min = null; reset(); };
+    /* Compare within: Broad keeps the lab's groups (the kind buttons); Position the spec's peer groups (the picker) */
+    const bar = () => {
+      const codes = POS_CODES.filter(c => LAB[posOf(c)[1]]);
+      GI.set('lab-wn-bar', QK.within.html({ within: S0.within, pos: S0.pos }, { id: 'lab-wn', groups: codes.map(c => [c, posName(c)]),
+        note: byPos() ? 'The metrics spec\'s peer group' + (posOf(S0.pos)[1] === 'DEF' ? ' (defensive role from our value model)' : '') + ' · qualified players only by default (the spec minimum, ' + esc(String((GI.SP.BY[posOf(S0.pos)[2]] || {}).unit || 'games')) + ')' : 'Offence by position, every defender together, or the teams' }) +
+        (byPos() ? '' : GI.seg('lab-kind', GI.GROUPS.concat(['TEAM']).map(g => [g, g === 'TEAM' ? 'Teams' : g, !LAB[g]]), S0.kind, 'Group')));
+      QK.within.wire(el, { within: S0.within, pos: S0.pos }, w => {
+        if (w.within === 'pos' && !byPos()) w.pos = S0.kind === 'DEF' ? 'EDGE' : (POS_CODES.indexOf(S0.kind) >= 0 ? S0.kind : 'QB');
+        S0.within = w.within; S0.pos = w.pos;
+        toKind(byPos() ? posOf(S0.pos)[1] : S0.kind);
+        if (byPos()) S0.qual = true;
+        bar(); redraw();
+      }, { id: 'lab-wn' });
+      GI.wireSeg(el, 'lab-kind', v => { if (!LAB[v]) return; toKind(v); redraw(); });
+    };
+    bar();
     $('lab-preset').addEventListener('change', e => { S0.preset = parseInt(e.target.value, 10); applyPreset(); redraw(); });
     $('lab-x').addEventListener('change', e => { S0.x = e.target.value; S0.preset = -1; redraw(); });
     $('lab-y').addEventListener('change', e => { S0.y = e.target.value; S0.preset = -1; redraw(); });
