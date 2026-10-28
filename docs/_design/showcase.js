@@ -32,7 +32,27 @@ QK.shell({
   section: 'identity',
   ctx: '<span class="qk-tag signal">Kit ' + esc(QK.version) + '</span>'
 });
-$('#sc-ticker').innerHTML = QK.ticker(GAMES);
+$('#sc-ticker').innerHTML = QK.ticker(GAMES, { market: 'quiet' });
+
+/* ── round 6: the quiet market and the fan modules ── */
+$('#h-fan').innerHTML = QK.sectionHead({ kicker: 'Round 6', title: 'The quiet market and the fan modules', sub: 'market: \'quiet\' on QK.gameCard, QK.previewCard, QK.scorebug (xl) and QK.ticker; QK.storyCards, QK.spotlight and QK.doing (the Model page\'s "How we\'re doing").' });
+var QG = [
+  { sport: 'hockey', league: 'NHL', status: 'pre', start: iso(3), away: T.TOR, home: T.BOS, p_home: 0.58, market_home: 0.55, market_src: ['kalshi', 'polymarket'], href: '#fan' },
+  { sport: 'hockey', league: 'NHL', status: 'pre', start: iso(5), away: T.COL, home: T.EDM, p_home: 0.38, market_home: 0.52, market_src: [{ source: 'polymarket' }], href: '#fan' },
+  { sport: 'football', league: 'Premier League', status: 'pre', start: iso(20), away: T.CHE, home: T.ARS, p_home: 0.54, p_draw: 0.24, p_away: 0.22, market_home: 0.57, market_draw: 0.23, market_away: 0.20, market_src: 'pinnacle', href: '#fan' }
+];
+$('#sc-fan-cards').innerHTML = QG.map(function (g) { return QK.gameCard(g, { market: 'quiet', why: true }); }).join('');
+$('#sc-fan-preview').innerHTML = QK.previewCard(QG[1], { market: 'quiet', kicker: 'NHL · Rogers Place, Edmonton' });
+$('#sc-fan-bug').innerHTML = QK.scorebug(QG[0], { size: 'xl', market: 'quiet' });
+$('#sc-fan-stories').innerHTML = QK.sectionHead({ kicker: 'Breakout watch', title: 'QK.storyCards' }) + QK.storyCards([
+  { kicker: 'Breakout watch', name: 'Macklin Celebrini', sub: 'San Jose · C · age 20', value: '+52', unit: 'percentile points', from: { label: 'Last season', pos: 41, value: '41st' }, to: { label: 'This season', pos: 93, value: '93rd' }, text: 'Points per 60 at 5-on-5, against forwards. Ten games in: a small sample, but the shot rate backs it up.', colour: '#006D75', mark: { abbr: 'SJS', colour: '#006D75' }, href: '#fan', link: { text: 'Progression' } },
+  { kicker: 'Records in reach', name: 'Connor McDavid', sub: 'Edmonton · C', value: 18, unit: 'points in 9 games', pace: { now: 18, pace: 164, target: 215, label: 'Record (Gretzky)' }, text: 'On pace for 164 points over 82 games. The record is 215, set in 1985-86.', colour: '#041E42', mark: { abbr: 'EDM', colour: '#041E42' } },
+  { kicker: 'Who’s for real?', name: 'Utah Mammoth', sub: '6-3-0 · 61.9% of 5-on-5 chances', value: '61.9%', text: 'The best chance share in the league: the results so far are earned.', colour: '#71AFE5', mark: { abbr: 'UTA', colour: '#71AFE5' }, spark: [48, 51, 55, 58, 61.9], sparkLabel: 'Chance share, last five seasons' }
+]);
+$('#sc-fan-spot').innerHTML = QK.spotlight({ kicker: 'Best player nobody talks about', name: 'Mikko Rantanen', sub: 'Dallas · RW · 27', number: 96, team: { colour: '#006847', abbr: 'DAL' }, headline: 'Top 5% of forwards in chances created and suppressed, on a line nobody talks about.', href: '#fan',
+  stats: [{ label: 'Expected goals for per 60', value: '3.42', pctl: 95, prev: 88 }, { label: 'Expected goals against per 60', value: '1.98', pctl: 91, prev: 70 }, { label: 'Points per 60', value: '3.1', pctl: 84, prev: 90 }],
+  spark: { values: [1.9, 2.4, 2.8, 3.1, 3.42], labels: ['2022-23', '2026-27'], label: 'xGF per 60 by season' }, links: [{ href: '#fan', text: 'Player page' }, { href: '#fan', text: 'Compare' }] });
+QK.doing('#sc-fan-doing', { record: { n: 47, won: 29, expected: 27.1, expected_rate: 0.577, upsets: 18, from: '2026-10-17' }, league: 'NHL', span: '2009-10 to 2025-26', bins: [{ lo: 0.3, hi: 0.4, n: 900, mean_p: 0.35, freq: 0.36 }, { lo: 0.4, hi: 0.5, n: 5000, mean_p: 0.46, freq: 0.45 }, { lo: 0.5, hi: 0.6, n: 11000, mean_p: 0.55, freq: 0.55 }, { lo: 0.6, hi: 0.7, n: 3000, mean_p: 0.64, freq: 0.66 }, { lo: 0.7, hi: 0.8, n: 420, mean_p: 0.73, freq: 0.8 }], brier: 0.24 });
 
 $('#sc-hero').innerHTML = QK.greeting({ date: 'Kit ' + QK.version + ' · sample data · dark only',
   lede: 'Broadcast: near-black and black blocks, Bebas Neue for scores and headlines, Barlow and Barlow Condensed for the rest, cobalt for ours, volt tags, team colours as big blocks, hard edges. Every block below is the real kit (assets/qk), drawn on sample numbers.',

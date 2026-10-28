@@ -111,12 +111,21 @@ A contrast audit of rendered pages (text against its real background) is the che
 
 It never marks a team, the market, or good and bad. In copy, say "ours in blue".
 
-**Market.** Never on overviews or cards, never in a headline stat, never on the Home page. It may appear only as a
-quiet reference, with its source named:
-- on game detail: a black line under the hero, "Market (source) X% · a reference, not our forecast";
-- on the Model page: a muted column.
+**Market (changed 28 Oct 2026, round 6).** Our chance stays the headline; the market sits beside it, quietly, with
+its source named in the tooltip. One kit option draws it everywhere, `market: 'quiet'`:
+- on game cards (`QK.gameCard`): "Market 54%" in small grey type under our chance for each side;
+- on the ticker (`QK.ticker`): one small grey line, the market's chance for our favourite, where a tick has room;
+- on preview cards and game pages (`QK.previewCard`, `QK.scorebug(g, { size: 'xl' })`): one small grey line under the hero;
+- where ours and the market differ by ten points or more, a small neutral marker ("We're higher than the market on
+  Boston", "The market is higher on Boston"). Nothing more.
 
-Game cards default to `market: false`.
+Before the start only (a live market has moved with the score). Never a section built around the market, never a
+headline stat, never a filled bar, never "beating" it. The game card's default stays `market: false`; sites pass
+`'quiet'`. On the Model page the market may stay a muted column.
+
+**Our record and calibration (round 6).** "We say it. Then we check it.", "Our record this week" and the "How sure are
+we?" teasers are off landing pages and overviews. They live on each site's Model page, in a "How we're doing" tab
+(`QK.doing`: the recent record, then `QK.howSure`), with a small link from the overview's foot.
 
 **Percentile scale (cold → hot).** It runs `--pc-0` blue #2f6fe0 → #7fa6e6 → `--pc-50` cool grey #a9adb5 → #f59a72
 → `--pc-100` red #d9361d. It steps in lightness, so it reads for red-green colour-blind viewers. Use `QK.pctColor(p)`
@@ -223,7 +232,10 @@ All builders return HTML strings unless noted. Signatures are in `quant.js` / `q
 | New here | `QK.newHere(o)` | the "What's that number?" strip with three numbered points |
 | How sure | `QK.howSure(el, o)` | three black big-number blocks (checked, the most common call, the Brier score) over the calibration line chart: our forecast against how often it happened, the dashed diagonal "spot on" (`style: 'bars'` draws the paired bars instead) |
 | Short version | `QK.shortVersion` | the explain strip |
-| Preview card | `QK.previewCard(g, o)` | the split hero (or `layout: 'bug'`), the market line on game detail only, the "How sure" strip, the factors as Bebas numbers with the label between |
+| Preview card | `QK.previewCard(g, o)` | the split hero (or `layout: 'bug'`), the quiet market line (`market: 'quiet'`), the "How sure" strip, the factors as Bebas numbers with the label between |
+| Story cards | `QK.storyCards(items, o)` | fan stories (breakout watch, records in reach, who's for real): volt tag, name, big number, a progression track, a pace bar or a season line, one sentence |
+| Spotlight | `QK.spotlight(o)` | a player or team in its colour block, outlined number, deep stats as LED meters, a season line |
+| How we're doing | `QK.doing(el, o)` | the Model page's record tiles over `QK.howSure` |
 | Score bug (compact) | `QK.scorebug(g)` | black, the clock on red, team edges |
 | Verdicts | `QK.verdicts` | black blocks with a volt top rule, the title in Bebas |
 | Note, aside, mark | `QK.note`, `QK.aside`, `QK.mark` | the explain strip on `--s-2`; ▸ in volt; the key phrase in volt |
@@ -254,7 +266,7 @@ There is one library, ECharts 5.5.1, and everything themes from the tokens.
   named ("The real deal", "Winning on luck?", "Due a run", "Struggling").
 - **538-style forecast lines** (`QKC.forecast`) keep end labels, bands and a "Today" rule.
 - **Uncertainty is shown, never implied.** Never invent an interval the payload lacks.
-- **The market** is never a filled bar or a second line: only a tick or a hollow ring, and only where §3 allows.
+- **The market** is never a filled bar: a tick, a hollow ring or the small grey `market: 'quiet'` text, only where §3 allows.
 - **Tooltips** are black with a 4 px volt edge.
 
 ## 7. Motion

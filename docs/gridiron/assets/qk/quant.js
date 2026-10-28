@@ -43,12 +43,18 @@
  *   QK.outlineNum(n, o) QK.longName(name, max)          the outlined number; Barlow Condensed for long names
  *   QK.color.deep / block / blockPair / markOutline     block contrast (white type >= 4.5:1) and the team-colour rules
  *   QK.scorebug(g, { size: 'xl' })                      the scoreboard bug: both team blocks, the start or the clock
- *   QK.spec.load(sport) QK.ours(o) QK.oursExplain(html)  the spec's labels (<sport>.labels.json) and the "Our model" tag */
+ *   QK.spec.load(sport) QK.ours(o) QK.oursExplain(html)  the spec's labels (<sport>.labels.json) and the "Our model" tag
+ * Round 6 (the hub experience; the market quiet beside ours):
+ *   QK.gameCard / previewCard / scorebug(xl) / ticker with market: 'quiet'   the market small and grey, source on hover
+ *   QK.marketSource(src) QK.marketSides(g) QK.marketGap(g) QK.marketMark(g) QK.marketLine(g)   the quiet market's parts
+ *   QK.storyCards(items, o)                             fan story cards: breakouts, surprises, records in reach
+ *   QK.spotlight(o)                                     a player or team spotlight with deep stats and a season line
+ *   QK.doing(el, o) (renders)                           "How we're doing" for the Model page: the record + QK.howSure */
 (function (root) {
 'use strict';
 
 var QK = root.QK || {};
-QK.version = '4.0.0';
+QK.version = '4.1.0';
 
 /* ─────────────────────────────────────── helpers */
 function esc(s) {
@@ -1007,8 +1013,11 @@ QK.tick = function (g, o) {
   /* the bar is the first-listed side's chance */
   var bar = pre && isNum(pa) && (!hfT || isNum(g.p_home)) ? '<span class="qk-tick-bar" aria-hidden="true"><i style="width:' + Math.round((hfT ? g.p_home : pa) * 100) + '%"></i></span>' : '';
   var rowsT = hfT ? r(hm, g.hs, hw < 0, 'h') + r(a, g.as, hw > 0, 'a') : r(a, g.as, hw > 0, 'a') + r(hm, g.hs, hw < 0, 'h');
+  /* market: 'quiet' (round 6): the market's chance for our favourite, one small grey line, the source on hover */
+  var mq = o.market === 'quiet' && fav ? QK.marketSides(g) : null, mv = mq ? (fav === 'h' ? mq.home : mq.away) : null;
+  var mqT = isNum(mv) ? '<div class="qk-tick-mq" title="' + esc(mktTip(g, o)) + '">Market ' + esc(QK.shortName(fav === 'h' ? g.home : g.away)) + ' ' + fmt.pct(mv) + '</div>' : '';
   return '<a class="qk-tick' + (live ? ' is-live' : '') + '" href="' + esc(g.href || '#') + '" style="--sa:' + (s.accent || '') + '"><div class="qk-tick-top">' + (o.pill === false ? '' : '<span class="qk-sportpill">' + esc(o.league ? (g.league || s.label || '') : (s.label || '')) + '</span>') + '<span class="st' + (live ? ' live' : '') + '">' +
-    (live ? '● ' + esc(QK.periodLabel(g) || 'Live') : fin ? 'Final' + (g.note === 'OT' || g.note === 'SO' ? '/' + esc(g.note) : '') : esc(QK.whenShort(g.start, g.tba))) + '</span></div>' + rowsT + bar + '</a>';
+    (live ? '● ' + esc(QK.periodLabel(g) || 'Live') : fin ? 'Final' + (g.note === 'OT' || g.note === 'SO' ? '/' + esc(g.note) : '') : esc(QK.whenShort(g.start, g.tba))) + '</span></div>' + rowsT + mqT + bar + '</a>';
 };
 
 /* ─────────────────────────────────────── sparkline (inline SVG, theme-aware via currentColor) */
@@ -1153,7 +1162,8 @@ QK.sectionHead = function (o) {
 /* ─────────────────────────────────────── scoreboard ticker */
 /* QK.ticker(games, { group: 'sport' (default) | 'league' | false, max, sort: false, pill: false (no sport/league pill
  * on each tick: single-sport sites, where the group label already says it) }) -> the inside of a
- * <div class="qk-ticker">. Live games first, then upcoming, then finals; one labelled block per sport (or league). */
+ * <div class="qk-ticker">. Live games first, then upcoming, then finals; one labelled block per sport (or league).
+ * market: 'quiet' (round 6) adds one small grey line to an upcoming tick: the market's chance for our favourite. */
 QK.ticker = function (games, o) {
   o = o || {};
   var order = { live: 0, pre: 1, final: 2 };
@@ -1171,7 +1181,7 @@ QK.ticker = function (games, o) {
     var g0 = groups[k][0], s = QK.sport(g0.sport) || {};
     var lab = o.group === 'league' ? k : (s.label || k);
     return '<span class="qk-tick-grp" style="--sa:' + (s.accent || 'var(--accent)') + '">' + (ICON[g0.sport] ? '<span class="ic" aria-hidden="true">' + ICON[g0.sport] + '</span>' : '') + '<b>' + esc(lab) + '</b></span>' +
-      groups[k].map(function (g) { return QK.tick(g, { league: o.group === 'league' ? false : o.league, pill: o.pill }); }).join('');
+      groups[k].map(function (g) { return QK.tick(g, { league: o.group === 'league' ? false : o.league, pill: o.pill, market: o.market }); }).join('');
   }).join('');
 };
 
@@ -1218,7 +1228,9 @@ QK.formDots = function (f) {
 
 /* ─────────────────────────────────────── game card (v2 API, v3 look) */
 /* QK.gameCard(game, { sport: false (hide the sport pill), market: true (show the market reference; v3 default false:
- * the market never sits on overview cards), marketLabel, marketTip, form: false, why: false | true | 'text' (the
+ * the market never sits on overview cards; round 6: 'quiet' puts the market's chance for each side, small and grey,
+ * under ours, the source (g.market_src) in the tooltip, and a neutral marker in the foot when ours and the market
+ * differ by ten points or more: marketMark: 0.15 | false), marketLabel, marketTip, form: false, why: false | true | 'text' (the
  * italic one-line reason: default g.why; true also writes QK.whyLine(g) when g.why is missing), bug: false (live
  * games: no score bug), homeFirst: true | false (the home side first in the rows and the stripe; default on for
  * football) }). Game shape as QK.matchCard, plus home/away .record and .form, and optional:
@@ -1239,6 +1251,75 @@ QK.preP = function (g) {
   if (isNum(g.p_pre)) return g.p_pre;
   return g.status === 'live' && !g.pre_only ? null : (isNum(g.p_home) ? g.p_home : null);
 };
+
+/* ─────────────────────────────────────── the quiet market (round 6) */
+/* Our chance leads; the market sits beside it, small and grey, with its source in the tooltip. Before the start only
+ * (a live market has moved with the score). Game fields read: market_home (the market's chance for the home side),
+ * optional market_away / market_draw (three-way markets: market_away is then needed), market_src (a name, a list of
+ * names, or [{ source }] as the payloads carry them). No betting words: "Market", "our chance", a neutral marker.
+ *   QK.marketSource(src)        -> 'Kalshi, Polymarket, DraftKings' (payload source keys made readable)
+ *   QK.marketSides(g)           -> { home, away, draw } before the start, else null
+ *   QK.marketGap(g, { mark })   -> { side: 'home' | 'away', team, ours, mkt, d } on our favourite when ours and the market
+ *                                  differ by mark or more (default 0.10, ten points), else null
+ *   QK.marketMark(g, o)         -> the neutral marker ("We’re higher than the market on Boston"), or ''
+ *   QK.marketLine(g, o)         -> the one-line quiet market for a hero or a bug ("Market BOS 58% · NYR 42%") with the
+ *                                  marker; o.mark: false drops the marker, o.source names a source the game lacks */
+var MKT_NAMES = { kalshi: 'Kalshi', polymarket: 'Polymarket', draftkings: 'DraftKings', fanduel: 'FanDuel', espn: 'ESPN (sportsbook line)',
+  pinnacle: 'Pinnacle', betfair: 'Betfair', smarkets: 'Smarkets', bet365: 'bet365', caesars: 'Caesars', betmgm: 'BetMGM', odds: 'The Odds API' };
+QK.marketSource = function (s) {
+  if (!s) return '';
+  var a = Array.isArray(s) ? s : [s], seen = {}, out = [];
+  a.forEach(function (x) {
+    var k = x && typeof x === 'object' ? (x.source || x.src || x.name) : x;
+    k = String(k || '').trim();
+    if (!k) return;
+    var key = k.toLowerCase().replace(/[\s-]+/g, '_');
+    var nm = MKT_NAMES[key] || MKT_NAMES[key.split('_')[0]] || k.charAt(0).toUpperCase() + k.slice(1);
+    if (!seen[nm]) { seen[nm] = 1; out.push(nm); }
+  });
+  return out.join(', ');
+};
+QK.marketSides = function (g) {
+  if (!g || g.status === 'live' || g.status === 'final' || !isNum(g.market_home)) return null;
+  var three = isNum(g.p_draw) || isNum(g.market_draw);
+  var a = isNum(g.market_away) ? g.market_away : (three ? null : 1 - g.market_home);
+  return { home: g.market_home, away: a, draw: isNum(g.market_draw) ? g.market_draw : null };
+};
+function mktTip(g, o) {
+  var src = QK.marketSource(g.market_src) || (o && o.source) || '';
+  return 'The market’s chance' + (src ? ', from ' + src : '') + '. A reference beside ours; our chance is our own forecast.';
+}
+QK.marketGap = function (g, o) {
+  o = o || {};
+  var m = QK.marketSides(g);
+  if (!m || !isNum(g.p_home)) return null;
+  var pD = isNum(g.p_draw) ? g.p_draw : 0;
+  var pA = isNum(g.p_away) ? g.p_away : 1 - g.p_home - pD;
+  var home = g.p_home >= pA, ours = home ? g.p_home : pA, mkt = home ? m.home : m.away;
+  if (!isNum(mkt)) return null;
+  var lim = isNum(o.mark) ? o.mark : 0.10;
+  var d = ours - mkt;
+  return Math.abs(d) >= lim - 1e-9 ? { side: home ? 'home' : 'away', team: home ? (g.home || {}) : (g.away || {}), ours: ours, mkt: mkt, d: d } : null;
+};
+QK.marketMark = function (g, o) {
+  o = o || {};
+  if (o.mark === false) return '';
+  var x = QK.marketGap(g, o);
+  if (!x) return '';
+  var nm = o.short ? QK.shortName(x.team) : (x.team.name || QK.shortName(x.team));
+  return '<span class="qk-mq-d">' + (x.d > 0 ? 'We’re higher than the market on ' : 'The market is higher on ') + esc(nm) + '</span>';
+};
+QK.marketLine = function (g, o) {
+  o = o || {};
+  var m = QK.marketSides(g);
+  if (!m) return '';
+  var A = g.away || {}, H = g.home || {};
+  var hf = o.homeFirst !== undefined ? !!o.homeFirst : !!(PREVIEW_WORDS[g.sport] || {}).homeFirst;
+  var sideH = esc(QK.shortName(H)) + ' <b>' + fmt.pct(m.home) + '</b>', sideA = isNum(m.away) ? esc(QK.shortName(A)) + ' <b>' + fmt.pct(m.away) + '</b>' : '';
+  var parts = (hf ? [sideH, isNum(m.draw) ? 'Draw <b>' + fmt.pct(m.draw) + '</b>' : '', sideA] : [sideA, isNum(m.draw) ? 'Draw <b>' + fmt.pct(m.draw) + '</b>' : '', sideH]).filter(Boolean);
+  var tip = mktTip(g, o);
+  return '<div class="qk-mq-line' + (o.cls ? ' ' + esc(o.cls) : '') + '"><span class="qk-mq" data-tip="' + esc(tip) + '" tabindex="0" aria-label="' + esc(tip) + '">Market ' + parts.join(' · ') + '</span>' + QK.marketMark(g, o) + '</div>';
+};
 QK.gameCard = function (g, o) {
   o = o || {};
   var s = QK.sport(g.sport) || {};
@@ -1252,10 +1333,13 @@ QK.gameCard = function (g, o) {
   var showP = !fin && isNum(pH);
   /* home first: o.homeFirst, else the sport's habit (football reads "Home v Away", PREVIEW_WORDS) */
   var hf = o.homeFirst !== undefined ? !!o.homeFirst : !!(PREVIEW_WORDS[g.sport] || {}).homeFirst;
-  function row(t, sc, p, lost, fav) {
+  /* market: 'quiet' (round 6): the market's chance for each side, small and grey under ours, the source in the tooltip */
+  var mq = o.market === 'quiet' ? QK.marketSides(g) : null, mqTip = mq ? mktTip(g, o) : '';
+  function row(t, sc, p, lost, fav, mside) {
     t = t || {};
     var score = fin || live ? '<span class="qk-gc-v">' + (isNum(sc) ? esc(sc) : '–') + '</span>' : '<span></span>';
     var ch = showP ? '<span class="qk-gc-v pct' + (live && g.pre_only ? ' sm' : '') + '">' + (isNum(p) ? QK.pctSmall(p) : '') + '</span>' : '<span></span>';
+    if (showP && mq && isNum(mq[mside])) ch = '<span class="qk-gc-pw">' + ch + '<span class="qk-gc-mq" data-tip="' + esc(mqTip) + '" tabindex="0" aria-label="' + esc('Market ' + (t.name || '') + ' ' + fmt.pct(mq[mside]) + '. ' + mqTip) + '">Market ' + fmt.pct(mq[mside]) + '</span></span>';
     return '<div class="qk-gc-row' + (fin && lost ? ' lost' : '') + (showP && fav && !g.pre_only ? ' fav' : '') + '">' + QK.teamMark(t, 'md') +
       '<span class="qk-gc-nm">' + esc(t.name) + (t.record ? '<small>' + esc(t.record) + '</small>' : '') + '</span>' + (o.form === false ? '<span></span>' : QK.formDots(t.form)) + score + ch + '</div>';
   }
@@ -1282,13 +1366,15 @@ QK.gameCard = function (g, o) {
   var segH = '<i style="flex:' + sH.toFixed(3) + ';background:' + QK.probColour(g.home, g.away, hf ? 'left' : 'right') + '"></i>';
   var stripe = o.stripe === false ? '' : '<span class="qk-gc-stripe"' + (stripeLab && !bar ? ' role="img" aria-label="' + esc(stripeLab) + '"' : ' aria-hidden="true"') + '>' + (hf ? segH : segA) +
     (sD > 0 ? '<i class="d" style="flex:' + sD.toFixed(3) + '"></i>' : '') + (hf ? segA : segH) + '</span>';
-  var rA = row(g.away, as, pA, hw > 0, favA), rH = row(g.home, hs, pH, hw < 0, !favA);
+  var rA = row(g.away, as, pA, hw > 0, favA, 'away'), rH = row(g.home, hs, pH, hw < 0, !favA, 'home');
+  var mqMark = mq && showP ? QK.marketMark(g, { mark: o.marketMark, short: true }) : '';
   /* the foot: "Our chance · <why>" (live: "Chance to win now · ..."; final: "Final · ...") */
   var ftLab = live ? (g.pre_only ? 'Live · ' : 'Chance to win now · ') : fin ? 'Final · ' : 'Our chance · ';
   return '<' + tag + (g.href ? ' href="' + esc(g.href) + '"' : '') + ' class="qk-gc' + (live ? ' is-live' : fin ? ' is-final' : '') + '" style="--sa:' + (s.accent || 'var(--accent)') + '">' + stripe +
     '<div class="qk-gc-top"><span class="qk-gc-lg">' + (o.sport !== false ? '<span class="qk-sportpill">' + esc(s.label || g.sport) + '</span> · ' : '') + esc(g.league || '') + (g.note && g.note !== 'OT' && g.note !== 'SO' ? ' · ' + esc(g.note) : '') + '</span>' + top + '</div>' +
     '<div class="qk-gc-rows">' + (hf ? rH + rA : rA + rH) + '</div>' + bar +
     (left || xg || mk ? '<div class="qk-gc-foot">' + (left || '<span></span>') + (xg || '') + mk + '</div>' : '') +
+    (mqMark ? '<div class="qk-gc-foot qk-gc-mqf">' + mqMark + '</div>' : '') +
     (whyTxt ? '<div class="qk-gc-ft"><b>' + esc(ftLab) + '</b>' + esc(whyTxt) + '</div>' : '') + '</' + tag + '>';
 };
 /* 0.35 -> '35<small>%</small>' (Bebas chances with a small per-cent sign); the text reads '35%'. */
@@ -1694,7 +1780,8 @@ QK.scorebug = function (g, o) {
     (fav && o.chance !== false && !o.compact ? '<span class="ch"><small>ours</small>' + esc(fav[0].abbr || fav[0].name || '') + ' ' + fmt.pct(fav[1]) + '</span>' : '') + '</span>';
 };
 
-/* QK.scorebugXL(g, { nick, homeFirst, bar: true }) (= QK.scorebug(g, { size: 'xl' })) -> the scoreboard bug for any
+/* QK.scorebugXL(g, { nick, homeFirst, bar: true, market: 'quiet' (round 6: before the start, the market's chances in a
+ * small grey line under the bar, the source on hover, g.market_home / market_src) }) (= QK.scorebug(g, { size: 'xl' })) -> the scoreboard bug for any
  * game: both teams as blocks (QK.color.blockPair) with the abbreviation, the name and record, and our chance (live:
  * the score), the start time, the clock or "Final" in black between; then the bar in the two colours. */
 QK.scorebugXL = function (g, o) {
@@ -1719,7 +1806,9 @@ QK.scorebugXL = function (g, o) {
     : '<div class="md">' + esc(fmt.relDay(g.start) === 'Today' ? 'Tonight' : fmt.relDay(g.start)) + '<b class="num">' + esc(g.tba ? 'TBA' : fmt.time(g.start)) + '</b>' + esc(g.league || '') + '</div>';
   var aria = (live ? 'Live' : fin ? 'Final' : 'Upcoming') + ': ' + (Ls.name || '') + ' ' + (live || fin ? (isNum(sL) ? sL : '') : fmt.pct(pL)) + ', ' + (Rs.name || '') + ' ' + (live || fin ? (isNum(sR) ? sR : '') : fmt.pct(pR));
   var bar = o.bar !== false && !fin && isNum(pL) && isNum(pR) ? QK.wpBar(pL, pD, pR, Ls, Rs, { labels: false, colors: [color.ensure(bp[0].bg, '#000000', 3), color.ensure(bp[1].bg, '#000000', 3)], label: live ? 'Live win chance' : 'Our win chance' }) : '';
-  return '<div class="qk-bugxl" role="group" aria-label="' + esc(aria) + '">' + tm(Ls, bp[0], pL, sL, '') + md + tm(Rs, bp[1], pR, sR, ' h') + '</div>' + bar;
+  /* market: 'quiet' (round 6): before the start, the market's chances in one small grey line under the bar */
+  var mq = o.market === 'quiet' && !live && !fin ? QK.marketLine(g, { homeFirst: hf, cls: 'qk-bugxl-mq', source: o.marketSource, mark: o.marketMark }) : '';
+  return '<div class="qk-bugxl" role="group" aria-label="' + esc(aria) + '">' + tm(Ls, bp[0], pL, sL, '') + md + tm(Rs, bp[1], pR, sR, ' h') + '</div>' + bar + mq;
 };
 
 /* ─────────────────────────────────────── why it is worth watching */
@@ -1974,6 +2063,99 @@ QK.statOfDay = function (x, o) {
     (x.note ? QK.note(x.note) : '') + (o.nav || '') + '</div></article>';
 };
 
+/* ─────────────────────────────────────── fan modules (round 6: the hub experience) */
+/* QK.storyCards([{ kicker: 'Breakout watch', name, sub, value, unit, text, html: true (text is HTML), href, colour (a
+ * team hex: the card's edge), mark: { abbr, colour, logo }, sport, from: { label, value, pos }, to: { label, value,
+ * pos } (a progression: two points on a 0-100 track, pos in 0-100; e.g. last season's percentile and this season's),
+ * spark: [numbers] (season by season), sparkLabel, pace: { now, pace, target, max, label, fmt } (records in reach: how
+ * far, the season pace, the mark to beat), link: { href, text } (a second link, "Progression"; on a card without its
+ * own href) }], { cols: 3 | 4 }) -> a grid of story cards: the volt tag, the name, the big number, the picture, one
+ * line. Phones: one a row. Every number comes from our data, and the text says what it means. */
+QK.storyCards = function (items, o) {
+  o = o || {};
+  var it = (items || []).filter(Boolean);
+  if (!it.length) return '';
+  function num(v, f) { return f ? esc(f(v)) : (isNum(v) ? (v % 1 ? fmt.num(v, 1) : fmt.num(v)) : esc(v === undefined || v === null ? '' : v)); }
+  function shown(e, pos) { return esc(e.value === undefined || e.value === null ? Math.round(pos) : e.value); }
+  return '<div class="qk-stories" style="--n:' + Math.min(o.cols || 3, it.length) + '">' + it.map(function (x) {
+    var sp = QK.sport(x.sport) || {};
+    var hex = color.parse(x.colour) ? x.colour : (x.mark && color.parse(x.mark.colour) ? x.mark.colour : null);
+    var edge = hex ? color.ensure(hex, cssVar('--s-1') || '#14171d', 3) : (sp.accent || 'var(--volt)');
+    var tag = x.href ? 'a' : 'div';
+    var prog = '';
+    if (x.from && x.to && isNum(x.from.pos) && isNum(x.to.pos)) {
+      var a = Math.max(0, Math.min(100, x.from.pos)), b = Math.max(0, Math.min(100, x.to.pos)), lo = Math.min(a, b), hi = Math.max(a, b);
+      prog = '<div class="qk-story-prog" role="img" aria-label="' + esc((x.from.label || 'Before') + ' ' + (x.from.value === undefined ? Math.round(a) : x.from.value) + ', ' + (x.to.label || 'Now') + ' ' + (x.to.value === undefined ? Math.round(b) : x.to.value)) + '">' +
+        '<div class="qk-story-track"><i class="span' + (b < a ? ' down' : '') + '" style="left:' + lo.toFixed(1) + '%;width:' + (hi - lo).toFixed(1) + '%"></i><i class="from" style="left:' + a.toFixed(1) + '%"></i><i class="to" style="left:' + b.toFixed(1) + '%"></i></div>' +
+        '<div class="qk-story-pl"><span>' + esc(x.from.label || 'Before') + ' <b>' + shown(x.from, a) + '</b></span><span>' + esc(x.to.label || 'Now') + ' <b>' + shown(x.to, b) + '</b></span></div></div>';
+    }
+    var pace = '';
+    if (x.pace && isNum(x.pace.now) && isNum(x.pace.target)) {
+      var P = x.pace, mx = isNum(P.max) ? P.max : Math.max(P.target, isNum(P.pace) ? P.pace : 0) * 1.08, f = P.fmt;
+      var w = function (v) { return Math.max(0, Math.min(100, 100 * v / mx)).toFixed(1); };
+      pace = '<div class="qk-story-pace" role="img" aria-label="' + esc('Now ' + (f ? f(P.now) : P.now) + (isNum(P.pace) ? ', on pace for ' + (f ? f(P.pace) : Math.round(P.pace)) : '') + ', ' + (P.label || 'the mark') + ' ' + (f ? f(P.target) : P.target)) + '">' +
+        '<div class="qk-story-track"><i class="pace" style="width:' + w(isNum(P.pace) ? P.pace : P.now) + '%"></i><i class="now" style="width:' + w(P.now) + '%"></i><i class="mark" style="left:' + w(P.target) + '%"></i></div>' +
+        '<div class="qk-story-pl"><span>Now <b>' + num(P.now, f) + '</b>' + (isNum(P.pace) ? ' · pace <b>' + num(f ? P.pace : Math.round(P.pace), f) + '</b>' : '') + '</span><span>' + esc(P.label || 'The mark') + ' <b>' + num(P.target, f) + '</b></span></div></div>';
+    }
+    var spark = x.spark && x.spark.filter(isNum).length > 1 ? '<div class="qk-story-spark">' + QK.spark(x.spark, { w: 220, h: 40, color: 'var(--volt)', label: x.sparkLabel || '' }) + (x.sparkLabel ? '<small>' + esc(x.sparkLabel) + '</small>' : '') + '</div>' : '';
+    var mark = x.mark ? QK.teamMark(x.mark, 'md') : '';
+    var val = x.value === undefined || x.value === null || x.value === '' ? '' : '<div class="qk-story-v num">' + num(x.value) + (x.unit ? '<small>' + esc(x.unit) + '</small>' : '') + '</div>';
+    var link = x.link && x.link.text ? (x.link.href && !x.href ? '<a class="qk-story-l" href="' + esc(x.link.href) + '">' + esc(x.link.text) + ' →</a>' : '<span class="qk-story-l">' + esc(x.link.text) + ' →</span>') : '';
+    return '<' + tag + ' class="qk-story"' + (x.href ? ' href="' + esc(x.href) + '"' : '') + ' style="--se:' + esc(edge) + '">' +
+      '<div class="qk-story-k">' + esc(x.kicker || '') + '</div>' +
+      '<div class="qk-story-who">' + mark + '<div class="qk-story-id"><div class="qk-story-nm' + QK.longName(x.name, 18) + '">' + esc(x.name || '') + '</div>' + (x.sub ? '<div class="qk-story-sub">' + esc(x.sub) + '</div>' : '') + '</div></div>' +
+      val + prog + pace + spark +
+      (x.text ? '<p class="qk-story-t">' + (x.html ? String(x.text) : esc(x.text)) + '</p>' : '') + link + '</' + tag + '>';
+  }).join('') + '</div>';
+};
+/* QK.spotlight({ kicker: 'Player spotlight', name, sub (team · position), number (outlined), team: { name, abbr,
+ * colour }, href, headline (one plain sentence), text, stats: [{ label, value, pctl, prev, tip }] (LED meters when
+ * every row has pctl, else big numbers), spark: { values, labels: [first, last], label } (a season-by-season line),
+ * links: [{ href, text }] }) -> a full-width feature: the team-colour block with the name and the outlined number on
+ * the left, the deep stats on the right. Tennis or no team: the cobalt block. */
+QK.spotlight = function (o) {
+  o = o || {};
+  var t = o.team || {};
+  var hex = color.parse(t.colour) ? t.colour : null;
+  var bk = hex ? color.block(hex) : { bg: cssVar('--signal-deep') || '#5a69b7', edge: null };
+  var st = (o.stats || []).filter(function (r) { return r && (r.value !== undefined || isNum(r.pctl)); });
+  var meters = st.length && st.filter(function (r) { return isNum(r.pctl); }).length === st.length;
+  var right = meters ? QK.pctlBars(st) : (st.length ? '<div class="qk-spot-nums">' + st.map(function (r) { return '<div><b class="num">' + esc(r.value) + '</b><span' + (r.tip ? ' data-tip="' + esc(r.tip) + '" tabindex="0"' : '') + '>' + esc(r.label) + '</span></div>'; }).join('') + '</div>' : '');
+  var sv = o.spark && (o.spark.values || []).filter(isNum).length > 1 ? o.spark : null;
+  var sp = sv ? '<div class="qk-spot-spark">' + QK.spark(sv.values, { w: 320, h: 56, color: 'var(--volt)', label: sv.label || '' }) +
+    '<div class="qk-spot-sl"><span>' + esc((sv.labels || [])[0] || '') + '</span><span>' + esc(sv.label || '') + '</span><span>' + esc((sv.labels || []).slice(-1)[0] || '') + '</span></div></div>' : '';
+  var links = (o.links || []).filter(function (l) { return l && l.href; }).map(function (l) { return '<a class="qk-more" href="' + esc(l.href) + '">' + esc(l.text) + '</a>'; }).join('');
+  var nm = o.href ? '<a href="' + esc(o.href) + '">' + esc(o.name || '') + '</a>' : esc(o.name || '');
+  var hasNum = o.number !== undefined && o.number !== null && o.number !== '';
+  return '<article class="qk-spot" style="--tb:' + esc(bk.bg) + (bk.edge ? ';--te:' + esc(bk.edge) : '') + '">' +
+    '<div class="qk-spot-l">' + (hasNum ? '<div class="qk-spot-num qk-outline num" aria-hidden="true">' + esc(o.number) + '</div>' : '') +
+    '<div class="qk-spot-k">' + esc(o.kicker || 'Spotlight') + '</div><h3 class="qk-spot-nm' + QK.longName(o.name, 16) + '">' + nm + '</h3>' +
+    (o.sub ? '<div class="qk-spot-sub">' + esc(o.sub) + '</div>' : '') + (o.headline ? '<p class="qk-spot-h">' + esc(o.headline) + '</p>' : '') + '</div>' +
+    '<div class="qk-spot-r">' + right + sp + (o.text ? '<p class="qk-spot-t">' + esc(o.text) + '</p>' : '') + (links ? '<div class="qk-spot-links">' + links + '</div>' : '') + '</div></article>';
+};
+/* QK.doing(el, { record (a digest's record: { n, won, expected, expected_rate, upsets, draws, from, to, days }),
+ * calibration | bins/brier/n (as QK.howSure), league, span, subject, unit, kicker, title, sub, note, caption }) ->
+ * renders "How we're doing" into el: the section head, our recent record as black tiles, then QK.howSure. Its home is
+ * a site's Model page (round 6: the record and the calibration live there, not on landing pages). */
+QK.doing = function (el, o) {
+  if (typeof el === 'string') el = $(el);
+  if (!el) return null;
+  o = o || {};
+  var r = o.record, unit = o.unit || 'games', tiles = [];
+  if (r && r.n) {
+    var wk = !r.days || r.days === 7, diff = r.won - (r.expected || 0);
+    tiles.push({ label: wk ? 'Our favourites this week' : 'Our favourites, last ' + r.days + ' days', value: r.won + ' of ' + r.n, signal: true,
+      sub: 'Won, of the ' + unit + ' with a chance we published before the start' + (r.from ? ', since ' + fmt.date(String(r.from).length === 10 ? r.from + 'T12:00:00' : r.from) : '') + '.' });
+    if (isNum(r.expected)) tiles.push({ label: 'We expected', value: fmt.num(r.expected, 0), sub: 'From our favourites’ average chance' + (isNum(r.expected_rate) ? ' of ' + fmt.pct(r.expected_rate) : '') + '. ' + (r.n < 20 ? 'A small sample: a couple of results move this a lot.' : Math.abs(diff) < 2 ? 'Right on our numbers.' : diff > 0 ? 'A good week for favourites.' : 'More upsets than we expected.') });
+    if (isNum(r.upsets)) tiles.push({ label: 'Upsets', value: String(r.upsets), sub: 'Our underdog won' + (isNum(r.draws) && r.draws ? '; ' + r.draws + ' draw' + (r.draws === 1 ? '' : 's') : '') + '. A 60% call still misses 4 times in 10.' });
+  }
+  var hid = 'qk-doing-' + Math.random().toString(36).slice(2, 8);
+  var noun = unit === 'games' ? 'game' : unit.replace(/s$/, '');
+  el.innerHTML = QK.sectionHead({ kicker: o.kicker || 'How we’re doing', title: o.title || 'We say it. Then we check it.', sub: o.sub || ((tiles.length ? 'Our recent record, then every ' : 'Every ') + (o.league ? o.league + ' ' : '') + noun + ' we have forecast, grouped by the chance we gave ' + (o.subject || 'the home team') + '. When the two match, our numbers mean what they say.') }) +
+    (tiles.length ? QK.stats(tiles) : '') + '<div id="' + hid + '"' + (tiles.length ? ' style="margin-top:18px"' : '') + '></div>' + (o.note ? QK.explain(o.note) : '');
+  return QK.howSure(el.querySelector('#' + hid), { calibration: o.calibration, bins: o.bins, brier: o.brier, n: o.n, league: o.league, span: o.span, subject: o.subject, unit: unit, caption: o.caption });
+};
+
 /* ─────────────────────────────────────── New here? */
 /* QK.newHere({ kicker: 'New here?', title: 'Three things to know', items: [HTML, ...] }) -> the cream card. The
  * default three items explain a chance, a percentile and the record; a site may pass its own (keep them three). */
@@ -2079,8 +2261,9 @@ QK.howSure = function (el, o) {
 /* ─────────────────────────────────────── game preview card (the game-page hero) */
 /* QK.previewCard(g, { kicker: 'NHL · Ball Arena, Denver', nick: fn(team) -> short name, note: HTML (replaces the
  * default "How sure are we?" note), noteExtra: HTML (appended to it), factors: [{ label, a, b, better: 'a' | 'b' }]
- * (away value, home value; the better side in blue), factorsTitle, keyLeft, keyRight, market: { p, label } (game
- * detail only: a quiet reference line under the bar), vs: 'at' | 'v' (the word between the sides), noun: 'game' |
+ * (away value, home value; the better side in blue), factorsTitle, keyLeft, keyRight, market: 'quiet' (round 6: the
+ * market's chances, small and grey under the hero, source on hover; or { p, src, quiet: true }) | { p, label } (the
+ * older black reference line), marketMark: 0.1 | false (the neutral marker's threshold), vs: 'at' | 'v' (the word between the sides), noun: 'game' |
  * 'match' | 'race' ("a match like this"), homeFirst: true (home on the left, "Home v Away") }) -> a card. The
  * defaults follow g.sport: football is home first with "v" and "match", tennis "v" and "match", F1 "race",
  * everything else away "at" home and "game". The card: both sides with monogram, record and form, the
@@ -2110,7 +2293,14 @@ QK.previewCard = function (g, o) {
   }
   var top = o.layout === 'bug' ? QK.scorebugXL(g, { nick: nk, homeFirst: hf })
     : QK.splitHero(g, { kicker: o.kicker, nick: nk, homeFirst: hf, noun: noun, note: false, link: false, compact: o.compact });
-  var mk = o.market && isNum(o.market.p) ? '<div class="qk-preview-mkt"><span class="qk-mkt">' + esc(o.market.label || 'Market') + ' <b>' + esc(QK.shortName(H)) + ' ' + fmt.pct(o.market.p) + '</b></span><span>a reference, not our forecast</span></div>' : '';
+  /* round 6: market: 'quiet' (from g.market_home / market_away / market_src) or { p, src, label, quiet: true } -> the
+     market's chances in a small grey line under the hero, the source on hover, a neutral marker when ours and the
+     market differ by ten points or more. The old { p, label } object still draws the black reference line. */
+  var mk = '';
+  if (o.market === 'quiet' || (o.market && o.market.quiet && isNum(o.market.p))) {
+    var gq = o.market === 'quiet' ? g : Object.assign({}, g, { market_home: o.market.p, market_away: o.market.away, market_draw: o.market.draw, market_src: o.market.src || g.market_src });
+    mk = QK.marketLine(gq, { homeFirst: hf, cls: 'qk-preview-mq', source: o.marketSource || (o.market && o.market.label), mark: o.marketMark });
+  } else if (o.market && isNum(o.market.p)) mk = '<div class="qk-preview-mkt"><span class="qk-mkt">' + esc(o.market.label || 'Market') + ' <b>' + esc(QK.shortName(H)) + ' ' + fmt.pct(o.market.p) + '</b></span><span>a reference, not our forecast</span></div>';
   var fx = (o.factors || []).filter(function (r) { return r && r.a !== undefined && r.b !== undefined; });
   var L = hf ? 'b' : 'a', R = hf ? 'a' : 'b';
   var fxh = fx.length ? '<div class="qk-factors-card"><h4 class="qk-factors-h">' + esc(o.factorsTitle || 'How they match up so far') + '</h4><div class="qk-factors">' + fx.map(function (r) {

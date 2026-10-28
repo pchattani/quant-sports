@@ -154,6 +154,7 @@ def build_season(b: Build, season: int, full: bool, cfg: dict, shared: dict) -> 
     from oddsmarkets.nhl.analytics import goalies as GK
     from oddsmarkets.nhl.analytics import history as HS
     from oddsmarkets.nhl.analytics import leaders as LD
+    from oddsmarkets.nhl.analytics import performers as PF
     from oddsmarkets.nhl.analytics import season as SN
     from oddsmarkets.nhl.analytics import skaters as SK
     from oddsmarkets.nhl.analytics import teams as TM
@@ -173,6 +174,10 @@ def build_season(b: Build, season: int, full: bool, cfg: dict, shared: dict) -> 
         skip = "events not on this machine; payloads kept"
     if skip:
         logger.info("%s: %s, skipped", season, skip)
+        if not (sdir / "performers.json").exists() and (sdir / "skaters.json").exists():
+            # a season built before the league page's performers: derive them from the catalogues on disk
+            b.write_or_fail(d + "performers.json", f"performers {season}",
+                            lambda: PF.build(an.read_json(sdir / "skaters.json"), an.read_json(sdir / "goalies.json"), season), season=season)
         return {"skipped": True, **_reduced_from_disk(sdir, season), "hist": manifest.get("hist")}
     ctx = SeasonContext(season, full=full, today=cfg["today"], current=current, sims=cfg["sims"],
                         fetch_markets=cfg["markets"] and full and current, use_models=not cfg["no_models"])
@@ -202,6 +207,8 @@ def build_season(b: Build, season: int, full: bool, cfg: dict, shared: dict) -> 
                           season=season)
     lns = b.write_or_fail(d + "lines.json", f"lines {season}", lambda: LD.lines(ctx, sk), season=season)
     b.write_or_fail(d + "leaders.json", f"leaders {season}", lambda: LD.build(ctx, sk, gk, tms), season=season)
+    # the league page's top and bottom performers (oddsmarkets/nhl/analytics/performers.py)
+    b.write_or_fail(d + "performers.json", f"performers {season}", lambda: PF.build(sk, gk, season), season=season)
     b.write_or_fail(d + "lab.json", f"lab {season}", lambda: LD.lab(ctx, sk, gk, tms, lns), season=season)
     aw_model = b.step(f"awards model {season}", lambda: adapters.awards(ctx, sim), None) if full and current else None
     b.write_or_fail(d + "awards.json", f"awards {season}", lambda: LD.awards(ctx, sk, gk, aw_model), season=season)

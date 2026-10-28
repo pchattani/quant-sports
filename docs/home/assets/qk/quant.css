@@ -1059,3 +1059,73 @@ th .qk-ours { vertical-align: 1px; }
 .qk-explain.qk-explain-ours { border-left-color: var(--signal); }
 .qk-explain.qk-explain-ours > b:first-child { color: var(--signal); }
 optgroup { font-style: normal; font-weight: 700; color: var(--ink-3); }
+/* ── round 6: the quiet market (small, grey, the source on hover; ours stays the headline) ── */
+.qk-gc-pw { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; min-width: 0; }
+.qk-gc-mq, .qk-mq { font: 600 11px/1.2 var(--font-cond); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); white-space: nowrap; font-variant-numeric: tabular-nums; cursor: help; }
+.qk-gc-mq:focus-visible, .qk-mq:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.qk-mq b { font-weight: 700; color: var(--ink-2); }
+.qk-mq-d { display: inline-flex; align-items: center; gap: 5px; font: 600 11px/1.2 var(--font-cond); letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-3); white-space: normal; }
+.qk-mq-d::before { content: ""; width: 7px; height: 7px; border: 1.5px solid var(--c-market); transform: rotate(45deg); flex: none; }
+.qk-gc-foot.qk-gc-mqf { justify-content: flex-end; text-align: right; }
+.qk-mq-line { display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: 4px 14px; padding: 7px 2px 0; }
+.qk-preview .qk-mq-line { padding: 8px 12px; background: var(--block); }
+.qk-tick-mq { font: 600 10.5px/1.25 var(--font-cond); letter-spacing: 0.06em; text-transform: uppercase; color: #8f98a8; text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ── round 6: fan modules ── */
+/* story cards (QK.storyCards): breakouts, surprises, records in reach */
+.qk-stories { display: grid; grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)); gap: 2px; }
+.qk-story { --se: var(--volt); position: relative; display: flex; flex-direction: column; gap: 10px; padding: 16px 18px 16px 20px; background: var(--s-1); color: var(--ink-1); border-left: 6px solid var(--se); min-width: 0; transition: background var(--t-fast); }
+a.qk-story:hover { background: #171b22; color: var(--ink-1); }
+a.qk-story:hover .qk-story-nm { color: var(--volt); }
+.qk-story-k { align-self: flex-start; background: var(--block); color: var(--volt); font: 700 var(--fs-2xs)/1 var(--font-cond); letter-spacing: 0.1em; text-transform: uppercase; padding: 6px 14px 6px 8px; clip-path: polygon(0 0, 100% 0, calc(100% - 8px) 100%, 0 100%); }
+.qk-story-who { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.qk-story-id { min-width: 0; }
+.qk-story-nm { font: 400 1.875rem/0.95 var(--font-display); text-transform: uppercase; overflow-wrap: anywhere; }
+.qk-story-nm.qk-long { font: 800 1.125rem/1.1 var(--font-cond); letter-spacing: 0.02em; }
+.qk-story-sub { margin-top: 3px; font: 600 13px/1.25 var(--font-cond); text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-3); }
+.qk-story-v { font: 400 3.5rem/0.85 var(--font-display); color: var(--volt); text-align: left; font-variant-numeric: tabular-nums; }
+.qk-story-v small { font: 700 13px/1 var(--font-cond); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-2); margin-left: 8px; }
+.qk-story-track { position: relative; height: 10px; background: var(--s-3, #252a34); }
+.qk-story-track i { position: absolute; top: 0; bottom: 0; display: block; }
+.qk-story-prog .span { background: color-mix(in srgb, var(--volt) 45%, transparent); }
+.qk-story-prog .span.down { background: color-mix(in srgb, var(--c-market) 55%, transparent); }
+.qk-story-prog .from { width: 12px; height: 12px; top: -1px; margin-left: -6px; border: 2px solid var(--ink-2); background: var(--s-1); border-radius: 50%; }
+.qk-story-prog .to { width: 14px; height: 14px; top: -2px; margin-left: -7px; background: var(--volt); border-radius: 50%; box-shadow: 0 0 0 2px var(--s-1); }
+.qk-story-pace .pace { left: 0; background: repeating-linear-gradient(-45deg, rgba(212, 255, 58, 0.45) 0 4px, transparent 4px 8px); }
+.qk-story-pace .now { left: 0; background: var(--volt); }
+.qk-story-pace .mark { width: 3px; top: -5px; bottom: -5px; margin-left: -1px; background: #fff; }
+.qk-story-pl { display: flex; justify-content: space-between; gap: 8px; margin-top: 6px; font: 600 12px/1.2 var(--font-cond); letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-3); }
+.qk-story-pl b { color: var(--ink-1); font-weight: 700; font-variant-numeric: tabular-nums; }
+.qk-story-spark { display: flex; flex-direction: column; align-items: stretch; gap: 4px; min-width: 0; }
+.qk-story-spark svg { width: 100%; height: 40px; }
+.qk-story-spark small { font: 600 12px/1.2 var(--font-cond); letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-3); }
+.qk-story-t { margin: 0; font: 500 14px/1.45 var(--font-ui); color: var(--ink-2); }
+.qk-story-t b { color: var(--ink-1); }
+.qk-story-l { margin-top: auto; font: 700 var(--fs-2xs)/1.2 var(--font-cond); letter-spacing: 0.08em; text-transform: uppercase; color: var(--signal); }
+@media (max-width: 1000px) { .qk-stories { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .qk-stories { grid-template-columns: minmax(0, 1fr); } .qk-story-v { font-size: 3rem; } }
+
+/* spotlight (QK.spotlight): the team-colour block beside the deep stats */
+.qk-spot { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 0; background: var(--s-1); min-width: 0; }
+.qk-spot-l { position: relative; overflow: hidden; padding: 22px 24px 24px; background: var(--tb, var(--signal-deep)); color: #fff; box-shadow: inset 0 -6px 0 var(--te, transparent); min-width: 0; }
+.qk-spot-l::after { content: ""; position: absolute; right: -40px; top: 0; bottom: 0; width: 90px; background: var(--volt); transform: skewX(var(--skew)); opacity: 0.9; }
+.qk-spot-num { position: absolute; right: 70px; bottom: -14px; font: 400 9rem/1 var(--font-display); --oc: rgba(255, 255, 255, 0.35); pointer-events: none; }
+.qk-spot-k { display: inline-block; position: relative; background: var(--block); color: var(--volt); font: 700 var(--fs-2xs)/1 var(--font-cond); letter-spacing: 0.1em; text-transform: uppercase; padding: 6px 14px 6px 8px; clip-path: polygon(0 0, 100% 0, calc(100% - 8px) 100%, 0 100%); }
+.qk .qk-spot-nm { position: relative; margin: 12px 0 0; font: 400 clamp(2.5rem, 2rem + 2vw, 3.75rem)/0.9 var(--font-display); text-transform: uppercase; color: #fff; max-width: 85%; }
+.qk .qk-spot-nm.qk-long { font: 800 clamp(1.5rem, 1.2rem + 1vw, 2rem)/1.05 var(--font-cond); }
+.qk-spot-nm a, body.qk .qk-spot-nm a { color: #fff; }
+.qk-spot-nm a:hover { color: var(--volt); }
+.qk-spot-sub { position: relative; margin-top: 8px; font: 700 14px/1.2 var(--font-cond); letter-spacing: 0.06em; text-transform: uppercase; color: rgba(255, 255, 255, 0.86); }
+.qk-spot-h { position: relative; margin: 14px 0 0; max-width: 40ch; font: 600 16px/1.4 var(--font-ui); color: #fff; }
+.qk-spot-r { display: flex; flex-direction: column; gap: 14px; padding: 18px 22px 20px; min-width: 0; }
+.qk-spot-nums { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 2px; }
+.qk-spot-nums > div { background: var(--block); padding: 12px 14px; display: grid; gap: 4px; }
+.qk-spot-nums b { font: 400 2.5rem/0.9 var(--font-display); color: var(--volt); text-align: left; }
+.qk-spot-nums span { font: 700 12px/1.2 var(--font-cond); letter-spacing: 0.06em; text-transform: uppercase; color: var(--block-ink-2); }
+.qk-spot-spark svg { width: 100%; height: 56px; }
+.qk-spot-sl { display: flex; justify-content: space-between; gap: 8px; font: 600 12px/1.2 var(--font-cond); letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-3); }
+.qk-spot-t { margin: 0; font: 500 14px/1.45 var(--font-ui); color: var(--ink-2); }
+.qk-spot-links { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+body.qk .qk-spot-l, body.qk .qk-spot-sub, body.qk .qk-spot-h { color: #fff; }
+@media (max-width: 900px) { .qk-spot { grid-template-columns: minmax(0, 1fr); } .qk-spot-num { font-size: 7rem; } }
+@media (max-width: 640px) { .qk-spot-l { padding: 18px 16px 20px; } .qk-spot-r { padding: 14px 14px 16px; } }

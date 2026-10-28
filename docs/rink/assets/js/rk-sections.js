@@ -63,6 +63,25 @@ function stBoard(node, g, pc, lo) {
   if (lo) QKL.wire(node, lo);
 }
 
+/* Top and bottom performers (QKL.leaders): all skaters, forwards, defence and goalies on their spec headline sets
+   (data/<S>/performers.json, oddsmarkets/nhl/analytics/performers.py: qualified players only, the payloads' floors),
+   then the clubs on the league block's team set (season.json, already loaded). Each name opens the player page. */
+function performers(host, d, S) {
+  if (!host) return;
+  const L = d && d.league;
+  RK.loadYear('performers.json', S).then(pf => {
+    if (!U.alive(host)) return;
+    const views = ((pf && pf.ok !== false && pf.views) || []).slice();
+    const tv = L ? QKL.teamView(L, { label: 'Clubs', peer: 'clubs', ours: 'Team rating model', name: t => RK.teamName(t) }) : null;
+    if (tv) views.push(tv);
+    QKL.leaders(host, { data: { views: views }, title: 'Who leads the league, and who is struggling',
+      sub: 'The top five and the bottom five on each key number: all skaters on our value model first, then forwards, defence and goalies on the numbers that matter for each, and the clubs. Qualified players only; each name opens the player page.',
+      team: t => ({ abbr: RK.teamAbbr(t), name: RK.teamName(t), colour: RK.teamColourRaw(t), href: RK.teamHref(t, S) }),
+      href: id => RK.playerHref(id),
+      empty: 'The boards fill once skaters reach 250 minutes at 5v5 over a full season, prorated by games.' });
+  });
+}
+
 function standingsNew(node, S) {
   node.innerHTML = QK.skeleton('lines', 8);
   return RK.loadYear('season.json', S).then(d => {
@@ -104,6 +123,7 @@ function standingsNew(node, S) {
       '<div id="st-body"></div>' +
       QK.note('<b>Reading the table.</b> <b>P%</b> is the share of the points available that a club has taken. <b>xGF%</b> is its share of the 5-on-5 chances (expected goals): over a season it predicts the next games better than the goal difference. <b>Rating</b> is our estimate of how many goals a game better or worse than an average club it is. <b>Playoffs</b> is our chance from ' + QK.fmt.num((d.sim || {}).n || 20000) + ' simulated seasons: 80% still misses about 1 time in 5.' + (lo ? ' <b>+</b> opens a club’s card: its strengths and weaknesses against the other 31 and where its race stands.' : '')) +
       (lo ? '<div id="st-race"></div>' : '') +
+      (window.QKL && QKL.leaders ? '<div id="st-perf"></div>' : '') +
       '<section class="qk-section">' + QK.sectionHead({ kicker: 'Season simulation', title: 'Where they finish', sub: 'Each club’s points at the end of the regular season across the simulated seasons: the dot is the mean, the bar the range it lands in nine times out of ten.',
         actions: '<div class="qk-seg" id="st-conf" role="group" aria-label="Conference"><button type="button" aria-pressed="true" data-value="Eastern">East</button><button type="button" aria-pressed="false" data-value="Western">West</button></div>' }) +
       U.card2('Projected full-season points', d.sim && d.sim.n ? QK.fmt.num(d.sim.n) + ' simulations of the rest of the season, from today’s points' : '', U.chart('st-range', 520, 'Projected full-season points with a 90% range') +
@@ -129,6 +149,7 @@ function standingsNew(node, S) {
     };
     draw('wc');
     if (lo) { QKL.race(node.querySelector('#st-race'), lo); QKL.shape(node.querySelector('#st-shape'), lo); }
+    if (window.QKL && QKL.leaders) performers(node.querySelector('#st-perf'), d, S);
     QK.seg(node.querySelector('#st-view'), draw);
     const range = c => {
       const rs = rows.filter(r => r.conference === c).map(r => Object.assign({}, r, sim[r.team] || {})).filter(r => isNum(r.pts_p05) && isNum(r.pts_p95)).sort((a, b) => (b.mean_pts || 0) - (a.mean_pts || 0));
