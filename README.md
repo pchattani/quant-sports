@@ -13,7 +13,7 @@ Actions workflows that fetch, build and publish them every hour:
 | [The Quant Gridiron](https://pchattani.github.io/the-quant-gridiron/) | NFL | `gridiron.yml` |
 | [The Quant Rink](https://pchattani.github.io/the-quant-rink/) | NHL | `rink.yml` |
 | [The Quant Campus](https://pchattani.github.io/the-quant-campus/) | college football (FBS), men's and women's college basketball (D-I) | `campus.yml` |
-| [The Quant Sports](https://pchattani.github.io/the-quant/) | the landing page, every sport in one place | `home.yml` |
+| [The Quant Sports](https://pchattani.github.io/the-quant-sports/) | the landing page, every sport in one place | `home.yml` |
 
 ## Layout
 

@@ -15,8 +15,8 @@ To move a page over, follow `MIGRATION_V4.md`.
 ## 1. Identity
 
 **Name.** The Quant Sports (since 28 October 2026; before that "The Quant"). The Quant is an umbrella for other,
-non-sports projects, so the sports hub always says "Sports". The landing page is The Quant Sports (the URL stays
-`pchattani.github.io/the-quant/`). Each sport site keeps its own name, "The Quant <Site>": Footballer, Paddock,
+non-sports projects, so the sports hub always says "Sports". The landing page is The Quant Sports at
+`pchattani.github.io/the-quant-sports/` (since 28 Oct 2026; the old `the-quant/` redirects there). Each sport site keeps its own name, "The Quant <Site>": Footballer, Paddock,
 Hardwood, Ace, Bullpen, Gridiron, Rink or Campus.
 
 **Logo.** A volt parallelogram, then the wordmark in Bebas Neue:

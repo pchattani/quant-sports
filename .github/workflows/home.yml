@@ -25,7 +25,7 @@ permissions:
   contents: read
 
 env:
-  PAGES_REPO: ${{ vars.HOME_REPO || 'pchattani/the-quant' }}
+  PAGES_REPO: ${{ vars.HOME_REPO || 'pchattani/the-quant-sports' }}
   DEPLOY: ${{ vars.DEPLOY_HOME == 'true' && !inputs.shadow }}
   PYTHONIOENCODING: utf-8
 

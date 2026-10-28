@@ -287,9 +287,10 @@ QK.ICON = ICON;
 
 /* ─────────────────────────────────────── sports registry + IA */
 var PUB = 'https://pchattani.github.io/';
-QK.HOME_URL = PUB + 'the-quant/';
+QK.HOME_URL = PUB + 'the-quant-sports/';
 /* the hub's name: the landing page is "The Quant Sports" (28 Oct 2026; The Quant is an umbrella for other, non-sports
- * projects). Each sport site keeps its own name, "The Quant <Site>". The URL stays the-quant/. */
+ * projects). Each sport site keeps its own name, "The Quant <Site>". The URL is the-quant-sports/ (28 Oct 2026;
+ * the old the-quant/ redirects here, and that repo name is kept for The Quant umbrella later). */
 QK.HUB_NAME = 'The Quant Sports';
 /* pending: true marks a site that is built but not launched (no public Pages site yet). It stays out of the
  * switcher, footer and home page everywhere except on its own pages and in local preview (QK.visible). */
