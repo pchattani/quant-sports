@@ -95,3 +95,37 @@ def test_scout_kit_ships_and_switches_the_nav():
     for folder in list(design_kit.SITE_SPORT) + ["home"]:
         copy = ROOT / "docs" / folder / "assets" / "qk" / "scout.js"
         assert copy.read_bytes() == (design_kit.DESIGN / "scout.js").read_bytes(), folder
+
+
+def test_every_spec_metric_has_a_short_board_head(tmp_path):
+    """Round 10 (the Board's "Bloomberg view"): every metric in every spec group carries a `short` one-line head of at
+    most 12 characters, and the labels file appends it and the short unit to each row ([7], [8]) without moving
+    [0]..[6]."""
+    for sport in sorted(set(design_kit.SITE_SPORT.values())):
+        spec = json.loads((design_kit.METRICS / f"{sport}.json").read_text(encoding="utf-8"))
+        for g in spec["groups"]:
+            for m in g.get("metrics") or []:
+                assert m.get("short"), (sport, g["id"], m["id"])
+                assert len(m["short"]) <= 12, (sport, m["id"], m["short"])
+    dst = design_kit.copy_kit(tmp_path / "site")
+    lab = json.loads((dst / "metrics" / "football.labels.json").read_text(encoding="utf-8"))
+    row = lab["m"]["player"]["padj_tkl_int_90"]
+    assert row[0] == "Tackles + interceptions (possession-adjusted)" and row[1] == "per 90"
+    assert row[7] == "PAdj Tkl+Int" and row[8] == "/90"
+    assert lab["m"]["player"]["aerial_pct"][8] == "%"
+    assert design_kit.short_unit({"unit": "goals per 90"}) == "/90"
+    assert design_kit.short_unit({"unit": "per 90", "unit_short": "per 90 min"}) == "per 90 min"
+    assert design_kit.short_unit({"unit": "something new"}) == ""
+
+
+def test_board_kit_round_10_api():
+    """The Board keeps its round-8 API and adds the summary column, the capped first set, the site heads map and the
+    phone card list; the spec catalogue reads the short head."""
+    src = (design_kit.DESIGN / "scout.js").read_text(encoding="utf-8")
+    for bit in ("QK.board.pick = ", "S.summary", "S.abbr", "S.family", "qk-bdc-list", "BD_PHONE = '(max-width: 600px)'",
+                "BD_HOT = 90, BD_COLD = 10", "function drawGrid()", "function drawBoard()"):
+        assert bit in src, bit
+    q = (design_kit.DESIGN / "quant.js").read_text(encoding="utf-8")
+    assert "SpecCat.prototype.short = " in q and "short: r[7] || r[0], su: r[8] || ''" in q
+    css = (design_kit.DESIGN / "quant.css").read_text(encoding="utf-8")
+    assert ".qk-bd-v10 {" in css and ".qk-room {" in css

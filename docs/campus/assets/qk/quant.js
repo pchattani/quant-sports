@@ -2367,8 +2367,9 @@ QK.verdicts = function (items) {
  * which design_kit.py writes from docs/_design/metrics/<sport>.json (display names, units, direction, headline sets,
  * explanations and `our_models`). The sport defaults to <html data-sport>. Once loaded, QK.spec.get(sport) returns it
  * synchronously. Catalogue:
- *   cat.metric(id, entity)  -> { id, label, unit, dir, set ('h'|'s'), order, style, explain, ours: model | null } | null
+ *   cat.metric(id, entity)  -> { id, label, unit, dir, set ('h'|'s'), order, style, explain, ours: model | null, short, su } | null
  *   cat.label(id, entity, fallback)   the spec's display name (fallback when the spec has none)
+ *   cat.short(id, entity)  the one-line table head (spec `short`, round 10) · cat.unitShort(id, entity) its unit ("/90")
  *   cat.tip(id, entity, fallback)     the explanation, plus "Our model: <name>." when it is ours
  *   cat.ours(id)            -> { key, name, about } | null    (id is a spec metric id or a payload key)
  *   cat.headline(groupId)   -> [ids] in the spec's order;  cat.isHeadline(id, entity) -> order | 0
@@ -2400,8 +2401,11 @@ SpecCat.prototype.metric = function (id, entity) {
   }
   var ours = this.ours(id);
   if (!r) return ours ? { id: id, label: id, unit: '', dir: 'higher', set: 's', order: 99, style: false, explain: ours.about, ours: ours } : null;
-  return { id: id, label: r[0], unit: r[1], dir: r[2], set: r[3], order: r[4], style: !!r[5], explain: r[6], ours: ours };
+  return { id: id, label: r[0], unit: r[1], dir: r[2], set: r[3], order: r[4], style: !!r[5], explain: r[6], ours: ours, short: r[7] || r[0], su: r[8] || '' };
 };
+/* the one-line table head (round 10: the spec's `short`, else the display name) and the unit as its second line */
+SpecCat.prototype.short = function (id, entity) { var m = this.metric(id, entity); return m ? m.short : null; };
+SpecCat.prototype.unitShort = function (id, entity) { var m = this.metric(id, entity); return m ? m.su : ''; };
 SpecCat.prototype.label = function (id, entity, fallback) { var m = this.metric(id, entity); return m && m.label !== id ? m.label : (fallback || id); };
 SpecCat.prototype.tip = function (id, entity, fallback) {
   var m = this.metric(id, entity);

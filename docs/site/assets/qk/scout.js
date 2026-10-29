@@ -1,4 +1,4 @@
-/* The Quant — the Scouting Room and team-comparison kit (round 8, 28 Oct 2026). Spec: STYLE_GUIDE.md §5 ("Scouting
+/* The Quant — the Scouting Room and team-comparison kit (round 8, 28 Oct 2026; the Board's "Bloomberg view": round 10). Spec: STYLE_GUIDE.md §5 ("Scouting
  * Room"); how a site switches: MIGRATION_V4.md ("Round 8"). Load after quant.js and quant-charts.js:
  *   <script src="assets/qk/scout.js" defer></script>
  * A page that does not load it is unaffected. Pilot: The Quant Bullpen (bp-scout.js: #/<L>/scout, bp-teams.js:
@@ -9,8 +9,17 @@
  *
  *   QK.pctRank(sorted, v)                  percentile 0-100 of v among ascending values (mid-rank of ties)
  *   QK.csv(cols, rows) / QK.download(name, text, type)    CSV text (RFC 4180, a BOM for spreadsheets) and a file download
- *   QK.board(el, spec) (renders)           the Board: column-set chips, "Add a metric", a percentile table with a sticky
- *        name column, paging (top N, "Show all"), sortable heads, pin buttons and "Download CSV" of what is on screen.
+ *   QK.board(el, spec) (renders)           the Board (round 10, the "Bloomberg view"): one toolbar row (a "Columns" select,
+ *        "Add a metric", the row count and sort, a CSV icon), a table of plain numbers with a thin percentile bar under
+ *        each (colour only at the ends: top 10% hot, bottom 10% cold; style metrics never), one-line heads (spec `short`,
+ *        the unit under it), the summary metric beside the name, a hover pin box, a sticky name column, paging (top N,
+ *        "Show all"), sortable heads and a CSV of what is on screen; on phones (<= 600 px) a card list with a "Cards |
+ *        Table" toggle. New in round 10: spec.summary (the value metric beside the name), cap (columns in the first set
+ *        counting the summary: default 8 with a summary; the rest one pick away as '<key>-all', see QK.board.pick),
+ *        peerNoun (the tooltip's "78th percentile of 967 <peerNoun>", default noun), entity (spec table, 'player'),
+ *        abbr: { id: 'Short' | ['Short', 'unit'] } and meta(id).abbr / unitShort (a site's own head and unit for a payload
+ *        key the spec lacks), family(id) (the cap keeps one
+ *        metric per family before a second).
  *        spec: { id, sets: [{ key, label, groups: [{ label, ids }] }], set, meta(id) -> { label, tip, ours: { name, about }
  *        | null, lower, style, fmt(v) }, addable: '<optgroup>' HTML (or [{ value, label }]), added: [ids],
  *        lead: [{ key, label, tip, fmt(row) -> text, val(row) -> number }], rows: [{ id, name, sub, mark: { abbr, colour },
@@ -85,43 +94,117 @@ QK.download = function (name, text, type) {
 function plain(html) { return String(html === undefined || html === null ? '' : html).replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").trim(); }
 
 /* ─────────────────────────────────────── the Board and the heat grid */
+/* Round 10 (28 Oct 2026), the Board's "Bloomberg view": a quiet table of plain numbers, a thin percentile bar under
+ * each, colour only at the ends (top 10%: the hot ink, number and bar; bottom 10%: the cold ink, muted; style metrics
+ * never coloured). One-line heads (the spec's `short`, the unit under it), the summary metric beside the name, the
+ * first set capped to `cap` columns ("<set> (all N)" one pick away), one toolbar row, and on phones a card list with a
+ * "Cards | Table" toggle. The heat grid (team profiles) keeps its filled cells. */
 function setIds(set) {
   var out = [];
   ((set && set.groups) || []).forEach(function (g) { (g.ids || []).forEach(function (id) { if (out.indexOf(id) < 0) out.push(id); }); });
   return out;
 }
+var BD_PHONE = '(max-width: 600px)', BD_HOT = 90, BD_COLD = 10, BD_MODE_KEY = 'qk-bd-mode';
+function bdPhone() { try { return !!(root.matchMedia && root.matchMedia(BD_PHONE).matches); } catch (e) { return false; } }
+function bdModeGet() { try { var v = root.localStorage.getItem(BD_MODE_KEY); return v === 'table' || v === 'cards' ? v : ''; } catch (e) { return ''; } }
+function bdModeSet(v) { try { root.localStorage.setItem(BD_MODE_KEY, v); } catch (e) { /* storage off */ } }
+var BD_CSV_ICON = '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M8 2.2v8M4.6 7 8 10.4 11.4 7M2.6 13.6h10.8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="square"/></svg>';
 function boardCore(el, spec, grid) {
   if (typeof el === 'string') el = document.querySelector(el);
   if (!el) return null;
   var S = spec, pre = S.id || (grid ? 'qk-hg' : 'qk-bd');
-  var st = { set: S.set || ((S.sets || [])[0] || {}).key, added: (S.added || []).slice(), sort: S.sort || null, all: !!S.all, show: S.show || 'value' };
+  var st = { set: S.set || ((S.sets || [])[0] || {}).key, added: (S.added || []).slice(), sort: S.sort || null, all: !!S.all, show: S.show || 'value', mode: S.mode || bdModeGet() };
   var rows = S.rows || [], peers = S.peers || null;
+  var ent = S.entity || 'player';
   var meta = function (id) { var m = S.meta ? S.meta(id) : null; return m || { label: id }; };
   var val = function (r, id) { var v = S.val ? S.val(r, id) : (r.vals || {})[id]; return isNum(v) ? v : null; };
-  function curSet() { return (S.sets || []).filter(function (x) { return x.key === st.set; })[0] || (S.sets || [])[0] || { key: '', groups: [] }; }
+  var cat = function () { return QK.spec && QK.spec.get ? QK.spec.get() : null; };
+  var lead0 = function (k) { return (S.lead || []).filter(function (c) { return c.key === k; })[0] || null; };
+  /* the one-line head: the site's own (m.abbr), else the spec's `short`, else the site's short label, else the name */
+  var abbr = function (id) { var a = S.abbr && Object.prototype.hasOwnProperty.call(S.abbr, id) ? S.abbr[id] : null; return a ? (typeof a === 'string' ? [a, null] : a) : null; };
+  function shortOf(id) {
+    var m = meta(id), a = abbr(id);
+    if (a) return a[0];
+    if (m.abbr) return m.abbr;
+    var c = cat(), sm = c ? c.metric(id, ent) : null;
+    if (sm && sm.short && sm.label !== id) return sm.short;
+    return m.short || m.label || id;
+  }
+  function unitOf(id) {
+    var m = meta(id), a = abbr(id);
+    if (a && a[1] !== null && a[1] !== undefined) return String(a[1]);
+    if (m.unitShort !== undefined && m.unitShort !== null) return String(m.unitShort);
+    var c = cat(), sm = c ? c.metric(id, ent) : null;
+    var u = sm && sm.label !== id ? (sm.su || '') : '';
+    return u && shortOf(id).indexOf(u) >= 0 ? '' : u;
+  }
+  var sets = function () { return S.sets || []; };
+  var capKey = (sets()[0] || {}).key, fullKey = capKey !== undefined ? capKey + '-all' : null;
+  var cap = grid ? 0 : (isNum(S.cap) ? S.cap : (S.summary ? 8 : 0));
+  function findSet(k) { return sets().filter(function (x) { return x.key === k; })[0] || null; }
+  function summaryId() { return !grid && S.summary && !lead0(S.summary) && S.summary !== 'name' ? S.summary : null; }
+  /* round-robin over the groups, the last of three or more (the value group, once the summary is out) at most one */
+  function trim(groups, n) {
+    var tot = 0;
+    groups.forEach(function (g) { tot += g.ids.length; });
+    if (n <= 0 || tot <= n) return false;
+    /* one per family first (S.family(id): OAA per chance, not also OAA and fielding runs); the rest only if room is left */
+    var fam = S.family || function (id) { return id; }, seen = {}, sum = summaryId();
+    if (sum) seen[fam(sum)] = 1;
+    var pools = groups.map(function (g) {
+      var a = [], b = [];
+      g.ids.forEach(function (id) { var f = fam(id); if (seen[f]) b.push(id); else { seen[f] = 1; a.push(id); } });
+      return a.concat(b);
+    });
+    var q = groups.map(function () { return 0; }), left = n, moved = true, last = groups.length - 1;
+    while (left > 0 && moved) {
+      moved = false;
+      for (var i = 0; i < groups.length && left > 0; i++) {
+        var mx = i === last && groups.length >= 3 ? Math.min(1, pools[i].length) : pools[i].length;
+        if (q[i] < mx) { q[i]++; left--; moved = true; }
+      }
+    }
+    groups.forEach(function (g, i) { var keep = pools[i].slice(0, q[i]); g.ids = g.ids.filter(function (id) { return keep.indexOf(id) >= 0; }); });
+    return true;
+  }
+  function rawGroups(set) {
+    var seen = {}, sum = summaryId();
+    if (sum) seen[sum] = 1;
+    /* a metric in two groups shows once, in the first */
+    return (set.groups || []).map(function (g) { return { label: g.label || '', ids: (g.ids || []).filter(function (id) { if (seen[id]) return false; seen[id] = 1; return true; }) }; }).filter(function (g) { return g.ids.length; });
+  }
+  function capped() { var s = findSet(capKey); return !!(s && cap && trim(rawGroups(s), cap - (summaryId() ? 1 : 0))); }
+  function setKeyNow() { return st.set === fullKey && !capped() ? capKey : st.set; }
+  function curSet() { var k = setKeyNow(); return findSet(k === fullKey ? capKey : k) || sets()[0] || { key: '', groups: [] }; }
   function columns() {
-    var set = curSet(), groups = (set.groups || []).map(function (g) { return { label: g.label || '', ids: (g.ids || []).slice() }; });
-    var have = setIds(set), extra = st.added.filter(function (id) { return have.indexOf(id) < 0; });
+    var k = setKeyNow(), set = curSet(), sum = summaryId();
+    var groups = rawGroups(set);
+    if (!grid && cap && set.key === capKey && k !== fullKey) trim(groups, cap - (sum ? 1 : 0));
+    groups = groups.filter(function (g) { return g.ids.length; });
+    var have = setIds(set), extra = st.added.filter(function (id) { return have.indexOf(id) < 0 && id !== sum; });
+    if (grid) groups = (set.groups || []).map(function (g) { return { label: g.label || '', ids: (g.ids || []).slice() }; }).filter(function (g) { return g.ids.length; });
     if (extra.length) groups.push({ label: 'Added', ids: extra, added: true });
-    return groups.filter(function (g) { return g.ids.length; });
+    return groups;
   }
   function pctFns(ids) {
     var P = peers || rows, out = {};
     ids.forEach(function (id) {
       var m = meta(id);
       var srt = P.filter(function (r) { return !S.ranked || S.ranked(r, id) !== false; }).map(function (r) { return val(r, id); }).filter(isNum).sort(function (a, b) { return a - b; });
-      out[id] = function (r) {
+      var f = function (r) {
         var v = val(r, id);
         if (!isNum(v) || srt.length < 3 || (S.ranked && S.ranked(r, id) === false)) return null;
         var p = QK.pctRank(srt, v);
         return m.lower ? 100 - p : p;
       };
+      f.n = srt.length;
+      out[id] = f;
     });
     return out;
   }
   function fmtv(id, v) { var m = meta(id); return !isNum(v) ? '—' : (m.fmt ? m.fmt(v) : QK.fmt.num(v, Math.abs(v) < 10 && v % 1 ? 2 : 0)); }
   function sortVal(r, key) {
-    var ld = (S.lead || []).filter(function (c) { return c.key === key; })[0];
+    var ld = lead0(key);
     if (key === 'name') return r.name;
     if (ld) return ld.val ? ld.val(r) : null;
     return val(r, key);
@@ -139,37 +222,58 @@ function boardCore(el, spec, grid) {
   }
   function headLabel(id) {
     var m = meta(id);
-    return '<span' + (m.tip ? ' data-tip="' + esc(m.tip) + '"' : '') + '>' + esc(m.short || m.label) + (m.lower ? ' ↓' : '') + '</span>' +
+    return '<span' + (m.tip ? ' data-tip="' + esc(m.tip) + '"' : '') + '>' + esc(shortOf(id)) + (m.lower ? ' ↓' : '') + '</span>' +
       (m.ours ? QK.ours({ short: true, model: m.ours.name, about: m.ours.about }) : '');
   }
-  function sortLabel() {
-    if (!st.sort || !st.sort.key) return '';
-    var k = st.sort.key, ld = (S.lead || []).filter(function (c) { return c.key === k; })[0];
-    var lab = k === 'name' ? 'name' : ld ? ld.label : meta(k).label;
-    return ' · sorted by ' + esc(lab) + (st.sort.dir === 'asc' ? ' (lowest first)' : ' (highest first)');
+  function headTip(id) {
+    var m = meta(id), t = m.label || id;
+    if (m.lower) t += ' (lower is better: the bar is flipped)';
+    if (m.style) t += ' (style: neither better nor worse)';
+    return t + (m.tip ? '. ' + m.tip : '');
   }
-  var shown = [], shownCols = [];
-  function draw() {
+  function sortLabel(short) {
+    if (!st.sort || !st.sort.key) return '';
+    var k = st.sort.key, ld = lead0(k);
+    var lab = k === 'name' ? 'name' : ld ? ld.label : (short ? shortOf(k) : meta(k).label);
+    var best = k === 'name' ? 'asc' : (!ld && meta(k).lower ? 'asc' : 'desc');
+    var dir = !short ? (st.sort.dir === 'asc' ? ' (lowest first)' : ' (highest first)') : st.sort.dir === best ? '' : (k === 'name' ? ' (Z to A)' : st.sort.dir === 'asc' ? ' (lowest first)' : ' (highest first)');
+    return ' · sorted by ' + esc(lab) + dir;
+  }
+  var shown = [], shownCols = [], lastP = null, lastMode = 'table';
+  function setOptions() {
+    var out = [];
+    sets().forEach(function (x, i) {
+      out.push({ key: x.key, label: x.label });
+      if (i === 0 && capped()) out.push({ key: fullKey, label: x.label + ' (all ' + setIds(x).length + ')' });
+    });
+    return out;
+  }
+  function addOptions() { return typeof S.addable === 'string' ? S.addable : (S.addable || []).map(function (o) { return '<option value="' + esc(o.value) + '">' + esc(o.label) + '</option>'; }).join(''); }
+  function addedRow() {
+    return st.added.length ? '<div class="qk-bd-added"><span class="qk-within-l">Added</span>' + st.added.map(function (id) {
+      return '<button type="button" class="qk-chip" data-rm="' + esc(id) + '" aria-label="Remove ' + esc(meta(id).label) + '">' + esc(grid ? meta(id).label : shortOf(id)) + ' <span aria-hidden="true">×</span></button>';
+    }).join('') + '<button type="button" class="qk-chip" data-rm="*">Clear</button></div>' : '';
+  }
+  function draw() { if (grid) drawGrid(); else drawBoard(); }
+  /* the heat grid (unchanged since round 8, but for the one-line heads) */
+  function drawGrid() {
     var groups = columns(), ids = [];
     groups.forEach(function (g) { g.ids.forEach(function (id) { if (ids.indexOf(id) < 0) ids.push(id); }); });
     var P = pctFns(ids);
-    var list = sorted(rows), total = list.length, page = S.page || 50;
-    shown = grid || st.all ? list : list.slice(0, page);
+    var list = sorted(rows), total = list.length;
+    shown = list;
     shownCols = ids;
     var lead = S.lead || [];
-    var chips = (S.sets || []).map(function (x) {
+    var chips = sets().map(function (x) {
       return '<button type="button" class="qk-chip" data-set="' + esc(x.key) + '" aria-pressed="' + (x.key === st.set ? 'true' : 'false') + '">' + esc(x.label) + '</button>';
     }).join('');
-    var addOpts = typeof S.addable === 'string' ? S.addable : (S.addable || []).map(function (o) { return '<option value="' + esc(o.value) + '">' + esc(o.label) + '</option>'; }).join('');
+    var addOpts = addOptions();
     var bar = '<div class="qk-bd-bar"><div class="qk-bd-sets"><span class="qk-within-l">' + esc(S.setsLabel || 'Columns') + '</span><div class="qk-chips scroll" role="group" aria-label="Column sets">' + chips + '</div></div>' +
       '<div class="qk-bd-tools">' + (addOpts ? '<label class="qk-bd-add"><span class="qk-within-l">Add a metric</span><select class="qk-select" id="' + esc(pre) + '-add"><option value="">Any metric…</option>' + addOpts + '</select></label>' : '') +
-      (grid ? '<div class="qk-seg" id="' + esc(pre) + '-show" role="group" aria-label="Cells show"><button type="button" data-value="value" aria-pressed="' + (st.show === 'value') + '">Values</button><button type="button" data-value="pct" aria-pressed="' + (st.show === 'pct') + '">Percentiles</button></div>' : '') +
+      '<div class="qk-seg" id="' + esc(pre) + '-show" role="group" aria-label="Cells show"><button type="button" data-value="value" aria-pressed="' + (st.show === 'value') + '">Values</button><button type="button" data-value="pct" aria-pressed="' + (st.show === 'pct') + '">Percentiles</button></div>' +
       '<button type="button" class="qk-btn sm" data-act="csv">Download CSV</button></div></div>';
-    var added = st.added.length ? '<div class="qk-bd-added"><span class="qk-within-l">Added</span>' + st.added.map(function (id) {
-      return '<button type="button" class="qk-chip" data-rm="' + esc(id) + '" aria-label="Remove ' + esc(meta(id).label) + '">' + esc(meta(id).label) + ' <span aria-hidden="true">×</span></button>';
-    }).join('') + '<button type="button" class="qk-chip" data-rm="*">Clear</button></div>' : '';
     var noun = S.noun || 'rows';
-    var metaLine = '<div class="qk-bd-meta">' + (grid || shown.length === total ? esc(total + ' ' + noun) : 'Top ' + shown.length + ' of ' + total + ' ' + esc(noun)) + sortLabel() + '</div>';
+    var metaLine = '<div class="qk-bd-meta">' + esc(total + ' ' + noun) + sortLabel(false) + '</div>';
     var hasGroups = groups.length > 1 || (groups[0] && groups[0].label);
     var aria = function (k) { return st.sort && st.sort.key === k ? (st.sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'; };
     var th = function (k, html, cls) { return '<th scope="col" class="' + (cls || 'num') + '" aria-sort="' + aria(k) + '" data-k="' + esc(k) + '"><button type="button">' + html + '</button></th>'; };
@@ -178,10 +282,9 @@ function boardCore(el, spec, grid) {
       '<tr>' + th('name', esc(S.nameLabel || 'Name'), 'sticky-col') + lead.map(function (c) { return th(c.key, c.tip ? '<span data-tip="' + esc(c.tip) + '">' + esc(c.label) + '</span>' : esc(c.label)); }).join('') +
       groups.map(function (g, gi) { return g.ids.map(function (id, j) { return th(id, headLabel(id), 'num' + (j === 0 && gi > 0 ? ' gs' : '')); }).join(''); }).join('') + '</tr>';
     var tbody = shown.map(function (r, i) {
-      var pin = S.pin ? '<button type="button" class="qk-pin" data-pin="' + esc(r.id) + '" aria-pressed="' + (S.pin.has(r.id) ? 'true' : 'false') + '" title="' + esc(S.pin.label || 'Pin to the compare tray') + '" aria-label="' + esc((S.pin.label || 'Pin to the compare tray') + ': ' + r.name) + '">' + (S.pin.has(r.id) ? '✓' : '+') + '</button>' : '';
       var mark = r.mark ? QK.teamMark(r.mark, 'sm') : '';
       var name = '<div class="qk-bd-in"><span class="qk-bd-rk num">' + (i + 1) + '</span>' + mark + '<span class="qk-bd-nm"><a class="qk-bd-a" href="' + esc(r.href || '#') + '"' + (S.onPick ? ' data-pick="' + esc(r.id) + '"' : '') + '>' + esc(r.name) + '</a>' +
-        (r.sub ? '<small>' + esc(r.sub) + '</small>' : '') + '</span>' + pin + '</div>';
+        (r.sub ? '<small>' + esc(r.sub) + '</small>' : '') + '</span></div>';
       var cells = lead.map(function (c) { return '<td class="num qk-bd-lead">' + esc(c.fmt ? c.fmt(r) : '') + '</td>'; }).join('');
       groups.forEach(function (g, gi) {
         g.ids.forEach(function (id, j) {
@@ -189,26 +292,132 @@ function boardCore(el, spec, grid) {
           if (!isNum(p)) { cells += '<td class="num qk-bd-c' + gs + '">' + esc(t) + '</td>'; return; }
           var tip = QK.ordinal(Math.round(p)) + ' percentile' + (m.style ? ' (style: neither better nor worse)' : '');
           var bg = m.style ? 'var(--s-3)' : QK.pctColor(p), ink = m.style ? 'var(--ink-1)' : QK.pctInk(p);
-          if (grid) cells += '<td class="num qk-hg-c' + gs + '" style="background:' + bg + ';color:' + ink + '" title="' + esc(m.label + ': ' + t + ', ' + tip) + '">' + esc(st.show === 'pct' ? String(Math.round(p)) : t) + '</td>';
-          else cells += '<td class="num qk-bd-c' + gs + '"><span class="qk-pcell" style="background:' + bg + ';color:' + ink + '" title="' + esc(tip) + '">' + esc(t) + '</span></td>';
+          cells += '<td class="num qk-hg-c' + gs + '" style="background:' + bg + ';color:' + ink + '" title="' + esc(m.label + ': ' + t + ', ' + tip) + '">' + esc(st.show === 'pct' ? String(Math.round(p)) : t) + '</td>';
         });
       });
-      return '<tr' + (S.hl && S.hl(r) ? ' class="hl"' : '') + (grid && r.href ? ' data-href="' + esc(r.href) + '"' : '') + '><th scope="row" class="sticky-col qk-bd-name">' + name + '</th>' + cells + '</tr>';
+      return '<tr' + (S.hl && S.hl(r) ? ' class="hl"' : '') + (r.href ? ' data-href="' + esc(r.href) + '"' : '') + '><th scope="row" class="sticky-col qk-bd-name">' + name + '</th>' + cells + '</tr>';
     }).join('');
-    var table = '<div class="qk-table-wrap qk-bd-wrap"' + (S.maxHeight ? ' style="--table-max:' + S.maxHeight + 'px"' : '') + '><table class="qk-table dense ' + (grid ? 'qk-hg-t' : 'qk-bd-t') + '">' +
+    var table = '<div class="qk-table-wrap qk-bd-wrap"' + (S.maxHeight ? ' style="--table-max:' + S.maxHeight + 'px"' : '') + '><table class="qk-table dense qk-hg-t">' +
       (S.caption ? '<caption class="qk-sr">' + esc(S.caption) + '</caption>' : '') + '<thead>' + thead + '</thead><tbody>' +
       (tbody || '<tr><td colspan="' + (1 + lead.length + ids.length) + '">' + QK.empty('No rows', S.empty || 'Nothing matches the current filters.') + '</td></tr>') + '</tbody></table></div>';
-    var foot = '<div class="qk-bd-foot">' + (!grid && total > (S.page || 50) ? '<button type="button" class="qk-btn sm" data-act="all">' + (st.all ? 'Show the top ' + (S.page || 50) : 'Show all ' + total) + '</button>' : '') +
-      (S.note ? '<div class="qk-bd-note">' + S.note + '</div>' : '') + '</div>';
-    el.innerHTML = '<div class="qk-bd' + (grid ? ' qk-hg' : '') + '">' + bar + added + metaLine + table + foot + '</div>';
+    var foot = '<div class="qk-bd-foot">' + (S.note ? '<div class="qk-bd-note">' + S.note + '</div>' : '') + '</div>';
+    el.innerHTML = '<div class="qk-bd qk-hg">' + bar + addedRow() + metaLine + table + foot + '</div>';
     wire();
     if (S.onState) S.onState({ set: st.set, added: st.added.slice(), sort: st.sort, all: st.all, show: st.show });
+  }
+  /* the Board */
+  function cellParts(r, id, P) {
+    var v = val(r, id), f = P[id], p = f ? f(r) : null, m = meta(id);
+    var band = !isNum(p) || m.style ? (m.style && isNum(p) ? ' sty' : '') : p >= BD_HOT ? ' hot' : p <= BD_COLD ? ' cold' : '';
+    var bar = '<span class="qk-bd-b' + (isNum(p) ? '' : ' none') + '"' + (isNum(p) ? ' style="--p:' + Math.max(2, Math.round(p)) + '%"' : '') + ' aria-hidden="true"></span>';
+    return { v: v, p: p, t: fmtv(id, v), band: band + (isNum(v) ? '' : ' na'), bar: bar };
+  }
+  function cellTip(r, id) {
+    var P = lastP || {}, f = P[id], m = meta(id), v = val(r, id), p = f ? f(r) : null;
+    var t = (m.label || id) + ': ' + fmtv(id, v) + '.';
+    if (isNum(p)) t += ' ' + QK.ordinal(Math.round(p)) + ' percentile of ' + f.n + ' ' + (S.peerNoun || S.noun || 'peers') + (m.lower ? ' (lower is better)' : '') + (m.style ? ' (style: neither better nor worse)' : '') + '.';
+    else if (isNum(v)) t += ' Not ranked here.';
+    return t + (m.tip ? ' ' + m.tip : '');
+  }
+  function nameBlock(r, i) {
+    var pinned = S.pin ? S.pin.has(r.id) : false;
+    var pin = S.pin ? '<button type="button" class="qk-bd-pin" data-pin="' + esc(r.id) + '" aria-pressed="' + (pinned ? 'true' : 'false') + '" title="' + esc(S.pin.label || 'Pin to the compare tray') + '" aria-label="' + esc((S.pin.label || 'Pin to the compare tray') + ': ' + r.name) + '"></button>' : '';
+    var mark = r.mark ? QK.teamMark(r.mark, 'sm') : '';
+    var long = String(r.name || '').length > 24;
+    return pin + '<span class="qk-bd-rk num">' + (i + 1) + '</span>' + mark + '<span class="qk-bd-nm"><a class="qk-bd-a" href="' + esc(r.href || '#') + '"' + (S.onPick ? ' data-pick="' + esc(r.id) + '"' : '') + (long ? ' title="' + esc(r.name) + '"' : '') + '>' + esc(r.name) + '</a>' +
+      (r.sub ? '<small>' + esc(r.sub) + '</small>' : '') + '</span>';
+  }
+  function drawBoard() {
+    var groups = columns(), ids = [], sum = summaryId();
+    groups.forEach(function (g) { g.ids.forEach(function (id) { if (ids.indexOf(id) < 0) ids.push(id); }); });
+    var all = sum ? [sum].concat(ids) : ids.slice();
+    var P = lastP = pctFns(all);
+    var list = sorted(rows), total = list.length, page = S.page || 50;
+    shown = st.all ? list : list.slice(0, page);
+    shownCols = all;
+    var lead = S.lead || [];
+    var phone = bdPhone(), mode = lastMode = phone && st.mode !== 'table' ? 'cards' : 'table';
+    var noun = S.noun || 'rows', setNow = setKeyNow();
+    var aria = function (k) { return st.sort && st.sort.key === k ? (st.sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'; };
+    var srt = function (k) { return st.sort && st.sort.key === k ? ' srt' : ''; };
+    /* the toolbar: Columns, Add a metric, (cards: Sort), the count, (phones: Cards | Table), CSV */
+    var opts = setOptions().map(function (o) { return '<option value="' + esc(o.key) + '"' + (o.key === setNow ? ' selected' : '') + '>' + esc(o.label) + '</option>'; }).join('');
+    var addOpts = addOptions();
+    var sortOpts = '';
+    if (mode === 'cards') {
+      var keys = all.concat(lead.map(function (c) { return c.key; })).concat(['name']);
+      sortOpts = keys.map(function (k) { var ld = lead0(k); return '<option value="' + esc(k) + '"' + (st.sort && st.sort.key === k ? ' selected' : '') + '>' + esc(k === 'name' ? 'Name' : ld ? ld.label : shortOf(k)) + '</option>'; }).join('');
+    }
+    var count = (shown.length === total ? esc(total.toLocaleString('en-GB') + ' ' + noun) : 'Top ' + shown.length + ' of ' + esc(total.toLocaleString('en-GB') + ' ' + noun)) + sortLabel(true);
+    var tb = '<div class="qk-bd-tb">' +
+      '<label class="qk-bd-f"><span class="qk-bd-fl">' + esc(S.setsLabel || 'Columns') + '</span><select class="qk-select" id="' + esc(pre) + '-cols">' + opts + '</select></label>' +
+      (addOpts ? '<label class="qk-bd-f"><span class="qk-bd-fl">Add a metric</span><select class="qk-select" id="' + esc(pre) + '-add"><option value="">Any metric…</option>' + addOpts + '</select></label>' : '') +
+      (sortOpts ? '<label class="qk-bd-f"><span class="qk-bd-fl">Sort</span><select class="qk-select" id="' + esc(pre) + '-sort">' + sortOpts + '</select></label>' : '') +
+      '<div class="qk-bd-count">' + count + '</div><div class="qk-bd-acts">' +
+      (phone ? '<div class="qk-seg qk-bd-mode" id="' + esc(pre) + '-mode" role="group" aria-label="Show as"><button type="button" data-value="cards" aria-pressed="' + (mode === 'cards') + '">Cards</button><button type="button" data-value="table" aria-pressed="' + (mode === 'table') + '">Table</button></div>' : '') +
+      '<button type="button" class="qk-bd-csv" data-act="csv" data-tip="Download a CSV of the rows and columns on screen">' + BD_CSV_ICON + '<span class="qk-sr">Download CSV of the rows on screen</span></button></div></div>';
+    var body;
+    if (mode === 'cards') {
+      var six = ids.slice(0, 6), first = lead.filter(function (c) { return c.key !== 'age'; })[0];
+      body = shown.length ? '<ol class="qk-bdc-list">' + shown.map(function (r, i) {
+        var s = sum ? cellParts(r, sum, P) : null;
+        var sub = r.sub && first && first.fmt ? r.sub + ' · ' + plain(first.fmt(r)) + ' ' + first.label : r.sub;
+        var head = '<div class="qk-bdc-h">' + nameBlock({ id: r.id, name: r.name, sub: sub, mark: r.mark, href: r.href }, i) +
+          (s ? '<span class="qk-bdc-sum' + s.band + '"><b class="num">' + esc(s.t) + '</b><small>' + esc(shortOf(sum)) + '</small>' + s.bar + '</span>' : '') + '</div>';
+        var tiles = six.map(function (id) {
+          var c = cellParts(r, id, P);
+          return '<div class="qk-bdc-t' + c.band + '"><span class="l">' + esc(shortOf(id)) + '</span><span class="v num">' + esc(c.t) + '</span>' + c.bar + '</div>';
+        }).join('');
+        return '<li class="qk-bdc' + (S.hl && S.hl(r) ? ' hl' : '') + '" data-i="' + i + '">' + head + (tiles ? '<div class="qk-bdc-m">' + tiles + '</div>' : '') + '</li>';
+      }).join('') + '</ol>' : QK.empty('No rows', S.empty || 'Nothing matches the current filters.');
+    } else {
+      var hasGroups = groups.some(function (g) { return g.label; });
+      var th = function (k, html, cls, tip) { return '<th scope="col" class="' + (cls || 'num') + '" aria-sort="' + aria(k) + '" data-k="' + esc(k) + '"><button type="button"' + (tip ? ' data-tip="' + esc(tip) + '"' : '') + '>' + html + '</button></th>'; };
+      var head = function (id) {
+        var m = meta(id), u = unitOf(id);
+        return '<span class="qk-bd-hl">' + esc(shortOf(id)) + '</span><span class="qk-bd-hu">' + (u ? '<span>' + esc(u) + '</span>' : '') +
+          (m.lower ? '<span class="qk-bd-low" aria-label="lower is better">↓</span>' : '') + (m.ours ? QK.ours({ short: true, model: m.ours.name, about: m.ours.about }) : '') + '</span>';
+      };
+      var thead = (hasGroups ? '<tr class="qk-bd-grp"><th class="sticky-col" scope="colgroup"></th>' + (sum ? '<th class="qk-bd-sum"></th>' : '') +
+        groups.map(function (g) { return '<th scope="colgroup" colspan="' + g.ids.length + '" class="gs"><span title="' + esc(g.label) + '">' + esc(g.label) + '</span></th>'; }).join('') +
+        (lead.length ? '<th colspan="' + lead.length + '" class="gs"></th>' : '') + '</tr>' : '') +
+        '<tr>' + th('name', '<span class="qk-bd-hl">' + esc(S.nameLabel || 'Name') + '</span><span class="qk-bd-hu"></span>', 'sticky-col qk-bd-nameh' + srt('name')) +
+        (sum ? th(sum, head(sum), 'num qk-bd-sum' + srt(sum), headTip(sum)) : '') +
+        groups.map(function (g) { return g.ids.map(function (id, j) { return th(id, head(id), 'num' + (j === 0 ? ' gs' : '') + srt(id), headTip(id)); }).join(''); }).join('') +
+        lead.map(function (c, j) { return th(c.key, '<span class="qk-bd-hl">' + esc(c.label) + '</span><span class="qk-bd-hu"></span>', 'num qk-bd-lead' + (j === 0 ? ' gs' : '') + srt(c.key), c.tip || ''); }).join('') + '</tr>';
+      var cell = function (r, id, cls) {
+        var c = cellParts(r, id, P);
+        return '<td class="num qk-bd-c' + c.band + cls + srt(id) + '"' + (isNum(c.v) ? ' data-c="' + esc(id) + '"' : '') + '><span class="qk-bd-v">' + esc(c.t) + '</span>' + c.bar + '</td>';
+      };
+      var tbody = shown.map(function (r, i) {
+        var cells = (sum ? cell(r, sum, ' qk-bd-sum') : '');
+        groups.forEach(function (g) { g.ids.forEach(function (id, j) { cells += cell(r, id, j === 0 ? ' gs' : ''); }); });
+        cells += lead.map(function (c, j) { return '<td class="num qk-bd-lead' + (j === 0 ? ' gs' : '') + srt(c.key) + '">' + esc(c.fmt ? c.fmt(r) : '') + '</td>'; }).join('');
+        return '<tr' + (S.hl && S.hl(r) ? ' class="hl"' : '') + ' data-i="' + i + '"><th scope="row" class="sticky-col qk-bd-name"><div class="qk-bd-in">' + nameBlock(r, i) + '</div></th>' + cells + '</tr>';
+      }).join('');
+      body = '<div class="qk-table-wrap qk-bd-wrap"' + (S.maxHeight ? ' style="--table-max:' + S.maxHeight + 'px"' : '') + '><table class="qk-table qk-bd-t">' +
+        (S.caption ? '<caption class="qk-sr">' + esc(S.caption) + '</caption>' : '') + '<thead>' + thead + '</thead><tbody>' +
+        (tbody || '<tr><td colspan="' + (1 + (sum ? 1 : 0) + lead.length + ids.length) + '">' + QK.empty('No rows', S.empty || 'Nothing matches the current filters.') + '</td></tr>') + '</tbody></table></div>';
+    }
+    var key = '<div class="qk-bd-key" aria-label="How to read the board"><span><i class="qk-bd-kb"></i>Bar: percentile against the ' + esc(S.peerNoun || S.noun || 'peers') + '</span>' +
+      '<span class="hot"><i class="qk-bd-kb"></i>Top 10%</span><span class="cold"><i class="qk-bd-kb"></i>Bottom 10%</span><span>↓ lower is better (bar flipped)</span></div>';
+    var foot = '<div class="qk-bd-foot">' + (total > page ? '<button type="button" class="qk-btn sm" data-act="all">' + (st.all ? 'Show the top ' + page : 'Show all ' + total.toLocaleString('en-GB')) + '</button>' : '') + key +
+      (S.note ? '<div class="qk-bd-note">' + S.note + '</div>' : '') + '</div>';
+    el.innerHTML = '<div class="qk-bd qk-bd-v10' + (mode === 'cards' ? ' cards' : '') + '">' + tb + addedRow() + body + foot + '</div>';
+    wire();
+    if (S.onState) S.onState({ set: st.set, added: st.added.slice(), sort: st.sort, all: st.all, show: st.show, mode: mode });
+  }
+  function firstDir(k) {
+    var ld = lead0(k);
+    return k === 'name' ? 'asc' : (!ld && meta(k).lower ? 'asc' : 'desc');
   }
   function wire() {
     QK.$$('[data-set]', el).forEach(function (b) { b.addEventListener('click', function () { st.set = b.getAttribute('data-set'); draw(); }); });
     QK.$$('[data-rm]', el).forEach(function (b) {
       b.addEventListener('click', function () { var id = b.getAttribute('data-rm'); st.added = id === '*' ? [] : st.added.filter(function (x) { return x !== id; }); draw(); });
     });
+    var cols = document.getElementById(pre + '-cols');
+    if (cols) cols.addEventListener('change', function () { st.set = cols.value; draw(); var n = document.getElementById(pre + '-cols'); if (n) n.focus(); });
     var add = document.getElementById(pre + '-add');
     if (add) add.addEventListener('change', function () {
       var id = add.value;
@@ -216,14 +425,16 @@ function boardCore(el, spec, grid) {
       if (id) st.sort = { key: id, dir: meta(id).lower ? 'asc' : 'desc' };
       draw();
     });
+    var so = document.getElementById(pre + '-sort');
+    if (so) so.addEventListener('change', function () { st.sort = { key: so.value, dir: firstDir(so.value) }; draw(); var n = document.getElementById(pre + '-sort'); if (n) n.focus(); });
     var show = document.getElementById(pre + '-show');
     if (show) QK.seg(show, function (v) { st.show = v === 'pct' ? 'pct' : 'value'; draw(); });
+    var md = document.getElementById(pre + '-mode');
+    if (md) QK.seg(md, function (v) { st.mode = v === 'table' ? 'table' : 'cards'; bdModeSet(st.mode); draw(); });
     QK.$$('th[aria-sort] button', el).forEach(function (b) {
       b.addEventListener('click', function () {
         var k = b.parentNode.getAttribute('data-k');
-        var low = k !== 'name' && !!meta(k).lower && !(S.lead || []).some(function (c) { return c.key === k; });
-        var first = k === 'name' ? 'asc' : low ? 'asc' : 'desc';
-        st.sort = st.sort && st.sort.key === k ? { key: k, dir: st.sort.dir === 'asc' ? 'desc' : 'asc' } : { key: k, dir: first };
+        st.sort = st.sort && st.sort.key === k ? { key: k, dir: st.sort.dir === 'asc' ? 'desc' : 'asc' } : { key: k, dir: firstDir(k) };
         draw();
         var nb = el.querySelector('th[data-k="' + k + '"] button'); if (nb) nb.focus();
       });
@@ -234,7 +445,7 @@ function boardCore(el, spec, grid) {
       b.addEventListener('click', function (ev) {
         ev.preventDefault(); ev.stopPropagation();
         var id = b.getAttribute('data-pin'), r = rows.filter(function (x) { return String(x.id) === id; })[0];
-        if (r && S.pin) { S.pin.toggle(r); var on = S.pin.has(r.id); b.setAttribute('aria-pressed', on ? 'true' : 'false'); b.textContent = on ? '✓' : '+'; }
+        if (r && S.pin) { S.pin.toggle(r); var on = S.pin.has(r.id); b.setAttribute('aria-pressed', on ? 'true' : 'false'); b.textContent = grid ? (on ? '✓' : '+') : ''; }
       });
     });
     if (S.onPick) QK.$$('[data-pick]', el).forEach(function (a) {
@@ -248,31 +459,67 @@ function boardCore(el, spec, grid) {
       tr.style.cursor = 'pointer';
       tr.addEventListener('click', function (ev) { if (ev.target.closest('a, button, input, select')) return; root.location.href = tr.getAttribute('data-href'); });
     });
+    /* a cell's tooltip (value, percentile of n peers, the explanation) is written on first hover */
+    var t = el.querySelector('.qk-bd-t');
+    if (t) t.addEventListener('mouseover', function (ev) {
+      var td = ev.target.closest ? ev.target.closest('td[data-c]') : null;
+      if (!td || td.hasAttribute('data-tip')) return;
+      var tr = td.parentNode, r = shown[+tr.getAttribute('data-i')];
+      if (r) td.setAttribute('data-tip', cellTip(r, td.getAttribute('data-c')));
+    });
     if (QK.tooltips) QK.tooltips();
   }
   /* exactly what is on screen: the rows shown (the top N, or all), the columns shown, the values as written */
   function csvText() {
     var lead = S.lead || [];
-    var cols = ['Rank', S.nameLabel || 'Name', S.subLabel || 'Detail'].concat(lead.map(function (c) { return c.label; })).concat(shownCols.map(function (id) { return meta(id).label; }));
+    var head = ['Rank', S.nameLabel || 'Name', S.subLabel || 'Detail'];
     var P = grid && st.show === 'pct' ? pctFns(shownCols) : null;
-    var out = shown.map(function (r, i) {
-      return [i + 1, r.name, r.sub || ''].concat(lead.map(function (c) { return c.fmt ? plain(c.fmt(r)) : ''; })).concat(shownCols.map(function (id) {
+    var metricCells = function (r) {
+      return shownCols.map(function (id) {
         if (P) { var p = P[id](r); return isNum(p) ? Math.round(p) : ''; }
         var v = val(r, id); return isNum(v) ? plain(fmtv(id, v)) : '';
-      }));
+      });
+    };
+    var leadCells = function (r) { return lead.map(function (c) { return c.fmt ? plain(c.fmt(r)) : ''; }); };
+    var labels = shownCols.map(function (id) { return meta(id).label; }), leadLabels = lead.map(function (c) { return c.label; });
+    var cols = grid ? head.concat(leadLabels).concat(labels) : head.concat(labels).concat(leadLabels);
+    var out = shown.map(function (r, i) {
+      return [i + 1, r.name, r.sub || ''].concat(grid ? leadCells(r).concat(metricCells(r)) : metricCells(r).concat(leadCells(r)));
     });
     return QK.csv(cols, out);
   }
+  var tok = {};
+  el._qkBd = tok;
   draw();
+  /* phones and wider screens draw differently (cards / table): redraw when the width crosses the line */
+  if (!grid && root.matchMedia) {
+    var mq = root.matchMedia(BD_PHONE);
+    var onMq = function () {
+      if (el._qkBd !== tok || !el.isConnected) { if (mq.removeEventListener) mq.removeEventListener('change', onMq); else if (mq.removeListener) mq.removeListener(onMq); return; }
+      draw();
+    };
+    if (mq.addEventListener) mq.addEventListener('change', onMq); else if (mq.addListener) mq.addListener(onMq);
+  }
+  /* the spec's short labels load once; a board drawn before them redraws when they land */
+  if (!grid && QK.spec && QK.spec.load && !cat()) {
+    QK.spec.load().then(function (c) { if (c && el.isConnected && el._qkBd === tok) draw(); });
+  }
   return {
     draw: draw,
-    state: function () { return { set: st.set, added: st.added.slice(), sort: st.sort, all: st.all, show: st.show }; },
+    state: function () { return { set: st.set, added: st.added.slice(), sort: st.sort, all: st.all, show: st.show, mode: lastMode }; },
     setRows: function (r, p) { rows = r || []; peers = p || null; draw(); },
     csv: csvText
   };
 }
 QK.board = function (el, spec) { return boardCore(el, spec, false); };
 QK.heatGrid = function (el, spec) { return boardCore(el, spec, true); };
+/* the column-set key a page may pass back as spec.set: one of sets, or the first set's "(all N)" key ('<key>-all') */
+QK.board.pick = function (sets, want, fallback) {
+  sets = sets || [];
+  if (sets.some(function (s) { return s.key === want; })) return want;
+  if (sets[0] && want === sets[0].key + '-all') return want;
+  return fallback;
+};
 
 /* ─────────────────────────────────────── the power board */
 QK.powerBars = function (rows, o) {

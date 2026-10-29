@@ -213,9 +213,9 @@ function render(el, params) {
   SC.S = Number(params.season) || GI.currentSeason();
   ROOT = el;
   readQuery(params.query || {});
-  el.innerHTML = GI.pageHead('Scouting Room · ' + SC.S, 'The Scouting Room', 'Every player, every metric, one control bar: the board, a chart, the leaders and the all-time lists. Tap a name for the profile; + pins to the compare tray.') +
+  el.innerHTML = GI.pageHead('Scouting Room · ' + SC.S, 'The Scouting Room', 'Every player, every metric, one control bar: the board, a chart, the leaders and the all-time lists. Tap a name for the profile; tick the box beside it to pin it to the compare tray.') +
     GI.sectionNav('scout', 'scout') +
-    '<div class="sc"><section class="qk-card sc-ctl"><div class="qk-card-body" id="sc-ctl">' + QK.skeleton('lines', 2) + '</div></section>' +
+    '<div class="sc qk-room"><section class="qk-card sc-ctl"><div class="qk-card-body" id="sc-ctl">' + QK.skeleton('lines', 2) + '</div></section>' +
     '<section class="sc-top" id="sc-top" aria-label="Top of the group"></section>' +
     '<div class="qk-tabs sc-tabs" role="tablist" aria-label="Scouting Room views">' +
     VIEWS.map(t => '<button type="button" class="qk-tab" role="tab" id="sc-tab-' + t[0] + '" data-view="' + t[0] + '" aria-selected="' + (SC.view === t[0]) + '" tabindex="' + (SC.view === t[0] ? 0 : -1) + '">' + t[1] + '</button>').join('') +
@@ -359,6 +359,12 @@ function topStrip() {
 }
 function shortTip(t) { t = String(t || '').replace(/ Our model: .*$/, ''); return t.length > 110 ? t.slice(0, 107).replace(/\s+\S*$/, '') + '…' : t; }
 
+/* one-line board heads (round 10) for payload keys the metrics spec does not carry; the spec's own come through
+   QK.spec (`short`). A value is the head, or [head, unit]. */
+var BOARD_ABBR = {
+  "composite_epa": "Comp. fcst", "gvar": "VAR", "epa_pa": "EPA PA", "epa_no_pa": "EPA no PA",
+  "rush_epa_qb": "QB run EPA", "tfl": "TFL", "ff": "FF"
+};
 /* Board: column sets as chips, percentile cells, paging, CSV */
 function boardView(host) {
   const v = view(), g = grp(), k = kind();
@@ -372,7 +378,7 @@ function boardView(host) {
   const gnames = [];
   metrics.forEach(m => { if (gnames.indexOf(m.group || 'Other') < 0) gnames.push(m.group || 'Other'); });
   gnames.forEach(gn => sets.push({ key: gn, label: gn, groups: [{ label: gn, ids: metrics.filter(m => (m.group || 'Other') === gn).map(m => m.key) }] }));
-  const setKey = sets.some(s => s.key === SC.cols) ? SC.cols : 'view';
+  const setKey = QK.board.pick(sets, SC.cols, 'view');
   const ag = v.sets.length === 3 && v.sets[2].key === 'aggregate' ? v.sets[2].ids : [];
   const defSort = v.color || ag[0] || (v.sets[0] || { ids: [] }).ids[0];
   let sort = SC.sort && SC.sort.key && (SC.sort.key === 'name' || SC.sort.key === 'n' || SC.sort.key === 'age' || has(SC.sort.key)) ? SC.sort : null;
@@ -382,11 +388,11 @@ function boardView(host) {
   const addable = GI.SP.orderOpts(metrics.map(m => ({ key: m.key, label: mmeta(m.key).label, lower: m.lower, group: m.group })), '', GI.SP.headIds(g[1] ? g[1] : 'DEF'));
   const floorTxt = isNum(SC.min) ? SC.min + '+ ' + nLabel().toLowerCase() : 'the qualified floor';
   host.innerHTML = '<section class="qk-card sc-board"><div class="qk-card-head"><div style="min-width:0"><div class="qk-card-title">The board</div><div class="qk-card-sub">' +
-    esc(g[2]) + ' · ' + SC.S + ' · cells on the percentile scale against the ' + P.length + ' ' + esc(g[3]) + ' past ' + esc(floorTxt) + ' (blue worst, red best). Tap a name for the profile; + pins to the compare tray.</div></div></div>' +
+    esc(g[2]) + ' · ' + SC.S + ' · the bar under each number is its percentile against the ' + P.length + ' ' + esc(g[3]) + ' past ' + esc(floorTxt) + ': the top 10% in red, the bottom 10% in blue. Tap a name for the profile; tick the box beside it to pin it to the compare tray.</div></div></div>' +
     '<div class="qk-card-body"><div id="sc-board"></div></div></section>' +
     GI.SP.oursNote([].concat.apply([], v.sets.map(s => s.ids)).filter(id => GI.SP.ours(id)).slice(0, 3).map(id => [id, mmeta(id).label]));
   BOARD = QK.board(document.getElementById('sc-board'), {
-    id: 'sc-bd', sets: sets, set: setKey, added: SC.add.filter(id => has(id)), sort: sort, all: SC.all, page: 50, noun: g[3],
+    id: 'sc-bd', summary: defSort, abbr: BOARD_ABBR, sets: sets, set: setKey, added: SC.add.filter(id => has(id)), sort: sort, all: SC.all, page: 50, noun: g[3],
     nameLabel: 'Player', subLabel: 'Position · team · age',
     meta: id => mmeta(id),
     addable: addable,
@@ -401,7 +407,7 @@ function boardView(host) {
     onState: st => { SC.cols = st.set === 'view' ? '' : st.set; SC.add = st.added; SC.sort = st.sort; SC.all = st.all; writeQuery(); },
     csv: 'gridiron-' + SC.S + '-' + code().toLowerCase() + '-' + String(setKey || 'view').toLowerCase().replace(/[^a-z0-9]+/g, '-') + '.csv',
     empty: SC.q.trim() ? 'No ' + g[3] + ' match “' + SC.q.trim() + '” with these filters.' : 'No ' + g[3] + ' pass these filters: lower the minimum or clear a filter.',
-    note: 'Percentiles are against every ' + esc(g[4]) + ' past the floor, whatever the team, age or search filters show; a ↓ marks a metric where lower is better (its colours are flipped) and grey cells are style (neither better nor worse). Every metric in the file is a chip or “Add a metric” away.'
+    note: 'Percentiles are against every ' + esc(g[4]) + ' past the floor, whatever the team, age or search filters show; a ↓ marks a metric where lower is better (its bar is flipped) and style metrics (neither better nor worse) are never coloured. Every metric in the file is under “Columns” or “Add a metric”.'
   });
 }
 

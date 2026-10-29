@@ -165,7 +165,7 @@ function render(el, params) {
   readQuery(params.query || {});
   var tabs = [['board', 'Board'], ['chart', 'Chart'], ['leaders', 'Leaders'], ['alltime', 'All-time']];
   el.innerHTML = PD.pageHead('Scouting Room', 'Every driver, every number', '<span id="sc-meta">Loading…</span>') +
-    '<div class="sc"><section class="qk-card sc-ctl"><div class="qk-card-body" id="sc-ctl">' + QK.skeleton('lines', 2) + '</div></section>' +
+    '<div class="sc qk-room"><section class="qk-card sc-ctl"><div class="qk-card-body" id="sc-ctl">' + QK.skeleton('lines', 2) + '</div></section>' +
     '<section class="sc-top" id="sc-top" aria-label="Top of the grid"></section>' +
     '<div class="qk-tabs sc-tabs" role="tablist" aria-label="Scouting Room views">' +
     tabs.map(function (t) { return '<button type="button" class="qk-tab" role="tab" id="sc-tab-' + t[0] + '" data-view="' + t[0] + '" aria-selected="' + (SC.view === t[0]) + '" tabindex="' + (SC.view === t[0] ? 0 : -1) + '">' + t[1] + '</button>'; }).join('') +
@@ -295,6 +295,24 @@ function topStrip() {
 }
 function shortTip(t) { t = String(t || '').replace(/ Our model: .*$/, ''); return t.length > 110 ? t.slice(0, 107).replace(/\s+\S*$/, '') + '…' : t; }
 
+/* one-line board heads (round 10) for payload keys the metrics spec does not carry; the spec's own come through
+   QK.spec (`short`). A value is the head, or [head, unit]. */
+var BOARD_ABBR = {
+  "quali_pace_rank": "Quali rank", "race_pace_pct": "Race pace %", "race_pace_rank": "Pace rank",
+  "race_pace_season_rank": "Season pace", "race_pace_best_rank": "Best pace rk", "points_lost_dnf": "Pts lost DNF",
+  "exp_points": "xPoints", "points_v_expected_pre": "Pts v xP pre", "median_finish": "Med finish",
+  "laps_led_share": "Laps led%", "front_row_rate": "Front row%", "avg_quali": "Avg quali",
+  "quali_gap_pole_pct": "Gap to pole", "quali_gap_tm_ms": ["Gap to TM", "ms"], "grid_drop": "Grid drop",
+  "traffic_cost": ["Traffic", "s/race"], "wet_pace_rank": "Wet pace rk", "sector_best_share": "Sector best%",
+  "late_gain": "Late gain", "overtakes_suffered": "Passed/race", "pass_difficulty": ["Pass diff.", "s/lap"],
+  "overtakes_per_pace": "Passes/pace", "penalties_per_race": "Penalties", "deg_soft": "Deg soft",
+  "deg_medium": "Deg medium", "deg_hard": "Deg hard", "stint_v_field": "Stint v fld", "avg_stint": ["Avg stint",
+  "laps"], "stops_per_race": "Stops/race", "pit_lane_ms": ["Pit lane", "ms"], "dnf_unknown": "DNF unknown",
+  "dns": "DNS", "laps_share": "Laps done%", "brake_earliness": ["Brake early", "m"], "full_throttle": "Throttle%",
+  "braking_share": "Braking%", "coasting": "Coasting%", "speed_trap_kph": ["Speed trap", "km/h"],
+  "speed_trap_rank": "Trap rank", "champ_pos": "Champ pos", "sprint_points": "Sprint pts",
+  "sprint_gain": "Sprint gain"
+};
 /* Board: column sets as chips, percentile cells, paging, CSV */
 function boardView(host) {
   var v = view(), all = shown();
@@ -306,19 +324,20 @@ function boardView(host) {
   var gnames = [];
   METRICS.forEach(function (m) { if (gnames.indexOf(m.group || 'Other') < 0) gnames.push(m.group || 'Other'); });
   gnames.forEach(function (gn) { sets.push({ key: gn, label: gn, groups: [{ label: gn, ids: METRICS.filter(function (m) { return (m.group || 'Other') === gn; }).map(function (m) { return m.key; }) }] }); });
-  var setKey = sets.some(function (s) { return s.key === SC.cols; }) ? SC.cols : 'view';
-  var defSort = v.color && has(v.color) ? v.color : ((v.sets[0] || { ids: [] }).ids[0]);
+  var setKey = QK.board.pick(sets, SC.cols, 'view');
+  /* the summary beside the name and the default sort: the race driver rating (round 10), else the view's colour metric */
+  var defSort = has('driver_effect') ? 'driver_effect' : v.color && has(v.color) ? v.color : ((v.sets[0] || { ids: [] }).ids[0]);
   var sort = SC.sort && SC.sort.key && (SC.sort.key === 'name' || SC.sort.key === 'n' || SC.sort.key === 'age' || has(SC.sort.key)) ? SC.sort : null;
   if (sort && !sort.dir) sort = { key: sort.key, dir: sort.key !== 'name' && sort.key !== 'n' && sort.key !== 'age' && mmeta(sort.key).lower ? 'asc' : 'desc' };
   SC.sortDef = defSort ? { key: defSort, dir: mmeta(defSort).lower ? 'asc' : 'desc' } : null;
   if (!sort && SC.sortDef) sort = SC.sortDef;
   var addable = V().picker(METRICS.map(function (m) { return { key: m.key, label: mmeta(m.key).label, group: m.group, lower: m.lower }; }), '', 'driver');
   host.innerHTML = '<section class="qk-card sc-board"><div class="qk-card-head"><div style="min-width:0"><div class="qk-card-title">The board</div><div class="qk-card-sub">' +
-    'Drivers · ' + SC.S + ' · cells on the percentile scale against the ' + P.length + ' drivers with ' + minNow() + '+ starts (blue worst, red best). Tap a name for the profile; + pins to the compare tray.</div></div></div>' +
+    'Drivers · ' + SC.S + ' · the bar under each number is its percentile against the ' + P.length + ' drivers with ' + minNow() + '+ starts: the top 10% in red, the bottom 10% in blue. Tap a name for the profile; tick the box beside it to pin it to the compare tray.</div></div></div>' +
     '<div class="qk-card-body"><div id="sc-board"></div></div></section>' +
     '<div class="pd-ours">' + QK.oursExplain('The driver ratings (race and qualifying pace against the team-mate, the car taken out), race and qualifying pace against the field, Elo and points against our forecast come from our models; columns tagged ' + QK.ours({ short: true }) + ' are theirs.') + '</div>';
   BOARD = QK.board(document.getElementById('sc-board'), {
-    id: 'sc-bd', sets: sets, set: setKey, added: SC.add.filter(has), sort: sort, all: SC.all, page: 50, noun: 'drivers',
+    id: 'sc-bd', summary: defSort, abbr: BOARD_ABBR, sets: sets, set: setKey, added: SC.add.filter(has), sort: sort, all: SC.all, page: 50, noun: 'drivers',
     nameLabel: 'Driver', subLabel: 'Constructor · age · starts',
     meta: mmeta, addable: addable,
     lead: [{ key: 'n', label: 'Starts', tip: 'Grand Prix starts this season', fmt: function (row) { return String(row._r.n); }, val: function (row) { return row._r.n; } },
@@ -332,7 +351,7 @@ function boardView(host) {
     onState: function (st) { SC.cols = st.set === 'view' ? '' : st.set; SC.add = st.added; SC.sort = st.sort; SC.all = st.all; writeQuery(); },
     csv: 'paddock-' + SC.S + '-drivers-' + String(setKey).toLowerCase().replace(/[^a-z0-9]+/g, '-') + '.csv',
     empty: SC.q.trim() ? 'No driver matches “' + SC.q.trim() + '” with these filters.' : 'No driver passes these filters: lower the minimum starts or clear a filter.',
-    note: 'Percentiles are against every driver past the floor, whatever the constructor or age filter shows; a ↓ marks a metric where lower is better (its colours are flipped). Every metric in the file is a chip or “Add a metric” away.'
+    note: 'Percentiles are against every driver past the floor, whatever the constructor or age filter shows; a ↓ marks a metric where lower is better (its bar is flipped). Every metric in the file is under “Columns” or “Add a metric”.'
   });
 }
 

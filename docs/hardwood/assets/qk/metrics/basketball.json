@@ -50,6 +50,7 @@
     {
      "id": "hpm",
      "display": "Total impact (HPM)",
+     "short": "HPM",
      "unit": "per 100",
      "direction": "higher",
      "set": "headline",
@@ -75,6 +76,7 @@
     {
      "id": "hpm_o",
      "display": "Offensive impact",
+     "short": "Off impact",
      "unit": "per 100",
      "direction": "higher",
      "set": "headline",
@@ -100,6 +102,7 @@
     {
      "id": "hpm_d",
      "display": "Defensive impact",
+     "short": "Def impact",
      "unit": "per 100",
      "direction": "higher",
      "set": "headline",
@@ -125,6 +128,7 @@
     {
      "id": "pts100",
      "display": "Points per 100",
+     "short": "Points",
      "unit": "per 100",
      "direction": "higher",
      "set": "headline",
@@ -150,6 +154,7 @@
     {
      "id": "ts_add",
      "display": "Scoring efficiency added",
+     "short": "TS added",
      "unit": "per 100",
      "direction": "higher",
      "set": "headline",
@@ -175,6 +180,7 @@
     {
      "id": "pox100",
      "display": "Shot-making",
+     "short": "Shot-making",
      "unit": "per 100 shots",
      "direction": "higher",
      "set": "headline",
@@ -200,6 +206,7 @@
     {
      "id": "ast_pct",
      "display": "Assist rate",
+     "short": "AST%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -225,6 +232,7 @@
     {
      "id": "ast_tov",
      "display": "Assist-to-turnover",
+     "short": "AST/TO",
      "unit": "ratio",
      "direction": "higher",
      "set": "headline",
@@ -250,6 +258,7 @@
     {
      "id": "fta100",
      "display": "Free throws drawn per 100",
+     "short": "FTA",
      "unit": "per 100",
      "direction": "higher",
      "set": "headline",
@@ -275,6 +284,7 @@
     {
      "id": "stl_pct",
      "display": "Steal rate",
+     "short": "STL%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -300,6 +310,7 @@
     {
      "id": "ts",
      "display": "True shooting",
+     "short": "TS%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -325,6 +336,7 @@
     {
      "id": "usg",
      "display": "Usage",
+     "short": "USG%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -351,6 +363,7 @@
     {
      "id": "efg",
      "display": "Effective FG",
+     "short": "eFG%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -376,6 +389,7 @@
     {
      "id": "fg3",
      "display": "3-point FG",
+     "short": "3P%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -401,6 +415,7 @@
     {
      "id": "ft",
      "display": "Free-throw %",
+     "short": "FT%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -426,6 +441,7 @@
     {
      "id": "ftr",
      "display": "Free-throw rate",
+     "short": "FT rate",
      "unit": "ratio",
      "direction": "higher",
      "set": "secondary",
@@ -451,6 +467,7 @@
     {
      "id": "tpar",
      "display": "3-point attempt rate",
+     "short": "3PA rate",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -477,6 +494,7 @@
     {
      "id": "unassisted_share",
      "display": "Self-created makes",
+     "short": "Self-created",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -502,6 +520,7 @@
     {
      "id": "ast100",
      "display": "Assists per 100",
+     "short": "Assists",
      "unit": "per 100",
      "direction": "higher",
      "set": "secondary",
@@ -527,6 +546,7 @@
     {
      "id": "tov_pct",
      "display": "Turnover rate",
+     "short": "TOV%",
      "unit": "%",
      "direction": "lower",
      "set": "secondary",
@@ -552,6 +572,7 @@
     {
      "id": "trb_pct",
      "display": "Rebound rate",
+     "short": "REB%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -577,6 +598,7 @@
     {
      "id": "blk_pct",
      "display": "Block rate",
+     "short": "BLK%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -602,6 +624,7 @@
     {
      "id": "pf100",
      "display": "Fouls per 100",
+     "short": "Fouls",
      "unit": "per 100",
      "direction": "lower",
      "set": "secondary",
@@ -627,6 +650,7 @@
     {
      "id": "rapm",
      "display": "RAPM",
+     "short": "RAPM",
      "unit": "per 100",
      "direction": "higher",
      "set": "secondary",
@@ -652,6 +676,7 @@
     {
      "id": "box_impact",
      "display": "Box impact",
+     "short": "Box impact",
      "unit": "per 100",
      "direction": "higher",
      "set": "secondary",
@@ -677,6 +702,7 @@
     {
      "id": "on_off",
      "display": "On/off",
+     "short": "On/off",
      "unit": "per 100",
      "direction": "higher",
      "set": "secondary",
@@ -702,6 +728,7 @@
     {
      "id": "and1_100",
      "display": "And-ones per 100",
+     "short": "And-ones",
      "unit": "per 100",
      "direction": "higher",
      "set": "secondary",
@@ -727,6 +754,7 @@
     {
      "id": "rim_freq",
      "display": "Rim frequency",
+     "short": "Rim freq",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -753,6 +781,7 @@
     {
      "id": "avg_dist",
      "display": "Average shot distance",
+     "short": "Shot dist",
      "unit": "ft",
      "direction": "higher",
      "set": "secondary",
@@ -888,6 +917,7 @@
     {
      "id": "hpm",
      "display": "Total impact (HPM)",
+     "short": "HPM",
      "unit": "per 100",
      "direction": "higher",
      "set": "headline",
@@ -913,6 +943,7 @@
     {
      "id": "hpm_o",
      "display": "Offensive impact",
+     "short": "Off impact",
      "unit": "per 100",
      "direction": "higher",
      "set": "headline",
@@ -938,6 +969,7 @@
     {
      "id": "hpm_d",
      "display": "Defensive impact",
+     "short": "Def impact",
      "unit": "per 100",
      "direction": "higher",
      "set": "headline",
@@ -963,6 +995,7 @@
     {
      "id": "pts100",
      "display": "Points per 100",
+     "short": "Points",
      "unit": "per 100",
      "direction": "higher",
      "set": "headline",
@@ -988,6 +1021,7 @@
     {
      "id": "ts_add",
      "display": "Scoring efficiency added",
+     "short": "TS added",
      "unit": "per 100",
      "direction": "higher",
      "set": "headline",
@@ -1013,6 +1047,7 @@
     {
      "id": "pox100",
      "display": "Shot-making",
+     "short": "Shot-making",
      "unit": "per 100 shots",
      "direction": "higher",
      "set": "headline",
@@ -1038,6 +1073,7 @@
     {
      "id": "fta100",
      "display": "Free throws drawn per 100",
+     "short": "FTA",
      "unit": "per 100",
      "direction": "higher",
      "set": "headline",
@@ -1063,6 +1099,7 @@
     {
      "id": "ast_pct",
      "display": "Assist rate",
+     "short": "AST%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -1088,6 +1125,7 @@
     {
      "id": "drb_pct",
      "display": "Defensive rebound rate",
+     "short": "DREB%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -1113,6 +1151,7 @@
     {
      "id": "stl_pct",
      "display": "Steal rate",
+     "short": "STL%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -1138,6 +1177,7 @@
     {
      "id": "ts",
      "display": "True shooting",
+     "short": "TS%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -1163,6 +1203,7 @@
     {
      "id": "usg",
      "display": "Usage",
+     "short": "USG%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -1189,6 +1230,7 @@
     {
      "id": "efg",
      "display": "Effective FG",
+     "short": "eFG%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -1214,6 +1256,7 @@
     {
      "id": "fg3",
      "display": "3-point FG",
+     "short": "3P%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -1239,6 +1282,7 @@
     {
      "id": "ft",
      "display": "Free-throw %",
+     "short": "FT%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -1264,6 +1308,7 @@
     {
      "id": "tpar",
      "display": "3-point attempt rate",
+     "short": "3PA rate",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -1290,6 +1335,7 @@
     {
      "id": "unassisted_share",
      "display": "Self-created makes",
+     "short": "Self-created",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -1315,6 +1361,7 @@
     {
      "id": "ast_tov",
      "display": "Assist-to-turnover",
+     "short": "AST/TO",
      "unit": "ratio",
      "direction": "higher",
      "set": "secondary",
@@ -1340,6 +1387,7 @@
     {
      "id": "tov_pct",
      "display": "Turnover rate",
+     "short": "TOV%",
      "unit": "%",
      "direction": "lower",
      "set": "secondary",
@@ -1365,6 +1413,7 @@
     {
      "id": "trb_pct",
      "display": "Rebound rate",
+     "short": "REB%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -1390,6 +1439,7 @@
     {
      "id": "orb_pct",
      "display": "Offensive rebound rate",
+     "short": "OREB%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -1415,6 +1465,7 @@
     {
      "id": "blk_pct",
      "display": "Block rate",
+     "short": "BLK%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -1440,6 +1491,7 @@
     {
      "id": "pf100",
      "display": "Fouls per 100",
+     "short": "Fouls",
      "unit": "per 100",
      "direction": "lower",
      "set": "secondary",
@@ -1465,6 +1517,7 @@
     {
      "id": "rapm",
      "display": "RAPM",
+     "short": "RAPM",
      "unit": "per 100",
      "direction": "higher",
      "set": "secondary",
@@ -1490,6 +1543,7 @@
     {
      "id": "box_impact",
      "display": "Box impact",
+     "short": "Box impact",
      "unit": "per 100",
      "direction": "higher",
      "set": "secondary",
@@ -1515,6 +1569,7 @@
     {
      "id": "on_off",
      "display": "On/off",
+     "short": "On/off",
      "unit": "per 100",
      "direction": "higher",
      "set": "secondary",
@@ -1540,6 +1595,7 @@
     {
      "id": "rim_freq",
      "display": "Rim frequency",
+     "short": "Rim freq",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -1566,6 +1622,7 @@
     {
      "id": "avg_dist",
      "display": "Average shot distance",
+     "short": "Shot dist",
      "unit": "ft",
      "direction": "higher",
      "set": "secondary",
@@ -1700,6 +1757,7 @@
     {
      "id": "hpm",
      "display": "Total impact (HPM)",
+     "short": "HPM",
      "unit": "per 100",
      "direction": "higher",
      "set": "headline",
@@ -1725,6 +1783,7 @@
     {
      "id": "hpm_o",
      "display": "Offensive impact",
+     "short": "Off impact",
      "unit": "per 100",
      "direction": "higher",
      "set": "headline",
@@ -1750,6 +1809,7 @@
     {
      "id": "hpm_d",
      "display": "Defensive impact",
+     "short": "Def impact",
      "unit": "per 100",
      "direction": "higher",
      "set": "headline",
@@ -1775,6 +1835,7 @@
     {
      "id": "pts100",
      "display": "Points per 100",
+     "short": "Points",
      "unit": "per 100",
      "direction": "higher",
      "set": "headline",
@@ -1800,6 +1861,7 @@
     {
      "id": "ts_add",
      "display": "Scoring efficiency added",
+     "short": "TS added",
      "unit": "per 100",
      "direction": "higher",
      "set": "headline",
@@ -1825,6 +1887,7 @@
     {
      "id": "drb_pct",
      "display": "Defensive rebound rate",
+     "short": "DREB%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -1850,6 +1913,7 @@
     {
      "id": "orb_pct",
      "display": "Offensive rebound rate",
+     "short": "OREB%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -1875,6 +1939,7 @@
     {
      "id": "blk_pct",
      "display": "Block rate",
+     "short": "BLK%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -1900,6 +1965,7 @@
     {
      "id": "ast_pct",
      "display": "Assist rate",
+     "short": "AST%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -1925,6 +1991,7 @@
     {
      "id": "fta100",
      "display": "Free throws drawn per 100",
+     "short": "FTA",
      "unit": "per 100",
      "direction": "higher",
      "set": "headline",
@@ -1950,6 +2017,7 @@
     {
      "id": "ts",
      "display": "True shooting",
+     "short": "TS%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -1975,6 +2043,7 @@
     {
      "id": "usg",
      "display": "Usage",
+     "short": "USG%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -2001,6 +2070,7 @@
     {
      "id": "efg",
      "display": "Effective FG",
+     "short": "eFG%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -2026,6 +2096,7 @@
     {
      "id": "fg2",
      "display": "2-point FG",
+     "short": "2P%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -2051,6 +2122,7 @@
     {
      "id": "ft",
      "display": "Free-throw %",
+     "short": "FT%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -2076,6 +2148,7 @@
     {
      "id": "ftr",
      "display": "Free-throw rate",
+     "short": "FT rate",
      "unit": "ratio",
      "direction": "higher",
      "set": "secondary",
@@ -2101,6 +2174,7 @@
     {
      "id": "rim_fg",
      "display": "Rim FG",
+     "short": "Rim FG%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -2126,6 +2200,7 @@
     {
      "id": "opp_rim_fg_on",
      "display": "Opponent rim FG, player on",
+     "short": "Opp rim FG%",
      "unit": "%",
      "direction": "lower",
      "set": "secondary",
@@ -2151,6 +2226,7 @@
     {
      "id": "stl_pct",
      "display": "Steal rate",
+     "short": "STL%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -2176,6 +2252,7 @@
     {
      "id": "tov_pct",
      "display": "Turnover rate",
+     "short": "TOV%",
      "unit": "%",
      "direction": "lower",
      "set": "secondary",
@@ -2201,6 +2278,7 @@
     {
      "id": "trb_pct",
      "display": "Rebound rate",
+     "short": "REB%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -2226,6 +2304,7 @@
     {
      "id": "pf100",
      "display": "Fouls per 100",
+     "short": "Fouls",
      "unit": "per 100",
      "direction": "lower",
      "set": "secondary",
@@ -2251,6 +2330,7 @@
     {
      "id": "rapm",
      "display": "RAPM",
+     "short": "RAPM",
      "unit": "per 100",
      "direction": "higher",
      "set": "secondary",
@@ -2276,6 +2356,7 @@
     {
      "id": "box_impact",
      "display": "Box impact",
+     "short": "Box impact",
      "unit": "per 100",
      "direction": "higher",
      "set": "secondary",
@@ -2301,6 +2382,7 @@
     {
      "id": "on_off",
      "display": "On/off",
+     "short": "On/off",
      "unit": "per 100",
      "direction": "higher",
      "set": "secondary",
@@ -2326,6 +2408,7 @@
     {
      "id": "rim_freq",
      "display": "Rim frequency",
+     "short": "Rim freq",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -2352,6 +2435,7 @@
     {
      "id": "tpar",
      "display": "3-point attempt rate",
+     "short": "3PA rate",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -2378,6 +2462,7 @@
     {
      "id": "putback100",
      "display": "Putbacks per 100",
+     "short": "Putbacks",
      "unit": "per 100",
      "direction": "higher",
      "set": "secondary",
@@ -2511,6 +2596,7 @@
     {
      "id": "hpm",
      "display": "Total impact (HPM)",
+     "short": "HPM",
      "unit": "per 100",
      "direction": "higher",
      "set": "headline",
@@ -2536,6 +2622,7 @@
     {
      "id": "hpm_o",
      "display": "Offensive impact",
+     "short": "Off impact",
      "unit": "per 100",
      "direction": "higher",
      "set": "headline",
@@ -2561,6 +2648,7 @@
     {
      "id": "hpm_d",
      "display": "Defensive impact",
+     "short": "Def impact",
      "unit": "per 100",
      "direction": "higher",
      "set": "headline",
@@ -2586,6 +2674,7 @@
     {
      "id": "pts100",
      "display": "Points per 100",
+     "short": "Points",
      "unit": "per 100",
      "direction": "higher",
      "set": "headline",
@@ -2611,6 +2700,7 @@
     {
      "id": "ts_add",
      "display": "Scoring efficiency added",
+     "short": "TS added",
      "unit": "per 100",
      "direction": "higher",
      "set": "headline",
@@ -2636,6 +2726,7 @@
     {
      "id": "pox100",
      "display": "Shot-making",
+     "short": "Shot-making",
      "unit": "per 100 shots",
      "direction": "higher",
      "set": "headline",
@@ -2661,6 +2752,7 @@
     {
      "id": "ast_pct",
      "display": "Assist rate",
+     "short": "AST%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -2686,6 +2778,7 @@
     {
      "id": "ast_tov",
      "display": "Assist-to-turnover",
+     "short": "AST/TO",
      "unit": "ratio",
      "direction": "higher",
      "set": "headline",
@@ -2711,6 +2804,7 @@
     {
      "id": "fta100",
      "display": "Free throws drawn per 100",
+     "short": "FTA",
      "unit": "per 100",
      "direction": "higher",
      "set": "headline",
@@ -2736,6 +2830,7 @@
     {
      "id": "stl_pct",
      "display": "Steal rate",
+     "short": "STL%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -2761,6 +2856,7 @@
     {
      "id": "ts",
      "display": "True shooting",
+     "short": "TS%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -2786,6 +2882,7 @@
     {
      "id": "usg",
      "display": "Usage",
+     "short": "USG%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -2812,6 +2909,7 @@
     {
      "id": "efg",
      "display": "Effective FG",
+     "short": "eFG%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -2837,6 +2935,7 @@
     {
      "id": "fg3",
      "display": "3-point FG",
+     "short": "3P%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -2862,6 +2961,7 @@
     {
      "id": "ft",
      "display": "Free-throw %",
+     "short": "FT%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -2887,6 +2987,7 @@
     {
      "id": "ftr",
      "display": "Free-throw rate",
+     "short": "FT rate",
      "unit": "ratio",
      "direction": "higher",
      "set": "secondary",
@@ -2912,6 +3013,7 @@
     {
      "id": "tpar",
      "display": "3-point attempt rate",
+     "short": "3PA rate",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -2938,6 +3040,7 @@
     {
      "id": "unassisted_share",
      "display": "Self-created makes",
+     "short": "Self-created",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -2963,6 +3066,7 @@
     {
      "id": "ast100",
      "display": "Assists per 100",
+     "short": "Assists",
      "unit": "per 100",
      "direction": "higher",
      "set": "secondary",
@@ -2988,6 +3092,7 @@
     {
      "id": "tov_pct",
      "display": "Turnover rate",
+     "short": "TOV%",
      "unit": "%",
      "direction": "lower",
      "set": "secondary",
@@ -3013,6 +3118,7 @@
     {
      "id": "trb_pct",
      "display": "Rebound rate",
+     "short": "REB%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -3038,6 +3144,7 @@
     {
      "id": "blk_pct",
      "display": "Block rate",
+     "short": "BLK%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -3063,6 +3170,7 @@
     {
      "id": "pf100",
      "display": "Fouls per 100",
+     "short": "Fouls",
      "unit": "per 100",
      "direction": "lower",
      "set": "secondary",
@@ -3088,6 +3196,7 @@
     {
      "id": "rapm",
      "display": "RAPM",
+     "short": "RAPM",
      "unit": "per 100",
      "direction": "higher",
      "set": "secondary",
@@ -3113,6 +3222,7 @@
     {
      "id": "box_impact",
      "display": "Box impact",
+     "short": "Box impact",
      "unit": "per 100",
      "direction": "higher",
      "set": "secondary",
@@ -3138,6 +3248,7 @@
     {
      "id": "on_off",
      "display": "On/off",
+     "short": "On/off",
      "unit": "per 100",
      "direction": "higher",
      "set": "secondary",
@@ -3163,6 +3274,7 @@
     {
      "id": "and1_100",
      "display": "And-ones per 100",
+     "short": "And-ones",
      "unit": "per 100",
      "direction": "higher",
      "set": "secondary",
@@ -3188,6 +3300,7 @@
     {
      "id": "rim_freq",
      "display": "Rim frequency",
+     "short": "Rim freq",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -3214,6 +3327,7 @@
     {
      "id": "avg_dist",
      "display": "Average shot distance",
+     "short": "Shot dist",
      "unit": "ft",
      "direction": "higher",
      "set": "secondary",
@@ -3349,6 +3463,7 @@
     {
      "id": "hpm",
      "display": "Total impact (HPM)",
+     "short": "HPM",
      "unit": "per 100",
      "direction": "higher",
      "set": "headline",
@@ -3374,6 +3489,7 @@
     {
      "id": "hpm_o",
      "display": "Offensive impact",
+     "short": "Off impact",
      "unit": "per 100",
      "direction": "higher",
      "set": "headline",
@@ -3399,6 +3515,7 @@
     {
      "id": "hpm_d",
      "display": "Defensive impact",
+     "short": "Def impact",
      "unit": "per 100",
      "direction": "higher",
      "set": "headline",
@@ -3424,6 +3541,7 @@
     {
      "id": "pts100",
      "display": "Points per 100",
+     "short": "Points",
      "unit": "per 100",
      "direction": "higher",
      "set": "headline",
@@ -3449,6 +3567,7 @@
     {
      "id": "ts_add",
      "display": "Scoring efficiency added",
+     "short": "TS added",
      "unit": "per 100",
      "direction": "higher",
      "set": "headline",
@@ -3474,6 +3593,7 @@
     {
      "id": "pox100",
      "display": "Shot-making",
+     "short": "Shot-making",
      "unit": "per 100 shots",
      "direction": "higher",
      "set": "headline",
@@ -3499,6 +3619,7 @@
     {
      "id": "fta100",
      "display": "Free throws drawn per 100",
+     "short": "FTA",
      "unit": "per 100",
      "direction": "higher",
      "set": "headline",
@@ -3524,6 +3645,7 @@
     {
      "id": "ast_pct",
      "display": "Assist rate",
+     "short": "AST%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -3549,6 +3671,7 @@
     {
      "id": "drb_pct",
      "display": "Defensive rebound rate",
+     "short": "DREB%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -3574,6 +3697,7 @@
     {
      "id": "stl_pct",
      "display": "Steal rate",
+     "short": "STL%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -3599,6 +3723,7 @@
     {
      "id": "ts",
      "display": "True shooting",
+     "short": "TS%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -3624,6 +3749,7 @@
     {
      "id": "usg",
      "display": "Usage",
+     "short": "USG%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -3650,6 +3776,7 @@
     {
      "id": "efg",
      "display": "Effective FG",
+     "short": "eFG%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -3675,6 +3802,7 @@
     {
      "id": "fg3",
      "display": "3-point FG",
+     "short": "3P%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -3700,6 +3828,7 @@
     {
      "id": "ft",
      "display": "Free-throw %",
+     "short": "FT%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -3725,6 +3854,7 @@
     {
      "id": "tpar",
      "display": "3-point attempt rate",
+     "short": "3PA rate",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -3751,6 +3881,7 @@
     {
      "id": "unassisted_share",
      "display": "Self-created makes",
+     "short": "Self-created",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -3776,6 +3907,7 @@
     {
      "id": "ast_tov",
      "display": "Assist-to-turnover",
+     "short": "AST/TO",
      "unit": "ratio",
      "direction": "higher",
      "set": "secondary",
@@ -3801,6 +3933,7 @@
     {
      "id": "tov_pct",
      "display": "Turnover rate",
+     "short": "TOV%",
      "unit": "%",
      "direction": "lower",
      "set": "secondary",
@@ -3826,6 +3959,7 @@
     {
      "id": "trb_pct",
      "display": "Rebound rate",
+     "short": "REB%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -3851,6 +3985,7 @@
     {
      "id": "orb_pct",
      "display": "Offensive rebound rate",
+     "short": "OREB%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -3876,6 +4011,7 @@
     {
      "id": "blk_pct",
      "display": "Block rate",
+     "short": "BLK%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -3901,6 +4037,7 @@
     {
      "id": "pf100",
      "display": "Fouls per 100",
+     "short": "Fouls",
      "unit": "per 100",
      "direction": "lower",
      "set": "secondary",
@@ -3926,6 +4063,7 @@
     {
      "id": "rapm",
      "display": "RAPM",
+     "short": "RAPM",
      "unit": "per 100",
      "direction": "higher",
      "set": "secondary",
@@ -3951,6 +4089,7 @@
     {
      "id": "box_impact",
      "display": "Box impact",
+     "short": "Box impact",
      "unit": "per 100",
      "direction": "higher",
      "set": "secondary",
@@ -3976,6 +4115,7 @@
     {
      "id": "on_off",
      "display": "On/off",
+     "short": "On/off",
      "unit": "per 100",
      "direction": "higher",
      "set": "secondary",
@@ -4001,6 +4141,7 @@
     {
      "id": "rim_freq",
      "display": "Rim frequency",
+     "short": "Rim freq",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -4027,6 +4168,7 @@
     {
      "id": "avg_dist",
      "display": "Average shot distance",
+     "short": "Shot dist",
      "unit": "ft",
      "direction": "higher",
      "set": "secondary",
@@ -4161,6 +4303,7 @@
     {
      "id": "hpm",
      "display": "Total impact (HPM)",
+     "short": "HPM",
      "unit": "per 100",
      "direction": "higher",
      "set": "headline",
@@ -4186,6 +4329,7 @@
     {
      "id": "hpm_o",
      "display": "Offensive impact",
+     "short": "Off impact",
      "unit": "per 100",
      "direction": "higher",
      "set": "headline",
@@ -4211,6 +4355,7 @@
     {
      "id": "hpm_d",
      "display": "Defensive impact",
+     "short": "Def impact",
      "unit": "per 100",
      "direction": "higher",
      "set": "headline",
@@ -4236,6 +4381,7 @@
     {
      "id": "pts100",
      "display": "Points per 100",
+     "short": "Points",
      "unit": "per 100",
      "direction": "higher",
      "set": "headline",
@@ -4261,6 +4407,7 @@
     {
      "id": "ts_add",
      "display": "Scoring efficiency added",
+     "short": "TS added",
      "unit": "per 100",
      "direction": "higher",
      "set": "headline",
@@ -4286,6 +4433,7 @@
     {
      "id": "drb_pct",
      "display": "Defensive rebound rate",
+     "short": "DREB%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -4311,6 +4459,7 @@
     {
      "id": "orb_pct",
      "display": "Offensive rebound rate",
+     "short": "OREB%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -4336,6 +4485,7 @@
     {
      "id": "blk_pct",
      "display": "Block rate",
+     "short": "BLK%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -4361,6 +4511,7 @@
     {
      "id": "ast_pct",
      "display": "Assist rate",
+     "short": "AST%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -4386,6 +4537,7 @@
     {
      "id": "fta100",
      "display": "Free throws drawn per 100",
+     "short": "FTA",
      "unit": "per 100",
      "direction": "higher",
      "set": "headline",
@@ -4411,6 +4563,7 @@
     {
      "id": "ts",
      "display": "True shooting",
+     "short": "TS%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -4436,6 +4589,7 @@
     {
      "id": "usg",
      "display": "Usage",
+     "short": "USG%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -4462,6 +4616,7 @@
     {
      "id": "efg",
      "display": "Effective FG",
+     "short": "eFG%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -4487,6 +4642,7 @@
     {
      "id": "fg2",
      "display": "2-point FG",
+     "short": "2P%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -4512,6 +4668,7 @@
     {
      "id": "ft",
      "display": "Free-throw %",
+     "short": "FT%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -4537,6 +4694,7 @@
     {
      "id": "ftr",
      "display": "Free-throw rate",
+     "short": "FT rate",
      "unit": "ratio",
      "direction": "higher",
      "set": "secondary",
@@ -4562,6 +4720,7 @@
     {
      "id": "rim_fg",
      "display": "Rim FG",
+     "short": "Rim FG%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -4587,6 +4746,7 @@
     {
      "id": "opp_rim_fg_on",
      "display": "Opponent rim FG, player on",
+     "short": "Opp rim FG%",
      "unit": "%",
      "direction": "lower",
      "set": "secondary",
@@ -4612,6 +4772,7 @@
     {
      "id": "stl_pct",
      "display": "Steal rate",
+     "short": "STL%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -4637,6 +4798,7 @@
     {
      "id": "tov_pct",
      "display": "Turnover rate",
+     "short": "TOV%",
      "unit": "%",
      "direction": "lower",
      "set": "secondary",
@@ -4662,6 +4824,7 @@
     {
      "id": "trb_pct",
      "display": "Rebound rate",
+     "short": "REB%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -4687,6 +4850,7 @@
     {
      "id": "pf100",
      "display": "Fouls per 100",
+     "short": "Fouls",
      "unit": "per 100",
      "direction": "lower",
      "set": "secondary",
@@ -4712,6 +4876,7 @@
     {
      "id": "rapm",
      "display": "RAPM",
+     "short": "RAPM",
      "unit": "per 100",
      "direction": "higher",
      "set": "secondary",
@@ -4737,6 +4902,7 @@
     {
      "id": "box_impact",
      "display": "Box impact",
+     "short": "Box impact",
      "unit": "per 100",
      "direction": "higher",
      "set": "secondary",
@@ -4762,6 +4928,7 @@
     {
      "id": "on_off",
      "display": "On/off",
+     "short": "On/off",
      "unit": "per 100",
      "direction": "higher",
      "set": "secondary",
@@ -4787,6 +4954,7 @@
     {
      "id": "rim_freq",
      "display": "Rim frequency",
+     "short": "Rim freq",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -4813,6 +4981,7 @@
     {
      "id": "tpar",
      "display": "3-point attempt rate",
+     "short": "3PA rate",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -4839,6 +5008,7 @@
     {
      "id": "putback100",
      "display": "Putbacks per 100",
+     "short": "Putbacks",
      "unit": "per 100",
      "direction": "higher",
      "set": "secondary",
@@ -4961,6 +5131,7 @@
     {
      "id": "model_net",
      "display": "Adjusted net rating",
+     "short": "Adj net",
      "unit": "per 100",
      "direction": "higher",
      "set": "headline",
@@ -4988,6 +5159,7 @@
     {
      "id": "model_off",
      "display": "Adjusted offence",
+     "short": "Adj off",
      "unit": "per 100",
      "direction": "higher",
      "set": "headline",
@@ -5015,6 +5187,7 @@
     {
      "id": "model_def",
      "display": "Adjusted defence",
+     "short": "Adj def",
      "unit": "per 100",
      "direction": "lower",
      "set": "headline",
@@ -5042,6 +5215,7 @@
     {
      "id": "pace",
      "display": "Pace",
+     "short": "Pace",
      "unit": "per 48 (NBA) / 40 (WNBA)",
      "direction": "higher",
      "set": "headline",
@@ -5069,6 +5243,7 @@
     {
      "id": "efg",
      "display": "Effective FG",
+     "short": "eFG%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -5095,6 +5270,7 @@
     {
      "id": "opp_efg",
      "display": "Opponent effective FG",
+     "short": "Opp eFG%",
      "unit": "%",
      "direction": "lower",
      "set": "headline",
@@ -5121,6 +5297,7 @@
     {
      "id": "tov_pct",
      "display": "Turnover rate",
+     "short": "TOV%",
      "unit": "%",
      "direction": "lower",
      "set": "headline",
@@ -5147,6 +5324,7 @@
     {
      "id": "opp_tov_pct",
      "display": "Forced turnover rate",
+     "short": "Forced TOV%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -5173,6 +5351,7 @@
     {
      "id": "orb_pct",
      "display": "Offensive rebound rate",
+     "short": "OREB%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -5199,6 +5378,7 @@
     {
      "id": "drb_pct",
      "display": "Defensive rebound rate",
+     "short": "DREB%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -5225,6 +5405,7 @@
     {
      "id": "net",
      "display": "Net rating",
+     "short": "Net rtg",
      "unit": "per 100",
      "direction": "higher",
      "set": "secondary",
@@ -5251,6 +5432,7 @@
     {
      "id": "ortg",
      "display": "Offensive rating",
+     "short": "ORtg",
      "unit": "per 100",
      "direction": "higher",
      "set": "secondary",
@@ -5277,6 +5459,7 @@
     {
      "id": "drtg",
      "display": "Defensive rating",
+     "short": "DRtg",
      "unit": "per 100",
      "direction": "lower",
      "set": "secondary",
@@ -5303,6 +5486,7 @@
     {
      "id": "ftr",
      "display": "Free-throw rate",
+     "short": "FT rate",
      "unit": "ratio",
      "direction": "higher",
      "set": "secondary",
@@ -5329,6 +5513,7 @@
     {
      "id": "opp_ftr",
      "display": "Opponent free-throw rate",
+     "short": "Opp FT rate",
      "unit": "ratio",
      "direction": "lower",
      "set": "secondary",
@@ -5355,6 +5540,7 @@
     {
      "id": "fg3",
      "display": "3-point %",
+     "short": "3P%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -5381,6 +5567,7 @@
     {
      "id": "tpar",
      "display": "3-point attempt rate",
+     "short": "3PA rate",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -5408,6 +5595,7 @@
     {
      "id": "opp_fg3",
      "display": "Opponent 3-point %",
+     "short": "Opp 3P%",
      "unit": "%",
      "direction": "lower",
      "set": "secondary",
@@ -5434,6 +5622,7 @@
     {
      "id": "win_pct",
      "display": "Win %",
+     "short": "Win%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -5460,6 +5649,7 @@
     {
      "id": "mov",
      "display": "Average margin",
+     "short": "Margin",
      "unit": "points",
      "direction": "higher",
      "set": "secondary",
@@ -5486,6 +5676,7 @@
     {
      "id": "pyth_wins",
      "display": "Pythagorean wins",
+     "short": "Pyth wins",
      "unit": "wins",
      "direction": "higher",
      "set": "secondary",
@@ -5513,6 +5704,7 @@
     {
      "id": "luck",
      "display": "Wins above Pythagorean",
+     "short": "W v Pyth",
      "unit": "wins",
      "direction": "higher",
      "set": "secondary",
@@ -5539,6 +5731,7 @@
     {
      "id": "close_win_pct",
      "display": "Close-game win %",
+     "short": "Close W%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -5588,6 +5781,7 @@
     {
      "id": "model_net",
      "display": "Adjusted net rating",
+     "short": "Adj net",
      "unit": "per 100",
      "direction": "higher",
      "set": "headline",
@@ -5615,6 +5809,7 @@
     {
      "id": "model_off",
      "display": "Adjusted offence",
+     "short": "Adj off",
      "unit": "per 100",
      "direction": "higher",
      "set": "headline",
@@ -5642,6 +5837,7 @@
     {
      "id": "model_def",
      "display": "Adjusted defence",
+     "short": "Adj def",
      "unit": "per 100",
      "direction": "lower",
      "set": "headline",
@@ -5669,6 +5865,7 @@
     {
      "id": "pace",
      "display": "Pace",
+     "short": "Pace",
      "unit": "per 48 (NBA) / 40 (WNBA)",
      "direction": "higher",
      "set": "headline",
@@ -5696,6 +5893,7 @@
     {
      "id": "efg",
      "display": "Effective FG",
+     "short": "eFG%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -5722,6 +5920,7 @@
     {
      "id": "opp_efg",
      "display": "Opponent effective FG",
+     "short": "Opp eFG%",
      "unit": "%",
      "direction": "lower",
      "set": "headline",
@@ -5748,6 +5947,7 @@
     {
      "id": "tov_pct",
      "display": "Turnover rate",
+     "short": "TOV%",
      "unit": "%",
      "direction": "lower",
      "set": "headline",
@@ -5774,6 +5974,7 @@
     {
      "id": "opp_tov_pct",
      "display": "Forced turnover rate",
+     "short": "Forced TOV%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -5800,6 +6001,7 @@
     {
      "id": "orb_pct",
      "display": "Offensive rebound rate",
+     "short": "OREB%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -5826,6 +6028,7 @@
     {
      "id": "drb_pct",
      "display": "Defensive rebound rate",
+     "short": "DREB%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -5852,6 +6055,7 @@
     {
      "id": "net",
      "display": "Net rating",
+     "short": "Net rtg",
      "unit": "per 100",
      "direction": "higher",
      "set": "secondary",
@@ -5878,6 +6082,7 @@
     {
      "id": "ortg",
      "display": "Offensive rating",
+     "short": "ORtg",
      "unit": "per 100",
      "direction": "higher",
      "set": "secondary",
@@ -5904,6 +6109,7 @@
     {
      "id": "drtg",
      "display": "Defensive rating",
+     "short": "DRtg",
      "unit": "per 100",
      "direction": "lower",
      "set": "secondary",
@@ -5930,6 +6136,7 @@
     {
      "id": "ftr",
      "display": "Free-throw rate",
+     "short": "FT rate",
      "unit": "ratio",
      "direction": "higher",
      "set": "secondary",
@@ -5956,6 +6163,7 @@
     {
      "id": "opp_ftr",
      "display": "Opponent free-throw rate",
+     "short": "Opp FT rate",
      "unit": "ratio",
      "direction": "lower",
      "set": "secondary",
@@ -5982,6 +6190,7 @@
     {
      "id": "fg3",
      "display": "3-point %",
+     "short": "3P%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -6008,6 +6217,7 @@
     {
      "id": "tpar",
      "display": "3-point attempt rate",
+     "short": "3PA rate",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -6035,6 +6245,7 @@
     {
      "id": "opp_fg3",
      "display": "Opponent 3-point %",
+     "short": "Opp 3P%",
      "unit": "%",
      "direction": "lower",
      "set": "secondary",
@@ -6061,6 +6272,7 @@
     {
      "id": "win_pct",
      "display": "Win %",
+     "short": "Win%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -6087,6 +6299,7 @@
     {
      "id": "mov",
      "display": "Average margin",
+     "short": "Margin",
      "unit": "points",
      "direction": "higher",
      "set": "secondary",
@@ -6113,6 +6326,7 @@
     {
      "id": "pyth_wins",
      "display": "Pythagorean wins",
+     "short": "Pyth wins",
      "unit": "wins",
      "direction": "higher",
      "set": "secondary",
@@ -6140,6 +6354,7 @@
     {
      "id": "luck",
      "display": "Wins above Pythagorean",
+     "short": "W v Pyth",
      "unit": "wins",
      "direction": "higher",
      "set": "secondary",
@@ -6166,6 +6381,7 @@
     {
      "id": "close_win_pct",
      "display": "Close-game win %",
+     "short": "Close W%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",

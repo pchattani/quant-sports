@@ -212,7 +212,7 @@ function render(el, params, state) {
   SC.S = Number(params.year || TA.currentYear(SC.T));
   ROOT = el;
   readQuery(params.query || {});
-  el.innerHTML = '<div class="sc ta-sc"><section class="qk-card sc-ctl"><div class="qk-card-body" id="sc-ctl">' + QK.skeleton('lines', 2) + '</div></section>' +
+  el.innerHTML = '<div class="sc ta-sc qk-room"><section class="qk-card sc-ctl"><div class="qk-card-body" id="sc-ctl">' + QK.skeleton('lines', 2) + '</div></section>' +
     '<section class="sc-top" id="sc-top" aria-label="Top of the group"></section>' +
     '<div class="qk-tabs sc-tabs" role="tablist" aria-label="Scouting Room views">' +
     [['board', 'Board'], ['chart', 'Chart'], ['leaders', 'Leaders']].map(t => '<button type="button" class="qk-tab" role="tab" id="sc-tab-' + t[0] + '" data-view="' + t[0] + '" aria-selected="' + (SC.view === t[0]) + '" tabindex="' + (SC.view === t[0] ? 0 : -1) + '">' + t[1] + '</button>').join('') +
@@ -348,6 +348,33 @@ function topStrip() {
     sub: 'The leader on five of the group’s key metrics among the ' + rows.length + ' on screen (one card each for as many different leaders as the metrics allow). Tap a name for the profile.' }) + QK.hotRow(items) : '';
 }
 
+/* one-line board heads (round 10) for payload keys the metrics spec does not carry; the spec's own come through
+   QK.spec (`short`). A value is the head, or [head, unit]. */
+var BOARD_ABBR = {
+  "wins_over_exp": "Wins OE", "woe_pm": ["Wins OE", "/match"], "spw_exp": "SPW model", "hold_hard": "Hold% hard",
+  "hold_clay": "Hold% clay", "hold_grass": "Hold% grass", "hold_v_strong": "Hold% v best", "rpw_exp": "RPW model",
+  "brk_hard": "Brk% hard", "brk_clay": "Brk% clay", "brk_grass": "Brk% grass", "brk_v_strong": "Brk% v best",
+  "sr_total": "Serve+return", "elo_d30": "Elo 30d", "elo_d90": "Elo 90d", "elo_d365": "Elo 1y",
+  "proj_rank": "Proj rank", "p_finals": "Finals %", "p_no1": "No. 1 %", "win_slam": "Win% Slams",
+  "win_m1000": "Win% 1000s", "win_500": "Win% 500s", "win_250": "Win% 250s", "wins_top10": "W v top 10",
+  "slam_wins": "Slam wins", "win_hard": "Win% hard", "win_clay": "Win% clay", "win_grass": "Win% grass",
+  "win_indoor": "Win% indoor", "serve_se": "Serve s.e.", "return_se": "Return s.e.", "tb_w": "TBs won",
+  "tb_l": "TBs lost", "tb_exp": "TB% exp", "tb_over": "TB OE", "dec_w": "Deciders W", "dec_l": "Deciders L",
+  "dec_over": "Deciders OE", "fsd_w": "Comebacks", "fsd_pct": "Comeback%", "fsd_over": "Comeback OE",
+  "blown": "Blown leads", "bagels_for": "Bagels", "bagels_against": "Bagels agst", "breadsticks_for": "Breadsticks",
+  "breadsticks_against": "Bread. agst", "games_per_match": "Games/match", "straight_win_pct": "Straight W%",
+  "straight_loss_pct": "Straight L%", "avg_margin": "Game margin", "win_games_pct": "Games% in W",
+  "close_out": "Close-out%", "hot_hand": "Hot hand", "best_streak": "Best streak", "ch_matches": "Charted",
+  "wide_deuce": "Wide deuce", "t_deuce": "T deuce", "body_deuce": "Body deuce", "wide_ad": "Wide ad", "t_ad": "T ad",
+  "body_ad": "Body ad", "unret_rate": "Unreturned%", "snv_rate": "S&V%", "rally_len": "Rally len",
+  "rally_short": "Short rally%", "rally_long": "Long rally%", "won_long": "Long won%", "won_short": "Short won%",
+  "winners_pp": "Winners/pt", "ue_pp": "UE/pt", "w_ue_ratio": "W/UE", "fh_share": "FH share",
+  "fh_winners_pp": "FH win/pt", "bh_winners_pp": "BH win/pt", "net_rate": "Net/pt", "net_won": "Net won%",
+  "ret_deep": "Deep ret%", "aggression": "Aggression", "best_rank": "Best rank", "points": "Rank pts",
+  "to_defend": "To defend", "stats_matches": "Stat matches", "bp_faced_pg": "BP faced/g", "aces_pm": "Aces/match",
+  "dfs_pm": "DFs/match", "spw_vs_exp": "SPW v exp", "hold_vs_exp": "Hold v exp", "bp_opps_pg": "BP opps/g",
+  "rpw_vs_exp": "RPW v exp", "brk_vs_exp": "Break v exp", "duration_avg": ["Match length", "min"]
+};
 /* Board: column sets as chips, percentile cells, paging, CSV */
 function boardView(host) {
   const k = K(), v = view(), g = grp(), c = code();
@@ -361,7 +388,7 @@ function boardView(host) {
   const gnames = [];
   avail.forEach(m => { if (gnames.indexOf(m.group || 'Other') < 0) gnames.push(m.group || 'Other'); });
   gnames.forEach(gn => sets.push({ key: gn, label: gn, groups: [{ label: gn, ids: avail.filter(m => (m.group || 'Other') === gn).map(m => m.key) }] }));
-  const setKey = sets.some(s => s.key === SC.cols) ? SC.cols : 'view';
+  const setKey = QK.board.pick(sets, SC.cols, 'view');
   const defSort = v.color || ((v.sets[0] || { ids: [] }).ids[0]);
   let sort = SC.sort && SC.sort.key && (['name', 'n', 'age', 'rank'].indexOf(SC.sort.key) >= 0 || has(SC.sort.key)) ? SC.sort : null;
   if (sort && !sort.dir) sort = { key: sort.key, dir: sort.key === 'rank' || (['name', 'n', 'age'].indexOf(sort.key) < 0 && mmeta(sort.key).lower) ? 'asc' : 'desc' };
@@ -369,11 +396,11 @@ function boardView(host) {
   if (!sort && SC.sortDef) sort = SC.sortDef;
   const addable = V().picker(avail, '', k.groups, m => (m.scope === 'wta_stats' ? ' ·stats' : m.scope === 'charted' ? ' ·charted' : ''));
   host.innerHTML = '<section class="qk-card sc-board"><div class="qk-card-head"><div style="min-width:0"><div class="qk-card-title">The board</div><div class="qk-card-sub">' +
-    esc(k.TN(SC.T)) + ' · ' + esc(g[0]) + ' · ' + SC.S + ' · cells on the percentile scale against the ' + P.length + ' ' + esc(g[1]) + ' with ' + minNow() + '+ matches' + (c === 'all' ? '' : ' on ' + c) + ' (blue worst, red best). Tap a name for the profile; + pins to the compare tray.</div></div></div>' +
+    esc(k.TN(SC.T)) + ' · ' + esc(g[0]) + ' · ' + SC.S + ' · the bar under each number is its percentile against the ' + P.length + ' ' + esc(g[1]) + ' with ' + minNow() + '+ matches' + (c === 'all' ? '' : ' on ' + c) + ': the top 10% in red, the bottom 10% in blue. Tap a name for the profile; tick the box beside it to pin it to the compare tray.</div></div></div>' +
     '<div class="qk-card-body"><div id="sc-board"></div></div></section>' +
     QK.oursExplain('Elo (overall and by surface) and the serve and return model are ours: the model reads hold and break rates from set scores against the quality of the opposition, and the ratings put them on one scale (0 = tour average). Columns tagged ' + QK.ours({ short: true }) + ' come from them; hover a head for what it measures.');
   BOARD = QK.board(document.getElementById('sc-board'), {
-    id: 'sc-bd', sets: sets, set: setKey, added: SC.add.filter(id => has(id)), sort: sort, all: SC.all, page: 50, noun: g[1],
+    id: 'sc-bd', summary: defSort, abbr: BOARD_ABBR, sets: sets, set: setKey, added: SC.add.filter(id => has(id)), sort: sort, all: SC.all, page: 50, noun: g[1],
     nameLabel: 'Player', subLabel: 'Country · ranking · age',
     meta: id => mmeta(id),
     addable: addable,
@@ -389,7 +416,7 @@ function boardView(host) {
     onState: st => { SC.cols = st.set === 'view' ? '' : st.set; SC.add = st.added; SC.sort = st.sort; SC.all = st.all; writeQuery(); },
     csv: 'ace-' + SC.T + '-' + SC.S + '-' + c + '-' + String(setKey).toLowerCase().replace(/[^a-z0-9]+/g, '-') + '.csv',
     empty: SC.q.trim() ? 'No players match “' + SC.q.trim() + '” with these filters.' : 'No players pass these filters: lower the minimum or clear a filter.',
-    note: 'Percentiles are against every ' + esc(g[2]) + ' past the floor, whatever the country, age or search filters show; a ↓ marks a metric where lower is better (its colours are flipped), and style metrics (rally length, net approaches ...) are neither better nor worse. Hold and break are inferred from set scores; real serve statistics are WTA only (2016 on, not the Slams) and style metrics need charted matches. Every metric in the file is a chip or “Add a metric” away.'
+    note: 'Percentiles are against every ' + esc(g[2]) + ' past the floor, whatever the country, age or search filters show; a ↓ marks a metric where lower is better (its bar is flipped), and style metrics (rally length, net approaches ...) are neither better nor worse. Hold and break are inferred from set scores; real serve statistics are WTA only (2016 on, not the Slams) and style metrics need charted matches. Every metric in the file is under “Columns” or “Add a metric”.'
   });
 }
 

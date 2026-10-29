@@ -50,6 +50,7 @@
         {
           "id": "gar90",
           "display": "Value added (GAR/90)",
+          "short": "GAR/90",
           "unit": "goals per 90",
           "direction": "higher",
           "set": "headline",
@@ -76,6 +77,7 @@
         {
           "id": "rating",
           "display": "Match rating",
+          "short": "Rating",
           "unit": "rating",
           "direction": "higher",
           "set": "headline",
@@ -101,6 +103,7 @@
         {
           "id": "aerials_won_90",
           "display": "Aerial duels won",
+          "short": "Aerials won",
           "unit": "per 90",
           "direction": "higher",
           "set": "headline",
@@ -126,6 +129,7 @@
         {
           "id": "aerial_pct",
           "display": "Aerial duel success",
+          "short": "Aerial %",
           "unit": "%",
           "direction": "higher",
           "set": "headline",
@@ -151,6 +155,7 @@
         {
           "id": "padj_tkl_int_90",
           "display": "Tackles + interceptions (possession-adjusted)",
+          "short": "PAdj Tkl+Int",
           "unit": "per 90",
           "direction": "higher",
           "set": "headline",
@@ -176,6 +181,7 @@
         {
           "id": "opp_half_passes_90",
           "display": "Passes in the opposition half",
+          "short": "Opp ½ passes",
           "unit": "per 90",
           "direction": "higher",
           "set": "headline",
@@ -201,6 +207,7 @@
         {
           "id": "pass_pct",
           "display": "Pass completion",
+          "short": "Pass %",
           "unit": "%",
           "direction": "higher",
           "set": "headline",
@@ -226,6 +233,7 @@
         {
           "id": "long_ball_pct",
           "display": "Long-ball accuracy",
+          "short": "Long ball %",
           "unit": "%",
           "direction": "higher",
           "set": "headline",
@@ -251,6 +259,7 @@
         {
           "id": "duels_won_90",
           "display": "Duels won",
+          "short": "Duels won",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -276,6 +285,7 @@
         {
           "id": "duel_pct",
           "display": "Duel success",
+          "short": "Duel %",
           "unit": "%",
           "direction": "higher",
           "set": "secondary",
@@ -301,6 +311,7 @@
         {
           "id": "recoveries_90",
           "display": "Ball recoveries",
+          "short": "Recoveries",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -326,6 +337,7 @@
         {
           "id": "interceptions_90",
           "display": "Interceptions",
+          "short": "Intercepts",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -351,6 +363,7 @@
         {
           "id": "clearances_90",
           "display": "Clearances",
+          "short": "Clearances",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -376,6 +389,7 @@
         {
           "id": "blocks_90",
           "display": "Blocks",
+          "short": "Blocks",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -401,6 +415,7 @@
         {
           "id": "long_balls_90",
           "display": "Accurate long balls",
+          "short": "Long balls",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -426,6 +441,7 @@
         {
           "id": "prog_carries_90",
           "display": "Progressive carries",
+          "short": "Prog carries",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -451,6 +467,7 @@
         {
           "id": "loss_per_100",
           "display": "Possession lost per 100 touches",
+          "short": "Poss lost",
           "unit": "per 100 touches",
           "direction": "lower",
           "set": "secondary",
@@ -476,6 +493,7 @@
         {
           "id": "shot_creation_90",
           "display": "Shots + key passes",
+          "short": "Shots + KP",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -501,6 +519,7 @@
         {
           "id": "npxg_xa_90",
           "display": "npxG + xA",
+          "short": "npxG+xA",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -526,6 +545,7 @@
         {
           "id": "on_npxgd_90",
           "display": "Team xG difference, player on the pitch",
+          "short": "On-pitch xGD",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -552,6 +572,7 @@
         {
           "id": "prog_dist_90",
           "display": "Progressive distance",
+          "short": "Prog dist",
           "unit": "metres per 90",
           "direction": "higher",
           "set": "secondary",
@@ -670,6 +691,7 @@
         {
           "id": "gar90",
           "display": "Value added (GAR/90)",
+          "short": "GAR/90",
           "unit": "goals per 90",
           "direction": "higher",
           "set": "headline",
@@ -696,6 +718,7 @@
         {
           "id": "rating",
           "display": "Match rating",
+          "short": "Rating",
           "unit": "rating",
           "direction": "higher",
           "set": "headline",
@@ -721,6 +744,7 @@
         {
           "id": "npxg_xa_90",
           "display": "npxG + xA",
+          "short": "npxG+xA",
           "unit": "per 90",
           "direction": "higher",
           "set": "headline",
@@ -746,6 +770,7 @@
         {
           "id": "key_passes_90",
           "display": "Key passes",
+          "short": "Key passes",
           "unit": "per 90",
           "direction": "higher",
           "set": "headline",
@@ -771,6 +796,7 @@
         {
           "id": "crosses_90",
           "display": "Accurate crosses",
+          "short": "Crosses",
           "unit": "per 90",
           "direction": "higher",
           "set": "headline",
@@ -796,6 +822,7 @@
         {
           "id": "prog_actions_90",
           "display": "Progressive carries + dribbles",
+          "short": "Prog actions",
           "unit": "per 90",
           "direction": "higher",
           "set": "headline",
@@ -821,6 +848,7 @@
         {
           "id": "opp_half_passes_90",
           "display": "Passes in the opposition half",
+          "short": "Opp ½ passes",
           "unit": "per 90",
           "direction": "higher",
           "set": "headline",
@@ -846,6 +874,7 @@
         {
           "id": "padj_tkl_int_90",
           "display": "Tackles + interceptions (possession-adjusted)",
+          "short": "PAdj Tkl+Int",
           "unit": "per 90",
           "direction": "higher",
           "set": "headline",
@@ -871,6 +900,7 @@
         {
           "id": "recoveries_90",
           "display": "Ball recoveries",
+          "short": "Recoveries",
           "unit": "per 90",
           "direction": "higher",
           "set": "headline",
@@ -896,6 +926,7 @@
         {
           "id": "xa_90",
           "display": "Expected assists (xA)",
+          "short": "xA",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -921,6 +952,7 @@
         {
           "id": "shot_creation_90",
           "display": "Shots + key passes",
+          "short": "Shots + KP",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -946,6 +978,7 @@
         {
           "id": "dribbles_90",
           "display": "Dribbles completed",
+          "short": "Dribbles",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -971,6 +1004,7 @@
         {
           "id": "prog_carries_90",
           "display": "Progressive carries",
+          "short": "Prog carries",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -996,6 +1030,7 @@
         {
           "id": "pass_pct",
           "display": "Pass completion",
+          "short": "Pass %",
           "unit": "%",
           "direction": "higher",
           "set": "secondary",
@@ -1021,6 +1056,7 @@
         {
           "id": "duels_won_90",
           "display": "Duels won",
+          "short": "Duels won",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -1046,6 +1082,7 @@
         {
           "id": "duel_pct",
           "display": "Duel success",
+          "short": "Duel %",
           "unit": "%",
           "direction": "higher",
           "set": "secondary",
@@ -1071,6 +1108,7 @@
         {
           "id": "aerials_won_90",
           "display": "Aerial duels won",
+          "short": "Aerials won",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -1096,6 +1134,7 @@
         {
           "id": "interceptions_90",
           "display": "Interceptions",
+          "short": "Intercepts",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -1121,6 +1160,7 @@
         {
           "id": "loss_per_100",
           "display": "Possession lost per 100 touches",
+          "short": "Poss lost",
           "unit": "per 100 touches",
           "direction": "lower",
           "set": "secondary",
@@ -1146,6 +1186,7 @@
         {
           "id": "hsr_km_90",
           "display": "High-speed running",
+          "short": "HS running",
           "unit": "km per 90",
           "direction": "higher",
           "set": "secondary",
@@ -1171,6 +1212,7 @@
         {
           "id": "on_npxgd_90",
           "display": "Team xG difference, player on the pitch",
+          "short": "On-pitch xGD",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -1197,6 +1239,7 @@
         {
           "id": "prog_dist_90",
           "display": "Progressive distance",
+          "short": "Prog dist",
           "unit": "metres per 90",
           "direction": "higher",
           "set": "secondary",
@@ -1311,6 +1354,7 @@
         {
           "id": "gar90",
           "display": "Value added (GAR/90)",
+          "short": "GAR/90",
           "unit": "goals per 90",
           "direction": "higher",
           "set": "headline",
@@ -1337,6 +1381,7 @@
         {
           "id": "rating",
           "display": "Match rating",
+          "short": "Rating",
           "unit": "rating",
           "direction": "higher",
           "set": "headline",
@@ -1362,6 +1407,7 @@
         {
           "id": "opp_half_passes_90",
           "display": "Passes in the opposition half",
+          "short": "Opp ½ passes",
           "unit": "per 90",
           "direction": "higher",
           "set": "headline",
@@ -1387,6 +1433,7 @@
         {
           "id": "long_balls_90",
           "display": "Accurate long balls",
+          "short": "Long balls",
           "unit": "per 90",
           "direction": "higher",
           "set": "headline",
@@ -1412,6 +1459,7 @@
         {
           "id": "npxg_xa_90",
           "display": "npxG + xA",
+          "short": "npxG+xA",
           "unit": "per 90",
           "direction": "higher",
           "set": "headline",
@@ -1437,6 +1485,7 @@
         {
           "id": "key_passes_90",
           "display": "Key passes",
+          "short": "Key passes",
           "unit": "per 90",
           "direction": "higher",
           "set": "headline",
@@ -1462,6 +1511,7 @@
         {
           "id": "prog_actions_90",
           "display": "Progressive carries + dribbles",
+          "short": "Prog actions",
           "unit": "per 90",
           "direction": "higher",
           "set": "headline",
@@ -1487,6 +1537,7 @@
         {
           "id": "padj_tkl_int_90",
           "display": "Tackles + interceptions (possession-adjusted)",
+          "short": "PAdj Tkl+Int",
           "unit": "per 90",
           "direction": "higher",
           "set": "headline",
@@ -1512,6 +1563,7 @@
         {
           "id": "recoveries_90",
           "display": "Ball recoveries",
+          "short": "Recoveries",
           "unit": "per 90",
           "direction": "higher",
           "set": "headline",
@@ -1537,6 +1589,7 @@
         {
           "id": "xa_90",
           "display": "Expected assists (xA)",
+          "short": "xA",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -1562,6 +1615,7 @@
         {
           "id": "shot_creation_90",
           "display": "Shots + key passes",
+          "short": "Shots + KP",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -1587,6 +1641,7 @@
         {
           "id": "passes_90",
           "display": "Passes",
+          "short": "Passes",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -1612,6 +1667,7 @@
         {
           "id": "pass_pct",
           "display": "Pass completion",
+          "short": "Pass %",
           "unit": "%",
           "direction": "higher",
           "set": "secondary",
@@ -1637,6 +1693,7 @@
         {
           "id": "loss_per_100",
           "display": "Possession lost per 100 touches",
+          "short": "Poss lost",
           "unit": "per 100 touches",
           "direction": "lower",
           "set": "secondary",
@@ -1662,6 +1719,7 @@
         {
           "id": "carries_90",
           "display": "Carries",
+          "short": "Carries",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -1687,6 +1745,7 @@
         {
           "id": "ball_wins_90",
           "display": "Ball wins",
+          "short": "Ball wins",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -1712,6 +1771,7 @@
         {
           "id": "interceptions_90",
           "display": "Interceptions",
+          "short": "Intercepts",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -1737,6 +1797,7 @@
         {
           "id": "duels_won_90",
           "display": "Duels won",
+          "short": "Duels won",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -1762,6 +1823,7 @@
         {
           "id": "duel_pct",
           "display": "Duel success",
+          "short": "Duel %",
           "unit": "%",
           "direction": "higher",
           "set": "secondary",
@@ -1787,6 +1849,7 @@
         {
           "id": "aerials_won_90",
           "display": "Aerial duels won",
+          "short": "Aerials won",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -1812,6 +1875,7 @@
         {
           "id": "dribbles_90",
           "display": "Dribbles completed",
+          "short": "Dribbles",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -1837,6 +1901,7 @@
         {
           "id": "on_npxgd_90",
           "display": "Team xG difference, player on the pitch",
+          "short": "On-pitch xGD",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -1863,6 +1928,7 @@
         {
           "id": "prog_dist_90",
           "display": "Progressive distance",
+          "short": "Prog dist",
           "unit": "metres per 90",
           "direction": "higher",
           "set": "secondary",
@@ -1980,6 +2046,7 @@
         {
           "id": "npxg_xa_90",
           "display": "npxG + xA",
+          "short": "npxG+xA",
           "unit": "per 90",
           "direction": "higher",
           "set": "headline",
@@ -2005,6 +2072,7 @@
         {
           "id": "gar90",
           "display": "Value added (GAR/90)",
+          "short": "GAR/90",
           "unit": "goals per 90",
           "direction": "higher",
           "set": "headline",
@@ -2031,6 +2099,7 @@
         {
           "id": "rating",
           "display": "Match rating",
+          "short": "Rating",
           "unit": "rating",
           "direction": "higher",
           "set": "headline",
@@ -2056,6 +2125,7 @@
         {
           "id": "npxg_90",
           "display": "Non-penalty xG",
+          "short": "npxG",
           "unit": "per 90",
           "direction": "higher",
           "set": "headline",
@@ -2081,6 +2151,7 @@
         {
           "id": "xa_90",
           "display": "Expected assists (xA)",
+          "short": "xA",
           "unit": "per 90",
           "direction": "higher",
           "set": "headline",
@@ -2106,6 +2177,7 @@
         {
           "id": "shot_creation_90",
           "display": "Shots + key passes",
+          "short": "Shots + KP",
           "unit": "per 90",
           "direction": "higher",
           "set": "headline",
@@ -2131,6 +2203,7 @@
         {
           "id": "dribbles_90",
           "display": "Dribbles completed",
+          "short": "Dribbles",
           "unit": "per 90",
           "direction": "higher",
           "set": "headline",
@@ -2156,6 +2229,7 @@
         {
           "id": "opp_half_passes_90",
           "display": "Passes in the opposition half",
+          "short": "Opp ½ passes",
           "unit": "per 90",
           "direction": "higher",
           "set": "headline",
@@ -2181,6 +2255,7 @@
         {
           "id": "key_passes_90",
           "display": "Key passes",
+          "short": "Key passes",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -2206,6 +2281,7 @@
         {
           "id": "big_chances_90",
           "display": "Big chances created",
+          "short": "Big chances",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -2231,6 +2307,7 @@
         {
           "id": "shots_90",
           "display": "Shots",
+          "short": "Shots",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -2256,6 +2333,7 @@
         {
           "id": "ga_90",
           "display": "Goals + assists",
+          "short": "G+A",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -2281,6 +2359,7 @@
         {
           "id": "prog_actions_90",
           "display": "Progressive carries + dribbles",
+          "short": "Prog actions",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -2306,6 +2385,7 @@
         {
           "id": "crosses_90",
           "display": "Accurate crosses",
+          "short": "Crosses",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -2331,6 +2411,7 @@
         {
           "id": "dribble_pct",
           "display": "Dribble success",
+          "short": "Dribble %",
           "unit": "%",
           "direction": "higher",
           "set": "secondary",
@@ -2356,6 +2437,7 @@
         {
           "id": "touches_90",
           "display": "Touches",
+          "short": "Touches",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -2381,6 +2463,7 @@
         {
           "id": "recoveries_90",
           "display": "Ball recoveries",
+          "short": "Recoveries",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -2406,6 +2489,7 @@
         {
           "id": "padj_tkl_int_90",
           "display": "Tackles + interceptions (possession-adjusted)",
+          "short": "PAdj Tkl+Int",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -2431,6 +2515,7 @@
         {
           "id": "loss_per_100",
           "display": "Possession lost per 100 touches",
+          "short": "Poss lost",
           "unit": "per 100 touches",
           "direction": "lower",
           "set": "secondary",
@@ -2456,6 +2541,7 @@
         {
           "id": "finishing",
           "display": "Finishing (npG - npxG per shot)",
+          "short": "Finishing",
           "unit": "goals per shot",
           "direction": "higher",
           "set": "secondary",
@@ -2481,6 +2567,7 @@
         {
           "id": "on_npxgd_90",
           "display": "Team xG difference, player on the pitch",
+          "short": "On-pitch xGD",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -2594,6 +2681,7 @@
         {
           "id": "npxg_xa_90",
           "display": "npxG + xA",
+          "short": "npxG+xA",
           "unit": "per 90",
           "direction": "higher",
           "set": "headline",
@@ -2619,6 +2707,7 @@
         {
           "id": "ga_90",
           "display": "Goals + assists",
+          "short": "G+A",
           "unit": "per 90",
           "direction": "higher",
           "set": "headline",
@@ -2644,6 +2733,7 @@
         {
           "id": "sot_90",
           "display": "Shots on target",
+          "short": "On target",
           "unit": "per 90",
           "direction": "higher",
           "set": "headline",
@@ -2669,6 +2759,7 @@
         {
           "id": "shot_creation_90",
           "display": "Shots + key passes",
+          "short": "Shots + KP",
           "unit": "per 90",
           "direction": "higher",
           "set": "headline",
@@ -2694,6 +2785,7 @@
         {
           "id": "xa_90",
           "display": "Expected assists (xA)",
+          "short": "xA",
           "unit": "per 90",
           "direction": "higher",
           "set": "headline",
@@ -2719,6 +2811,7 @@
         {
           "id": "xg_per_shot",
           "display": "xG per shot",
+          "short": "xG/shot",
           "unit": "xG",
           "direction": "higher",
           "set": "headline",
@@ -2744,6 +2837,7 @@
         {
           "id": "gar90",
           "display": "Value added (GAR/90)",
+          "short": "GAR/90",
           "unit": "goals per 90",
           "direction": "higher",
           "set": "headline",
@@ -2770,6 +2864,7 @@
         {
           "id": "rating",
           "display": "Match rating",
+          "short": "Rating",
           "unit": "rating",
           "direction": "higher",
           "set": "headline",
@@ -2795,6 +2890,7 @@
         {
           "id": "npxg_90",
           "display": "Non-penalty xG",
+          "short": "npxG",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -2820,6 +2916,7 @@
         {
           "id": "xgot_90",
           "display": "xG on target (xGOT)",
+          "short": "xGOT",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -2845,6 +2942,7 @@
         {
           "id": "goals_90",
           "display": "Goals",
+          "short": "Goals",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -2870,6 +2968,7 @@
         {
           "id": "shots_90",
           "display": "Shots",
+          "short": "Shots",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -2895,6 +2994,7 @@
         {
           "id": "big_chances_90",
           "display": "Big chances created",
+          "short": "Big chances",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -2920,6 +3020,7 @@
         {
           "id": "key_passes_90",
           "display": "Key passes",
+          "short": "Key passes",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -2945,6 +3046,7 @@
         {
           "id": "aerials_won_90",
           "display": "Aerial duels won",
+          "short": "Aerials won",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -2970,6 +3072,7 @@
         {
           "id": "aerial_pct",
           "display": "Aerial duel success",
+          "short": "Aerial %",
           "unit": "%",
           "direction": "higher",
           "set": "secondary",
@@ -2995,6 +3098,7 @@
         {
           "id": "duels_won_90",
           "display": "Duels won",
+          "short": "Duels won",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -3020,6 +3124,7 @@
         {
           "id": "fouled_90",
           "display": "Fouls won",
+          "short": "Fouls won",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -3045,6 +3150,7 @@
         {
           "id": "touches_90",
           "display": "Touches",
+          "short": "Touches",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -3070,6 +3176,7 @@
         {
           "id": "finishing",
           "display": "Finishing (npG - npxG per shot)",
+          "short": "Finishing",
           "unit": "goals per shot",
           "direction": "higher",
           "set": "secondary",
@@ -3095,6 +3202,7 @@
         {
           "id": "g_minus_xg",
           "display": "Goals - xG",
+          "short": "G - xG",
           "unit": "goals",
           "direction": "higher",
           "set": "secondary",
@@ -3120,6 +3228,7 @@
         {
           "id": "on_npxgd_90",
           "display": "Team xG difference, player on the pitch",
+          "short": "On-pitch xGD",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -3234,6 +3343,7 @@
         {
           "id": "goals_prevented_90",
           "display": "Goals prevented",
+          "short": "G prevented",
           "unit": "per 90",
           "direction": "higher",
           "set": "headline",
@@ -3259,6 +3369,7 @@
         {
           "id": "save_pct",
           "display": "Save percentage",
+          "short": "Save %",
           "unit": "%",
           "direction": "higher",
           "set": "headline",
@@ -3284,6 +3395,7 @@
         {
           "id": "high_claims_90",
           "display": "High claims",
+          "short": "High claims",
           "unit": "per 90",
           "direction": "higher",
           "set": "headline",
@@ -3309,6 +3421,7 @@
         {
           "id": "sweeper_90",
           "display": "Sweeper actions",
+          "short": "Sweeper",
           "unit": "per 90",
           "direction": "higher",
           "set": "headline",
@@ -3334,6 +3447,7 @@
         {
           "id": "pass_pct",
           "display": "Pass completion",
+          "short": "Pass %",
           "unit": "%",
           "direction": "higher",
           "set": "headline",
@@ -3359,6 +3473,7 @@
         {
           "id": "long_ball_pct",
           "display": "Long-ball accuracy",
+          "short": "Long ball %",
           "unit": "%",
           "direction": "higher",
           "set": "headline",
@@ -3384,6 +3499,7 @@
         {
           "id": "passes_90",
           "display": "Passes",
+          "short": "Passes",
           "unit": "per 90",
           "direction": "higher",
           "set": "headline",
@@ -3409,6 +3525,7 @@
         {
           "id": "gar90",
           "display": "Value added (GAR/90)",
+          "short": "GAR/90",
           "unit": "goals per 90",
           "direction": "higher",
           "set": "headline",
@@ -3435,6 +3552,7 @@
         {
           "id": "saves_90",
           "display": "Saves",
+          "short": "Saves",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -3460,6 +3578,7 @@
         {
           "id": "conceded_90",
           "display": "Goals conceded",
+          "short": "Conceded",
           "unit": "per 90",
           "direction": "lower",
           "set": "secondary",
@@ -3485,6 +3604,7 @@
         {
           "id": "long_balls_90",
           "display": "Accurate long balls",
+          "short": "Long balls",
           "unit": "per 90",
           "direction": "higher",
           "set": "secondary",
@@ -3510,6 +3630,7 @@
         {
           "id": "rating",
           "display": "Match rating",
+          "short": "Rating",
           "unit": "rating",
           "direction": "higher",
           "set": "secondary",
@@ -3615,6 +3736,7 @@
         {
           "id": "xg_diff",
           "display": "xG difference",
+          "short": "xGD",
           "unit": "per match",
           "direction": "higher",
           "set": "headline",
@@ -3641,6 +3763,7 @@
         {
           "id": "xg_for",
           "display": "xG for",
+          "short": "xGF",
           "unit": "per match",
           "direction": "higher",
           "set": "headline",
@@ -3667,6 +3790,7 @@
         {
           "id": "xg_against",
           "display": "xG against",
+          "short": "xGA",
           "unit": "per match",
           "direction": "lower",
           "set": "headline",
@@ -3693,6 +3817,7 @@
         {
           "id": "sot_diff",
           "display": "Shots on target difference",
+          "short": "SoT diff",
           "unit": "per match",
           "direction": "higher",
           "set": "headline",
@@ -3719,6 +3844,7 @@
         {
           "id": "field_tilt",
           "display": "Field tilt",
+          "short": "Field tilt",
           "unit": "%",
           "direction": "higher",
           "set": "headline",
@@ -3745,6 +3871,7 @@
         {
           "id": "big_chances",
           "display": "Big chances",
+          "short": "Big chances",
           "unit": "per match",
           "direction": "higher",
           "set": "headline",
@@ -3771,6 +3898,7 @@
         {
           "id": "possession",
           "display": "Possession",
+          "short": "Possession",
           "unit": "%",
           "direction": "higher",
           "set": "headline",
@@ -3797,6 +3925,7 @@
         {
           "id": "ppda",
           "display": "PPDA (pressing)",
+          "short": "PPDA",
           "unit": "passes",
           "direction": "lower",
           "set": "headline",
@@ -3823,6 +3952,7 @@
         {
           "id": "xpts_per_match",
           "display": "Expected points",
+          "short": "xPts",
           "unit": "per match",
           "direction": "higher",
           "set": "secondary",
@@ -3849,6 +3979,7 @@
         {
           "id": "goals_for",
           "display": "Goals for",
+          "short": "GF",
           "unit": "per match",
           "direction": "higher",
           "set": "secondary",
@@ -3875,6 +4006,7 @@
         {
           "id": "goals_against",
           "display": "Goals against",
+          "short": "GA",
           "unit": "per match",
           "direction": "lower",
           "set": "secondary",
@@ -3901,6 +4033,7 @@
         {
           "id": "shots",
           "display": "Shots",
+          "short": "Shots",
           "unit": "per match",
           "direction": "higher",
           "set": "secondary",
@@ -3927,6 +4060,7 @@
         {
           "id": "shots_against",
           "display": "Shots against",
+          "short": "Shots agst",
           "unit": "per match",
           "direction": "lower",
           "set": "secondary",
@@ -3953,6 +4087,7 @@
         {
           "id": "shot_quality",
           "display": "Shot quality",
+          "short": "xG/shot",
           "unit": "xG per shot",
           "direction": "higher",
           "set": "secondary",
@@ -3979,6 +4114,7 @@
         {
           "id": "shot_quality_against",
           "display": "Shot quality against",
+          "short": "xGA/shot",
           "unit": "xG per shot",
           "direction": "lower",
           "set": "secondary",
@@ -4005,6 +4141,7 @@
         {
           "id": "sot_pct",
           "display": "Shots on target %",
+          "short": "SoT %",
           "unit": "%",
           "direction": "higher",
           "set": "secondary",
@@ -4031,6 +4168,7 @@
         {
           "id": "corners",
           "display": "Corners",
+          "short": "Corners",
           "unit": "per match",
           "direction": "higher",
           "set": "secondary",
@@ -4057,6 +4195,7 @@
         {
           "id": "passes",
           "display": "Passes",
+          "short": "Passes",
           "unit": "per match",
           "direction": "higher",
           "set": "secondary",
@@ -4083,6 +4222,7 @@
         {
           "id": "finishing",
           "display": "Finishing",
+          "short": "Finishing",
           "unit": "goals per match",
           "direction": "higher",
           "set": "secondary",
@@ -4109,6 +4249,7 @@
         {
           "id": "keeping",
           "display": "Keeping",
+          "short": "Keeping",
           "unit": "goals per match",
           "direction": "higher",
           "set": "secondary",
@@ -4135,6 +4276,7 @@
         {
           "id": "luck",
           "display": "Points above expected",
+          "short": "Pts v xPts",
           "unit": "points per match",
           "direction": "higher",
           "set": "secondary",

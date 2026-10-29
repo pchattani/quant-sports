@@ -240,11 +240,11 @@ FB.route('scout', function (el, p) {
   ROOT = el;
   readQuery(p.query || {});
   el.innerHTML = FB.pageHead('Scouting Room', 'Every player, every metric', 'Judged against the same position: sort the board, chart any two numbers, scan the leaders, open a profile, pin up to four to compare. One row per player over every competition, club football, national-team football or one competition, this season or a window.') +
-    '<section class="qk-card sc-ctl"><div class="qk-card-body" id="sc-ctl">' + QK.skeleton('lines', 2) + '</div></section>' +
+    '<div class="sc qk-room"><section class="qk-card sc-ctl"><div class="qk-card-body" id="sc-ctl">' + QK.skeleton('lines', 2) + '</div></section>' +
     '<section class="sc-top" id="sc-top" aria-label="Top of the group"></section>' +
     '<div class="qk-tabs sc-tabs" role="tablist" aria-label="Scouting Room views">' +
     [['board', 'Board'], ['chart', 'Chart'], ['leaders', 'Leaders']].map(function (t) { return '<button type="button" class="qk-tab" role="tab" id="sc-tab-' + t[0] + '" data-view="' + t[0] + '" aria-selected="' + (SC.view === t[0]) + '" tabindex="' + (SC.view === t[0] ? 0 : -1) + '">' + t[1] + '</button>'; }).join('') +
-    '</div><div id="sc-view" class="sc-view" role="tabpanel" aria-labelledby="sc-tab-' + SC.view + '"></div>';
+    '</div><div id="sc-view" class="sc-view" role="tabpanel" aria-labelledby="sc-tab-' + SC.view + '"></div></div>';
   FB.onLeave(function () { if (QK.drawer && QK.drawer.isOpen()) QK.drawer.close(true); if (TRAY) { TRAY.destroy(); TRAY = null; } ROOT = null; BOARD = null; });
   el.addEventListener('click', pickClick);
   return load().then(function () {
@@ -394,6 +394,15 @@ function topStrip() {
 }
 function shortTip(t) { t = String(t || '').replace(/ Our model: .*$/, ''); return t.length > 110 ? t.slice(0, 107).replace(/\s+\S*$/, '') + '…' : t; }
 
+/* one-line board heads (round 10) for payload keys the metrics spec does not carry; the spec's own come through
+   QK.spec (`short`). A value is the head, or [head, unit]. */
+var BOARD_ABBR = {
+  "gar": "GAR", "v_par": "PAR", "v_proj": "Proj GAR/90", "v_v2": "Valuation", "v_mv": ["Market value", "EUR"],
+  "carry_dist_90": ["Carry dist", "m/90"], "dispossessed_90": ["Dispossessed", "/90"], "poss_lost_90": ["Poss lost",
+  "/90"], "tackle_pct": "Tackle %", "km_90": ["Distance", "km/90"], "top_speed": ["Top speed", "km/h"],
+  "placement": "Placement", "xa_per_kp": "xA/key pass", "def_actions_90": ["Def actions", "/90"], "duels_90": ["Duels",
+  "/90"], "aerials_90": ["Aerials", "/90"]
+};
 /* Board: column sets as chips, percentile cells, paging, CSV */
 function boardView(host) {
   var v = view(), all = shown();
@@ -409,7 +418,7 @@ function boardView(host) {
   var gnames = [];
   (IX.metrics || []).forEach(function (m) { if (has(m.key) && offered(m.key) && gnames.indexOf(m.group || 'Other') < 0) gnames.push(m.group || 'Other'); });
   gnames.forEach(function (gn) { sets.push({ key: gn, label: gn, groups: [{ label: gn, ids: (IX.metrics || []).filter(function (m) { return (m.group || 'Other') === gn && has(m.key) && offered(m.key); }).map(function (m) { return m.key; }) }] }); });
-  var setKey = sets.some(function (s) { return s.key === SC.cols; }) ? SC.cols : 'view';
+  var setKey = QK.board.pick(sets, SC.cols, 'view');
   var defSort = v.color || (v.sets[0] || { ids: [] }).ids[0];
   var sort = SC.sort && SC.sort.key && (SC.sort.key === 'name' || SC.sort.key === 'min' || SC.sort.key === 'age' || has(SC.sort.key)) ? SC.sort : null;
   if (sort && !sort.dir) sort = { key: sort.key, dir: sort.key !== 'name' && sort.key !== 'min' && sort.key !== 'age' && mmeta(sort.key).lower ? 'asc' : 'desc' };
@@ -421,10 +430,10 @@ function boardView(host) {
     return '<optgroup label="' + esc(g) + '">' + groups[g].map(function (k) { return '<option value="' + esc(k) + '">' + esc(mmeta(k).label) + '</option>'; }).join('') + '</optgroup>';
   }).join('');
   host.innerHTML = '<section class="qk-card sc-board"><div class="qk-card-head"><div style="min-width:0"><div class="qk-card-title">The board</div><div class="qk-card-sub">' +
-    esc(cap(noun())) + ' · ' + esc(FB.labScopeName(SC.c, IX)) + ' · cells on the percentile scale against the ' + P.length + ' ' + esc(noun()) + ' with ' + FB.int(minNow()) + '+ minutes (blue worst, red best). Tap a name for the profile; + pins to the compare tray.</div></div></div>' +
+    esc(cap(noun())) + ' · ' + esc(FB.labScopeName(SC.c, IX)) + ' · the bar under each number is its percentile against the ' + P.length + ' ' + esc(noun()) + ' with ' + FB.int(minNow()) + '+ minutes: the top 10% in red, the bottom 10% in blue. Tap a name for the profile; tick the box beside it to pin it to the compare tray.</div></div></div>' +
     '<div class="qk-card-body"><div id="sc-board"></div></div></section>';
   BOARD = QK.board(document.getElementById('sc-board'), {
-    id: 'sc-bd', sets: sets, set: setKey, added: SC.add.filter(function (id) { return has(id); }), sort: sort, all: SC.all, page: 50, noun: noun(),
+    id: 'sc-bd', summary: defSort, abbr: BOARD_ABBR, sets: sets, set: setKey, added: SC.add.filter(function (id) { return has(id); }), sort: sort, all: SC.all, page: 50, noun: noun(),
     nameLabel: 'Player', subLabel: 'Role · club · age',
     meta: function (id) { return mmeta(id); },
     addable: addable,
@@ -444,7 +453,7 @@ function boardView(host) {
     },
     csv: 'footballer-' + SC.w + '-' + SC.c + '-' + code().toLowerCase() + '-' + String(setKey).toLowerCase().replace(/[^a-z0-9]+/g, '-') + '.csv',
     empty: SC.q.trim() ? 'No ' + noun() + ' match “' + SC.q.trim() + '” with these filters.' : 'No ' + noun() + ' pass these filters: lower the minimum or clear a filter.',
-    note: 'Percentiles are against every ' + esc(one()) + ' past the minimum in the view, whatever the club or age filters show; a ↓ marks a metric where lower is better (its colours are flipped). Rates are per 90 minutes; GAR/90 and GAR are our player value model. Every metric in the file is a chip or “Add a metric” away.'
+    note: 'Percentiles are against every ' + esc(one()) + ' past the minimum in the view, whatever the club or age filters show; a ↓ marks a metric where lower is better (its bar is flipped). Rates are per 90 minutes; GAR/90 and GAR are our player value model. Every metric in the file is under “Columns” or “Add a metric”.'
   });
 }
 

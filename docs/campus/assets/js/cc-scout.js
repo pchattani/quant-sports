@@ -255,7 +255,7 @@ function render(el, p) {
   ROOT = el;
   readQuery(p.query || {});
   el.innerHTML = U.head('Scouting Room', 'Every player and every metric, judged against the same position: sort the board, chart any two numbers, scan the leaders, open a profile, pin up to four to compare.', U.kicker(SC.L, SC.S)) +
-    '<div class="sc"><section class="qk-card sc-ctl"><div class="qk-card-body" id="sc-ctl">' + QK.skeleton('lines', 2) + '</div></section>' +
+    '<div class="sc qk-room"><section class="qk-card sc-ctl"><div class="qk-card-body" id="sc-ctl">' + QK.skeleton('lines', 2) + '</div></section>' +
     '<section class="sc-top" id="sc-top" aria-label="Top of the group"></section>' +
     '<div class="qk-tabs sc-tabs" role="tablist" aria-label="Scouting Room views">' +
     [['board', 'Board'], ['chart', 'Chart'], ['leaders', 'Leaders']].concat(CC.fb(SC.L) ? [['prospects', 'Draft prospects']] : []).map(function (t) { return '<button type="button" class="qk-tab" role="tab" id="sc-tab-' + t[0] + '" data-view="' + t[0] + '" aria-selected="' + (SC.view === t[0]) + '" tabindex="' + (SC.view === t[0] ? 0 : -1) + '">' + t[1] + '</button>'; }).join('') +
@@ -406,9 +406,10 @@ function boardView(host) {
   var gnames = [];
   D.metrics.forEach(function (m) { var gn = CC.uk(m.group || 'Other'); if (gnames.indexOf(gn) < 0 && okAny(m.key)) gnames.push(gn); });
   gnames.forEach(function (gn) { sets.push({ key: gn, label: gn, groups: [{ label: gn, ids: D.metrics.filter(function (m) { return CC.uk(m.group || 'Other') === gn && okAny(m.key); }).map(function (m) { return m.key; }) }] }); });
-  var setKey = sets.some(function (s) { return s.key === SC.cols; }) ? SC.cols : 'view';
+  var setKey = QK.board.pick(sets, SC.cols, 'view');
   var ag = v.sets.filter(function (s) { return s.key === 'aggregate'; })[0];
-  var defSort = v.color || (ag ? ag.ids[0] : null) || ((v.sets[0] || { ids: [] }).ids[0]);
+  /* the summary beside the name and the default sort: value per game, else the box rating (round 10), else the view's colour */
+  var defSort = (has('value_pg') ? 'value_pg' : has('r') ? 'r' : null) || v.color || (ag ? ag.ids[0] : null) || ((v.sets[0] || { ids: [] }).ids[0]);
   var sort = SC.sort && SC.sort.key && (SC.sort.key === 'name' || SC.sort.key === 'gp' || has(SC.sort.key)) ? SC.sort : null;
   if (sort && !sort.dir) sort = { key: sort.key, dir: sort.key !== 'name' && sort.key !== 'gp' && mmeta(sort.key).lower ? 'asc' : 'desc' };
   SC.sortDef = defSort ? { key: defSort, dir: mmeta(defSort).lower ? 'asc' : 'desc' } : null;
@@ -417,10 +418,10 @@ function boardView(host) {
   var addable = ordered.map(function (g) { return '<optgroup label="' + esc(CC.uk(g.label)) + '">' + g.items.map(function (m) { return '<option value="' + esc(m.key) + '">' + esc(mmeta(m.key).label) + '</option>'; }).join('') + '</optgroup>'; }).join('');
   var noun = grpNoun();
   host.innerHTML = '<section class="qk-card sc-board"><div class="qk-card-head"><div style="min-width:0"><h2 class="qk-card-title">The board</h2><div class="qk-card-sub">' +
-    esc(grpName()) + ' · ' + esc(CC.seasonLabel(SC.L, SC.S)) + ' · cells on the percentile scale against the ' + P.length + ' ' + esc(noun) + ', ' + esc(floorText()) + ' (blue worst, red best). Tap a name for the profile; + pins to the compare tray.</div></div></div>' +
+    esc(grpName()) + ' · ' + esc(CC.seasonLabel(SC.L, SC.S)) + ' · the bar under each number is its percentile against the ' + P.length + ' ' + esc(noun) + ', ' + esc(floorText()) + ': the top 10% in red, the bottom 10% in blue. Tap a name for the profile; tick the box beside it to pin it to the compare tray.</div></div></div>' +
     '<div class="qk-card-body"><div id="sc-board"></div></div></section>';
   BOARD = QK.board(document.getElementById('sc-board'), {
-    id: 'sc-bd', sets: sets, set: setKey, added: SC.add.filter(has), sort: sort, all: SC.all, page: 50, noun: noun,
+    id: 'sc-bd', summary: defSort, sets: sets, set: setKey, added: SC.add.filter(has), sort: sort, all: SC.all, page: 50, noun: noun,
     nameLabel: 'Player', subLabel: 'Position · team · year · games',
     meta: mmeta, addable: addable,
     lead: [{ key: 'gp', label: 'GP', tip: 'Games played', fmt: function (row) { return String(row._r.gp); }, val: function (row) { return row._r.gp; } }],
@@ -433,7 +434,7 @@ function boardView(host) {
     onState: function (st) { SC.cols = st.set === 'view' ? '' : st.set; SC.add = st.added; SC.sort = st.sort; SC.all = st.all; writeQuery(); },
     csv: 'campus-' + SC.L + '-' + SC.S + '-' + code().replace(/[^a-z0-9]+/gi, '-').toLowerCase() + '.csv',
     empty: String(SC.q || '').trim() ? 'No ' + noun + ' match “' + SC.q.trim() + '” with these filters.' : 'No ' + noun + ' pass these filters: lower the minimum or clear a filter.',
-    note: 'Percentiles are against every ' + esc(noun.replace(/s$/, '')) + ' in the peer group, whatever the team, conference or year filters show; a ↓ marks a metric where lower is better (its colours are flipped) and grey cells describe style (neither better nor worse). Every metric in the file is a chip or “Add a metric” away.' +
+    note: 'Percentiles are against every ' + esc(noun.replace(/s$/, '')) + ' in the peer group, whatever the team, conference or year filters show; a ↓ marks a metric where lower is better (its bar is flipped) and style metrics (neither better nor worse) are never coloured. Every metric in the file is under “Columns” or “Add a metric”.' +
       (D.derived.length ? ' Some rates are computed here from the season totals (this season’s file predates them).' : '')
   });
   if (v.sets.some(function (s) { return s.ids.some(function (id) { return CC.ours(id); }); })) host.insertAdjacentHTML('beforeend', '<div class="cc-ours">' + QK.oursExplain((fb() ? 'Value (points above a replacement-level player) and EPA per play' : 'Value (points above a replacement-level player) and the box rating per 100') + ' come from our models; columns tagged ' + QK.ours({ short: true }) + ' are theirs.') + '</div>');

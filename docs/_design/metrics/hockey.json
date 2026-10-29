@@ -46,6 +46,7 @@
     {
      "id": "gar_60",
      "display": "Rink value per 60",
+     "short": "GAR/60",
      "unit": "GAR/60",
      "direction": "higher",
      "set": "headline",
@@ -78,6 +79,7 @@
     {
      "id": "p60",
      "display": "Points per 60",
+     "short": "Points",
      "unit": "per 60",
      "direction": "higher",
      "set": "headline",
@@ -110,6 +112,7 @@
     {
      "id": "ixg60_all",
      "display": "Individual xG per 60",
+     "short": "ixG",
      "unit": "per 60",
      "direction": "higher",
      "set": "headline",
@@ -142,6 +145,7 @@
     {
      "id": "icf60",
      "display": "Shot attempts per 60 (5v5)",
+     "short": "Attempts",
      "unit": "per 60",
      "direction": "higher",
      "set": "headline",
@@ -174,6 +178,7 @@
     {
      "id": "adj_xgf_pct",
      "display": "On-ice xG share (5v5)",
+     "short": "Adj xGF%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -206,6 +211,7 @@
     {
      "id": "xgf60_rel",
      "display": "xG for per 60, relative to team (5v5)",
+     "short": "xGF rel",
      "unit": "per 60",
      "direction": "higher",
      "set": "headline",
@@ -238,6 +244,7 @@
     {
      "id": "rapm_net",
      "display": "Isolated impact (RAPM)",
+     "short": "RAPM",
      "unit": "xG per 60",
      "direction": "higher",
      "set": "headline",
@@ -270,6 +277,7 @@
     {
      "id": "pen_diff60",
      "display": "Penalty differential per 60",
+     "short": "Pen diff",
      "unit": "per 60",
      "direction": "higher",
      "set": "headline",
@@ -302,6 +310,7 @@
     {
      "id": "toi_gp",
      "display": "Ice time per game",
+     "short": "TOI/GP",
      "unit": "min",
      "direction": "higher",
      "set": "headline",
@@ -334,6 +343,7 @@
     {
      "id": "g60",
      "display": "Goals / 60",
+     "short": "Goals",
      "unit": "per 60",
      "direction": "higher",
      "set": "secondary",
@@ -366,6 +376,7 @@
     {
      "id": "p1_60",
      "display": "Primary points / 60",
+     "short": "Primary pts",
      "unit": "per 60",
      "direction": "higher",
      "set": "secondary",
@@ -398,6 +409,7 @@
     {
      "id": "p60_5v5",
      "display": "5v5 points / 60",
+     "short": "5v5 points",
      "unit": "per 60",
      "direction": "higher",
      "set": "secondary",
@@ -430,6 +442,7 @@
     {
      "id": "ixg60",
      "display": "ixG / 60 (5v5)",
+     "short": "ixG 5v5",
      "unit": "per 60",
      "direction": "higher",
      "set": "secondary",
@@ -462,6 +475,7 @@
     {
      "id": "sog60",
      "display": "Shots / 60 (5v5)",
+     "short": "Shots",
      "unit": "per 60",
      "direction": "higher",
      "set": "secondary",
@@ -494,6 +508,7 @@
     {
      "id": "iff60",
      "display": "Unblocked / 60 (5v5)",
+     "short": "Unblocked",
      "unit": "per 60",
      "direction": "higher",
      "set": "secondary",
@@ -526,6 +541,7 @@
     {
      "id": "sh_pct",
      "display": "Shooting %",
+     "short": "Sh%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -558,6 +574,7 @@
     {
      "id": "xfsh_pct",
      "display": "Expected Fenwick sh%",
+     "short": "xFSh%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -590,6 +607,7 @@
     {
      "id": "shot_dist",
      "display": "Avg shot distance",
+     "short": "Shot dist",
      "unit": "ft",
      "direction": "lower",
      "set": "secondary",
@@ -622,6 +640,7 @@
     {
      "id": "hd_att60",
      "display": "High-danger attempts / 60",
+     "short": "HD attempts",
      "unit": "per 60",
      "direction": "higher",
      "set": "secondary",
@@ -654,6 +673,7 @@
     {
      "id": "shooting_talent",
      "display": "Shooting talent",
+     "short": "Shooting",
      "unit": "goals",
      "direction": "higher",
      "set": "secondary",
@@ -686,6 +706,7 @@
     {
      "id": "xgf_pct",
      "display": "xGF%",
+     "short": "xGF%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -718,6 +739,7 @@
     {
      "id": "cf_pct",
      "display": "CF%",
+     "short": "CF%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -750,6 +772,7 @@
     {
      "id": "cf_pct_rel",
      "display": "CF% rel",
+     "short": "CF% rel",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -782,6 +805,7 @@
     {
      "id": "adj_xgf60",
      "display": "Adj. xGF / 60",
+     "short": "Adj xGF",
      "unit": "per 60",
      "direction": "higher",
      "set": "secondary",
@@ -814,6 +838,7 @@
     {
      "id": "adj_xga60",
      "display": "Adj. xGA / 60",
+     "short": "Adj xGA",
      "unit": "per 60",
      "direction": "lower",
      "set": "secondary",
@@ -846,6 +871,7 @@
     {
      "id": "xga60_rel",
      "display": "xGA/60 rel",
+     "short": "xGA rel",
      "unit": "per 60",
      "direction": "lower",
      "set": "secondary",
@@ -878,6 +904,7 @@
     {
      "id": "rapm_off",
      "display": "Isolated offence (RAPM)",
+     "short": "RAPM off",
      "unit": "xGF per 60",
      "direction": "higher",
      "set": "secondary",
@@ -910,6 +937,7 @@
     {
      "id": "rapm_def",
      "display": "Isolated defence (RAPM)",
+     "short": "RAPM def",
      "unit": "xGA per 60 prevented",
      "direction": "higher",
      "set": "secondary",
@@ -942,6 +970,7 @@
     {
      "id": "gar_ev_off",
      "display": "GAR EV offence",
+     "short": "GAR EV off",
      "unit": "1",
      "direction": "higher",
      "set": "secondary",
@@ -974,6 +1003,7 @@
     {
      "id": "gar_ev_def",
      "display": "GAR EV defence",
+     "short": "GAR EV def",
      "unit": "1",
      "direction": "higher",
      "set": "secondary",
@@ -1006,6 +1036,7 @@
     {
      "id": "gar_pp",
      "display": "GAR power play",
+     "short": "GAR PP",
      "unit": "1",
      "direction": "higher",
      "set": "secondary",
@@ -1038,6 +1069,7 @@
     {
      "id": "pp_p60",
      "display": "PP points / 60",
+     "short": "PP points",
      "unit": "per 60",
      "direction": "higher",
      "set": "secondary",
@@ -1070,6 +1102,7 @@
     {
      "id": "pp_ixg60",
      "display": "PP ixG / 60",
+     "short": "PP ixG",
      "unit": "per 60",
      "direction": "higher",
      "set": "secondary",
@@ -1102,6 +1135,7 @@
     {
      "id": "pp_xgf60",
      "display": "PP xGF / 60",
+     "short": "PP xGF",
      "unit": "per 60",
      "direction": "higher",
      "set": "secondary",
@@ -1134,6 +1168,7 @@
     {
      "id": "toi_pp_gp",
      "display": "PP TOI / GP",
+     "short": "PP TOI",
      "unit": "min",
      "direction": "higher",
      "set": "secondary",
@@ -1166,6 +1201,7 @@
     {
      "id": "toi_sh_gp",
      "display": "PK TOI / GP",
+     "short": "PK TOI",
      "unit": "min",
      "direction": "higher",
      "set": "secondary",
@@ -1198,6 +1234,7 @@
     {
      "id": "pk_xga60",
      "display": "PK xGA / 60",
+     "short": "PK xGA",
      "unit": "per 60",
      "direction": "lower",
      "set": "secondary",
@@ -1230,6 +1267,7 @@
     {
      "id": "fo_pct",
      "display": "Faceoff %",
+     "short": "FO%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -1263,6 +1301,7 @@
     {
      "id": "take60",
      "display": "Takeaways / 60",
+     "short": "Takeaways",
      "unit": "per 60",
      "direction": "higher",
      "set": "secondary",
@@ -1295,6 +1334,7 @@
     {
      "id": "give60",
      "display": "Giveaways / 60",
+     "short": "Giveaways",
      "unit": "per 60",
      "direction": "lower",
      "set": "secondary",
@@ -1327,6 +1367,7 @@
     {
      "id": "hits60",
      "display": "Hits / 60",
+     "short": "Hits",
      "unit": "per 60",
      "direction": "higher",
      "set": "secondary",
@@ -1360,6 +1401,7 @@
     {
      "id": "blocks60",
      "display": "Blocks / 60",
+     "short": "Blocks",
      "unit": "per 60",
      "direction": "higher",
      "set": "secondary",
@@ -1393,6 +1435,7 @@
     {
      "id": "ozs_pct",
      "display": "OZ start %",
+     "short": "OZ start%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -1425,6 +1468,7 @@
     {
      "id": "qoc_toi",
      "display": "QoC (TOI)",
+     "short": "QoC",
      "unit": "min",
      "direction": "higher",
      "set": "secondary",
@@ -1457,6 +1501,7 @@
     {
      "id": "qot_toi",
      "display": "QoT (TOI)",
+     "short": "QoT",
      "unit": "min",
      "direction": "higher",
      "set": "secondary",
@@ -1489,6 +1534,7 @@
     {
      "id": "pdo",
      "display": "PDO",
+     "short": "PDO",
      "unit": "3",
      "direction": "higher",
      "set": "secondary",
@@ -1521,6 +1567,7 @@
     {
      "id": "on_sh_pct",
      "display": "On-ice sh%",
+     "short": "On-ice Sh%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -1553,6 +1600,7 @@
     {
      "id": "war",
      "display": "Rink value (WAR)",
+     "short": "WAR",
      "unit": "wins",
      "direction": "higher",
      "set": "secondary",
@@ -1585,6 +1633,7 @@
     {
      "id": "gar",
      "display": "Rink value (GAR)",
+     "short": "GAR",
      "unit": "1",
      "direction": "higher",
      "set": "secondary",
@@ -1709,6 +1758,7 @@
     {
      "id": "gar_60",
      "display": "Rink value per 60",
+     "short": "GAR/60",
      "unit": "GAR/60",
      "direction": "higher",
      "set": "headline",
@@ -1741,6 +1791,7 @@
     {
      "id": "adj_xgf_pct",
      "display": "On-ice xG share (5v5)",
+     "short": "Adj xGF%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -1773,6 +1824,7 @@
     {
      "id": "rapm_def",
      "display": "Isolated defence (RAPM)",
+     "short": "RAPM def",
      "unit": "xGA per 60 prevented",
      "direction": "higher",
      "set": "headline",
@@ -1805,6 +1857,7 @@
     {
      "id": "rapm_off",
      "display": "Isolated offence (RAPM)",
+     "short": "RAPM off",
      "unit": "xGF per 60",
      "direction": "higher",
      "set": "headline",
@@ -1837,6 +1890,7 @@
     {
      "id": "adj_xga60",
      "display": "On-ice xG against per 60 (5v5)",
+     "short": "Adj xGA",
      "unit": "per 60",
      "direction": "lower",
      "set": "headline",
@@ -1869,6 +1923,7 @@
     {
      "id": "p60",
      "display": "Points per 60",
+     "short": "Points",
      "unit": "per 60",
      "direction": "higher",
      "set": "headline",
@@ -1901,6 +1956,7 @@
     {
      "id": "ixg60_all",
      "display": "Individual xG per 60",
+     "short": "ixG",
      "unit": "per 60",
      "direction": "higher",
      "set": "headline",
@@ -1933,6 +1989,7 @@
     {
      "id": "toi_gp",
      "display": "Ice time per game",
+     "short": "TOI/GP",
      "unit": "min",
      "direction": "higher",
      "set": "headline",
@@ -1965,6 +2022,7 @@
     {
      "id": "pen_diff60",
      "display": "Penalty differential per 60",
+     "short": "Pen diff",
      "unit": "per 60",
      "direction": "higher",
      "set": "headline",
@@ -1997,6 +2055,7 @@
     {
      "id": "rapm_net",
      "display": "Isolated impact (RAPM)",
+     "short": "RAPM",
      "unit": "xG per 60",
      "direction": "higher",
      "set": "secondary",
@@ -2029,6 +2088,7 @@
     {
      "id": "xgf_pct",
      "display": "xGF%",
+     "short": "xGF%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -2061,6 +2121,7 @@
     {
      "id": "cf_pct",
      "display": "CF%",
+     "short": "CF%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -2093,6 +2154,7 @@
     {
      "id": "cf_pct_rel",
      "display": "CF% rel",
+     "short": "CF% rel",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -2125,6 +2187,7 @@
     {
      "id": "xgf60_rel",
      "display": "xGF/60 rel",
+     "short": "xGF rel",
      "unit": "per 60",
      "direction": "higher",
      "set": "secondary",
@@ -2157,6 +2220,7 @@
     {
      "id": "xga60_rel",
      "display": "xGA/60 rel",
+     "short": "xGA rel",
      "unit": "per 60",
      "direction": "lower",
      "set": "secondary",
@@ -2189,6 +2253,7 @@
     {
      "id": "adj_xgf60",
      "display": "Adj. xGF / 60",
+     "short": "Adj xGF",
      "unit": "per 60",
      "direction": "higher",
      "set": "secondary",
@@ -2221,6 +2286,7 @@
     {
      "id": "adj_cf60",
      "display": "Adj. CF / 60",
+     "short": "Adj CF",
      "unit": "per 60",
      "direction": "higher",
      "set": "secondary",
@@ -2253,6 +2319,7 @@
     {
      "id": "adj_ca60",
      "display": "Adj. CA / 60",
+     "short": "Adj CA",
      "unit": "per 60",
      "direction": "lower",
      "set": "secondary",
@@ -2285,6 +2352,7 @@
     {
      "id": "icf60",
      "display": "Attempts / 60 (5v5)",
+     "short": "Attempts",
      "unit": "per 60",
      "direction": "higher",
      "set": "secondary",
@@ -2317,6 +2385,7 @@
     {
      "id": "sog60",
      "display": "Shots / 60 (5v5)",
+     "short": "Shots",
      "unit": "per 60",
      "direction": "higher",
      "set": "secondary",
@@ -2349,6 +2418,7 @@
     {
      "id": "shot_dist",
      "display": "Avg shot distance",
+     "short": "Shot dist",
      "unit": "ft",
      "direction": "lower",
      "set": "secondary",
@@ -2381,6 +2451,7 @@
     {
      "id": "p1_60",
      "display": "Primary points / 60",
+     "short": "Primary pts",
      "unit": "per 60",
      "direction": "higher",
      "set": "secondary",
@@ -2413,6 +2484,7 @@
     {
      "id": "p60_5v5",
      "display": "5v5 points / 60",
+     "short": "5v5 points",
      "unit": "per 60",
      "direction": "higher",
      "set": "secondary",
@@ -2445,6 +2517,7 @@
     {
      "id": "gar_ev_off",
      "display": "GAR EV offence",
+     "short": "GAR EV off",
      "unit": "1",
      "direction": "higher",
      "set": "secondary",
@@ -2477,6 +2550,7 @@
     {
      "id": "gar_ev_def",
      "display": "GAR EV defence",
+     "short": "GAR EV def",
      "unit": "1",
      "direction": "higher",
      "set": "secondary",
@@ -2509,6 +2583,7 @@
     {
      "id": "gar_pp",
      "display": "GAR power play",
+     "short": "GAR PP",
      "unit": "1",
      "direction": "higher",
      "set": "secondary",
@@ -2541,6 +2616,7 @@
     {
      "id": "gar_pk",
      "display": "GAR penalty kill",
+     "short": "GAR PK",
      "unit": "1",
      "direction": "higher",
      "set": "secondary",
@@ -2573,6 +2649,7 @@
     {
      "id": "pp_p60",
      "display": "PP points / 60",
+     "short": "PP points",
      "unit": "per 60",
      "direction": "higher",
      "set": "secondary",
@@ -2605,6 +2682,7 @@
     {
      "id": "toi_pp_gp",
      "display": "PP TOI / GP",
+     "short": "PP TOI",
      "unit": "min",
      "direction": "higher",
      "set": "secondary",
@@ -2637,6 +2715,7 @@
     {
      "id": "toi_sh_gp",
      "display": "PK TOI / GP",
+     "short": "PK TOI",
      "unit": "min",
      "direction": "higher",
      "set": "secondary",
@@ -2669,6 +2748,7 @@
     {
      "id": "pk_xga60",
      "display": "PK xGA / 60",
+     "short": "PK xGA",
      "unit": "per 60",
      "direction": "lower",
      "set": "secondary",
@@ -2701,6 +2781,7 @@
     {
      "id": "pen_taken60",
      "display": "Penalties taken / 60",
+     "short": "Pen taken",
      "unit": "per 60",
      "direction": "lower",
      "set": "secondary",
@@ -2733,6 +2814,7 @@
     {
      "id": "take60",
      "display": "Takeaways / 60",
+     "short": "Takeaways",
      "unit": "per 60",
      "direction": "higher",
      "set": "secondary",
@@ -2765,6 +2847,7 @@
     {
      "id": "give60",
      "display": "Giveaways / 60",
+     "short": "Giveaways",
      "unit": "per 60",
      "direction": "lower",
      "set": "secondary",
@@ -2797,6 +2880,7 @@
     {
      "id": "hits60",
      "display": "Hits / 60",
+     "short": "Hits",
      "unit": "per 60",
      "direction": "higher",
      "set": "secondary",
@@ -2830,6 +2914,7 @@
     {
      "id": "blocks60",
      "display": "Blocks / 60",
+     "short": "Blocks",
      "unit": "per 60",
      "direction": "higher",
      "set": "secondary",
@@ -2863,6 +2948,7 @@
     {
      "id": "ozs_pct",
      "display": "OZ start %",
+     "short": "OZ start%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -2895,6 +2981,7 @@
     {
      "id": "qoc_toi",
      "display": "QoC (TOI)",
+     "short": "QoC",
      "unit": "min",
      "direction": "higher",
      "set": "secondary",
@@ -2927,6 +3014,7 @@
     {
      "id": "pdo",
      "display": "PDO",
+     "short": "PDO",
      "unit": "3",
      "direction": "higher",
      "set": "secondary",
@@ -2959,6 +3047,7 @@
     {
      "id": "war",
      "display": "Rink value (WAR)",
+     "short": "WAR",
      "unit": "wins",
      "direction": "higher",
      "set": "secondary",
@@ -2991,6 +3080,7 @@
     {
      "id": "gar",
      "display": "Rink value (GAR)",
+     "short": "GAR",
      "unit": "1",
      "direction": "higher",
      "set": "secondary",
@@ -3115,6 +3205,7 @@
     {
      "id": "gsax100",
      "display": "Goals saved above expected per 100 shots",
+     "short": "GSAx/100",
      "unit": "per 100 unblocked attempts",
      "direction": "higher",
      "set": "headline",
@@ -3147,6 +3238,7 @@
     {
      "id": "gsax",
      "display": "Goals saved above expected",
+     "short": "GSAx",
      "unit": "goals",
      "direction": "higher",
      "set": "headline",
@@ -3179,6 +3271,7 @@
     {
      "id": "sv_pct",
      "display": "Save percentage",
+     "short": "Sv%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -3211,6 +3304,7 @@
     {
      "id": "sv_pct_high",
      "display": "High-danger save %",
+     "short": "HD Sv%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -3243,6 +3337,7 @@
     {
      "id": "sv_pct_med",
      "display": "Medium-danger save %",
+     "short": "MD Sv%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -3275,6 +3370,7 @@
     {
      "id": "sv_pct_low",
      "display": "Low-danger save %",
+     "short": "LD Sv%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -3307,6 +3403,7 @@
     {
      "id": "qs_pct",
      "display": "Quality start %",
+     "short": "QS%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -3339,6 +3436,7 @@
     {
      "id": "gsax60",
      "display": "GSAx / 60",
+     "short": "GSAx/60",
      "unit": "3",
      "direction": "higher",
      "set": "secondary",
@@ -3371,6 +3469,7 @@
     {
      "id": "dfsv_pct",
      "display": "dFSv%",
+     "short": "dFSv%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -3403,6 +3502,7 @@
     {
      "id": "gsax_shrunk",
      "display": "GSAx (shrunk)",
+     "short": "GSAx shrunk",
      "unit": "goals",
      "direction": "higher",
      "set": "secondary",
@@ -3435,6 +3535,7 @@
     {
      "id": "sv_pct_5v5",
      "display": "5v5 sv%",
+     "short": "5v5 Sv%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -3467,6 +3568,7 @@
     {
      "id": "sv_pct_sh",
      "display": "PK sv%",
+     "short": "PK Sv%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -3499,6 +3601,7 @@
     {
      "id": "gaa",
      "display": "GAA",
+     "short": "GAA",
      "unit": "goals per 60",
      "direction": "lower",
      "set": "secondary",
@@ -3531,6 +3634,7 @@
     {
      "id": "reb_rate",
      "display": "Rebound rate",
+     "short": "Rebound%",
      "unit": "%",
      "direction": "lower",
      "set": "secondary",
@@ -3563,6 +3667,7 @@
     {
      "id": "xg_per_shot",
      "display": "xG per attempt",
+     "short": "xG/attempt",
      "unit": "3",
      "direction": "higher",
      "set": "secondary",
@@ -3595,6 +3700,7 @@
     {
      "id": "hd_share",
      "display": "High-danger share",
+     "short": "HD share",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -3627,6 +3733,7 @@
     {
      "id": "start_share",
      "display": "Start share",
+     "short": "Start share",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -3659,6 +3766,7 @@
     {
      "id": "gsax_low",
      "display": "GSAx low danger",
+     "short": "GSAx LD",
      "unit": "goals",
      "direction": "higher",
      "set": "secondary",
@@ -3691,6 +3799,7 @@
     {
      "id": "gsax_med",
      "display": "GSAx medium danger",
+     "short": "GSAx MD",
      "unit": "goals",
      "direction": "higher",
      "set": "secondary",
@@ -3723,6 +3832,7 @@
     {
      "id": "gsax_high",
      "display": "GSAx high danger",
+     "short": "GSAx HD",
      "unit": "goals",
      "direction": "higher",
      "set": "secondary",
@@ -3755,6 +3865,7 @@
     {
      "id": "gsax_5v5",
      "display": "GSAx 5v5",
+     "short": "GSAx 5v5",
      "unit": "goals",
      "direction": "higher",
      "set": "secondary",
@@ -3787,6 +3898,7 @@
     {
      "id": "gsax_wrist",
      "display": "GSAx wrist / snap",
+     "short": "GSAx wrist",
      "unit": "goals",
      "direction": "higher",
      "set": "secondary",
@@ -3819,6 +3931,7 @@
     {
      "id": "gsax_slap",
      "display": "GSAx slap",
+     "short": "GSAx slap",
      "unit": "goals",
      "direction": "higher",
      "set": "secondary",
@@ -3851,6 +3964,7 @@
     {
      "id": "gsax_tip",
      "display": "GSAx tips",
+     "short": "GSAx tips",
      "unit": "goals",
      "direction": "higher",
      "set": "secondary",
@@ -3883,6 +3997,7 @@
     {
      "id": "gsax_back",
      "display": "GSAx backhand",
+     "short": "GSAx back",
      "unit": "goals",
      "direction": "higher",
      "set": "secondary",
@@ -3915,6 +4030,7 @@
     {
      "id": "war",
      "display": "Rink value (WAR)",
+     "short": "WAR",
      "unit": "wins",
      "direction": "higher",
      "set": "secondary",
@@ -3947,6 +4063,7 @@
     {
      "id": "gar",
      "display": "Rink value (GAR)",
+     "short": "GAR",
      "unit": "1",
      "direction": "higher",
      "set": "secondary",
@@ -3979,6 +4096,7 @@
     {
      "id": "edge_hd_sv_pct",
      "display": "Tracked high-danger sv%",
+     "short": "Trk HD Sv%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -4011,6 +4129,7 @@
     {
      "id": "edge_md_sv_pct",
      "display": "Tracked mid-range sv%",
+     "short": "Trk MD Sv%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -4043,6 +4162,7 @@
     {
      "id": "edge_ld_sv_pct",
      "display": "Tracked long-range sv%",
+     "short": "Trk LD Sv%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -4155,6 +4275,7 @@
      "id": "rating",
      "payload_id": "rating",
      "display": "Team rating",
+     "short": "Rating",
      "unit": "goals per game",
      "direction": "higher",
      "set": "headline",
@@ -4185,6 +4306,7 @@
      "id": "xgf_pct5",
      "payload_id": "xgf_pct5",
      "display": "Expected-goal share (5v5)",
+     "short": "xGF%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -4219,6 +4341,7 @@
      "id": "cf_pct5",
      "payload_id": "cf_pct5",
      "display": "Shot-attempt share (5v5)",
+     "short": "CF%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -4253,6 +4376,7 @@
      "id": "off5",
      "payload_id": "off5",
      "display": "5v5 offence",
+     "short": "5v5 off",
      "unit": "xGF per 60",
      "direction": "higher",
      "set": "headline",
@@ -4287,6 +4411,7 @@
      "id": "def5",
      "payload_id": "def5",
      "display": "5v5 defence",
+     "short": "5v5 def",
      "unit": "xGA per 60",
      "direction": "lower",
      "set": "headline",
@@ -4321,6 +4446,7 @@
      "id": "pp",
      "payload_id": "pp",
      "display": "Power play",
+     "short": "PP",
      "unit": "xGF per 60",
      "direction": "higher",
      "set": "headline",
@@ -4355,6 +4481,7 @@
      "id": "pk",
      "payload_id": "pk",
      "display": "Penalty kill",
+     "short": "PK",
      "unit": "xGA per 60",
      "direction": "lower",
      "set": "headline",
@@ -4389,6 +4516,7 @@
      "id": "goalie",
      "payload_id": "goalie",
      "display": "Goaltending",
+     "short": "Goaltending",
      "unit": "GSAx per 60",
      "direction": "higher",
      "set": "headline",
@@ -4423,6 +4551,7 @@
      "id": "gd_g",
      "payload_id": null,
      "display": "Goal differential per game",
+     "short": "GD/game",
      "unit": "goals",
      "direction": "higher",
      "set": "headline",
@@ -4457,6 +4586,7 @@
      "id": "pts_pct",
      "payload_id": "p_pct (season.json standings.rows)",
      "display": "Points %",
+     "short": "Pts%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -4490,6 +4620,7 @@
     {
      "id": "gf_g",
      "display": "Goals for per game",
+     "short": "GF",
      "direction": "higher",
      "set": "secondary",
      "order": 1,
@@ -4510,6 +4641,7 @@
     {
      "id": "ga_g",
      "display": "Goals against per game",
+     "short": "GA",
      "direction": "lower",
      "set": "secondary",
      "order": 2,
@@ -4530,6 +4662,7 @@
     {
      "id": "xgf_g",
      "display": "xG for per game",
+     "short": "xGF",
      "direction": "higher",
      "set": "secondary",
      "order": 3,
@@ -4550,6 +4683,7 @@
     {
      "id": "xga_g",
      "display": "xG against per game",
+     "short": "xGA",
      "direction": "lower",
      "set": "secondary",
      "order": 4,
@@ -4570,6 +4704,7 @@
     {
      "id": "pp_pct",
      "display": "Power-play %",
+     "short": "PP%",
      "direction": "higher",
      "set": "secondary",
      "order": 5,
@@ -4590,6 +4725,7 @@
     {
      "id": "pk_pct",
      "display": "Penalty-kill %",
+     "short": "PK%",
      "direction": "higher",
      "set": "secondary",
      "order": 6,
@@ -4610,6 +4746,7 @@
     {
      "id": "gsax",
      "display": "Team GSAx",
+     "short": "GSAx",
      "direction": "higher",
      "set": "secondary",
      "order": 7,
@@ -4630,6 +4767,7 @@
     {
      "id": "pp_gf60",
      "display": "Power-play goals per 60",
+     "short": "PP GF",
      "direction": "higher",
      "set": "secondary",
      "order": 8,
@@ -4650,6 +4788,7 @@
     {
      "id": "pk_ga60",
      "display": "Penalty-kill goals against per 60",
+     "short": "PK GA",
      "direction": "lower",
      "set": "secondary",
      "order": 9,
@@ -4670,6 +4809,7 @@
     {
      "id": "ff_pct5",
      "display": "Unblocked-attempt share (5v5)",
+     "short": "FF%",
      "direction": "higher",
      "set": "secondary",
      "order": 10,
@@ -4690,6 +4830,7 @@
     {
      "id": "gf_pct5",
      "display": "Goal share (5v5)",
+     "short": "GF%",
      "direction": "higher",
      "set": "secondary",
      "order": 11,

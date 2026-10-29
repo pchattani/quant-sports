@@ -310,6 +310,17 @@ room's Chart view), `core.js` (routes, redirects, the nav switch). The kit piece
    and weaknesses, head to head (`QK.tape` with `gap: true`), and "Through the season" only where the game log or a race
    log already carries it.
 
+### Round 10: the Board's "Bloomberg view" (28 Oct 2026)
+
+`QK.board` draws a quiet table: plain numbers, a thin percentile bar under each, colour only for the top and bottom 10%,
+one-line heads from the spec's `short` (every metric in `docs/_design/metrics/<sport>.json` has one; `design_kit.py`
+appends it and the short unit to each labels row as `[7]`, `[8]`; `cat.short(id)`, `cat.unitShort(id)`), and a card list on
+phones. A site passes `summary` (its value metric, also the default sort), `abbr` (heads for payload keys the spec lacks:
+`{ id: 'Short' | ['Short', 'unit'] }`), optionally `family` (the 8-column cap keeps one metric per family first), reads its
+column set back with `QK.board.pick(sets, SC.cols, 'view')` (so "Position view (all N)" survives a redraw) and marks the room
+`<div class="sc qk-room">` (on phones the tabs come straight after the controls, then "Top of the ..." as small cards). The
+heat grid is unchanged.
+
 ### What changes per sport
 
 | Site | Groups (Broad / Position) | Rating parts on the power board | Style-map presets |

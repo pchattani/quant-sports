@@ -235,7 +235,7 @@ function render(el, params, state) {
   SC.L = k.L(params, state);
   ROOT = el;
   readQuery(params.query || {});
-  el.innerHTML = '<div class="sc"><section class="qk-card sc-ctl"><div class="qk-card-body" id="sc-ctl">' + QK.skeleton('lines', 2) + '</div></section>' +
+  el.innerHTML = '<div class="sc qk-room"><section class="qk-card sc-ctl"><div class="qk-card-body" id="sc-ctl">' + QK.skeleton('lines', 2) + '</div></section>' +
     '<section class="sc-top" id="sc-top" aria-label="Top of the group"></section>' +
     '<div class="qk-tabs sc-tabs" role="tablist" aria-label="Scouting Room views">' +
     [['board', 'Board'], ['chart', 'Chart'], ['leaders', 'Leaders'], ['alltime', 'All-time']].map(t => '<button type="button" class="qk-tab" role="tab" id="sc-tab-' + t[0] + '" data-view="' + t[0] + '" aria-selected="' + (SC.view === t[0]) + '" tabindex="' + (SC.view === t[0] ? 0 : -1) + '">' + t[1] + '</button>').join('') +
@@ -393,6 +393,38 @@ function topStrip() {
 }
 function shortTip(t) { t = String(t || '').replace(/ Our model: .*$/, ''); return t.length > 110 ? t.slice(0, 107).replace(/\s+\S*$/, '') + '…' : t; }
 
+/* one-line board heads (round 10) for payload keys the metrics spec does not carry; the spec's own come through
+   QK.spec (`short`). A value is the head, or [head, unit]. */
+var BOARD_ABBR = {
+  "g": "Games", "cstr_pct": "CStr%", "fp_swing_pct": "F-Swing%", "fp_strike_pct": "F-Strike%",
+  "s2_whiff_pct": "2S Whiff%", "chase_zone_swing_pct": "Chase-zn sw%", "dv": "Decision RV", "dv_zone": "Zone dec.",
+  "dv_chase": "Chase dec.", "x_swing_pct": "xSwing%", "swing_oe": "Swing% OE", "should_swing_pct": "Bad-take%",
+  "should_take_pct": "Bad-swing%", "la_sd": "LA SD", "solid_pct": "Solid%", "flare_pct": "Flare/burner",
+  "fb_dist": "Fly dist", "xwoba_diff": "xwOBA+ - Sav", "woba_minus_x": "wOBA - xw", "xwobacon_savant": "xwOBAcon Sav",
+  "cent_pct": "Straight%", "bat_speed_adj": "Adj bat spd", "swing_length_adj": "Adj sw len", "sq_swing": "SqUp%/swing",
+  "sq_oe": "SqUp% OE", "path_mismatch": "Path miss", "path_matched_pct": "Path match%",
+  "attack_direction": "Attack dir", "swing_tilt": "Swing tilt", "intercept_rel": "Contact pt", "fb_xwoba": "FB xwOBA",
+  "fb_whiff_pct": "FB Whiff%", "fb_rv100": "FB RV/100", "fb_chase_pct": "FB Chase%", "br_xwoba": "Brk xwOBA",
+  "br_whiff_pct": "Brk Whiff%", "br_rv100": "Brk RV/100", "br_chase_pct": "Brk Chase%", "os_xwoba": "OS xwOBA",
+  "os_whiff_pct": "OS Whiff%", "os_rv100": "OS RV/100", "os_chase_pct": "OS Chase%", "v95_xwoba": "95+ xwOBA",
+  "v95_whiff_pct": "95+ Whiff%", "v90_xwoba": "90-95 xwOBA", "v90_whiff_pct": "90-95 Whiff%", "vlo_xwoba": "<90 xwOBA",
+  "vlo_whiff_pct": "<90 Whiff%", "heart_rv100": "Heart RV", "shadow_rv100": "Shadow RV", "chase_rv100": "Chase RV",
+  "waste_rv100": "Waste RV", "shadow_swing_pct": "Shadow sw%", "pa_vl_share": "PA% v LHP", "woba_hilev": "wOBA hi-lev",
+  "hp_to_1b": ["Home to 1st", "s"], "ebt_runs": "XBT runs", "oaa_back": "OAA back", "oaa_in": "OAA in",
+  "oaa_3b": "OAA to 3B", "oaa_1b": "OAA to 1B", "war_results": "WAR (res.)", "batting_results": "Bat runs res",
+  "pos_runs": "Pos runs", "repl_runs": "Repl runs", "proj_woba": "Proj wOBA", "proj_iso": "Proj ISO",
+  "proj_babip": "Proj BABIP", "proj_bb_pct": "Proj BB%", "proj_hr_pa": "Proj HR/PA", "pre_woba": "Pre wOBA", "r": "R",
+  "fb_stuff": "FB Stuff+", "fb_location": "FB Loc+", "fb_pitching": "FB Pitch+",
+  "best_secondary_stuff": "Best 2nd St+", "fb_spin": ["FB spin", "rpm"], "fb_hb": ["FB arm run", "in"],
+  "fb_spin_eff": "FB spin eff", "fb_axis_dev": "FB SSW", "velo_gap": ["Velo gap", "mph"], "rel_height": ["Rel height",
+  "ft"], "rel_spread": "Rel spread", "rel_type_spread": "Rel gap", "tunnel_in": "Tunnel (in)", "fb_ahead": "FB% ahead",
+  "fb_behind": "FB% behind", "fb_even": "FB% even", "br_two": "Brk% 2 strk", "fb_vl": "FB% v LHB",
+  "fb_vr": "FB% v RHB", "os_vl": "OS% v LHB", "br_vr": "Brk% v RHB", "o_contact_pct": "O-Contact%",
+  "bf_vl_share": "BF% v LHB", "fb_csw_pct": "FB CSW%", "br_csw_pct": "Brk CSW%", "os_csw_pct": "OS CSW%",
+  "xwoba_tto1": "TTO1 xwOBA", "xwoba_tto2": "TTO2 xwOBA", "xwoba_tto3": "TTO3+ xwOBA", "velo_per100": ["Velo fade",
+  "/100 p"], "spin_per100": ["Spin fade", "/100 p"], "velo_last3": "Velo last 3", "spin_last3": "Spin last 3",
+  "rel_z_last3": "Rel drift", "velo_trend_30d": "Velo 30d", "workload_flag": "Workload", "proj_hr_bf": "Proj HR/BF"
+};
 /* Board: column sets as chips, percentile cells, paging, CSV */
 function boardView(host) {
   const k = K(), v = view(), kd = kind(), g = grp();
@@ -406,7 +438,7 @@ function boardView(host) {
   const gnames = [];
   KD().metrics.forEach(m => { if (gnames.indexOf(m.group || 'Other') < 0) gnames.push(m.group || 'Other'); });
   gnames.forEach(gn => sets.push({ key: gn, label: gn, groups: [{ label: gn, ids: KD().metrics.filter(m => (m.group || 'Other') === gn).map(m => m.key) }] }));
-  const setKey = sets.some(s => s.key === SC.cols) ? SC.cols : 'view';
+  const setKey = QK.board.pick(sets, SC.cols, 'view');
   const ag = v.sets.length === 3 && v.sets[2].key === 'aggregate' ? v.sets[2].ids : [];
   const defSort = v.color || ag[0] || (v.sets[0] || { ids: [] }).ids[0];
   let sort = SC.sort && SC.sort.key && (SC.sort.key === 'name' || SC.sort.key === 'n' || SC.sort.key === 'age' || has(SC.sort.key)) ? SC.sort : null;
@@ -415,11 +447,11 @@ function boardView(host) {
   if (!sort && SC.sortDef) sort = SC.sortDef;
   const addable = U().metricOpts(KD().metrics, '', kd, { set: g[1] });
   host.innerHTML = '<section class="qk-card sc-board"><div class="qk-card-head"><div style="min-width:0"><div class="qk-card-title">The board</div><div class="qk-card-sub">' +
-    esc(g[2]) + ' · ' + SC.S + ' · cells on the percentile scale against the ' + P.length + ' ' + esc(g[3]) + ' with ' + minNow() + '+ ' + nUnit() + ' (blue worst, red best). Tap a name for the profile; + pins to the compare tray.</div></div></div>' +
+    esc(g[2]) + ' · ' + SC.S + ' · the bar under each number is its percentile against the ' + P.length + ' ' + esc(g[3]) + ' with ' + minNow() + '+ ' + nUnit() + ': the top 10% in red, the bottom 10% in blue. Tap a name for the profile; tick the box beside it to pin it to the compare tray.</div></div></div>' +
     '<div class="qk-card-body"><div id="sc-board"></div></div></section>' +
     (v.sets.some(s => s.ids.some(id => U().ours(id))) ? U().oursNote(kd, [].concat.apply([], v.sets.map(s => s.ids)).filter(id => U().ours(id)).slice(0, 3)) : '');
   BOARD = QK.board(document.getElementById('sc-board'), {
-    id: 'sc-bd', sets: sets, set: setKey, added: SC.add.filter(id => has(id)), sort: sort, all: SC.all, page: 50, noun: g[3],
+    id: 'sc-bd', summary: defSort, abbr: BOARD_ABBR, family: fam, sets: sets, set: setKey, added: SC.add.filter(id => has(id)), sort: sort, all: SC.all, page: 50, noun: g[3],
     nameLabel: kd === 'pitcher' ? 'Pitcher' : 'Hitter', subLabel: 'Position · team · age',
     meta: id => mmeta(id),
     addable: addable,
@@ -435,7 +467,7 @@ function boardView(host) {
     onState: st => { SC.cols = st.set === 'view' ? '' : st.set; SC.add = st.added; SC.sort = st.sort; SC.all = st.all; writeQuery(); },
     csv: 'bullpen-' + SC.L + '-' + SC.S + '-' + code().toLowerCase() + '-' + st0(setKey) + '.csv',
     empty: SC.q.trim() ? 'No ' + g[3] + ' match “' + SC.q.trim() + '” with these filters.' : 'No ' + g[3] + ' pass these filters: lower the minimum or clear a filter.',
-    note: 'Percentiles are against every ' + esc(SING[code()]) + ' past the floor, whatever the team, age or hand filters show; a ↓ marks a metric where lower is better (its colours are flipped), grey cells are style (neither better nor worse), and fielding and framing are ranked only within a position and past their own chances. Every metric in the file is a chip or “Add a metric” away.'
+    note: 'Percentiles are against every ' + esc(SING[code()]) + ' past the floor, whatever the team, age or hand filters show; a ↓ marks a metric where lower is better (its bar is flipped), style metrics (neither better nor worse) are never coloured, and fielding and framing are ranked only within a position and past their own chances. Every metric in the file is under “Columns” or “Add a metric”.'
   });
 }
 function st0(s) { return String(s || 'view').toLowerCase().replace(/[^a-z0-9]+/g, '-'); }

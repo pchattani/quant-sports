@@ -56,6 +56,7 @@
     {
      "id": "composite",
      "display": "QB composite",
+     "short": "Composite",
      "unit": "rating (100 = average, 10 = 1 SD)",
      "direction": "higher",
      "set": "headline",
@@ -86,6 +87,7 @@
     {
      "id": "epa_db",
      "display": "EPA per dropback",
+     "short": "EPA/db",
      "unit": "EPA/dropback",
      "direction": "higher",
      "set": "headline",
@@ -116,6 +118,7 @@
     {
      "id": "success",
      "display": "Success rate",
+     "short": "Success%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -146,6 +149,7 @@
     {
      "id": "cpoe",
      "display": "CPOE",
+     "short": "CPOE",
      "unit": "pp",
      "direction": "higher",
      "set": "headline",
@@ -176,6 +180,7 @@
     {
      "id": "sack_rate",
      "display": "Sack rate",
+     "short": "Sack%",
      "unit": "%",
      "direction": "lower",
      "set": "headline",
@@ -206,6 +211,7 @@
     {
      "id": "int_rate",
      "display": "Interception rate",
+     "short": "INT%",
      "unit": "%",
      "direction": "lower",
      "set": "headline",
@@ -236,6 +242,7 @@
     {
      "id": "pressure_rate",
      "display": "Pressure rate",
+     "short": "Pressure%",
      "unit": "%",
      "direction": "lower",
      "set": "headline",
@@ -266,6 +273,7 @@
     {
      "id": "adot",
      "display": "Average depth of target",
+     "short": "aDOT",
      "unit": "yds",
      "direction": "higher",
      "set": "headline",
@@ -297,6 +305,7 @@
     {
      "id": "ttt",
      "display": "Time to throw",
+     "short": "TTT",
      "unit": "sec",
      "direction": "lower",
      "set": "headline",
@@ -328,6 +337,7 @@
     {
      "id": "scramble_rate",
      "display": "Scramble rate",
+     "short": "Scramble%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -359,6 +369,7 @@
     {
      "id": "anya",
      "display": "ANY/A",
+     "short": "ANY/A",
      "unit": "yds/dropback",
      "direction": "higher",
      "set": "secondary",
@@ -389,6 +400,7 @@
     {
      "id": "gvar_pg",
      "display": "Value per game",
+     "short": "Value/game",
      "unit": "points/game",
      "direction": "higher",
      "set": "secondary",
@@ -420,6 +432,7 @@
     {
      "id": "comp_pct",
      "display": "Completion %",
+     "short": "Comp%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -450,6 +463,7 @@
     {
      "id": "deep_rate",
      "display": "Deep rate",
+     "short": "Deep%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -481,6 +495,7 @@
     {
      "id": "aggressiveness",
      "display": "Aggressiveness",
+     "short": "Aggressive%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -512,6 +527,7 @@
     {
      "id": "twp_rate",
      "display": "Turnover-worthy throw rate",
+     "short": "TWP%",
      "unit": "%",
      "direction": "lower",
      "set": "secondary",
@@ -542,6 +558,7 @@
     {
      "id": "epa_pressure",
      "display": "EPA under pressure",
+     "short": "EPA pressure",
      "unit": "EPA/dropback",
      "direction": "higher",
      "set": "secondary",
@@ -572,6 +589,7 @@
     {
      "id": "epa_clean",
      "display": "EPA from a clean pocket",
+     "short": "EPA clean",
      "unit": "EPA/dropback",
      "direction": "higher",
      "set": "secondary",
@@ -602,6 +620,7 @@
     {
      "id": "pa_rate",
      "display": "Play-action rate",
+     "short": "PA rate",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -633,6 +652,7 @@
     {
      "id": "epa_play",
      "display": "EPA per play",
+     "short": "EPA/play",
      "unit": "EPA/play",
      "direction": "higher",
      "set": "secondary",
@@ -663,6 +683,7 @@
     {
      "id": "value",
      "display": "Gridiron Value",
+     "short": "Value",
      "unit": "EPA",
      "direction": "higher",
      "set": "secondary",
@@ -693,6 +714,7 @@
     {
      "id": "pass_yds",
      "display": "Passing yards",
+     "short": "Pass yds",
      "unit": "yds",
      "direction": "higher",
      "set": "secondary",
@@ -720,6 +742,7 @@
     {
      "id": "pass_td",
      "display": "Passing TD",
+     "short": "Pass TD",
      "unit": "TD",
      "direction": "higher",
      "set": "secondary",
@@ -838,6 +861,7 @@
     {
      "id": "gvar_pg",
      "display": "Value per game",
+     "short": "Value/game",
      "unit": "points/game",
      "direction": "higher",
      "set": "headline",
@@ -869,6 +893,7 @@
     {
      "id": "ryoe",
      "display": "Rush yards over expected",
+     "short": "RYOE",
      "unit": "yds/carry",
      "direction": "higher",
      "set": "headline",
@@ -899,6 +924,7 @@
     {
      "id": "rush_success",
      "display": "Rush success rate",
+     "short": "Rush SR",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -929,6 +955,7 @@
     {
      "id": "explosive",
      "display": "Explosive run rate",
+     "short": "Explosive%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -959,6 +986,7 @@
     {
      "id": "rush_epa",
      "display": "EPA per carry",
+     "short": "EPA/carry",
      "unit": "EPA/carry",
      "direction": "higher",
      "set": "headline",
@@ -989,6 +1017,7 @@
     {
      "id": "stuff_rate",
      "display": "Stuff rate",
+     "short": "Stuff%",
      "unit": "%",
      "direction": "lower",
      "set": "headline",
@@ -1019,6 +1048,7 @@
     {
      "id": "target_share",
      "display": "Target share",
+     "short": "Tgt share",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -1049,6 +1079,7 @@
     {
      "id": "ypc",
      "display": "Yards per carry",
+     "short": "YPC",
      "unit": "yds",
      "direction": "higher",
      "set": "secondary",
@@ -1079,6 +1110,7 @@
     {
      "id": "rec_epa_tgt",
      "display": "EPA per target",
+     "short": "EPA/target",
      "unit": "EPA/target",
      "direction": "higher",
      "set": "secondary",
@@ -1109,6 +1141,7 @@
     {
      "id": "box8",
      "display": "8+ in the box",
+     "short": "8+ box%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -1136,6 +1169,7 @@
     {
      "id": "rush_yds",
      "display": "Rushing yards",
+     "short": "Rush yds",
      "unit": "yds",
      "direction": "higher",
      "set": "secondary",
@@ -1163,6 +1197,7 @@
     {
      "id": "rush_td",
      "display": "Rushing TD",
+     "short": "Rush TD",
      "unit": "TD",
      "direction": "higher",
      "set": "secondary",
@@ -1190,6 +1225,7 @@
     {
      "id": "rec_yds",
      "display": "Receiving yards",
+     "short": "Rec yds",
      "unit": "yds",
      "direction": "higher",
      "set": "secondary",
@@ -1303,6 +1339,7 @@
     {
      "id": "gvar_pg",
      "display": "Value per game",
+     "short": "Value/game",
      "unit": "points/game",
      "direction": "higher",
      "set": "headline",
@@ -1334,6 +1371,7 @@
     {
      "id": "yptpa",
      "display": "Yards per team pass attempt",
+     "short": "YPTPA",
      "unit": "yds",
      "direction": "higher",
      "set": "headline",
@@ -1364,6 +1402,7 @@
     {
      "id": "target_share",
      "display": "Target share",
+     "short": "Tgt share",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -1394,6 +1433,7 @@
     {
      "id": "rec_epa_tgt",
      "display": "EPA per target",
+     "short": "EPA/target",
      "unit": "EPA/target",
      "direction": "higher",
      "set": "headline",
@@ -1424,6 +1464,7 @@
     {
      "id": "croe",
      "display": "Catch rate over expected",
+     "short": "CROE",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -1454,6 +1495,7 @@
     {
      "id": "yac_rec",
      "display": "YAC per reception",
+     "short": "YAC/rec",
      "unit": "yds",
      "direction": "higher",
      "set": "headline",
@@ -1484,6 +1526,7 @@
     {
      "id": "adot",
      "display": "Average depth of target",
+     "short": "aDOT",
      "unit": "yds",
      "direction": "higher",
      "set": "headline",
@@ -1515,6 +1558,7 @@
     {
      "id": "yacoe",
      "display": "YAC over expected",
+     "short": "YACOE",
      "unit": "yds/reception",
      "direction": "higher",
      "set": "secondary",
@@ -1545,6 +1589,7 @@
     {
      "id": "air_share",
      "display": "Air-yards share",
+     "short": "Air share",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -1575,6 +1620,7 @@
     {
      "id": "wopr",
      "display": "WOPR",
+     "short": "WOPR",
      "unit": "index",
      "direction": "higher",
      "set": "secondary",
@@ -1605,6 +1651,7 @@
     {
      "id": "catch_rate",
      "display": "Catch rate",
+     "short": "Catch%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -1635,6 +1682,7 @@
     {
      "id": "drop_rate",
      "display": "Drop rate",
+     "short": "Drop%",
      "unit": "%",
      "direction": "lower",
      "set": "secondary",
@@ -1665,6 +1713,7 @@
     {
      "id": "contested_rate",
      "display": "Contested catch rate",
+     "short": "Contested%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -1695,6 +1744,7 @@
     {
      "id": "separation",
      "display": "Separation",
+     "short": "Separation",
      "unit": "yds",
      "direction": "higher",
      "set": "secondary",
@@ -1721,6 +1771,7 @@
     {
      "id": "cushion",
      "display": "Cushion",
+     "short": "Cushion",
      "unit": "yds",
      "direction": "higher",
      "set": "secondary",
@@ -1748,6 +1799,7 @@
     {
      "id": "yprr",
      "display": "Yards per route run",
+     "short": "YPRR",
      "unit": "yds/route",
      "direction": "higher",
      "set": "secondary",
@@ -1778,6 +1830,7 @@
     {
      "id": "tprr",
      "display": "Targets per route run",
+     "short": "TPRR",
      "unit": "targets/route",
      "direction": "higher",
      "set": "secondary",
@@ -1808,6 +1861,7 @@
     {
      "id": "rec_yds",
      "display": "Receiving yards",
+     "short": "Rec yds",
      "unit": "yds",
      "direction": "higher",
      "set": "secondary",
@@ -1835,6 +1889,7 @@
     {
      "id": "rec_td",
      "display": "Receiving TD",
+     "short": "Rec TD",
      "unit": "TD",
      "direction": "higher",
      "set": "secondary",
@@ -1862,6 +1917,7 @@
     {
      "id": "rec_epa",
      "display": "Receiving EPA",
+     "short": "Rec EPA",
      "unit": "EPA",
      "direction": "higher",
      "set": "secondary",
@@ -1980,6 +2036,7 @@
     {
      "id": "gvar_pg",
      "display": "Value per game",
+     "short": "Value/game",
      "unit": "points/game",
      "direction": "higher",
      "set": "headline",
@@ -2011,6 +2068,7 @@
     {
      "id": "yptpa",
      "display": "Yards per team pass attempt",
+     "short": "YPTPA",
      "unit": "yds",
      "direction": "higher",
      "set": "headline",
@@ -2041,6 +2099,7 @@
     {
      "id": "target_share",
      "display": "Target share",
+     "short": "Tgt share",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -2071,6 +2130,7 @@
     {
      "id": "rec_epa_tgt",
      "display": "EPA per target",
+     "short": "EPA/target",
      "unit": "EPA/target",
      "direction": "higher",
      "set": "headline",
@@ -2101,6 +2161,7 @@
     {
      "id": "croe",
      "display": "Catch rate over expected",
+     "short": "CROE",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -2131,6 +2192,7 @@
     {
      "id": "yac_rec",
      "display": "YAC per reception",
+     "short": "YAC/rec",
      "unit": "yds",
      "direction": "higher",
      "set": "headline",
@@ -2161,6 +2223,7 @@
     {
      "id": "adot",
      "display": "Average depth of target",
+     "short": "aDOT",
      "unit": "yds",
      "direction": "higher",
      "set": "headline",
@@ -2192,6 +2255,7 @@
     {
      "id": "yacoe",
      "display": "YAC over expected",
+     "short": "YACOE",
      "unit": "yds/reception",
      "direction": "higher",
      "set": "secondary",
@@ -2222,6 +2286,7 @@
     {
      "id": "air_share",
      "display": "Air-yards share",
+     "short": "Air share",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -2252,6 +2317,7 @@
     {
      "id": "wopr",
      "display": "WOPR",
+     "short": "WOPR",
      "unit": "index",
      "direction": "higher",
      "set": "secondary",
@@ -2282,6 +2348,7 @@
     {
      "id": "catch_rate",
      "display": "Catch rate",
+     "short": "Catch%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -2312,6 +2379,7 @@
     {
      "id": "drop_rate",
      "display": "Drop rate",
+     "short": "Drop%",
      "unit": "%",
      "direction": "lower",
      "set": "secondary",
@@ -2342,6 +2410,7 @@
     {
      "id": "contested_rate",
      "display": "Contested catch rate",
+     "short": "Contested%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -2372,6 +2441,7 @@
     {
      "id": "separation",
      "display": "Separation",
+     "short": "Separation",
      "unit": "yds",
      "direction": "higher",
      "set": "secondary",
@@ -2398,6 +2468,7 @@
     {
      "id": "cushion",
      "display": "Cushion",
+     "short": "Cushion",
      "unit": "yds",
      "direction": "higher",
      "set": "secondary",
@@ -2425,6 +2496,7 @@
     {
      "id": "yprr",
      "display": "Yards per route run",
+     "short": "YPRR",
      "unit": "yds/route",
      "direction": "higher",
      "set": "secondary",
@@ -2455,6 +2527,7 @@
     {
      "id": "tprr",
      "display": "Targets per route run",
+     "short": "TPRR",
      "unit": "targets/route",
      "direction": "higher",
      "set": "secondary",
@@ -2485,6 +2558,7 @@
     {
      "id": "rec_yds",
      "display": "Receiving yards",
+     "short": "Rec yds",
      "unit": "yds",
      "direction": "higher",
      "set": "secondary",
@@ -2512,6 +2586,7 @@
     {
      "id": "rec_td",
      "display": "Receiving TD",
+     "short": "Rec TD",
      "unit": "TD",
      "direction": "higher",
      "set": "secondary",
@@ -2539,6 +2614,7 @@
     {
      "id": "rec_epa",
      "display": "Receiving EPA",
+     "short": "Rec EPA",
      "unit": "EPA",
      "direction": "higher",
      "set": "secondary",
@@ -2657,6 +2733,7 @@
     {
      "id": "gvar_pg",
      "display": "Value per game",
+     "short": "Value/game",
      "unit": "points/game",
      "direction": "higher",
      "set": "headline",
@@ -2688,6 +2765,7 @@
     {
      "id": "pressures_pg",
      "display": "Sacks + QB hits per game",
+     "short": "Sacks+hits",
      "unit": "per game",
      "direction": "higher",
      "set": "headline",
@@ -2718,6 +2796,7 @@
     {
      "id": "tfl_pg",
      "display": "Tackles for loss per game",
+     "short": "TFL",
      "unit": "per game",
      "direction": "higher",
      "set": "headline",
@@ -2750,6 +2829,7 @@
     {
      "id": "splash_pg",
      "display": "Splash plays per game",
+     "short": "Splash",
      "unit": "per game",
      "direction": "higher",
      "set": "secondary",
@@ -2780,6 +2860,7 @@
     {
      "id": "tackles_pg",
      "display": "Tackles per game",
+     "short": "Tackles",
      "unit": "per game",
      "direction": "higher",
      "set": "headline",
@@ -2812,6 +2893,7 @@
     {
      "id": "ff_pg",
      "display": "Forced fumbles per game",
+     "short": "FF",
      "unit": "per game",
      "direction": "higher",
      "set": "headline",
@@ -2844,6 +2926,7 @@
     {
      "id": "sacks_pg",
      "display": "Sacks per game",
+     "short": "Sacks",
      "unit": "per game",
      "direction": "higher",
      "set": "secondary",
@@ -2876,6 +2959,7 @@
     {
      "id": "pd_pg",
      "display": "Passes defensed per game",
+     "short": "PD",
      "unit": "per game",
      "direction": "higher",
      "set": "headline",
@@ -2908,6 +2992,7 @@
     {
      "id": "pass_rush_rate",
      "display": "Sacks + hits per pass snap",
+     "short": "Sk+hit/snap",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -2938,6 +3023,7 @@
     {
      "id": "tfl_run",
      "display": "TFL per run snap",
+     "short": "TFL/run",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -2968,6 +3054,7 @@
     {
      "id": "sacks",
      "display": "Sacks",
+     "short": "Sacks",
      "unit": "sacks",
      "direction": "higher",
      "set": "secondary",
@@ -2998,6 +3085,7 @@
     {
      "id": "qb_hits",
      "display": "QB hits",
+     "short": "QB hits",
      "unit": "hits",
      "direction": "higher",
      "set": "secondary",
@@ -3028,6 +3116,7 @@
     {
      "id": "def_value",
      "display": "Splash EPA",
+     "short": "Splash EPA",
      "unit": "EPA",
      "direction": "higher",
      "set": "secondary",
@@ -3151,6 +3240,7 @@
     {
      "id": "gvar_pg",
      "display": "Value per game",
+     "short": "Value/game",
      "unit": "points/game",
      "direction": "higher",
      "set": "headline",
@@ -3182,6 +3272,7 @@
     {
      "id": "pressures_pg",
      "display": "Sacks + QB hits per game",
+     "short": "Sacks+hits",
      "unit": "per game",
      "direction": "higher",
      "set": "headline",
@@ -3212,6 +3303,7 @@
     {
      "id": "tfl_pg",
      "display": "Tackles for loss per game",
+     "short": "TFL",
      "unit": "per game",
      "direction": "higher",
      "set": "headline",
@@ -3244,6 +3336,7 @@
     {
      "id": "splash_pg",
      "display": "Splash plays per game",
+     "short": "Splash",
      "unit": "per game",
      "direction": "higher",
      "set": "secondary",
@@ -3274,6 +3367,7 @@
     {
      "id": "tackles_pg",
      "display": "Tackles per game",
+     "short": "Tackles",
      "unit": "per game",
      "direction": "higher",
      "set": "headline",
@@ -3306,6 +3400,7 @@
     {
      "id": "ff_pg",
      "display": "Forced fumbles per game",
+     "short": "FF",
      "unit": "per game",
      "direction": "higher",
      "set": "headline",
@@ -3338,6 +3433,7 @@
     {
      "id": "sacks_pg",
      "display": "Sacks per game",
+     "short": "Sacks",
      "unit": "per game",
      "direction": "higher",
      "set": "secondary",
@@ -3370,6 +3466,7 @@
     {
      "id": "pd_pg",
      "display": "Passes defensed per game",
+     "short": "PD",
      "unit": "per game",
      "direction": "higher",
      "set": "headline",
@@ -3402,6 +3499,7 @@
     {
      "id": "pass_rush_rate",
      "display": "Sacks + hits per pass snap",
+     "short": "Sk+hit/snap",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -3432,6 +3530,7 @@
     {
      "id": "tfl_run",
      "display": "TFL per run snap",
+     "short": "TFL/run",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -3462,6 +3561,7 @@
     {
      "id": "sacks",
      "display": "Sacks",
+     "short": "Sacks",
      "unit": "sacks",
      "direction": "higher",
      "set": "secondary",
@@ -3492,6 +3592,7 @@
     {
      "id": "qb_hits",
      "display": "QB hits",
+     "short": "QB hits",
      "unit": "hits",
      "direction": "higher",
      "set": "secondary",
@@ -3522,6 +3623,7 @@
     {
      "id": "def_value",
      "display": "Splash EPA",
+     "short": "Splash EPA",
      "unit": "EPA",
      "direction": "higher",
      "set": "secondary",
@@ -3645,6 +3747,7 @@
     {
      "id": "gvar_pg",
      "display": "Value per game",
+     "short": "Value/game",
      "unit": "points/game",
      "direction": "higher",
      "set": "headline",
@@ -3676,6 +3779,7 @@
     {
      "id": "tackles_pg",
      "display": "Tackles per game",
+     "short": "Tackles",
      "unit": "per game",
      "direction": "higher",
      "set": "headline",
@@ -3708,6 +3812,7 @@
     {
      "id": "tfl_pg",
      "display": "Tackles for loss per game",
+     "short": "TFL",
      "unit": "per game",
      "direction": "higher",
      "set": "headline",
@@ -3740,6 +3845,7 @@
     {
      "id": "pressures_pg",
      "display": "Sacks + QB hits per game",
+     "short": "Sacks+hits",
      "unit": "per game",
      "direction": "higher",
      "set": "headline",
@@ -3770,6 +3876,7 @@
     {
      "id": "pd_pg",
      "display": "Passes defensed per game",
+     "short": "PD",
      "unit": "per game",
      "direction": "higher",
      "set": "headline",
@@ -3802,6 +3909,7 @@
     {
      "id": "splash_pg",
      "display": "Splash plays per game",
+     "short": "Splash",
      "unit": "per game",
      "direction": "higher",
      "set": "headline",
@@ -3832,6 +3940,7 @@
     {
      "id": "ints_pg",
      "display": "Interceptions per game",
+     "short": "INT",
      "unit": "per game",
      "direction": "higher",
      "set": "secondary",
@@ -3864,6 +3973,7 @@
     {
      "id": "ff_pg",
      "display": "Forced fumbles per game",
+     "short": "FF",
      "unit": "per game",
      "direction": "higher",
      "set": "secondary",
@@ -3896,6 +4006,7 @@
     {
      "id": "tackle_snap",
      "display": "Tackles per snap",
+     "short": "Tkl/snap",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -3926,6 +4037,7 @@
     {
      "id": "tackles",
      "display": "Tackles",
+     "short": "Tackles",
      "unit": "tackles",
      "direction": "higher",
      "set": "secondary",
@@ -3956,6 +4068,7 @@
     {
      "id": "sacks",
      "display": "Sacks",
+     "short": "Sacks",
      "unit": "sacks",
      "direction": "higher",
      "set": "secondary",
@@ -3986,6 +4099,7 @@
     {
      "id": "def_value",
      "display": "Splash EPA",
+     "short": "Splash EPA",
      "unit": "EPA",
      "direction": "higher",
      "set": "secondary",
@@ -4108,6 +4222,7 @@
     {
      "id": "gvar_pg",
      "display": "Value per game",
+     "short": "Value/game",
      "unit": "points/game",
      "direction": "higher",
      "set": "headline",
@@ -4139,6 +4254,7 @@
     {
      "id": "pd_pg",
      "display": "Passes defensed per game",
+     "short": "PD",
      "unit": "per game",
      "direction": "higher",
      "set": "headline",
@@ -4171,6 +4287,7 @@
     {
      "id": "ints_pg",
      "display": "Interceptions per game",
+     "short": "INT",
      "unit": "per game",
      "direction": "higher",
      "set": "headline",
@@ -4203,6 +4320,7 @@
     {
      "id": "splash_pg",
      "display": "Splash plays per game",
+     "short": "Splash",
      "unit": "per game",
      "direction": "higher",
      "set": "secondary",
@@ -4233,6 +4351,7 @@
     {
      "id": "tackles_pg",
      "display": "Tackles per game",
+     "short": "Tackles",
      "unit": "per game",
      "direction": "higher",
      "set": "headline",
@@ -4265,6 +4384,7 @@
     {
      "id": "tfl_pg",
      "display": "Tackles for loss per game",
+     "short": "TFL",
      "unit": "per game",
      "direction": "higher",
      "set": "headline",
@@ -4297,6 +4417,7 @@
     {
      "id": "ff_pg",
      "display": "Forced fumbles per game",
+     "short": "FF",
      "unit": "per game",
      "direction": "higher",
      "set": "headline",
@@ -4329,6 +4450,7 @@
     {
      "id": "pressures_pg",
      "display": "Sacks + QB hits per game",
+     "short": "Sacks+hits",
      "unit": "per game",
      "direction": "higher",
      "set": "secondary",
@@ -4359,6 +4481,7 @@
     {
      "id": "ball_cov",
      "display": "Passes defensed per pass snap",
+     "short": "PD/snap",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -4389,6 +4512,7 @@
     {
      "id": "ints",
      "display": "Interceptions",
+     "short": "INT",
      "unit": "INT",
      "direction": "higher",
      "set": "secondary",
@@ -4419,6 +4543,7 @@
     {
      "id": "pd",
      "display": "Passes defensed",
+     "short": "PD",
      "unit": "PD",
      "direction": "higher",
      "set": "secondary",
@@ -4449,6 +4574,7 @@
     {
      "id": "def_value",
      "display": "Splash EPA",
+     "short": "Splash EPA",
      "unit": "EPA",
      "direction": "higher",
      "set": "secondary",
@@ -4567,6 +4693,7 @@
     {
      "id": "gvar_pg",
      "display": "Value per game",
+     "short": "Value/game",
      "unit": "points/game",
      "direction": "higher",
      "set": "headline",
@@ -4598,6 +4725,7 @@
     {
      "id": "tackles_pg",
      "display": "Tackles per game",
+     "short": "Tackles",
      "unit": "per game",
      "direction": "higher",
      "set": "headline",
@@ -4630,6 +4758,7 @@
     {
      "id": "pd_pg",
      "display": "Passes defensed per game",
+     "short": "PD",
      "unit": "per game",
      "direction": "higher",
      "set": "headline",
@@ -4662,6 +4791,7 @@
     {
      "id": "ints_pg",
      "display": "Interceptions per game",
+     "short": "INT",
      "unit": "per game",
      "direction": "higher",
      "set": "headline",
@@ -4694,6 +4824,7 @@
     {
      "id": "tfl_pg",
      "display": "Tackles for loss per game",
+     "short": "TFL",
      "unit": "per game",
      "direction": "higher",
      "set": "headline",
@@ -4726,6 +4857,7 @@
     {
      "id": "splash_pg",
      "display": "Splash plays per game",
+     "short": "Splash",
      "unit": "per game",
      "direction": "higher",
      "set": "headline",
@@ -4756,6 +4888,7 @@
     {
      "id": "ff_pg",
      "display": "Forced fumbles per game",
+     "short": "FF",
      "unit": "per game",
      "direction": "higher",
      "set": "secondary",
@@ -4788,6 +4921,7 @@
     {
      "id": "pressures_pg",
      "display": "Sacks + QB hits per game",
+     "short": "Sacks+hits",
      "unit": "per game",
      "direction": "higher",
      "set": "secondary",
@@ -4818,6 +4952,7 @@
     {
      "id": "ball_cov",
      "display": "Passes defensed per pass snap",
+     "short": "PD/snap",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -4848,6 +4983,7 @@
     {
      "id": "ints",
      "display": "Interceptions",
+     "short": "INT",
      "unit": "INT",
      "direction": "higher",
      "set": "secondary",
@@ -4878,6 +5014,7 @@
     {
      "id": "pd",
      "display": "Passes defensed",
+     "short": "PD",
      "unit": "PD",
      "direction": "higher",
      "set": "secondary",
@@ -4908,6 +5045,7 @@
     {
      "id": "def_value",
      "display": "Splash EPA",
+     "short": "Splash EPA",
      "unit": "EPA",
      "direction": "higher",
      "set": "secondary",
@@ -5029,6 +5167,7 @@
     {
      "id": "fg_oe",
      "display": "Field goals over expected",
+     "short": "FGOE",
      "unit": "FG",
      "direction": "higher",
      "set": "headline",
@@ -5059,6 +5198,7 @@
     {
      "id": "fg_pct",
      "display": "Field goal %",
+     "short": "FG%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -5089,6 +5229,7 @@
     {
      "id": "fg_50_pct",
      "display": "50+ yard %",
+     "short": "50+ FG%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -5119,6 +5260,7 @@
     {
      "id": "xp_pct",
      "display": "Extra point %",
+     "short": "XP%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -5149,6 +5291,7 @@
     {
      "id": "avg_dist",
      "display": "Average attempt distance",
+     "short": "Avg dist",
      "unit": "yds",
      "direction": "higher",
      "set": "headline",
@@ -5180,6 +5323,7 @@
     {
      "id": "fg_50",
      "display": "50+ yard makes",
+     "short": "50+ makes",
      "unit": "FG",
      "direction": "higher",
      "set": "headline",
@@ -5210,6 +5354,7 @@
     {
      "id": "pts_oe",
      "display": "Points over expected",
+     "short": "Pts OE",
      "unit": "pts",
      "direction": "higher",
      "set": "secondary",
@@ -5240,6 +5385,7 @@
     {
      "id": "fga",
      "display": "Field-goal attempts",
+     "short": "FGA",
      "unit": "FGA",
      "direction": "higher",
      "set": "secondary",
@@ -5340,6 +5486,7 @@
     {
      "id": "epa_punt",
      "display": "EPA per punt",
+     "short": "EPA/punt",
      "unit": "EPA/punt",
      "direction": "higher",
      "set": "headline",
@@ -5370,6 +5517,7 @@
     {
      "id": "net",
      "display": "Net average",
+     "short": "Net avg",
      "unit": "yds",
      "direction": "higher",
      "set": "headline",
@@ -5400,6 +5548,7 @@
     {
      "id": "gross",
      "display": "Gross average",
+     "short": "Gross avg",
      "unit": "yds",
      "direction": "higher",
      "set": "headline",
@@ -5430,6 +5579,7 @@
     {
      "id": "inside20",
      "display": "Inside the 20",
+     "short": "Inside 20",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -5460,6 +5610,7 @@
     {
      "id": "touchback_rate",
      "display": "Touchback rate",
+     "short": "Touchback%",
      "unit": "%",
      "direction": "lower",
      "set": "headline",
@@ -5490,6 +5641,7 @@
     {
      "id": "net_oe",
      "display": "Net over expected",
+     "short": "Net OE",
      "unit": "yds/punt",
      "direction": "higher",
      "set": "secondary",
@@ -5520,6 +5672,7 @@
     {
      "id": "punts",
      "display": "Punts",
+     "short": "Punts",
      "unit": "punts",
      "direction": "higher",
      "set": "secondary",
@@ -5620,6 +5773,7 @@
     {
      "id": "rating",
      "display": "Team rating",
+     "short": "Rating",
      "unit": "points/game",
      "direction": "higher",
      "set": "headline",
@@ -5647,6 +5801,7 @@
     {
      "id": "off_rating",
      "display": "Offence rating",
+     "short": "Off rating",
      "unit": "points/game",
      "direction": "higher",
      "set": "headline",
@@ -5674,6 +5829,7 @@
     {
      "id": "def_rating",
      "display": "Defence rating",
+     "short": "Def rating",
      "unit": "points/game",
      "direction": "higher",
      "set": "headline",
@@ -5701,6 +5857,7 @@
     {
      "id": "off_epa",
      "display": "Offence EPA per play",
+     "short": "Off EPA",
      "unit": "EPA/play",
      "direction": "higher",
      "set": "headline",
@@ -5728,6 +5885,7 @@
     {
      "id": "def_epa",
      "display": "Defence EPA per play",
+     "short": "Def EPA",
      "unit": "EPA/play",
      "direction": "lower",
      "set": "headline",
@@ -5755,6 +5913,7 @@
     {
      "id": "st_epa_g",
      "display": "Special teams EPA per game",
+     "short": "ST EPA",
      "unit": "EPA/game",
      "direction": "higher",
      "set": "headline",
@@ -5814,6 +5973,7 @@
     {
      "id": "off_epa",
      "display": "EPA per play",
+     "short": "Off EPA",
      "unit": "EPA/play",
      "direction": "higher",
      "set": "headline",
@@ -5841,6 +6001,7 @@
     {
      "id": "off_pass_epa",
      "display": "Pass EPA per dropback",
+     "short": "Pass EPA",
      "unit": "EPA/dropback",
      "direction": "higher",
      "set": "headline",
@@ -5868,6 +6029,7 @@
     {
      "id": "off_rush_epa",
      "display": "Rush EPA per carry",
+     "short": "Rush EPA",
      "unit": "EPA/carry",
      "direction": "higher",
      "set": "headline",
@@ -5895,6 +6057,7 @@
     {
      "id": "off_success",
      "display": "Success rate",
+     "short": "Success%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -5922,6 +6085,7 @@
     {
      "id": "pressure_allowed",
      "display": "Pressure rate allowed",
+     "short": "Pressure alw",
      "unit": "%",
      "direction": "lower",
      "set": "headline",
@@ -5949,6 +6113,7 @@
     {
      "id": "off_rating",
      "display": "Offence rating",
+     "short": "Off rating",
      "unit": "points/game",
      "direction": "higher",
      "set": "headline",
@@ -5976,6 +6141,7 @@
     {
      "id": "proe_neutral",
      "display": "Pass rate over expected (neutral)",
+     "short": "PROE",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -6004,6 +6170,7 @@
     {
      "id": "sec_per_play_neutral",
      "display": "Seconds per play (neutral)",
+     "short": "Sec/play",
      "unit": "sec",
      "direction": "lower",
      "set": "secondary",
@@ -6032,6 +6199,7 @@
     {
      "id": "plays_pg",
      "display": "Plays per game",
+     "short": "Plays",
      "unit": "plays",
      "direction": "higher",
      "set": "secondary",
@@ -6060,6 +6228,7 @@
     {
      "id": "motion_rate",
      "display": "Motion rate",
+     "short": "Motion%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -6088,6 +6257,7 @@
     {
      "id": "go_rate_rec",
      "display": "Go when advised",
+     "short": "Go rate",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -6147,6 +6317,7 @@
     {
      "id": "def_epa",
      "display": "EPA per play allowed",
+     "short": "Def EPA",
      "unit": "EPA/play",
      "direction": "lower",
      "set": "headline",
@@ -6174,6 +6345,7 @@
     {
      "id": "def_pass_epa",
      "display": "Pass EPA allowed",
+     "short": "Pass EPA alw",
      "unit": "EPA/dropback",
      "direction": "lower",
      "set": "headline",
@@ -6201,6 +6373,7 @@
     {
      "id": "def_rush_epa",
      "display": "Rush EPA allowed",
+     "short": "Rush EPA alw",
      "unit": "EPA/carry",
      "direction": "lower",
      "set": "headline",
@@ -6228,6 +6401,7 @@
     {
      "id": "def_success",
      "display": "Success rate allowed",
+     "short": "SR allowed",
      "unit": "%",
      "direction": "lower",
      "set": "headline",
@@ -6255,6 +6429,7 @@
     {
      "id": "pressure_rate_def",
      "display": "Pressure rate",
+     "short": "Pressure%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -6282,6 +6457,7 @@
     {
      "id": "def_rating",
      "display": "Defence rating",
+     "short": "Def rating",
      "unit": "points/game",
      "direction": "higher",
      "set": "headline",
@@ -6309,6 +6485,7 @@
     {
      "id": "blitz_rate",
      "display": "Blitz rate",
+     "short": "Blitz%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -6337,6 +6514,7 @@
     {
      "id": "man_rate",
      "display": "Man coverage rate",
+     "short": "Man%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -6365,6 +6543,7 @@
     {
      "id": "box_avg",
      "display": "Box count",
+     "short": "Box count",
      "unit": "defenders",
      "direction": "higher",
      "set": "secondary",

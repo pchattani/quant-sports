@@ -72,10 +72,37 @@ def copy_kit(site_dir: Path, sub: str = "assets/qk") -> Path:
     return dst
 
 
+# the unit as a table head's second line: the spec's long unit ("goals per 90") to a few characters ("/90"); a metric
+# may set its own with "unit_short". Units that only restate the label (counts, "rating", "index") give "".
+SHORT_UNIT = {
+    "per 90": "/90", "goals per 90": "/90", "metres per 90": "m/90", "km per 90": "km/90", "per match": "/match",
+    "goals per match": "/match", "points per match": "/match", "per 100 touches": "/100 touches", "goals per shot": "/shot",
+    "xG per shot": "xG/shot", "xG": "xG", "goals": "goals", "%": "%", "mph": "mph", "runs": "runs", "wins": "wins", "ft": "ft",
+    "outs": "outs", "wins per 600 PA": "/600 PA", "ft/s": "ft/s", "runs per 100 pitches": "/100 pitches", "runs per PA": "/PA",
+    "runs per 9": "/9", "per 9": "/9", "100 = average": "100 = avg", "runs/game": "runs/game", "in": "in", "deg": "deg",
+    "per inning": "/inning", "wins per 200 IP": "/200 IP", "per 100": "/100", "per 100 shots": "/100 shots",
+    "per 48 (NBA) / 40 (WNBA)": "poss/game", "points": "pts", "per 60": "/60", "min": "min", "xGF per 60": "xGF/60",
+    "per game": "/game", "GAR/60": "/60", "xG per 60": "xG/60", "xGA per 60 prevented": "xGA/60", "xGA per 60": "xGA/60",
+    "per 100 unblocked attempts": "/100 shots", "goals per 60": "/60", "goals per game": "/game", "GSAx per 60": "/60",
+    "yds": "yds", "points/game": "pts/game", "EPA": "EPA", "EPA/dropback": "/dropback", "EPA/play": "/play", "EPA/carry": "/carry",
+    "EPA/target": "/target", "EPA/run": "/run", "EPA/punt": "/punt", "EPA/game": "/game", "sec": "sec", "yds/reception": "yds/rec",
+    "yds/route": "yds/route", "targets/route": "/route", "rating (100 = average, 10 = 1 SD)": "100 = avg", "pp": "pp",
+    "yds/dropback": "yds/dropback", "yds/carry": "yds/carry", "pts": "pts", "yds/punt": "yds/punt", "poss/40": "/40",
+    "wins/game": "wins/game", "per set": "/set", "% of lap": "% of lap", "places": "places", "km/h": "km/h", "ms": "ms",
+    "s/lap": "s/lap", "per race": "/race", "s": "s",
+}
+
+
+def short_unit(metric: dict) -> str:
+    if metric.get("unit_short") is not None:
+        return str(metric["unit_short"])
+    return SHORT_UNIT.get(str(metric.get("unit") or "").strip(), "")
+
+
 def labels(spec: dict) -> dict:
     """The compact labels file from a sport's metrics spec: {"sport", "generated", "ours": {"models": {key: {name,
     about}}, "metrics": {id: model key}}, "m": {entity: {id: [display, unit, direction, set ("h"/"s"), order, style
-    (0/1), explanation]}}, "groups": [{"id", "display", "entity", "headline": [ids in order], "field"?, "codes"?,
+    (0/1), explanation, short, short unit]}}, "groups": [{"id", "display", "entity", "headline": [ids in order], "field"?, "codes"?,
     "min"?: {"field", "value", "unit"}, "view"?}]} (field/codes: the payload field and codes of the peer group; min: the
     spec's minimum sample; view: the Labs' Position default, as in the spec). A metric id that
     appears in several groups of one entity keeps the first headline entry (else the first entry)."""
@@ -92,8 +119,11 @@ def labels(spec: dict) -> dict:
             head = x.get("set") == "headline"
             if head:
                 heads.append((x.get("order") or 99, mid))
+            # [7] short: the one-line table head (round 10, the Scouting Room board); [8] the unit as the head's second
+            # line ("/90", "%", "mph"). Appended, so readers of [0]..[6] are unaffected.
             row = [x.get("display") or mid, x.get("unit") or "", x.get("direction") or "higher", "h" if head else "s",
-                   x.get("order") or 99, 1 if x.get("style") else 0, x.get("explanation") or ""]
+                   x.get("order") or 99, 1 if x.get("style") else 0, x.get("explanation") or "",
+                   x.get("short") or x.get("display") or mid, short_unit(x)]
             if mid not in tab or (head and tab[mid][3] != "h"):
                 tab[mid] = row
         groups.append({"id": g.get("id"), "display": g.get("display") or g.get("id"), "entity": ent,

@@ -184,7 +184,7 @@ function render(el, params) {
   ROOT = el;
   readQuery(params.query || {});
   el.innerHTML = U().secHead('Scouting Room', 'Every player and every metric, judged against the same role: sort the board, chart any two numbers, scan the leaders, open a profile, pin up to four to compare.', null, null, U().kicker(SC.L, U().S(params))) +
-    '<div class="sc"><section class="qk-card sc-ctl"><div class="qk-card-body" id="sc-ctl">' + QK.skeleton('lines', 2) + '</div></section>' +
+    '<div class="sc qk-room"><section class="qk-card sc-ctl"><div class="qk-card-body" id="sc-ctl">' + QK.skeleton('lines', 2) + '</div></section>' +
     '<section class="sc-top" id="sc-top" aria-label="Top of the group"></section>' +
     '<div class="qk-tabs sc-tabs" role="tablist" aria-label="Scouting Room views">' +
     [['board', 'Board'], ['chart', 'Chart'], ['leaders', 'Leaders'], ['clutch', 'Clutch']].map(t => '<button type="button" class="qk-tab" role="tab" id="sc-tab-' + t[0] + '" data-view="' + t[0] + '" aria-selected="' + (SC.view === t[0]) + '" tabindex="' + (SC.view === t[0] ? 0 : -1) + '">' + t[1] + '</button>').join('') +
@@ -324,6 +324,32 @@ function topStrip() {
   host.innerHTML = items.length ? QK.sectionHead({ kicker: 'Top of the ' + g[1], title: SC.within === 'pos' ? 'The best ' + g[1] + ', on what matters there' : 'The best players right now', sub: 'The leader on five of the ' + (SC.within === 'pos' ? 'role' : 'group') + '’s key metrics among the ' + rows.length + ' on screen. Tap a name for the profile.' }) + QK.hotRow(items) : '';
 }
 
+/* one-line board heads (round 10) for payload keys the metrics spec does not carry; the spec's own come through
+   QK.spec (`short`). A value is the head, or [head, unit]. */
+var BOARD_ABBR = {
+  "xpps": "xPPS", "rapm_d": "Def RAPM", "box_d": "Def box", "opp_xpps_on": "Opp xPPS on", "dwpa": "Def WPA",
+  "rapm_o": "Off RAPM", "box_o": "Off box", "hpm_next": "Proj HPM", "wpa": "WPA", "li_wpa": "WPA (LI)",
+  "team_net": "Team net", "career_hpm": "Career HPM", "hpm_delta": "HPM change", "pts_g": ["Points", "/game"],
+  "pts36": ["Points", "/36"], "pps": "Pts/FGA", "tpm_g": ["3PM", "/game"], "rim_fg_diff": "Rim FG% +/-",
+  "smid_freq": "S-mid freq", "smid_fg": "S-mid FG%", "smid_fg_diff": "S-mid +/-", "lmid_freq": "L-mid freq",
+  "lmid_fg": "L-mid FG%", "lmid_fg_diff": "L-mid +/-", "c3_freq": "C3 freq", "c3_fg": "C3 FG%", "c3_fg_diff": "C3 +/-",
+  "ab3_freq": "AB3 freq", "ab3_fg": "AB3 FG%", "ab3_fg_diff": "AB3 +/-", "dunk_freq": "Dunk freq",
+  "layup_freq": "Layup freq", "float_hook_freq": "Float/hook", "jumper_freq": "Jumper freq",
+  "pullup_freq": "Pull-up freq", "iso_freq": "Step/fade %", "assisted_share": "Assisted%",
+  "putback_freq": "Putback freq", "transition_freq": "Transition", "ast_g": ["Assists", "/game"], "ast36": ["Assists",
+  "/36"], "ast_usg": "AST%/USG", "ast_pts100": ["Ast points", "/100"], "ast_rim_share": "Ast to rim",
+  "ast_3_share": "Ast to 3s", "tov_g": ["Turnovers", "/game"], "tov100": ["Turnovers", "/100"],
+  "live_tov_share": "Live-ball TO", "off_foul100": ["Off fouls", "/100"], "reb_g": ["Rebounds", "/game"],
+  "reb36": ["Rebounds", "/36"], "oreb100": ["Off reb", "/100"], "dreb100": ["Def reb", "/100"], "stl_g": ["Steals",
+  "/game"], "blk_g": ["Blocks", "/game"], "stl100": ["Steals", "/100"], "blk100": ["Blocks", "/100"],
+  "opp_fg3_on": "Opp 3P% on", "on_drtg": "On DRtg", "hpm_se": "HPM s.e.", "on_net": "On net", "off_net": "Off net",
+  "pm_g": ["+/-", "/game"], "pm100": ["+/-", "/100"], "gmsc": "Game Score", "clutch_min": "Clutch min",
+  "clutch_pts": "Clutch pts", "clutch_ts": "Clutch TS%", "clutch_net": "Clutch net", "clutch_poss": "Clutch poss",
+  "gs": "Starts", "mpg": ["Minutes", "/game"], "start_share": "Start %", "avail": "Available %",
+  "games_missed": "Missed", "injury_dnp": "Injured", "b2b_gmsc_diff": "B2B GmSc +/-", "pts_share": "Team pts %",
+  "min_share": "Team min %", "ast_share": "Team ast %", "reb_share": "Team reb %", "lineup_net": "Best lineup",
+  "age": "Age", "seasons": "Seasons", "war": "WAR", "gmsc_sd": "GmSc SD"
+};
 function boardView(host) {
   const v = view(), g = grp();
   const all = shown();
@@ -335,9 +361,10 @@ function boardView(host) {
   const gnames = [];
   D.metrics.forEach(m => { if (gnames.indexOf(m.group || 'Other') < 0) gnames.push(m.group || 'Other'); });
   gnames.forEach(gn => sets.push({ key: gn, label: gn, groups: [{ label: gn, ids: D.metrics.filter(m => (m.group || 'Other') === gn).map(m => m.key) }] }));
-  const setKey = sets.some(s => s.key === SC.cols) ? SC.cols : 'view';
+  const setKey = QK.board.pick(sets, SC.cols, 'view');
   const ag = v.sets.length >= 3 ? v.sets[2].ids : [];
-  const defSort = v.color || ag[0] || (v.sets[0] || { ids: [] }).ids[0];
+  /* the summary beside the name and the default sort: HPM (round 10; WNBA's view colours by WAR), else the view's colour */
+  const defSort = (has('hpm') ? 'hpm' : null) || v.color || ag[0] || (v.sets[0] || { ids: [] }).ids[0];
   const LEAD = ['name', 'gp', 'min', 'age'];
   let sort = SC.sort && SC.sort.key && (LEAD.indexOf(SC.sort.key) >= 0 || has(SC.sort.key)) ? SC.sort : null;
   if (sort && !sort.dir) sort = { key: sort.key, dir: LEAD.indexOf(sort.key) < 0 && mmeta(sort.key).lower ? 'asc' : 'desc' };
@@ -346,11 +373,11 @@ function boardView(host) {
   const groups = HW.ours ? HW.ours.groups(D.metrics) : [{ name: 'Metrics', items: D.metrics }];
   const addable = groups.map(gr => '<optgroup label="' + esc(gr.name) + '">' + gr.items.map(m => '<option value="' + esc(m.key) + '">' + esc(m.label) + (m.lower ? ' ↓' : '') + '</option>').join('') + '</optgroup>').join('');
   host.innerHTML = '<section class="qk-card sc-board"><div class="qk-card-head"><div style="min-width:0"><div class="qk-card-title">The board</div><div class="qk-card-sub">' +
-    esc(g[0]) + ' · ' + esc(seasonLabel(SC.S)) + ' · cells on the percentile scale against the ' + P.length + ' ' + esc(g[1]) + ' past the floor (blue worst, red best). Tap a name for the profile; + pins to the compare tray.</div></div></div>' +
+    esc(g[0]) + ' · ' + esc(seasonLabel(SC.S)) + ' · the bar under each number is its percentile against the ' + P.length + ' ' + esc(g[1]) + ' past the floor: the top 10% in red, the bottom 10% in blue. Tap a name for the profile; tick the box beside it to pin it to the compare tray.</div></div></div>' +
     '<div class="qk-card-body"><div id="sc-board"></div></div></section>' +
     (HW.ours ? HW.ours.explain([].concat.apply([], v.sets.map(s => s.ids)).filter(id => HW.ours.of(id)).slice(0, 2), { label: id => mmeta(id).label }) : '');
   BOARD = QK.board(document.getElementById('sc-board'), {
-    id: 'sc-bd', sets: sets, set: setKey, added: SC.add.filter(id => has(id)), sort: sort, all: SC.all, page: 50, noun: g[1],
+    id: 'sc-bd', summary: defSort, abbr: BOARD_ABBR, sets: sets, set: setKey, added: SC.add.filter(id => has(id)), sort: sort, all: SC.all, page: 50, noun: g[1],
     nameLabel: 'Player', subLabel: 'Role · team · age',
     meta: id => mmeta(id),
     addable: addable,
@@ -366,7 +393,7 @@ function boardView(host) {
     onState: st => { SC.cols = st.set === 'view' ? '' : st.set; SC.add = st.added; SC.sort = st.sort; SC.all = st.all; writeQuery(); },
     csv: 'hardwood-' + SC.L + '-' + SC.S + '-' + code().toLowerCase() + '-' + String(setKey || 'view').toLowerCase().replace(/[^a-z0-9]+/g, '-') + '.csv',
     empty: SC.q.trim() ? 'No ' + g[1] + ' match “' + SC.q.trim() + '” with these filters.' : 'No ' + g[1] + ' pass these filters: lower the minimum or clear a filter.',
-    note: 'Percentiles are against every ' + esc(g[2]) + ' past the floor, whatever the team or age filters show; a ↓ marks a metric where lower is better (its colours are flipped) and grey cells are style (neither better nor worse). Every metric in the file is a chip or “Add a metric” away.'
+    note: 'Percentiles are against every ' + esc(g[2]) + ' past the floor, whatever the team or age filters show; a ↓ marks a metric where lower is better (its bar is flipped) and style metrics (neither better nor worse) are never coloured. Every metric in the file is under “Columns” or “Add a metric”.'
   });
 }
 

@@ -14,10 +14,10 @@ var M = { xw: { label: 'xwOBA+', tip: 'Expected wOBA from the contact.', ours: {
   k: { label: 'K%', tip: 'Strikeouts per plate appearance.', lower: true, fmt: function (v) { return (v * 100).toFixed(1) + '%'; } },
   war: { label: 'WAR/600', tip: 'Value per 600 plate appearances.', ours: { name: 'Bullpen WAR' }, fmt: function (v) { return v.toFixed(1); } } };
 var pinned = {};
-QK.board($('#sc-scout-board'), { id: 'sc-x-bd', noun: 'players', nameLabel: 'Player', sets: [{ key: 'view', label: 'Position view', groups: [{ label: 'Hitting', ids: ['xw', 'iso', 'k'] }, { label: 'Value', ids: ['war'] }] }, { key: 'pow', label: 'Power', groups: [{ label: 'Power', ids: ['iso'] }] }],
+QK.board($('#sc-scout-board'), { id: 'sc-x-bd', summary: 'war', noun: 'players', nameLabel: 'Player', sets: [{ key: 'view', label: 'Position view', groups: [{ label: 'Hitting', ids: ['xw', 'iso', 'k'] }, { label: 'Value', ids: ['war'] }] }, { key: 'pow', label: 'Power', groups: [{ label: 'Power', ids: ['iso'] }] }],
   meta: function (id) { return M[id]; }, rows: rows, val: function (r, id) { return r.v[id]; }, sort: { key: 'war', dir: 'desc' }, page: 5, csv: 'showcase-board.csv',
   lead: [{ key: 'n', label: 'PA', fmt: function (r) { return String(r.n); }, val: function (r) { return r.n; } }, { key: 'age', label: 'Age', fmt: function (r) { return String(r.age); }, val: function (r) { return r.age; } }],
-  pin: { has: function (id) { return !!pinned[id]; }, toggle: function (r) { pinned[r.id] = !pinned[r.id]; } }, note: 'Cells on the percentile scale within the rows; K% is lower-is-better, so its colours flip.' });
+  pin: { has: function (id) { return !!pinned[id]; }, toggle: function (r) { pinned[r.id] = !pinned[r.id]; } }, note: 'Round 10: plain numbers, a percentile bar under each, colour only for the top and bottom 10% of the rows; K% is lower-is-better, so its bar flips.' });
 
 var TM = [['NYR', 'New York', '#0038A8', 1.21, 0.62, 0.41, 0.18, '103–59', 'WWLWWWLWWW'], ['EDM', 'Edmonton', '#041E42', 0.55, 0.31, 0.12, 0.12, '92–70', 'LWWLWLWWLW'],
   ['COL', 'Colorado', '#6F263D', -0.12, 0.25, -0.31, -0.06, '79–83', 'LLWLWWLLWL'], ['BOS', 'Boston', '#FFB81C', -0.71, -0.42, -0.18, -0.11, '68–94', 'LLLWLLWLLL']];

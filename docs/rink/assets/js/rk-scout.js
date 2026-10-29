@@ -204,7 +204,7 @@ function render(el, params) {
   SC.S = Number(params.season) || RK.currentSeason();
   const tabs = [{ key: 'scout', label: 'Scouting Room', href: '#/scout' + (U.sq(SC.S) ? '?' + U.sq(SC.S) : '') }, { key: 'compare', label: 'Compare', href: '#/compare' }];
   const body = U.section(el, { section: 'scout', title: 'Scouting Room', sub: 'Every skater and goalie on every metric, judged against the same position: sort the board, chart any two numbers, scan the leaders, open a profile, pin up to four to compare.', tabs: tabs, active: 'scout' });
-  body.innerHTML = '<div class="sc"><section class="qk-card sc-ctl"><div class="qk-card-body" id="sc-ctl">' + QK.skeleton('lines', 2) + '</div></section>' +
+  body.innerHTML = '<div class="sc qk-room"><section class="qk-card sc-ctl"><div class="qk-card-body" id="sc-ctl">' + QK.skeleton('lines', 2) + '</div></section>' +
     '<section class="sc-top" id="sc-top" aria-label="Top of the group"></section>' +
     '<div class="qk-tabs sc-tabs" role="tablist" aria-label="Scouting Room views">' +
     [['board', 'Board'], ['chart', 'Chart'], ['leaders', 'Leaders']].map(t => '<button type="button" class="qk-tab" role="tab" id="sc-tab-' + t[0] + '" data-view="' + t[0] + '" aria-selected="' + (SC.view === t[0]) + '" tabindex="' + (SC.view === t[0] ? 0 : -1) + '">' + t[1] + '</button>').join('') +
@@ -346,6 +346,19 @@ function topStrip() {
     sub: 'The leader on five of the ' + (SC.within === 'pos' ? 'position' : 'group') + '’s key metrics among the ' + rows.length + ' on screen. Tap a name for the profile.' }) + QK.hotRow(items) : '';
 }
 
+/* one-line board heads (round 10) for payload keys the metrics spec does not carry; the spec's own come through
+   QK.spec (`short`). A value is the head, or [head, unit]. */
+var BOARD_ABBR = {
+  "gax": "G - xG", "gax_onice": "On-ice G-xG", "gar_pen": "GAR pen", "proj_pts": "Proj pts", "proj_g": "Proj goals",
+  "proj_xgf_pct": "Proj xGF%", "a1": "A1", "a2": "A2", "g60_5v5": ["5v5 goals", "/60"], "a1_60_5v5": ["5v5 A1", "/60"],
+  "sog": "SOG", "iff": "Unblocked", "icf": "Attempts", "fsh_pct": "FSh%", "hd_sh_pct": "HD finish%",
+  "wrist_share": "Wrist/snap %", "tip_share": "Tip share", "rapm_off_se": "RAPM off SE", "rapm_def_se": "RAPM def SE",
+  "dzs_share": "DZ start %", "ozs": "OZ FO", "dzs": "DZ FO", "toi_share": "5v5 TOI%", "shift_len": ["Shift", "s"],
+  "hits_taken60": ["Hits taken", "/60"], "fo_taken": "FO taken", "pen_drawn60": ["Pen drawn", "/60"],
+  "edge_bursts_20": "20+ mph", "edge_distance60": ["Distance", "/60"], "xfsv_pct": "xFSv%", "gsax_sh": "GSAx SH",
+  "sa": "Shots agst", "sa60": ["Shots agst", "/60"], "b2b_starts": "B2B starts", "otl": "OTL", "ga": "GA",
+  "rbs": "RBS"
+};
 /* Board: column sets as chips, percentile cells, paging, CSV */
 function boardView(host) {
   const k = K(), v = view(), kd = kind(), g = grp();
@@ -359,9 +372,10 @@ function boardView(host) {
   const gnames = [];
   cols.forEach(id => { const gn = KD().meta[id].group || 'Other'; if (gnames.indexOf(gn) < 0) gnames.push(gn); });
   gnames.forEach(gn => sets.push({ key: gn, label: gn, groups: [{ label: gn, ids: cols.filter(id => (KD().meta[id].group || 'Other') === gn) }] }));
-  const setKey = sets.some(s => s.key === SC.cols) ? SC.cols : 'view';
+  const setKey = QK.board.pick(sets, SC.cols, 'view');
   const ag = v.sets.length === 3 ? v.sets[2].ids : [];
-  const defSort = v.color || ag[0] || (v.sets[0] || { ids: [] }).ids[0];
+  /* the summary beside the name and the default sort: GAR/60 for skaters (round 10), the view's colour metric otherwise (GSAx) */
+  const defSort = (kd !== 'G' && has('gar_60') ? 'gar_60' : null) || v.color || ag[0] || (v.sets[0] || { ids: [] }).ids[0];
   const leadKeys = ['name', 'gp', 'n', 'age'];
   let sort = SC.sort && SC.sort.key && (leadKeys.indexOf(SC.sort.key) >= 0 || has(SC.sort.key)) ? SC.sort : null;
   if (sort && !sort.dir) sort = { key: sort.key, dir: leadKeys.indexOf(sort.key) < 0 && mmeta(sort.key).lower ? 'asc' : (sort.key === 'name' ? 'asc' : 'desc') };
@@ -370,11 +384,11 @@ function boardView(host) {
   const items = cols.map(id => ({ value: id, key: id, label: mmeta(id).label }));
   const addable = QK.optgroups ? QK.optgroups(items, CAT, { entity: 'player' }) : items.map(o => '<option value="' + esc(o.value) + '">' + esc(o.label) + '</option>').join('');
   host.innerHTML = '<section class="qk-card sc-board"><div class="qk-card-head"><div style="min-width:0"><div class="qk-card-title">The board</div><div class="qk-card-sub">' +
-    esc(g[2]) + ' · ' + esc(RK.seasonLabel(SC.S)) + ' · cells on the percentile scale against the ' + P.length + ' ' + esc(g[3]) + ' with ' + minNow() + '+ ' + esc(nLong()) + ' (blue worst, red best). Tap a name for the profile; + pins to the compare tray.</div></div></div>' +
+    esc(g[2]) + ' · ' + esc(RK.seasonLabel(SC.S)) + ' · the bar under each number is its percentile against the ' + P.length + ' ' + esc(g[3]) + ' with ' + minNow() + '+ ' + esc(nLong()) + ': the top 10% in red, the bottom 10% in blue. Tap a name for the profile; tick the box beside it to pin it to the compare tray.</div></div></div>' +
     '<div class="qk-card-body"><div id="sc-board"></div></div></section>' +
     (RK.ours && RK.ours.explain ? RK.ours.explain([].concat.apply([], v.sets.map(s => s.ids)).filter(id => RK.ours.of(id)).slice(0, 2), { label: id => mmeta(id).label }) : '');
   BOARD = QK.board(document.getElementById('sc-board'), {
-    id: 'sc-bd', sets: sets, set: setKey, added: SC.add.filter(id => has(id)), sort: sort, all: SC.all, page: 50, noun: g[3],
+    id: 'sc-bd', summary: defSort, abbr: BOARD_ABBR, sets: sets, set: setKey, added: SC.add.filter(id => has(id)), sort: sort, all: SC.all, page: 50, noun: g[3],
     nameLabel: kd === 'G' ? 'Goalie' : 'Skater', subLabel: 'Position · team · age',
     meta: id => mmeta(id), addable: addable,
     lead: [{ key: 'gp', label: 'GP', tip: 'Games played', fmt: row => String(row._r.gp || 0), val: row => row._r.gp },
@@ -389,7 +403,7 @@ function boardView(host) {
     onState: st => { SC.cols = st.set === 'view' ? '' : st.set; SC.add = st.added; SC.sort = st.sort; SC.all = st.all; writeQuery(); },
     csv: 'rink-' + SC.S + '-' + code().toLowerCase() + '-' + String(setKey).toLowerCase().replace(/[^a-z0-9]+/g, '-') + '.csv',
     empty: SC.q.trim() ? 'No ' + g[3] + ' match “' + SC.q.trim() + '” with these filters.' : 'No ' + g[3] + ' pass these filters: lower the minimum or clear a filter.',
-    note: 'Percentiles are against every ' + esc(SING[code()]) + ' past the floor, whatever the team, age or hand filters show; a ↓ marks a metric where lower is better (its colours are flipped), and grey cells are style (neither better nor worse). Every metric in the file is a chip or “Add a metric” away.'
+    note: 'Percentiles are against every ' + esc(SING[code()]) + ' past the floor, whatever the team, age or hand filters show; a ↓ marks a metric where lower is better (its bar is flipped), and style metrics (neither better nor worse) are never coloured. Every metric in the file is under “Columns” or “Add a metric”.'
   });
 }
 

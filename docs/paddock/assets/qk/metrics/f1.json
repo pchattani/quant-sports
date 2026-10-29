@@ -64,6 +64,7 @@
     {
      "id": "driver_effect",
      "display": "Race driver rating",
+     "short": "Driver rtg",
      "unit": "% of lap",
      "direction": "lower",
      "set": "headline",
@@ -100,6 +101,7 @@
     {
      "id": "quali_driver_effect",
      "display": "Qualifying driver rating",
+     "short": "Quali rtg",
      "unit": "% of lap",
      "direction": "lower",
      "set": "headline",
@@ -136,6 +138,7 @@
     {
      "id": "race_h2h",
      "display": "Race head-to-head",
+     "short": "Race H2H",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -172,6 +175,7 @@
     {
      "id": "team_points_share",
      "display": "Share of team points",
+     "short": "Team share",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -208,6 +212,7 @@
     {
      "id": "race_pace",
      "display": "Race pace v field",
+     "short": "Race pace",
      "unit": "s/lap",
      "direction": "lower",
      "set": "headline",
@@ -243,6 +248,7 @@
     {
      "id": "points_per_race",
      "display": "Points per race",
+     "short": "Points",
      "unit": "pts",
      "direction": "higher",
      "set": "headline",
@@ -278,6 +284,7 @@
     {
      "id": "elo_teammate",
      "display": "Team-mate Elo",
+     "short": "Elo v mate",
      "unit": "rating",
      "direction": "higher",
      "set": "headline",
@@ -315,6 +322,7 @@
     {
      "id": "lap1_gain",
      "display": "Lap-1 gain",
+     "short": "Lap-1 gain",
      "unit": "places",
      "direction": "higher",
      "set": "headline",
@@ -350,6 +358,7 @@
     {
      "id": "quali_h2h",
      "display": "Qualifying head-to-head",
+     "short": "Quali H2H",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -386,6 +395,7 @@
     {
      "id": "quali_gap_tm_pct",
      "display": "Qualifying gap to team-mate",
+     "short": "Quali gap TM",
      "unit": "%",
      "direction": "lower",
      "set": "secondary",
@@ -422,6 +432,7 @@
     {
      "id": "race_pace_tm_delta",
      "display": "Race pace v team-mate",
+     "short": "Pace v TM",
      "unit": "s/lap",
      "direction": "lower",
      "set": "secondary",
@@ -458,6 +469,7 @@
     {
      "id": "race_pace_h2h",
      "display": "Race-pace head-to-head",
+     "short": "Pace H2H",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -494,6 +506,7 @@
     {
      "id": "quali_pace",
      "display": "Qualifying pace v field",
+     "short": "Quali pace",
      "unit": "% of lap",
      "direction": "lower",
      "set": "secondary",
@@ -529,6 +542,7 @@
     {
      "id": "avg_grid",
      "display": "Average grid",
+     "short": "Avg grid",
      "unit": "position",
      "direction": "lower",
      "set": "secondary",
@@ -564,6 +578,7 @@
     {
      "id": "avg_finish",
      "display": "Average finish",
+     "short": "Avg finish",
      "unit": "position",
      "direction": "lower",
      "set": "secondary",
@@ -599,6 +614,7 @@
     {
      "id": "podium_rate",
      "display": "Podium rate",
+     "short": "Podium%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -634,6 +650,7 @@
     {
      "id": "win_rate",
      "display": "Win rate",
+     "short": "Win%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -669,6 +686,7 @@
     {
      "id": "points_rate",
      "display": "Points-finish rate",
+     "short": "Points%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -704,6 +722,7 @@
     {
      "id": "q3_rate",
      "display": "Q3 rate",
+     "short": "Q3%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -739,6 +758,7 @@
     {
      "id": "elo",
      "display": "Field Elo",
+     "short": "Field Elo",
      "unit": "rating",
      "direction": "higher",
      "set": "secondary",
@@ -775,6 +795,7 @@
     {
      "id": "pos_gained",
      "display": "Positions gained",
+     "short": "Pos gained",
      "unit": "places",
      "direction": "higher",
      "set": "secondary",
@@ -810,6 +831,7 @@
     {
      "id": "dnf_rate",
      "display": "DNF rate",
+     "short": "DNF%",
      "unit": "%",
      "direction": "lower",
      "set": "secondary",
@@ -845,6 +867,7 @@
     {
      "id": "dnf_driver",
      "display": "Driver-caused DNFs",
+     "short": "Driver DNFs",
      "unit": "count",
      "direction": "lower",
      "set": "secondary",
@@ -880,6 +903,7 @@
     {
      "id": "dnf_mech",
      "display": "Mechanical DNFs",
+     "short": "Mech DNFs",
      "unit": "count",
      "direction": "lower",
      "set": "secondary",
@@ -915,6 +939,7 @@
     {
      "id": "consistency",
      "display": "Lap-time scatter",
+     "short": "Lap scatter",
      "unit": "s",
      "direction": "lower",
      "set": "secondary",
@@ -950,6 +975,7 @@
     {
      "id": "avg_fastest_rank",
      "display": "Average fastest-lap rank",
+     "short": "FL rank",
      "unit": "rank",
      "direction": "lower",
      "set": "secondary",
@@ -985,6 +1011,7 @@
     {
      "id": "sector_rank",
      "display": "Personal-best sector rank",
+     "short": "Sector rank",
      "unit": "rank",
      "direction": "lower",
      "set": "secondary",
@@ -1020,6 +1047,7 @@
     {
      "id": "corner_speed_delta",
      "display": "Minimum corner speed v field",
+     "short": "Corner spd",
      "unit": "km/h",
      "direction": "higher",
      "set": "secondary",
@@ -1055,6 +1083,7 @@
     {
      "id": "overtakes_made",
      "display": "Overtakes per race",
+     "short": "Overtakes",
      "unit": "per race",
      "direction": "higher",
      "set": "secondary",
@@ -1090,6 +1119,7 @@
     {
      "id": "net_overtakes",
      "display": "Net overtakes per race",
+     "short": "Net overtake",
      "unit": "per race",
      "direction": "higher",
      "set": "secondary",
@@ -1125,6 +1155,7 @@
     {
      "id": "tyre_mgmt",
      "display": "Tyre management index",
+     "short": "Tyre mgmt",
      "unit": "index",
      "direction": "higher",
      "set": "secondary",
@@ -1160,6 +1191,7 @@
     {
      "id": "points_v_expected",
      "display": "Points v expected",
+     "short": "Pts v exp",
      "unit": "pts",
      "direction": "higher",
      "set": "secondary",
@@ -1239,6 +1271,7 @@
     {
      "id": "car_race_pace",
      "display": "Car race pace",
+     "short": "Race pace",
      "unit": "% of lap",
      "direction": "lower",
      "set": "headline",
@@ -1269,6 +1302,7 @@
     {
      "id": "points_per_race",
      "display": "Points per race",
+     "short": "Points",
      "unit": "pts",
      "direction": "higher",
      "set": "headline",
@@ -1299,6 +1333,7 @@
     {
      "id": "dnf_rate",
      "display": "DNF rate",
+     "short": "DNF%",
      "unit": "%",
      "direction": "lower",
      "set": "headline",
@@ -1329,6 +1364,7 @@
     {
      "id": "pit_lane_v_field",
      "display": "Pit-lane time v field",
+     "short": "Pit lane",
      "unit": "ms",
      "direction": "lower",
      "set": "headline",
@@ -1359,6 +1395,7 @@
     {
      "id": "pit_under_2500",
      "display": "Stops under 2.5 s",
+     "short": "Stops <2.5s",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -1389,6 +1426,7 @@
     {
      "id": "strategy_gain",
      "display": "Places gained through stops",
+     "short": "Strategy",
      "unit": "places",
      "direction": "higher",
      "set": "headline",
@@ -1419,6 +1457,7 @@
     {
      "id": "car_quali_pace",
      "display": "Car qualifying pace",
+     "short": "Quali pace",
      "unit": "% of lap",
      "direction": "lower",
      "set": "secondary",
@@ -1449,6 +1488,7 @@
     {
      "id": "car_pace_latest",
      "display": "Car race pace, latest",
+     "short": "Pace latest",
      "unit": "% of lap",
      "direction": "lower",
      "set": "secondary",
@@ -1479,6 +1519,7 @@
     {
      "id": "car_pace_trend",
      "display": "Car development",
+     "short": "Development",
      "unit": "% of lap",
      "direction": "lower",
      "set": "secondary",
@@ -1509,6 +1550,7 @@
     {
      "id": "avg_best_finish",
      "display": "Average best-car finish",
+     "short": "Best finish",
      "unit": "position",
      "direction": "lower",
      "set": "secondary",
@@ -1539,6 +1581,7 @@
     {
      "id": "avg_best_grid",
      "display": "Average best-car grid",
+     "short": "Best grid",
      "unit": "position",
      "direction": "lower",
      "set": "secondary",
@@ -1569,6 +1612,7 @@
     {
      "id": "both_points_rate",
      "display": "Both cars in the points",
+     "short": "Both in pts",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -1599,6 +1643,7 @@
     {
      "id": "wins",
      "display": "Wins",
+     "short": "Wins",
      "unit": "count",
      "direction": "higher",
      "set": "secondary",
@@ -1629,6 +1674,7 @@
     {
      "id": "podiums",
      "display": "Podiums",
+     "short": "Podiums",
      "unit": "count",
      "direction": "higher",
      "set": "secondary",
@@ -1659,6 +1705,7 @@
     {
      "id": "pit_stop_ms",
      "display": "Median pit stop",
+     "short": "Median stop",
      "unit": "ms",
      "direction": "lower",
      "set": "secondary",
@@ -1689,6 +1736,7 @@
     {
      "id": "pit_best_ms",
      "display": "Best pit stop",
+     "short": "Best stop",
      "unit": "ms",
      "direction": "lower",
      "set": "secondary",
@@ -1719,6 +1767,7 @@
     {
      "id": "dnf_mech",
      "display": "Mechanical DNFs",
+     "short": "Mech DNFs",
      "unit": "count",
      "direction": "lower",
      "set": "secondary",
@@ -1749,6 +1798,7 @@
     {
      "id": "corner_speed",
      "display": "Minimum corner speed v field",
+     "short": "Corner spd",
      "unit": "km/h",
      "direction": "higher",
      "set": "secondary",
@@ -1779,6 +1829,7 @@
     {
      "id": "top_speed",
      "display": "Top speed",
+     "short": "Top speed",
      "unit": "km/h",
      "direction": "higher",
      "set": "secondary",
@@ -1809,6 +1860,7 @@
     {
      "id": "tyre_mgmt",
      "display": "Tyre management index",
+     "short": "Tyre mgmt",
      "unit": "index",
      "direction": "higher",
      "set": "secondary",
@@ -1839,6 +1891,7 @@
     {
      "id": "lead_driver_share",
      "display": "Lead driver's share of points",
+     "short": "Lead share",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -1869,6 +1922,7 @@
     {
      "id": "car_share",
      "display": "Car share of points",
+     "short": "Car share",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",

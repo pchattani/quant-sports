@@ -76,6 +76,7 @@
     {
      "id": "xwoba_n",
      "display": "xwOBA+ (park-neutral)",
+     "short": "xwOBA+ (PN)",
      "unit": "wOBA scale",
      "direction": "higher",
      "set": "headline",
@@ -102,6 +103,7 @@
     {
      "id": "woba",
      "display": "wOBA",
+     "short": "wOBA",
      "unit": "wOBA scale",
      "direction": "higher",
      "set": "headline",
@@ -128,6 +130,7 @@
     {
      "id": "war_600",
      "display": "WAR/600",
+     "short": "WAR/600",
      "unit": "wins per 600 PA",
      "direction": "higher",
      "set": "headline",
@@ -154,6 +157,7 @@
     {
      "id": "barrel_pct",
      "display": "Barrel%",
+     "short": "Barrel%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -180,6 +184,7 @@
     {
      "id": "hard_pct",
      "display": "Hard-hit%",
+     "short": "Hard-hit%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -206,6 +211,7 @@
     {
      "id": "bat_speed",
      "display": "Bat speed",
+     "short": "Bat speed",
      "unit": "mph",
      "direction": "higher",
      "set": "headline",
@@ -232,6 +238,7 @@
     {
      "id": "k_pct",
      "display": "K%",
+     "short": "K%",
      "unit": "%",
      "direction": "lower",
      "set": "headline",
@@ -258,6 +265,7 @@
     {
      "id": "bb_pct",
      "display": "BB%",
+     "short": "BB%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -284,6 +292,7 @@
     {
      "id": "chase_pct",
      "display": "Chase%",
+     "short": "Chase%",
      "unit": "%",
      "direction": "lower",
      "set": "headline",
@@ -310,6 +319,7 @@
     {
      "id": "sprint_speed",
      "display": "Sprint speed",
+     "short": "Sprint",
      "unit": "ft/s",
      "direction": "higher",
      "set": "headline",
@@ -336,6 +346,7 @@
     {
      "id": "xwoba_plus",
      "display": "xwOBA+",
+     "short": "xwOBA+",
      "unit": "wOBA scale",
      "direction": "higher",
      "set": "secondary",
@@ -362,6 +373,7 @@
     {
      "id": "xwoba_savant",
      "display": "xwOBA (Savant)",
+     "short": "xwOBA (Sav)",
      "unit": "wOBA scale",
      "direction": "higher",
      "set": "secondary",
@@ -388,6 +400,7 @@
     {
      "id": "xslg",
      "display": "xSLG",
+     "short": "xSLG",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -414,6 +427,7 @@
     {
      "id": "iso",
      "display": "ISO",
+     "short": "ISO",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -440,6 +454,7 @@
     {
      "id": "ev",
      "display": "Exit velocity",
+     "short": "Exit velo",
      "unit": "mph",
      "direction": "higher",
      "set": "secondary",
@@ -466,6 +481,7 @@
     {
      "id": "ev90",
      "display": "EV90",
+     "short": "EV90",
      "unit": "mph",
      "direction": "higher",
      "set": "secondary",
@@ -492,6 +508,7 @@
     {
      "id": "whiff_pct",
      "display": "Whiff%",
+     "short": "Whiff%",
      "unit": "%",
      "direction": "lower",
      "set": "secondary",
@@ -518,6 +535,7 @@
     {
      "id": "z_swing_pct",
      "display": "Z-Swing%",
+     "short": "Z-Swing%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -544,6 +562,7 @@
     {
      "id": "swstr_pct",
      "display": "SwStr%",
+     "short": "SwStr%",
      "unit": "%",
      "direction": "lower",
      "set": "secondary",
@@ -570,6 +589,7 @@
     {
      "id": "gb_pct",
      "display": "GB%",
+     "short": "GB%",
      "unit": "%",
      "direction": "lower",
      "set": "secondary",
@@ -596,6 +616,7 @@
     {
      "id": "pull_air_pct",
      "display": "Pull-air%",
+     "short": "Pull-air%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -622,6 +643,7 @@
     {
      "id": "obp",
      "display": "OBP",
+     "short": "OBP",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -648,6 +670,7 @@
     {
      "id": "slg",
      "display": "SLG",
+     "short": "SLG",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -674,6 +697,7 @@
     {
      "id": "avg",
      "display": "AVG",
+     "short": "AVG",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -700,6 +724,7 @@
     {
      "id": "babip",
      "display": "BABIP",
+     "short": "BABIP",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -726,6 +751,7 @@
     {
      "id": "dv100",
      "display": "Decision value /100",
+     "short": "Decision/100",
      "unit": "runs per 100 pitches",
      "direction": "higher",
      "set": "secondary",
@@ -752,6 +778,7 @@
     {
      "id": "xwobacon_plus",
      "display": "xwOBAcon+",
+     "short": "xwOBAcon+",
      "unit": "wOBA scale",
      "direction": "higher",
      "set": "secondary",
@@ -778,6 +805,7 @@
     {
      "id": "re24_pa",
      "display": "RE24/PA",
+     "short": "RE24/PA",
      "unit": "runs per PA",
      "direction": "higher",
      "set": "secondary",
@@ -804,6 +832,7 @@
     {
      "id": "sq_contact",
      "display": "Squared-up%",
+     "short": "Squared-up%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -830,6 +859,7 @@
     {
      "id": "swing_length",
      "display": "Swing length",
+     "short": "Swing length",
      "unit": "ft",
      "direction": "lower",
      "set": "secondary",
@@ -856,6 +886,7 @@
     {
      "id": "bsr",
      "display": "Baserunning runs",
+     "short": "BsR",
      "unit": "runs",
      "direction": "higher",
      "set": "secondary",
@@ -882,6 +913,7 @@
     {
      "id": "oaa",
      "display": "OAA",
+     "short": "OAA",
      "unit": "outs",
      "direction": "higher",
      "set": "secondary",
@@ -908,6 +940,7 @@
     {
      "id": "fielding_runs",
      "display": "Fielding runs",
+     "short": "Fielding",
      "unit": "runs",
      "direction": "higher",
      "set": "secondary",
@@ -934,6 +967,7 @@
     {
      "id": "war",
      "display": "WAR",
+     "short": "WAR",
      "unit": "wins",
      "direction": "higher",
      "set": "secondary",
@@ -960,6 +994,7 @@
     {
      "id": "sra",
      "display": "OAA per chance",
+     "short": "OAA/ch",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -986,6 +1021,7 @@
     {
      "id": "arm",
      "display": "Arm strength",
+     "short": "Arm",
      "unit": "mph",
      "direction": "higher",
      "set": "secondary",
@@ -1051,6 +1087,7 @@
     {
      "id": "xwoba_n",
      "display": "xwOBA+ (park-neutral)",
+     "short": "xwOBA+ (PN)",
      "unit": "wOBA scale",
      "direction": "higher",
      "set": "headline",
@@ -1077,6 +1114,7 @@
     {
      "id": "woba",
      "display": "wOBA",
+     "short": "wOBA",
      "unit": "wOBA scale",
      "direction": "higher",
      "set": "headline",
@@ -1103,6 +1141,7 @@
     {
      "id": "war_600",
      "display": "WAR/600",
+     "short": "WAR/600",
      "unit": "wins per 600 PA",
      "direction": "higher",
      "set": "headline",
@@ -1129,6 +1168,7 @@
     {
      "id": "framing_rate",
      "display": "Framing (strikes added)",
+     "short": "Framing",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -1155,6 +1195,7 @@
     {
      "id": "barrel_pct",
      "display": "Barrel%",
+     "short": "Barrel%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -1181,6 +1222,7 @@
     {
      "id": "hard_pct",
      "display": "Hard-hit%",
+     "short": "Hard-hit%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -1207,6 +1249,7 @@
     {
      "id": "k_pct",
      "display": "K%",
+     "short": "K%",
      "unit": "%",
      "direction": "lower",
      "set": "headline",
@@ -1233,6 +1276,7 @@
     {
      "id": "bb_pct",
      "display": "BB%",
+     "short": "BB%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -1259,6 +1303,7 @@
     {
      "id": "chase_pct",
      "display": "Chase%",
+     "short": "Chase%",
      "unit": "%",
      "direction": "lower",
      "set": "headline",
@@ -1285,6 +1330,7 @@
     {
      "id": "framing_runs",
      "display": "Framing runs",
+     "short": "Framing runs",
      "unit": "runs",
      "direction": "higher",
      "set": "secondary",
@@ -1311,6 +1357,7 @@
     {
      "id": "framing_savant",
      "display": "Framing runs (Savant)",
+     "short": "Framing Sav",
      "unit": "runs",
      "direction": "higher",
      "set": "secondary",
@@ -1335,6 +1382,7 @@
     {
      "id": "xwoba_plus",
      "display": "xwOBA+",
+     "short": "xwOBA+",
      "unit": "wOBA scale",
      "direction": "higher",
      "set": "secondary",
@@ -1361,6 +1409,7 @@
     {
      "id": "xwoba_savant",
      "display": "xwOBA (Savant)",
+     "short": "xwOBA (Sav)",
      "unit": "wOBA scale",
      "direction": "higher",
      "set": "secondary",
@@ -1387,6 +1436,7 @@
     {
      "id": "xslg",
      "display": "xSLG",
+     "short": "xSLG",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -1413,6 +1463,7 @@
     {
      "id": "iso",
      "display": "ISO",
+     "short": "ISO",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -1439,6 +1490,7 @@
     {
      "id": "ev",
      "display": "Exit velocity",
+     "short": "Exit velo",
      "unit": "mph",
      "direction": "higher",
      "set": "secondary",
@@ -1465,6 +1517,7 @@
     {
      "id": "ev90",
      "display": "EV90",
+     "short": "EV90",
      "unit": "mph",
      "direction": "higher",
      "set": "secondary",
@@ -1491,6 +1544,7 @@
     {
      "id": "whiff_pct",
      "display": "Whiff%",
+     "short": "Whiff%",
      "unit": "%",
      "direction": "lower",
      "set": "secondary",
@@ -1517,6 +1571,7 @@
     {
      "id": "z_swing_pct",
      "display": "Z-Swing%",
+     "short": "Z-Swing%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -1543,6 +1598,7 @@
     {
      "id": "swstr_pct",
      "display": "SwStr%",
+     "short": "SwStr%",
      "unit": "%",
      "direction": "lower",
      "set": "secondary",
@@ -1569,6 +1625,7 @@
     {
      "id": "gb_pct",
      "display": "GB%",
+     "short": "GB%",
      "unit": "%",
      "direction": "lower",
      "set": "secondary",
@@ -1595,6 +1652,7 @@
     {
      "id": "pull_air_pct",
      "display": "Pull-air%",
+     "short": "Pull-air%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -1621,6 +1679,7 @@
     {
      "id": "obp",
      "display": "OBP",
+     "short": "OBP",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -1647,6 +1706,7 @@
     {
      "id": "slg",
      "display": "SLG",
+     "short": "SLG",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -1673,6 +1733,7 @@
     {
      "id": "avg",
      "display": "AVG",
+     "short": "AVG",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -1699,6 +1760,7 @@
     {
      "id": "babip",
      "display": "BABIP",
+     "short": "BABIP",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -1725,6 +1787,7 @@
     {
      "id": "dv100",
      "display": "Decision value /100",
+     "short": "Decision/100",
      "unit": "runs per 100 pitches",
      "direction": "higher",
      "set": "secondary",
@@ -1751,6 +1814,7 @@
     {
      "id": "xwobacon_plus",
      "display": "xwOBAcon+",
+     "short": "xwOBAcon+",
      "unit": "wOBA scale",
      "direction": "higher",
      "set": "secondary",
@@ -1777,6 +1841,7 @@
     {
      "id": "re24_pa",
      "display": "RE24/PA",
+     "short": "RE24/PA",
      "unit": "runs per PA",
      "direction": "higher",
      "set": "secondary",
@@ -1803,6 +1868,7 @@
     {
      "id": "sq_contact",
      "display": "Squared-up%",
+     "short": "Squared-up%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -1829,6 +1895,7 @@
     {
      "id": "swing_length",
      "display": "Swing length",
+     "short": "Swing length",
      "unit": "ft",
      "direction": "lower",
      "set": "secondary",
@@ -1855,6 +1922,7 @@
     {
      "id": "bsr",
      "display": "Baserunning runs",
+     "short": "BsR",
      "unit": "runs",
      "direction": "higher",
      "set": "secondary",
@@ -1881,6 +1949,7 @@
     {
      "id": "oaa",
      "display": "OAA",
+     "short": "OAA",
      "unit": "outs",
      "direction": "higher",
      "set": "secondary",
@@ -1907,6 +1976,7 @@
     {
      "id": "fielding_runs",
      "display": "Fielding runs",
+     "short": "Fielding",
      "unit": "runs",
      "direction": "higher",
      "set": "secondary",
@@ -1933,6 +2003,7 @@
     {
      "id": "war",
      "display": "WAR",
+     "short": "WAR",
      "unit": "wins",
      "direction": "higher",
      "set": "secondary",
@@ -1959,6 +2030,7 @@
     {
      "id": "bat_speed",
      "display": "Bat speed",
+     "short": "Bat speed",
      "unit": "mph",
      "direction": "higher",
      "set": "secondary",
@@ -1985,6 +2057,7 @@
     {
      "id": "sprint_speed",
      "display": "Sprint speed",
+     "short": "Sprint",
      "unit": "ft/s",
      "direction": "higher",
      "set": "secondary",
@@ -2094,6 +2167,7 @@
     {
      "id": "xwoba_n",
      "display": "xwOBA+ (park-neutral)",
+     "short": "xwOBA+ (PN)",
      "unit": "wOBA scale",
      "direction": "higher",
      "set": "headline",
@@ -2120,6 +2194,7 @@
     {
      "id": "woba",
      "display": "wOBA",
+     "short": "wOBA",
      "unit": "wOBA scale",
      "direction": "higher",
      "set": "headline",
@@ -2146,6 +2221,7 @@
     {
      "id": "war_600",
      "display": "WAR/600",
+     "short": "WAR/600",
      "unit": "wins per 600 PA",
      "direction": "higher",
      "set": "headline",
@@ -2172,6 +2248,7 @@
     {
      "id": "barrel_pct",
      "display": "Barrel%",
+     "short": "Barrel%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -2198,6 +2275,7 @@
     {
      "id": "hard_pct",
      "display": "Hard-hit%",
+     "short": "Hard-hit%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -2224,6 +2302,7 @@
     {
      "id": "bat_speed",
      "display": "Bat speed",
+     "short": "Bat speed",
      "unit": "mph",
      "direction": "higher",
      "set": "headline",
@@ -2250,6 +2329,7 @@
     {
      "id": "k_pct",
      "display": "K%",
+     "short": "K%",
      "unit": "%",
      "direction": "lower",
      "set": "headline",
@@ -2276,6 +2356,7 @@
     {
      "id": "bb_pct",
      "display": "BB%",
+     "short": "BB%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -2302,6 +2383,7 @@
     {
      "id": "chase_pct",
      "display": "Chase%",
+     "short": "Chase%",
      "unit": "%",
      "direction": "lower",
      "set": "headline",
@@ -2328,6 +2410,7 @@
     {
      "id": "sra",
      "display": "OAA per chance",
+     "short": "OAA/ch",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -2354,6 +2437,7 @@
     {
      "id": "xwoba_plus",
      "display": "xwOBA+",
+     "short": "xwOBA+",
      "unit": "wOBA scale",
      "direction": "higher",
      "set": "secondary",
@@ -2380,6 +2464,7 @@
     {
      "id": "xwoba_savant",
      "display": "xwOBA (Savant)",
+     "short": "xwOBA (Sav)",
      "unit": "wOBA scale",
      "direction": "higher",
      "set": "secondary",
@@ -2406,6 +2491,7 @@
     {
      "id": "xslg",
      "display": "xSLG",
+     "short": "xSLG",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -2432,6 +2518,7 @@
     {
      "id": "iso",
      "display": "ISO",
+     "short": "ISO",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -2458,6 +2545,7 @@
     {
      "id": "ev",
      "display": "Exit velocity",
+     "short": "Exit velo",
      "unit": "mph",
      "direction": "higher",
      "set": "secondary",
@@ -2484,6 +2572,7 @@
     {
      "id": "ev90",
      "display": "EV90",
+     "short": "EV90",
      "unit": "mph",
      "direction": "higher",
      "set": "secondary",
@@ -2510,6 +2599,7 @@
     {
      "id": "whiff_pct",
      "display": "Whiff%",
+     "short": "Whiff%",
      "unit": "%",
      "direction": "lower",
      "set": "secondary",
@@ -2536,6 +2626,7 @@
     {
      "id": "z_swing_pct",
      "display": "Z-Swing%",
+     "short": "Z-Swing%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -2562,6 +2653,7 @@
     {
      "id": "swstr_pct",
      "display": "SwStr%",
+     "short": "SwStr%",
      "unit": "%",
      "direction": "lower",
      "set": "secondary",
@@ -2588,6 +2680,7 @@
     {
      "id": "gb_pct",
      "display": "GB%",
+     "short": "GB%",
      "unit": "%",
      "direction": "lower",
      "set": "secondary",
@@ -2614,6 +2707,7 @@
     {
      "id": "pull_air_pct",
      "display": "Pull-air%",
+     "short": "Pull-air%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -2640,6 +2734,7 @@
     {
      "id": "obp",
      "display": "OBP",
+     "short": "OBP",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -2666,6 +2761,7 @@
     {
      "id": "slg",
      "display": "SLG",
+     "short": "SLG",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -2692,6 +2788,7 @@
     {
      "id": "avg",
      "display": "AVG",
+     "short": "AVG",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -2718,6 +2815,7 @@
     {
      "id": "babip",
      "display": "BABIP",
+     "short": "BABIP",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -2744,6 +2842,7 @@
     {
      "id": "dv100",
      "display": "Decision value /100",
+     "short": "Decision/100",
      "unit": "runs per 100 pitches",
      "direction": "higher",
      "set": "secondary",
@@ -2770,6 +2869,7 @@
     {
      "id": "xwobacon_plus",
      "display": "xwOBAcon+",
+     "short": "xwOBAcon+",
      "unit": "wOBA scale",
      "direction": "higher",
      "set": "secondary",
@@ -2796,6 +2896,7 @@
     {
      "id": "re24_pa",
      "display": "RE24/PA",
+     "short": "RE24/PA",
      "unit": "runs per PA",
      "direction": "higher",
      "set": "secondary",
@@ -2822,6 +2923,7 @@
     {
      "id": "sq_contact",
      "display": "Squared-up%",
+     "short": "Squared-up%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -2848,6 +2950,7 @@
     {
      "id": "swing_length",
      "display": "Swing length",
+     "short": "Swing length",
      "unit": "ft",
      "direction": "lower",
      "set": "secondary",
@@ -2874,6 +2977,7 @@
     {
      "id": "bsr",
      "display": "Baserunning runs",
+     "short": "BsR",
      "unit": "runs",
      "direction": "higher",
      "set": "secondary",
@@ -2900,6 +3004,7 @@
     {
      "id": "oaa",
      "display": "OAA",
+     "short": "OAA",
      "unit": "outs",
      "direction": "higher",
      "set": "secondary",
@@ -2926,6 +3031,7 @@
     {
      "id": "fielding_runs",
      "display": "Fielding runs",
+     "short": "Fielding",
      "unit": "runs",
      "direction": "higher",
      "set": "secondary",
@@ -2952,6 +3058,7 @@
     {
      "id": "war",
      "display": "WAR",
+     "short": "WAR",
      "unit": "wins",
      "direction": "higher",
      "set": "secondary",
@@ -2978,6 +3085,7 @@
     {
      "id": "sprint_speed",
      "display": "Sprint speed",
+     "short": "Sprint",
      "unit": "ft/s",
      "direction": "higher",
      "set": "secondary",
@@ -3091,6 +3199,7 @@
     {
      "id": "xwoba_n",
      "display": "xwOBA+ (park-neutral)",
+     "short": "xwOBA+ (PN)",
      "unit": "wOBA scale",
      "direction": "higher",
      "set": "headline",
@@ -3117,6 +3226,7 @@
     {
      "id": "woba",
      "display": "wOBA",
+     "short": "wOBA",
      "unit": "wOBA scale",
      "direction": "higher",
      "set": "headline",
@@ -3143,6 +3253,7 @@
     {
      "id": "war_600",
      "display": "WAR/600",
+     "short": "WAR/600",
      "unit": "wins per 600 PA",
      "direction": "higher",
      "set": "headline",
@@ -3169,6 +3280,7 @@
     {
      "id": "sra",
      "display": "OAA per chance",
+     "short": "OAA/ch",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -3195,6 +3307,7 @@
     {
      "id": "sprint_speed",
      "display": "Sprint speed",
+     "short": "Sprint",
      "unit": "ft/s",
      "direction": "higher",
      "set": "headline",
@@ -3221,6 +3334,7 @@
     {
      "id": "barrel_pct",
      "display": "Barrel%",
+     "short": "Barrel%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -3247,6 +3361,7 @@
     {
      "id": "hard_pct",
      "display": "Hard-hit%",
+     "short": "Hard-hit%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -3273,6 +3388,7 @@
     {
      "id": "k_pct",
      "display": "K%",
+     "short": "K%",
      "unit": "%",
      "direction": "lower",
      "set": "headline",
@@ -3299,6 +3415,7 @@
     {
      "id": "bb_pct",
      "display": "BB%",
+     "short": "BB%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -3325,6 +3442,7 @@
     {
      "id": "chase_pct",
      "display": "Chase%",
+     "short": "Chase%",
      "unit": "%",
      "direction": "lower",
      "set": "headline",
@@ -3351,6 +3469,7 @@
     {
      "id": "xwoba_plus",
      "display": "xwOBA+",
+     "short": "xwOBA+",
      "unit": "wOBA scale",
      "direction": "higher",
      "set": "secondary",
@@ -3377,6 +3496,7 @@
     {
      "id": "xwoba_savant",
      "display": "xwOBA (Savant)",
+     "short": "xwOBA (Sav)",
      "unit": "wOBA scale",
      "direction": "higher",
      "set": "secondary",
@@ -3403,6 +3523,7 @@
     {
      "id": "xslg",
      "display": "xSLG",
+     "short": "xSLG",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -3429,6 +3550,7 @@
     {
      "id": "iso",
      "display": "ISO",
+     "short": "ISO",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -3455,6 +3577,7 @@
     {
      "id": "ev",
      "display": "Exit velocity",
+     "short": "Exit velo",
      "unit": "mph",
      "direction": "higher",
      "set": "secondary",
@@ -3481,6 +3604,7 @@
     {
      "id": "ev90",
      "display": "EV90",
+     "short": "EV90",
      "unit": "mph",
      "direction": "higher",
      "set": "secondary",
@@ -3507,6 +3631,7 @@
     {
      "id": "whiff_pct",
      "display": "Whiff%",
+     "short": "Whiff%",
      "unit": "%",
      "direction": "lower",
      "set": "secondary",
@@ -3533,6 +3658,7 @@
     {
      "id": "z_swing_pct",
      "display": "Z-Swing%",
+     "short": "Z-Swing%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -3559,6 +3685,7 @@
     {
      "id": "swstr_pct",
      "display": "SwStr%",
+     "short": "SwStr%",
      "unit": "%",
      "direction": "lower",
      "set": "secondary",
@@ -3585,6 +3712,7 @@
     {
      "id": "gb_pct",
      "display": "GB%",
+     "short": "GB%",
      "unit": "%",
      "direction": "lower",
      "set": "secondary",
@@ -3611,6 +3739,7 @@
     {
      "id": "pull_air_pct",
      "display": "Pull-air%",
+     "short": "Pull-air%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -3637,6 +3766,7 @@
     {
      "id": "obp",
      "display": "OBP",
+     "short": "OBP",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -3663,6 +3793,7 @@
     {
      "id": "slg",
      "display": "SLG",
+     "short": "SLG",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -3689,6 +3820,7 @@
     {
      "id": "avg",
      "display": "AVG",
+     "short": "AVG",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -3715,6 +3847,7 @@
     {
      "id": "babip",
      "display": "BABIP",
+     "short": "BABIP",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -3741,6 +3874,7 @@
     {
      "id": "dv100",
      "display": "Decision value /100",
+     "short": "Decision/100",
      "unit": "runs per 100 pitches",
      "direction": "higher",
      "set": "secondary",
@@ -3767,6 +3901,7 @@
     {
      "id": "xwobacon_plus",
      "display": "xwOBAcon+",
+     "short": "xwOBAcon+",
      "unit": "wOBA scale",
      "direction": "higher",
      "set": "secondary",
@@ -3793,6 +3928,7 @@
     {
      "id": "re24_pa",
      "display": "RE24/PA",
+     "short": "RE24/PA",
      "unit": "runs per PA",
      "direction": "higher",
      "set": "secondary",
@@ -3819,6 +3955,7 @@
     {
      "id": "sq_contact",
      "display": "Squared-up%",
+     "short": "Squared-up%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -3845,6 +3982,7 @@
     {
      "id": "swing_length",
      "display": "Swing length",
+     "short": "Swing length",
      "unit": "ft",
      "direction": "lower",
      "set": "secondary",
@@ -3871,6 +4009,7 @@
     {
      "id": "bsr",
      "display": "Baserunning runs",
+     "short": "BsR",
      "unit": "runs",
      "direction": "higher",
      "set": "secondary",
@@ -3897,6 +4036,7 @@
     {
      "id": "oaa",
      "display": "OAA",
+     "short": "OAA",
      "unit": "outs",
      "direction": "higher",
      "set": "secondary",
@@ -3923,6 +4063,7 @@
     {
      "id": "fielding_runs",
      "display": "Fielding runs",
+     "short": "Fielding",
      "unit": "runs",
      "direction": "higher",
      "set": "secondary",
@@ -3949,6 +4090,7 @@
     {
      "id": "war",
      "display": "WAR",
+     "short": "WAR",
      "unit": "wins",
      "direction": "higher",
      "set": "secondary",
@@ -3975,6 +4117,7 @@
     {
      "id": "bat_speed",
      "display": "Bat speed",
+     "short": "Bat speed",
      "unit": "mph",
      "direction": "higher",
      "set": "secondary",
@@ -4001,6 +4144,7 @@
     {
      "id": "arm",
      "display": "Arm strength",
+     "short": "Arm",
      "unit": "mph",
      "direction": "higher",
      "set": "secondary",
@@ -4111,6 +4255,7 @@
     {
      "id": "xwoba_n",
      "display": "xwOBA+ (park-neutral)",
+     "short": "xwOBA+ (PN)",
      "unit": "wOBA scale",
      "direction": "higher",
      "set": "headline",
@@ -4137,6 +4282,7 @@
     {
      "id": "woba",
      "display": "wOBA",
+     "short": "wOBA",
      "unit": "wOBA scale",
      "direction": "higher",
      "set": "headline",
@@ -4163,6 +4309,7 @@
     {
      "id": "war_600",
      "display": "WAR/600",
+     "short": "WAR/600",
      "unit": "wins per 600 PA",
      "direction": "higher",
      "set": "headline",
@@ -4189,6 +4336,7 @@
     {
      "id": "sra",
      "display": "OAA per chance",
+     "short": "OAA/ch",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -4215,6 +4363,7 @@
     {
      "id": "arm",
      "display": "Arm strength",
+     "short": "Arm",
      "unit": "mph",
      "direction": "higher",
      "set": "headline",
@@ -4241,6 +4390,7 @@
     {
      "id": "barrel_pct",
      "display": "Barrel%",
+     "short": "Barrel%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -4267,6 +4417,7 @@
     {
      "id": "hard_pct",
      "display": "Hard-hit%",
+     "short": "Hard-hit%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -4293,6 +4444,7 @@
     {
      "id": "k_pct",
      "display": "K%",
+     "short": "K%",
      "unit": "%",
      "direction": "lower",
      "set": "headline",
@@ -4319,6 +4471,7 @@
     {
      "id": "bb_pct",
      "display": "BB%",
+     "short": "BB%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -4345,6 +4498,7 @@
     {
      "id": "chase_pct",
      "display": "Chase%",
+     "short": "Chase%",
      "unit": "%",
      "direction": "lower",
      "set": "headline",
@@ -4371,6 +4525,7 @@
     {
      "id": "xwoba_plus",
      "display": "xwOBA+",
+     "short": "xwOBA+",
      "unit": "wOBA scale",
      "direction": "higher",
      "set": "secondary",
@@ -4397,6 +4552,7 @@
     {
      "id": "xwoba_savant",
      "display": "xwOBA (Savant)",
+     "short": "xwOBA (Sav)",
      "unit": "wOBA scale",
      "direction": "higher",
      "set": "secondary",
@@ -4423,6 +4579,7 @@
     {
      "id": "xslg",
      "display": "xSLG",
+     "short": "xSLG",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -4449,6 +4606,7 @@
     {
      "id": "iso",
      "display": "ISO",
+     "short": "ISO",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -4475,6 +4633,7 @@
     {
      "id": "ev",
      "display": "Exit velocity",
+     "short": "Exit velo",
      "unit": "mph",
      "direction": "higher",
      "set": "secondary",
@@ -4501,6 +4660,7 @@
     {
      "id": "ev90",
      "display": "EV90",
+     "short": "EV90",
      "unit": "mph",
      "direction": "higher",
      "set": "secondary",
@@ -4527,6 +4687,7 @@
     {
      "id": "whiff_pct",
      "display": "Whiff%",
+     "short": "Whiff%",
      "unit": "%",
      "direction": "lower",
      "set": "secondary",
@@ -4553,6 +4714,7 @@
     {
      "id": "z_swing_pct",
      "display": "Z-Swing%",
+     "short": "Z-Swing%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -4579,6 +4741,7 @@
     {
      "id": "swstr_pct",
      "display": "SwStr%",
+     "short": "SwStr%",
      "unit": "%",
      "direction": "lower",
      "set": "secondary",
@@ -4605,6 +4768,7 @@
     {
      "id": "gb_pct",
      "display": "GB%",
+     "short": "GB%",
      "unit": "%",
      "direction": "lower",
      "set": "secondary",
@@ -4631,6 +4795,7 @@
     {
      "id": "pull_air_pct",
      "display": "Pull-air%",
+     "short": "Pull-air%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -4657,6 +4822,7 @@
     {
      "id": "obp",
      "display": "OBP",
+     "short": "OBP",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -4683,6 +4849,7 @@
     {
      "id": "slg",
      "display": "SLG",
+     "short": "SLG",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -4709,6 +4876,7 @@
     {
      "id": "avg",
      "display": "AVG",
+     "short": "AVG",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -4735,6 +4903,7 @@
     {
      "id": "babip",
      "display": "BABIP",
+     "short": "BABIP",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -4761,6 +4930,7 @@
     {
      "id": "dv100",
      "display": "Decision value /100",
+     "short": "Decision/100",
      "unit": "runs per 100 pitches",
      "direction": "higher",
      "set": "secondary",
@@ -4787,6 +4957,7 @@
     {
      "id": "xwobacon_plus",
      "display": "xwOBAcon+",
+     "short": "xwOBAcon+",
      "unit": "wOBA scale",
      "direction": "higher",
      "set": "secondary",
@@ -4813,6 +4984,7 @@
     {
      "id": "re24_pa",
      "display": "RE24/PA",
+     "short": "RE24/PA",
      "unit": "runs per PA",
      "direction": "higher",
      "set": "secondary",
@@ -4839,6 +5011,7 @@
     {
      "id": "sq_contact",
      "display": "Squared-up%",
+     "short": "Squared-up%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -4865,6 +5038,7 @@
     {
      "id": "swing_length",
      "display": "Swing length",
+     "short": "Swing length",
      "unit": "ft",
      "direction": "lower",
      "set": "secondary",
@@ -4891,6 +5065,7 @@
     {
      "id": "bsr",
      "display": "Baserunning runs",
+     "short": "BsR",
      "unit": "runs",
      "direction": "higher",
      "set": "secondary",
@@ -4917,6 +5092,7 @@
     {
      "id": "oaa",
      "display": "OAA",
+     "short": "OAA",
      "unit": "outs",
      "direction": "higher",
      "set": "secondary",
@@ -4943,6 +5119,7 @@
     {
      "id": "fielding_runs",
      "display": "Fielding runs",
+     "short": "Fielding",
      "unit": "runs",
      "direction": "higher",
      "set": "secondary",
@@ -4969,6 +5146,7 @@
     {
      "id": "war",
      "display": "WAR",
+     "short": "WAR",
      "unit": "wins",
      "direction": "higher",
      "set": "secondary",
@@ -4995,6 +5173,7 @@
     {
      "id": "bat_speed",
      "display": "Bat speed",
+     "short": "Bat speed",
      "unit": "mph",
      "direction": "higher",
      "set": "secondary",
@@ -5021,6 +5200,7 @@
     {
      "id": "sprint_speed",
      "display": "Sprint speed",
+     "short": "Sprint",
      "unit": "ft/s",
      "direction": "higher",
      "set": "secondary",
@@ -5129,6 +5309,7 @@
     {
      "id": "xwoba_n",
      "display": "xwOBA+ (park-neutral)",
+     "short": "xwOBA+ (PN)",
      "unit": "wOBA scale",
      "direction": "higher",
      "set": "headline",
@@ -5155,6 +5336,7 @@
     {
      "id": "woba",
      "display": "wOBA",
+     "short": "wOBA",
      "unit": "wOBA scale",
      "direction": "higher",
      "set": "headline",
@@ -5181,6 +5363,7 @@
     {
      "id": "war_600",
      "display": "WAR/600",
+     "short": "WAR/600",
      "unit": "wins per 600 PA",
      "direction": "higher",
      "set": "headline",
@@ -5207,6 +5390,7 @@
     {
      "id": "sra",
      "display": "OAA per chance",
+     "short": "OAA/ch",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -5233,6 +5417,7 @@
     {
      "id": "arm",
      "display": "Arm strength",
+     "short": "Arm",
      "unit": "mph",
      "direction": "higher",
      "set": "headline",
@@ -5259,6 +5444,7 @@
     {
      "id": "sprint_speed",
      "display": "Sprint speed",
+     "short": "Sprint",
      "unit": "ft/s",
      "direction": "higher",
      "set": "headline",
@@ -5285,6 +5471,7 @@
     {
      "id": "barrel_pct",
      "display": "Barrel%",
+     "short": "Barrel%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -5311,6 +5498,7 @@
     {
      "id": "k_pct",
      "display": "K%",
+     "short": "K%",
      "unit": "%",
      "direction": "lower",
      "set": "headline",
@@ -5337,6 +5525,7 @@
     {
      "id": "bb_pct",
      "display": "BB%",
+     "short": "BB%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -5363,6 +5552,7 @@
     {
      "id": "chase_pct",
      "display": "Chase%",
+     "short": "Chase%",
      "unit": "%",
      "direction": "lower",
      "set": "headline",
@@ -5389,6 +5579,7 @@
     {
      "id": "xwoba_plus",
      "display": "xwOBA+",
+     "short": "xwOBA+",
      "unit": "wOBA scale",
      "direction": "higher",
      "set": "secondary",
@@ -5415,6 +5606,7 @@
     {
      "id": "xwoba_savant",
      "display": "xwOBA (Savant)",
+     "short": "xwOBA (Sav)",
      "unit": "wOBA scale",
      "direction": "higher",
      "set": "secondary",
@@ -5441,6 +5633,7 @@
     {
      "id": "xslg",
      "display": "xSLG",
+     "short": "xSLG",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -5467,6 +5660,7 @@
     {
      "id": "iso",
      "display": "ISO",
+     "short": "ISO",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -5493,6 +5687,7 @@
     {
      "id": "ev",
      "display": "Exit velocity",
+     "short": "Exit velo",
      "unit": "mph",
      "direction": "higher",
      "set": "secondary",
@@ -5519,6 +5714,7 @@
     {
      "id": "ev90",
      "display": "EV90",
+     "short": "EV90",
      "unit": "mph",
      "direction": "higher",
      "set": "secondary",
@@ -5545,6 +5741,7 @@
     {
      "id": "whiff_pct",
      "display": "Whiff%",
+     "short": "Whiff%",
      "unit": "%",
      "direction": "lower",
      "set": "secondary",
@@ -5571,6 +5768,7 @@
     {
      "id": "z_swing_pct",
      "display": "Z-Swing%",
+     "short": "Z-Swing%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -5597,6 +5795,7 @@
     {
      "id": "swstr_pct",
      "display": "SwStr%",
+     "short": "SwStr%",
      "unit": "%",
      "direction": "lower",
      "set": "secondary",
@@ -5623,6 +5822,7 @@
     {
      "id": "gb_pct",
      "display": "GB%",
+     "short": "GB%",
      "unit": "%",
      "direction": "lower",
      "set": "secondary",
@@ -5649,6 +5849,7 @@
     {
      "id": "pull_air_pct",
      "display": "Pull-air%",
+     "short": "Pull-air%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -5675,6 +5876,7 @@
     {
      "id": "obp",
      "display": "OBP",
+     "short": "OBP",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -5701,6 +5903,7 @@
     {
      "id": "slg",
      "display": "SLG",
+     "short": "SLG",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -5727,6 +5930,7 @@
     {
      "id": "avg",
      "display": "AVG",
+     "short": "AVG",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -5753,6 +5957,7 @@
     {
      "id": "babip",
      "display": "BABIP",
+     "short": "BABIP",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -5779,6 +5984,7 @@
     {
      "id": "dv100",
      "display": "Decision value /100",
+     "short": "Decision/100",
      "unit": "runs per 100 pitches",
      "direction": "higher",
      "set": "secondary",
@@ -5805,6 +6011,7 @@
     {
      "id": "xwobacon_plus",
      "display": "xwOBAcon+",
+     "short": "xwOBAcon+",
      "unit": "wOBA scale",
      "direction": "higher",
      "set": "secondary",
@@ -5831,6 +6038,7 @@
     {
      "id": "re24_pa",
      "display": "RE24/PA",
+     "short": "RE24/PA",
      "unit": "runs per PA",
      "direction": "higher",
      "set": "secondary",
@@ -5857,6 +6065,7 @@
     {
      "id": "sq_contact",
      "display": "Squared-up%",
+     "short": "Squared-up%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -5883,6 +6092,7 @@
     {
      "id": "swing_length",
      "display": "Swing length",
+     "short": "Swing length",
      "unit": "ft",
      "direction": "lower",
      "set": "secondary",
@@ -5909,6 +6119,7 @@
     {
      "id": "bsr",
      "display": "Baserunning runs",
+     "short": "BsR",
      "unit": "runs",
      "direction": "higher",
      "set": "secondary",
@@ -5935,6 +6146,7 @@
     {
      "id": "oaa",
      "display": "OAA",
+     "short": "OAA",
      "unit": "outs",
      "direction": "higher",
      "set": "secondary",
@@ -5961,6 +6173,7 @@
     {
      "id": "fielding_runs",
      "display": "Fielding runs",
+     "short": "Fielding",
      "unit": "runs",
      "direction": "higher",
      "set": "secondary",
@@ -5987,6 +6200,7 @@
     {
      "id": "war",
      "display": "WAR",
+     "short": "WAR",
      "unit": "wins",
      "direction": "higher",
      "set": "secondary",
@@ -6013,6 +6227,7 @@
     {
      "id": "hard_pct",
      "display": "Hard-hit%",
+     "short": "Hard-hit%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -6039,6 +6254,7 @@
     {
      "id": "bat_speed",
      "display": "Bat speed",
+     "short": "Bat speed",
      "unit": "mph",
      "direction": "higher",
      "set": "secondary",
@@ -6148,6 +6364,7 @@
     {
      "id": "xwoba_n",
      "display": "xwOBA+ (park-neutral)",
+     "short": "xwOBA+ (PN)",
      "unit": "wOBA scale",
      "direction": "higher",
      "set": "headline",
@@ -6174,6 +6391,7 @@
     {
      "id": "woba",
      "display": "wOBA",
+     "short": "wOBA",
      "unit": "wOBA scale",
      "direction": "higher",
      "set": "headline",
@@ -6200,6 +6418,7 @@
     {
      "id": "war_600",
      "display": "WAR/600",
+     "short": "WAR/600",
      "unit": "wins per 600 PA",
      "direction": "higher",
      "set": "headline",
@@ -6226,6 +6445,7 @@
     {
      "id": "sra",
      "display": "OAA per chance",
+     "short": "OAA/ch",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -6252,6 +6472,7 @@
     {
      "id": "sprint_speed",
      "display": "Sprint speed",
+     "short": "Sprint",
      "unit": "ft/s",
      "direction": "higher",
      "set": "headline",
@@ -6278,6 +6499,7 @@
     {
      "id": "arm",
      "display": "Arm strength",
+     "short": "Arm",
      "unit": "mph",
      "direction": "higher",
      "set": "headline",
@@ -6304,6 +6526,7 @@
     {
      "id": "barrel_pct",
      "display": "Barrel%",
+     "short": "Barrel%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -6330,6 +6553,7 @@
     {
      "id": "k_pct",
      "display": "K%",
+     "short": "K%",
      "unit": "%",
      "direction": "lower",
      "set": "headline",
@@ -6356,6 +6580,7 @@
     {
      "id": "bb_pct",
      "display": "BB%",
+     "short": "BB%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -6382,6 +6607,7 @@
     {
      "id": "chase_pct",
      "display": "Chase%",
+     "short": "Chase%",
      "unit": "%",
      "direction": "lower",
      "set": "headline",
@@ -6408,6 +6634,7 @@
     {
      "id": "xwoba_plus",
      "display": "xwOBA+",
+     "short": "xwOBA+",
      "unit": "wOBA scale",
      "direction": "higher",
      "set": "secondary",
@@ -6434,6 +6661,7 @@
     {
      "id": "xwoba_savant",
      "display": "xwOBA (Savant)",
+     "short": "xwOBA (Sav)",
      "unit": "wOBA scale",
      "direction": "higher",
      "set": "secondary",
@@ -6460,6 +6688,7 @@
     {
      "id": "xslg",
      "display": "xSLG",
+     "short": "xSLG",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -6486,6 +6715,7 @@
     {
      "id": "iso",
      "display": "ISO",
+     "short": "ISO",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -6512,6 +6742,7 @@
     {
      "id": "ev",
      "display": "Exit velocity",
+     "short": "Exit velo",
      "unit": "mph",
      "direction": "higher",
      "set": "secondary",
@@ -6538,6 +6769,7 @@
     {
      "id": "ev90",
      "display": "EV90",
+     "short": "EV90",
      "unit": "mph",
      "direction": "higher",
      "set": "secondary",
@@ -6564,6 +6796,7 @@
     {
      "id": "whiff_pct",
      "display": "Whiff%",
+     "short": "Whiff%",
      "unit": "%",
      "direction": "lower",
      "set": "secondary",
@@ -6590,6 +6823,7 @@
     {
      "id": "z_swing_pct",
      "display": "Z-Swing%",
+     "short": "Z-Swing%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -6616,6 +6850,7 @@
     {
      "id": "swstr_pct",
      "display": "SwStr%",
+     "short": "SwStr%",
      "unit": "%",
      "direction": "lower",
      "set": "secondary",
@@ -6642,6 +6877,7 @@
     {
      "id": "gb_pct",
      "display": "GB%",
+     "short": "GB%",
      "unit": "%",
      "direction": "lower",
      "set": "secondary",
@@ -6668,6 +6904,7 @@
     {
      "id": "pull_air_pct",
      "display": "Pull-air%",
+     "short": "Pull-air%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -6694,6 +6931,7 @@
     {
      "id": "obp",
      "display": "OBP",
+     "short": "OBP",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -6720,6 +6958,7 @@
     {
      "id": "slg",
      "display": "SLG",
+     "short": "SLG",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -6746,6 +6985,7 @@
     {
      "id": "avg",
      "display": "AVG",
+     "short": "AVG",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -6772,6 +7012,7 @@
     {
      "id": "babip",
      "display": "BABIP",
+     "short": "BABIP",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -6798,6 +7039,7 @@
     {
      "id": "dv100",
      "display": "Decision value /100",
+     "short": "Decision/100",
      "unit": "runs per 100 pitches",
      "direction": "higher",
      "set": "secondary",
@@ -6824,6 +7066,7 @@
     {
      "id": "xwobacon_plus",
      "display": "xwOBAcon+",
+     "short": "xwOBAcon+",
      "unit": "wOBA scale",
      "direction": "higher",
      "set": "secondary",
@@ -6850,6 +7093,7 @@
     {
      "id": "re24_pa",
      "display": "RE24/PA",
+     "short": "RE24/PA",
      "unit": "runs per PA",
      "direction": "higher",
      "set": "secondary",
@@ -6876,6 +7120,7 @@
     {
      "id": "sq_contact",
      "display": "Squared-up%",
+     "short": "Squared-up%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -6902,6 +7147,7 @@
     {
      "id": "swing_length",
      "display": "Swing length",
+     "short": "Swing length",
      "unit": "ft",
      "direction": "lower",
      "set": "secondary",
@@ -6928,6 +7174,7 @@
     {
      "id": "bsr",
      "display": "Baserunning runs",
+     "short": "BsR",
      "unit": "runs",
      "direction": "higher",
      "set": "secondary",
@@ -6954,6 +7201,7 @@
     {
      "id": "oaa",
      "display": "OAA",
+     "short": "OAA",
      "unit": "outs",
      "direction": "higher",
      "set": "secondary",
@@ -6980,6 +7228,7 @@
     {
      "id": "fielding_runs",
      "display": "Fielding runs",
+     "short": "Fielding",
      "unit": "runs",
      "direction": "higher",
      "set": "secondary",
@@ -7006,6 +7255,7 @@
     {
      "id": "war",
      "display": "WAR",
+     "short": "WAR",
      "unit": "wins",
      "direction": "higher",
      "set": "secondary",
@@ -7032,6 +7282,7 @@
     {
      "id": "hard_pct",
      "display": "Hard-hit%",
+     "short": "Hard-hit%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -7058,6 +7309,7 @@
     {
      "id": "bat_speed",
      "display": "Bat speed",
+     "short": "Bat speed",
      "unit": "mph",
      "direction": "higher",
      "set": "secondary",
@@ -7169,6 +7421,7 @@
     {
      "id": "xwoba_n",
      "display": "xwOBA+ (park-neutral)",
+     "short": "xwOBA+ (PN)",
      "unit": "wOBA scale",
      "direction": "higher",
      "set": "headline",
@@ -7195,6 +7448,7 @@
     {
      "id": "woba",
      "display": "wOBA",
+     "short": "wOBA",
      "unit": "wOBA scale",
      "direction": "higher",
      "set": "headline",
@@ -7221,6 +7475,7 @@
     {
      "id": "war_600",
      "display": "WAR/600",
+     "short": "WAR/600",
      "unit": "wins per 600 PA",
      "direction": "higher",
      "set": "headline",
@@ -7247,6 +7502,7 @@
     {
      "id": "sra",
      "display": "OAA per chance",
+     "short": "OAA/ch",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -7273,6 +7529,7 @@
     {
      "id": "arm",
      "display": "Arm strength",
+     "short": "Arm",
      "unit": "mph",
      "direction": "higher",
      "set": "headline",
@@ -7299,6 +7556,7 @@
     {
      "id": "barrel_pct",
      "display": "Barrel%",
+     "short": "Barrel%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -7325,6 +7583,7 @@
     {
      "id": "hard_pct",
      "display": "Hard-hit%",
+     "short": "Hard-hit%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -7351,6 +7610,7 @@
     {
      "id": "k_pct",
      "display": "K%",
+     "short": "K%",
      "unit": "%",
      "direction": "lower",
      "set": "headline",
@@ -7377,6 +7637,7 @@
     {
      "id": "bb_pct",
      "display": "BB%",
+     "short": "BB%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -7403,6 +7664,7 @@
     {
      "id": "chase_pct",
      "display": "Chase%",
+     "short": "Chase%",
      "unit": "%",
      "direction": "lower",
      "set": "headline",
@@ -7429,6 +7691,7 @@
     {
      "id": "xwoba_plus",
      "display": "xwOBA+",
+     "short": "xwOBA+",
      "unit": "wOBA scale",
      "direction": "higher",
      "set": "secondary",
@@ -7455,6 +7718,7 @@
     {
      "id": "xwoba_savant",
      "display": "xwOBA (Savant)",
+     "short": "xwOBA (Sav)",
      "unit": "wOBA scale",
      "direction": "higher",
      "set": "secondary",
@@ -7481,6 +7745,7 @@
     {
      "id": "xslg",
      "display": "xSLG",
+     "short": "xSLG",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -7507,6 +7772,7 @@
     {
      "id": "iso",
      "display": "ISO",
+     "short": "ISO",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -7533,6 +7799,7 @@
     {
      "id": "ev",
      "display": "Exit velocity",
+     "short": "Exit velo",
      "unit": "mph",
      "direction": "higher",
      "set": "secondary",
@@ -7559,6 +7826,7 @@
     {
      "id": "ev90",
      "display": "EV90",
+     "short": "EV90",
      "unit": "mph",
      "direction": "higher",
      "set": "secondary",
@@ -7585,6 +7853,7 @@
     {
      "id": "whiff_pct",
      "display": "Whiff%",
+     "short": "Whiff%",
      "unit": "%",
      "direction": "lower",
      "set": "secondary",
@@ -7611,6 +7880,7 @@
     {
      "id": "z_swing_pct",
      "display": "Z-Swing%",
+     "short": "Z-Swing%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -7637,6 +7907,7 @@
     {
      "id": "swstr_pct",
      "display": "SwStr%",
+     "short": "SwStr%",
      "unit": "%",
      "direction": "lower",
      "set": "secondary",
@@ -7663,6 +7934,7 @@
     {
      "id": "gb_pct",
      "display": "GB%",
+     "short": "GB%",
      "unit": "%",
      "direction": "lower",
      "set": "secondary",
@@ -7689,6 +7961,7 @@
     {
      "id": "pull_air_pct",
      "display": "Pull-air%",
+     "short": "Pull-air%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -7715,6 +7988,7 @@
     {
      "id": "obp",
      "display": "OBP",
+     "short": "OBP",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -7741,6 +8015,7 @@
     {
      "id": "slg",
      "display": "SLG",
+     "short": "SLG",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -7767,6 +8042,7 @@
     {
      "id": "avg",
      "display": "AVG",
+     "short": "AVG",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -7793,6 +8069,7 @@
     {
      "id": "babip",
      "display": "BABIP",
+     "short": "BABIP",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -7819,6 +8096,7 @@
     {
      "id": "dv100",
      "display": "Decision value /100",
+     "short": "Decision/100",
      "unit": "runs per 100 pitches",
      "direction": "higher",
      "set": "secondary",
@@ -7845,6 +8123,7 @@
     {
      "id": "xwobacon_plus",
      "display": "xwOBAcon+",
+     "short": "xwOBAcon+",
      "unit": "wOBA scale",
      "direction": "higher",
      "set": "secondary",
@@ -7871,6 +8150,7 @@
     {
      "id": "re24_pa",
      "display": "RE24/PA",
+     "short": "RE24/PA",
      "unit": "runs per PA",
      "direction": "higher",
      "set": "secondary",
@@ -7897,6 +8177,7 @@
     {
      "id": "sq_contact",
      "display": "Squared-up%",
+     "short": "Squared-up%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -7923,6 +8204,7 @@
     {
      "id": "swing_length",
      "display": "Swing length",
+     "short": "Swing length",
      "unit": "ft",
      "direction": "lower",
      "set": "secondary",
@@ -7949,6 +8231,7 @@
     {
      "id": "bsr",
      "display": "Baserunning runs",
+     "short": "BsR",
      "unit": "runs",
      "direction": "higher",
      "set": "secondary",
@@ -7975,6 +8258,7 @@
     {
      "id": "oaa",
      "display": "OAA",
+     "short": "OAA",
      "unit": "outs",
      "direction": "higher",
      "set": "secondary",
@@ -8001,6 +8285,7 @@
     {
      "id": "fielding_runs",
      "display": "Fielding runs",
+     "short": "Fielding",
      "unit": "runs",
      "direction": "higher",
      "set": "secondary",
@@ -8027,6 +8312,7 @@
     {
      "id": "war",
      "display": "WAR",
+     "short": "WAR",
      "unit": "wins",
      "direction": "higher",
      "set": "secondary",
@@ -8053,6 +8339,7 @@
     {
      "id": "bat_speed",
      "display": "Bat speed",
+     "short": "Bat speed",
      "unit": "mph",
      "direction": "higher",
      "set": "secondary",
@@ -8079,6 +8366,7 @@
     {
      "id": "sprint_speed",
      "display": "Sprint speed",
+     "short": "Sprint",
      "unit": "ft/s",
      "direction": "higher",
      "set": "secondary",
@@ -8189,6 +8477,7 @@
     {
      "id": "xwoba_n",
      "display": "xwOBA+ (park-neutral)",
+     "short": "xwOBA+ (PN)",
      "unit": "wOBA scale",
      "direction": "higher",
      "set": "headline",
@@ -8215,6 +8504,7 @@
     {
      "id": "woba",
      "display": "wOBA",
+     "short": "wOBA",
      "unit": "wOBA scale",
      "direction": "higher",
      "set": "headline",
@@ -8241,6 +8531,7 @@
     {
      "id": "war_600",
      "display": "WAR/600",
+     "short": "WAR/600",
      "unit": "wins per 600 PA",
      "direction": "higher",
      "set": "headline",
@@ -8267,6 +8558,7 @@
     {
      "id": "barrel_pct",
      "display": "Barrel%",
+     "short": "Barrel%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -8293,6 +8585,7 @@
     {
      "id": "hard_pct",
      "display": "Hard-hit%",
+     "short": "Hard-hit%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -8319,6 +8612,7 @@
     {
      "id": "bat_speed",
      "display": "Bat speed",
+     "short": "Bat speed",
      "unit": "mph",
      "direction": "higher",
      "set": "headline",
@@ -8345,6 +8639,7 @@
     {
      "id": "iso",
      "display": "ISO",
+     "short": "ISO",
      "unit": "rate",
      "direction": "higher",
      "set": "headline",
@@ -8371,6 +8666,7 @@
     {
      "id": "k_pct",
      "display": "K%",
+     "short": "K%",
      "unit": "%",
      "direction": "lower",
      "set": "headline",
@@ -8397,6 +8693,7 @@
     {
      "id": "bb_pct",
      "display": "BB%",
+     "short": "BB%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -8423,6 +8720,7 @@
     {
      "id": "chase_pct",
      "display": "Chase%",
+     "short": "Chase%",
      "unit": "%",
      "direction": "lower",
      "set": "headline",
@@ -8449,6 +8747,7 @@
     {
      "id": "xwoba_plus",
      "display": "xwOBA+",
+     "short": "xwOBA+",
      "unit": "wOBA scale",
      "direction": "higher",
      "set": "secondary",
@@ -8475,6 +8774,7 @@
     {
      "id": "xwoba_savant",
      "display": "xwOBA (Savant)",
+     "short": "xwOBA (Sav)",
      "unit": "wOBA scale",
      "direction": "higher",
      "set": "secondary",
@@ -8501,6 +8801,7 @@
     {
      "id": "xslg",
      "display": "xSLG",
+     "short": "xSLG",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -8527,6 +8828,7 @@
     {
      "id": "ev",
      "display": "Exit velocity",
+     "short": "Exit velo",
      "unit": "mph",
      "direction": "higher",
      "set": "secondary",
@@ -8553,6 +8855,7 @@
     {
      "id": "ev90",
      "display": "EV90",
+     "short": "EV90",
      "unit": "mph",
      "direction": "higher",
      "set": "secondary",
@@ -8579,6 +8882,7 @@
     {
      "id": "whiff_pct",
      "display": "Whiff%",
+     "short": "Whiff%",
      "unit": "%",
      "direction": "lower",
      "set": "secondary",
@@ -8605,6 +8909,7 @@
     {
      "id": "z_swing_pct",
      "display": "Z-Swing%",
+     "short": "Z-Swing%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -8631,6 +8936,7 @@
     {
      "id": "swstr_pct",
      "display": "SwStr%",
+     "short": "SwStr%",
      "unit": "%",
      "direction": "lower",
      "set": "secondary",
@@ -8657,6 +8963,7 @@
     {
      "id": "gb_pct",
      "display": "GB%",
+     "short": "GB%",
      "unit": "%",
      "direction": "lower",
      "set": "secondary",
@@ -8683,6 +8990,7 @@
     {
      "id": "pull_air_pct",
      "display": "Pull-air%",
+     "short": "Pull-air%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -8709,6 +9017,7 @@
     {
      "id": "obp",
      "display": "OBP",
+     "short": "OBP",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -8735,6 +9044,7 @@
     {
      "id": "slg",
      "display": "SLG",
+     "short": "SLG",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -8761,6 +9071,7 @@
     {
      "id": "avg",
      "display": "AVG",
+     "short": "AVG",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -8787,6 +9098,7 @@
     {
      "id": "babip",
      "display": "BABIP",
+     "short": "BABIP",
      "unit": "rate",
      "direction": "higher",
      "set": "secondary",
@@ -8813,6 +9125,7 @@
     {
      "id": "dv100",
      "display": "Decision value /100",
+     "short": "Decision/100",
      "unit": "runs per 100 pitches",
      "direction": "higher",
      "set": "secondary",
@@ -8839,6 +9152,7 @@
     {
      "id": "xwobacon_plus",
      "display": "xwOBAcon+",
+     "short": "xwOBAcon+",
      "unit": "wOBA scale",
      "direction": "higher",
      "set": "secondary",
@@ -8865,6 +9179,7 @@
     {
      "id": "re24_pa",
      "display": "RE24/PA",
+     "short": "RE24/PA",
      "unit": "runs per PA",
      "direction": "higher",
      "set": "secondary",
@@ -8891,6 +9206,7 @@
     {
      "id": "sq_contact",
      "display": "Squared-up%",
+     "short": "Squared-up%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -8917,6 +9233,7 @@
     {
      "id": "swing_length",
      "display": "Swing length",
+     "short": "Swing length",
      "unit": "ft",
      "direction": "lower",
      "set": "secondary",
@@ -8943,6 +9260,7 @@
     {
      "id": "bsr",
      "display": "Baserunning runs",
+     "short": "BsR",
      "unit": "runs",
      "direction": "higher",
      "set": "secondary",
@@ -8969,6 +9287,7 @@
     {
      "id": "oaa",
      "display": "OAA",
+     "short": "OAA",
      "unit": "outs",
      "direction": "higher",
      "set": "secondary",
@@ -8995,6 +9314,7 @@
     {
      "id": "fielding_runs",
      "display": "Fielding runs",
+     "short": "Fielding",
      "unit": "runs",
      "direction": "higher",
      "set": "secondary",
@@ -9021,6 +9341,7 @@
     {
      "id": "war",
      "display": "WAR",
+     "short": "WAR",
      "unit": "wins",
      "direction": "higher",
      "set": "secondary",
@@ -9047,6 +9368,7 @@
     {
      "id": "sprint_speed",
      "display": "Sprint speed",
+     "short": "Sprint",
      "unit": "ft/s",
      "direction": "higher",
      "set": "secondary",
@@ -9160,6 +9482,7 @@
     {
      "id": "xwoba_n",
      "display": "xwOBA+ against (park-neutral)",
+     "short": "xwOBA+ (PN)",
      "unit": "wOBA scale",
      "direction": "lower",
      "set": "headline",
@@ -9186,6 +9509,7 @@
     {
      "id": "xfip",
      "display": "xFIP",
+     "short": "xFIP",
      "unit": "runs per 9",
      "direction": "lower",
      "set": "headline",
@@ -9212,6 +9536,7 @@
     {
      "id": "k_pct",
      "display": "K%",
+     "short": "K%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -9238,6 +9563,7 @@
     {
      "id": "bb_pct",
      "display": "BB%",
+     "short": "BB%",
      "unit": "%",
      "direction": "lower",
      "set": "headline",
@@ -9264,6 +9590,7 @@
     {
      "id": "csw_pct",
      "display": "CSW%",
+     "short": "CSW%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -9290,6 +9617,7 @@
     {
      "id": "stuff_plus",
      "display": "Stuff+",
+     "short": "Stuff+",
      "unit": "100 = average",
      "direction": "higher",
      "set": "headline",
@@ -9316,6 +9644,7 @@
     {
      "id": "pitching_plus",
      "display": "Pitching+",
+     "short": "Pitching+",
      "unit": "100 = average",
      "direction": "higher",
      "set": "headline",
@@ -9342,6 +9671,7 @@
     {
      "id": "fb_velo",
      "display": "Fastball velocity",
+     "short": "FB velo",
      "unit": "mph",
      "direction": "higher",
      "set": "headline",
@@ -9368,6 +9698,7 @@
     {
      "id": "chase_pct",
      "display": "Chase%",
+     "short": "Chase%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -9394,6 +9725,7 @@
     {
      "id": "gb_pct",
      "display": "GB%",
+     "short": "GB%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -9420,6 +9752,7 @@
     {
      "id": "ra9",
      "display": "RA9",
+     "short": "RA9",
      "unit": "runs per 9",
      "direction": "lower",
      "set": "secondary",
@@ -9446,6 +9779,7 @@
     {
      "id": "fip",
      "display": "FIP",
+     "short": "FIP",
      "unit": "runs per 9",
      "direction": "lower",
      "set": "secondary",
@@ -9472,6 +9806,7 @@
     {
      "id": "k_bb_pct",
      "display": "K-BB%",
+     "short": "K-BB%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -9498,6 +9833,7 @@
     {
      "id": "whiff_pct",
      "display": "Whiff%",
+     "short": "Whiff%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -9524,6 +9860,7 @@
     {
      "id": "swstr_pct",
      "display": "SwStr%",
+     "short": "SwStr%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -9550,6 +9887,7 @@
     {
      "id": "xwoba_plus",
      "display": "xwOBA+ against",
+     "short": "xwOBA+",
      "unit": "wOBA scale",
      "direction": "lower",
      "set": "secondary",
@@ -9576,6 +9914,7 @@
     {
      "id": "xwoba_savant",
      "display": "xwOBA against (Savant)",
+     "short": "xwOBA (Sav)",
      "unit": "wOBA scale",
      "direction": "lower",
      "set": "secondary",
@@ -9602,6 +9941,7 @@
     {
      "id": "xra9",
      "display": "xRA9",
+     "short": "xRA9",
      "unit": "runs per 9",
      "direction": "lower",
      "set": "secondary",
@@ -9628,6 +9968,7 @@
     {
      "id": "war_200",
      "display": "WAR/200 IP",
+     "short": "WAR/200",
      "unit": "wins per 200 IP",
      "direction": "higher",
      "set": "secondary",
@@ -9654,6 +9995,7 @@
     {
      "id": "location_plus",
      "display": "Location+",
+     "short": "Location+",
      "unit": "100 = average",
      "direction": "higher",
      "set": "secondary",
@@ -9680,6 +10022,7 @@
     {
      "id": "fb_ivb",
      "display": "Fastball IVB",
+     "short": "FB IVB",
      "unit": "in",
      "direction": "higher",
      "set": "secondary",
@@ -9706,6 +10049,7 @@
     {
      "id": "fb_vaa",
      "display": "Fastball VAA",
+     "short": "FB VAA",
      "unit": "deg",
      "direction": "higher",
      "set": "secondary",
@@ -9732,6 +10076,7 @@
     {
      "id": "extension",
      "display": "Extension",
+     "short": "Extension",
      "unit": "ft",
      "direction": "higher",
      "set": "secondary",
@@ -9758,6 +10103,7 @@
     {
      "id": "hard_pct",
      "display": "Hard-hit% allowed",
+     "short": "Hard-hit%",
      "unit": "%",
      "direction": "lower",
      "set": "secondary",
@@ -9784,6 +10130,7 @@
     {
      "id": "barrel_pct",
      "display": "Barrel% allowed",
+     "short": "Barrel%",
      "unit": "%",
      "direction": "lower",
      "set": "secondary",
@@ -9810,6 +10157,7 @@
     {
      "id": "ev",
      "display": "Exit velocity allowed",
+     "short": "Exit velo",
      "unit": "mph",
      "direction": "lower",
      "set": "secondary",
@@ -9836,6 +10184,7 @@
     {
      "id": "hr9",
      "display": "HR/9",
+     "short": "HR/9",
      "unit": "per 9",
      "direction": "lower",
      "set": "secondary",
@@ -9862,6 +10211,7 @@
     {
      "id": "whip",
      "display": "WHIP",
+     "short": "WHIP",
      "unit": "per inning",
      "direction": "lower",
      "set": "secondary",
@@ -9888,6 +10238,7 @@
     {
      "id": "babip_against",
      "display": "BABIP against",
+     "short": "Opp BABIP",
      "unit": "rate",
      "direction": "lower",
      "set": "secondary",
@@ -9914,6 +10265,7 @@
     {
      "id": "p_start",
      "display": "Pitches/start",
+     "short": "Pitches/GS",
      "unit": "pitches",
      "direction": "higher",
      "set": "secondary",
@@ -9940,6 +10292,7 @@
     {
      "id": "tto_penalty",
      "display": "TTO penalty",
+     "short": "TTO penalty",
      "unit": "wOBA scale",
      "direction": "lower",
      "set": "secondary",
@@ -9966,6 +10319,7 @@
     {
      "id": "fb_usage",
      "display": "Fastball%",
+     "short": "FB%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -9992,6 +10346,7 @@
     {
      "id": "br_usage",
      "display": "Breaking%",
+     "short": "Breaking%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -10018,6 +10373,7 @@
     {
      "id": "os_usage",
      "display": "Offspeed%",
+     "short": "Offspeed%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -10044,6 +10400,7 @@
     {
      "id": "war",
      "display": "WAR",
+     "short": "WAR",
      "unit": "wins",
      "direction": "higher",
      "set": "secondary",
@@ -10070,6 +10427,7 @@
     {
      "id": "war_x",
      "display": "WAR (xwOBA+)",
+     "short": "WAR (xw)",
      "unit": "wins",
      "direction": "higher",
      "set": "secondary",
@@ -10179,6 +10537,7 @@
     {
      "id": "k_bb_pct",
      "display": "K-BB%",
+     "short": "K-BB%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -10205,6 +10564,7 @@
     {
      "id": "csw_pct",
      "display": "CSW%",
+     "short": "CSW%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -10231,6 +10591,7 @@
     {
      "id": "whiff_pct",
      "display": "Whiff%",
+     "short": "Whiff%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -10257,6 +10618,7 @@
     {
      "id": "pitching_plus",
      "display": "Pitching+",
+     "short": "Pitching+",
      "unit": "100 = average",
      "direction": "higher",
      "set": "headline",
@@ -10283,6 +10645,7 @@
     {
      "id": "stuff_plus",
      "display": "Stuff+",
+     "short": "Stuff+",
      "unit": "100 = average",
      "direction": "higher",
      "set": "headline",
@@ -10309,6 +10672,7 @@
     {
      "id": "fb_velo",
      "display": "Fastball velocity",
+     "short": "FB velo",
      "unit": "mph",
      "direction": "higher",
      "set": "headline",
@@ -10335,6 +10699,7 @@
     {
      "id": "xwoba_n",
      "display": "xwOBA+ against (park-neutral)",
+     "short": "xwOBA+ (PN)",
      "unit": "wOBA scale",
      "direction": "lower",
      "set": "headline",
@@ -10361,6 +10726,7 @@
     {
      "id": "bb_pct",
      "display": "BB%",
+     "short": "BB%",
      "unit": "%",
      "direction": "lower",
      "set": "headline",
@@ -10387,6 +10753,7 @@
     {
      "id": "gb_pct",
      "display": "GB%",
+     "short": "GB%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -10413,6 +10780,7 @@
     {
      "id": "chase_pct",
      "display": "Chase%",
+     "short": "Chase%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -10439,6 +10807,7 @@
     {
      "id": "k_pct",
      "display": "K%",
+     "short": "K%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -10465,6 +10834,7 @@
     {
      "id": "xfip",
      "display": "xFIP",
+     "short": "xFIP",
      "unit": "runs per 9",
      "direction": "lower",
      "set": "secondary",
@@ -10491,6 +10861,7 @@
     {
      "id": "fip",
      "display": "FIP",
+     "short": "FIP",
      "unit": "runs per 9",
      "direction": "lower",
      "set": "secondary",
@@ -10517,6 +10888,7 @@
     {
      "id": "ra9",
      "display": "RA9",
+     "short": "RA9",
      "unit": "runs per 9",
      "direction": "lower",
      "set": "secondary",
@@ -10543,6 +10915,7 @@
     {
      "id": "gmli",
      "display": "gmLI",
+     "short": "gmLI",
      "unit": "index",
      "direction": "higher",
      "set": "secondary",
@@ -10569,6 +10942,7 @@
     {
      "id": "wpa_li",
      "display": "WPA/LI",
+     "short": "WPA/LI",
      "unit": "wins",
      "direction": "higher",
      "set": "secondary",
@@ -10595,6 +10969,7 @@
     {
      "id": "swstr_pct",
      "display": "SwStr%",
+     "short": "SwStr%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -10621,6 +10996,7 @@
     {
      "id": "xwoba_plus",
      "display": "xwOBA+ against",
+     "short": "xwOBA+",
      "unit": "wOBA scale",
      "direction": "lower",
      "set": "secondary",
@@ -10647,6 +11023,7 @@
     {
      "id": "xra9",
      "display": "xRA9",
+     "short": "xRA9",
      "unit": "runs per 9",
      "direction": "lower",
      "set": "secondary",
@@ -10673,6 +11050,7 @@
     {
      "id": "location_plus",
      "display": "Location+",
+     "short": "Location+",
      "unit": "100 = average",
      "direction": "higher",
      "set": "secondary",
@@ -10699,6 +11077,7 @@
     {
      "id": "fb_ivb",
      "display": "Fastball IVB",
+     "short": "FB IVB",
      "unit": "in",
      "direction": "higher",
      "set": "secondary",
@@ -10725,6 +11104,7 @@
     {
      "id": "fb_vaa",
      "display": "Fastball VAA",
+     "short": "FB VAA",
      "unit": "deg",
      "direction": "higher",
      "set": "secondary",
@@ -10751,6 +11131,7 @@
     {
      "id": "extension",
      "display": "Extension",
+     "short": "Extension",
      "unit": "ft",
      "direction": "higher",
      "set": "secondary",
@@ -10777,6 +11158,7 @@
     {
      "id": "hard_pct",
      "display": "Hard-hit% allowed",
+     "short": "Hard-hit%",
      "unit": "%",
      "direction": "lower",
      "set": "secondary",
@@ -10803,6 +11185,7 @@
     {
      "id": "barrel_pct",
      "display": "Barrel% allowed",
+     "short": "Barrel%",
      "unit": "%",
      "direction": "lower",
      "set": "secondary",
@@ -10829,6 +11212,7 @@
     {
      "id": "hr9",
      "display": "HR/9",
+     "short": "HR/9",
      "unit": "per 9",
      "direction": "lower",
      "set": "secondary",
@@ -10855,6 +11239,7 @@
     {
      "id": "whip",
      "display": "WHIP",
+     "short": "WHIP",
      "unit": "per inning",
      "direction": "lower",
      "set": "secondary",
@@ -10881,6 +11266,7 @@
     {
      "id": "fb_usage",
      "display": "Fastball%",
+     "short": "FB%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -10907,6 +11293,7 @@
     {
      "id": "br_usage",
      "display": "Breaking%",
+     "short": "Breaking%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -10933,6 +11320,7 @@
     {
      "id": "os_usage",
      "display": "Offspeed%",
+     "short": "Offspeed%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -10959,6 +11347,7 @@
     {
      "id": "war",
      "display": "WAR",
+     "short": "WAR",
      "unit": "wins",
      "direction": "higher",
      "set": "secondary",
@@ -10985,6 +11374,7 @@
     {
      "id": "war_x",
      "display": "WAR (xwOBA+)",
+     "short": "WAR (xw)",
      "unit": "wins",
      "direction": "higher",
      "set": "secondary",
@@ -11090,6 +11480,7 @@
     {
      "id": "rating",
      "display": "Team rating",
+     "short": "Rating",
      "unit": "runs/game",
      "direction": "higher",
      "set": "headline",
@@ -11112,6 +11503,7 @@
     {
      "id": "baseruns_pct",
      "display": "BaseRuns win%",
+     "short": "BaseRuns%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -11136,6 +11528,7 @@
     {
      "id": "off_rpg",
      "display": "Offence",
+     "short": "Offence",
      "unit": "runs/game",
      "direction": "higher",
      "set": "headline",
@@ -11158,6 +11551,7 @@
     {
      "id": "pit_rpg",
      "display": "Pitching",
+     "short": "Pitching",
      "unit": "runs/game",
      "direction": "higher",
      "set": "headline",
@@ -11180,6 +11574,7 @@
     {
      "id": "def_rpg",
      "display": "Defence",
+     "short": "Defence",
      "unit": "runs/game",
      "direction": "higher",
      "set": "headline",
@@ -11202,6 +11597,7 @@
     {
      "id": "woba",
      "display": "Team wOBA",
+     "short": "wOBA",
      "unit": "wOBA scale",
      "direction": "higher",
      "set": "headline",
@@ -11226,6 +11622,7 @@
     {
      "id": "bb_pct",
      "display": "Team BB%",
+     "short": "BB%",
      "unit": "%",
      "direction": "higher",
      "set": "headline",
@@ -11250,6 +11647,7 @@
     {
      "id": "pythag",
      "display": "Pythagorean win%",
+     "short": "Pyth W%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -11274,6 +11672,7 @@
     {
      "id": "pct",
      "display": "Win%",
+     "short": "Win%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -11298,6 +11697,7 @@
     {
      "id": "rd",
      "display": "Run differential",
+     "short": "Run diff",
      "unit": "runs",
      "direction": "higher",
      "set": "secondary",
@@ -11322,6 +11722,7 @@
     {
      "id": "xwoba_savant",
      "display": "Team xwOBA",
+     "short": "xwOBA",
      "unit": "wOBA scale",
      "direction": "higher",
      "set": "secondary",
@@ -11346,6 +11747,7 @@
     {
      "id": "xwoba_against",
      "display": "xwOBA against",
+     "short": "Opp xwOBA",
      "unit": "wOBA scale",
      "direction": "lower",
      "set": "secondary",
@@ -11370,6 +11772,7 @@
     {
      "id": "woba_against",
      "display": "wOBA against",
+     "short": "Opp wOBA",
      "unit": "wOBA scale",
      "direction": "lower",
      "set": "secondary",
@@ -11394,6 +11797,7 @@
     {
      "id": "p_k_bb",
      "display": "Staff K-BB%",
+     "short": "Staff K-BB%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -11418,6 +11822,7 @@
     {
      "id": "p_k_pct",
      "display": "Staff K%",
+     "short": "Staff K%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -11442,6 +11847,7 @@
     {
      "id": "k_pct",
      "display": "Team K%",
+     "short": "K%",
      "unit": "%",
      "direction": "lower",
      "set": "secondary",
@@ -11466,6 +11872,7 @@
     {
      "id": "csw_pct",
      "display": "Staff CSW%",
+     "short": "Staff CSW%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -11490,6 +11897,7 @@
     {
      "id": "stuff_plus",
      "display": "Staff Stuff+",
+     "short": "Staff Stuff+",
      "unit": "100 = average",
      "direction": "higher",
      "set": "secondary",
@@ -11512,6 +11920,7 @@
     {
      "id": "pitching_plus",
      "display": "Staff Pitching+",
+     "short": "Staff Pitch+",
      "unit": "100 = average",
      "direction": "higher",
      "set": "secondary",
@@ -11534,6 +11943,7 @@
     {
      "id": "barrel_pct",
      "display": "Team Barrel%",
+     "short": "Barrel%",
      "unit": "%",
      "direction": "higher",
      "set": "secondary",
@@ -11558,6 +11968,7 @@
     {
      "id": "p_barrel_pct",
      "display": "Barrel% allowed",
+     "short": "Opp Barrel%",
      "unit": "%",
      "direction": "lower",
      "set": "secondary",
@@ -11582,6 +11993,7 @@
     {
      "id": "war",
      "display": "Total WAR",
+     "short": "WAR",
      "unit": "wins",
      "direction": "higher",
      "set": "secondary",
@@ -11604,6 +12016,7 @@
     {
      "id": "oaa",
      "display": "Team OAA",
+     "short": "OAA",
      "unit": "outs",
      "direction": "higher",
      "set": "secondary",
@@ -11626,6 +12039,7 @@
     {
      "id": "framing_runs",
      "display": "Framing runs",
+     "short": "Framing",
      "unit": "runs",
      "direction": "higher",
      "set": "secondary",
