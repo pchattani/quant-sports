@@ -1,7 +1,7 @@
 {
-"source":"Wikidata (query.wikidata.org): season items (P3450) and their winners (P1346)",
+"source":"Wikidata (www.wikidata.org Special:EntityData): season items (P3450) and their winners (P1346)",
 "licence":"CC0 1.0",
-"fetched_at":"2026-10-28T21:53:50Z",
+"fetched_at":"2026-10-30T18:51:36Z",
 "competitions":{
 "premier-league":{
 "qid":"Q9448",
@@ -6172,20 +6172,14 @@
 {
 "season":"1931 Argentine Primera División",
 "year":1931,
-"winner":"Club Atlético Estudiantil Porteño",
-"winner_qid":"Q665999"
-},
-{
-"season":"1931 Argentine Primera División",
-"year":1931,
 "winner":"Boca Juniors",
 "winner_qid":"Q170703"
 },
 {
-"season":"1932 Argentine Primera División",
-"year":1932,
-"winner":"Sportivo Barracas",
-"winner_qid":"Q585480"
+"season":"1931 Argentine Primera División",
+"year":1931,
+"winner":"Club Atlético Estudiantil Porteño",
+"winner_qid":"Q665999"
 },
 {
 "season":"1932 Argentine Primera División",
@@ -6194,10 +6188,10 @@
 "winner_qid":"Q15799"
 },
 {
-"season":"1933 Argentine Primera División",
-"year":1933,
-"winner":"Sportivo Dock Sud",
-"winner_qid":"Q2469413"
+"season":"1932 Argentine Primera División",
+"year":1932,
+"winner":"Sportivo Barracas",
+"winner_qid":"Q585480"
 },
 {
 "season":"1933 Argentine Primera División",
@@ -6206,16 +6200,22 @@
 "winner_qid":"Q218282"
 },
 {
-"season":"1934 Argentine Primera División",
-"year":1934,
-"winner":"Club Atlético Estudiantil Porteño",
-"winner_qid":"Q665999"
+"season":"1933 Argentine Primera División",
+"year":1933,
+"winner":"Sportivo Dock Sud",
+"winner_qid":"Q2469413"
 },
 {
 "season":"1934 Argentine Primera División",
 "year":1934,
 "winner":"Boca Juniors",
 "winner_qid":"Q170703"
+},
+{
+"season":"1934 Argentine Primera División",
+"year":1934,
+"winner":"Club Atlético Estudiantil Porteño",
+"winner_qid":"Q665999"
 },
 {
 "season":"1935 Argentine Primera División",
@@ -6472,14 +6472,14 @@
 {
 "season":"1977 Argentine Primera División",
 "year":1977,
-"winner":"Club Atlético Estudiantes",
-"winner_qid":"Q2333719"
+"winner":"Club Atlético Independiente",
+"winner_qid":"Q214978"
 },
 {
 "season":"1977 Argentine Primera División",
 "year":1977,
-"winner":"Club Atlético Independiente",
-"winner_qid":"Q214978"
+"winner":"Club Atlético Estudiantes",
+"winner_qid":"Q2333719"
 },
 {
 "season":"1978 Argentine Primera División",
@@ -6496,14 +6496,20 @@
 {
 "season":"1980 Argentine Primera División",
 "year":1980,
-"winner":"Club Atlético River Plate",
-"winner_qid":"Q15799"
+"winner":"Club Atlético Rosario Central",
+"winner_qid":"Q318307"
 },
 {
 "season":"1980 Argentine Primera División",
 "year":1980,
-"winner":"Club Atlético Rosario Central",
-"winner_qid":"Q318307"
+"winner":"Club Atlético River Plate",
+"winner_qid":"Q15799"
+},
+{
+"season":"1981 Argentine Primera División",
+"year":1981,
+"winner":"Club Atlético River Plate",
+"winner_qid":"Q15799"
 },
 {
 "season":"1981 Argentine Primera División",
@@ -6512,22 +6518,16 @@
 "winner_qid":"Q170703"
 },
 {
-"season":"1981 Argentine Primera División",
-"year":1981,
-"winner":"Club Atlético River Plate",
-"winner_qid":"Q15799"
+"season":"1982 Argentine Primera División",
+"year":1982,
+"winner":"Ferro Carril Oeste",
+"winner_qid":"Q910444"
 },
 {
 "season":"1982 Argentine Primera División",
 "year":1982,
 "winner":"Estudiantes de La Plata",
 "winner_qid":"Q214940"
-},
-{
-"season":"1982 Argentine Primera División",
-"year":1982,
-"winner":"Ferro Carril Oeste",
-"winner_qid":"Q910444"
 },
 {
 "season":"1983 Argentine Primera División",
@@ -6538,14 +6538,14 @@
 {
 "season":"1984 Argentine Primera División",
 "year":1984,
-"winner":"Argentinos Juniors",
-"winner_qid":"Q220621"
+"winner":"Ferro Carril Oeste",
+"winner_qid":"Q910444"
 },
 {
 "season":"1984 Argentine Primera División",
 "year":1984,
-"winner":"Ferro Carril Oeste",
-"winner_qid":"Q910444"
+"winner":"Argentinos Juniors",
+"winner_qid":"Q220621"
 },
 {
 "season":"1985 Argentine Primera División",
@@ -12580,14 +12580,14 @@
 {
 "season":"1971 Trophée des Champions",
 "year":1971,
-"winner":"Stade Rennais F.C.",
-"winner_qid":"Q19509"
+"winner":"Olympique de Marseille",
+"winner_qid":"Q132885"
 },
 {
 "season":"1971 Trophée des Champions",
 "year":1971,
-"winner":"Olympique de Marseille",
-"winner_qid":"Q132885"
+"winner":"Stade Rennais F.C.",
+"winner_qid":"Q19509"
 },
 {
 "season":"1972 Trophée des Champions",
@@ -15874,14 +15874,14 @@
 {
 "season":"1971 CONCACAF Championship",
 "year":1971,
-"winner":"Costa Rica men's national football team",
-"winner_qid":"Q194387"
+"winner":"Haiti men's national football team",
+"winner_qid":"Q236006"
 },
 {
 "season":"1971 CONCACAF Championship",
 "year":1971,
-"winner":"Haiti men's national football team",
-"winner_qid":"Q236006"
+"winner":"Costa Rica men's national football team",
+"winner_qid":"Q194387"
 },
 {
 "season":"1985 CONCACAF Championship",

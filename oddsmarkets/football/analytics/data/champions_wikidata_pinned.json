@@ -1,0 +1,111 @@
+{
+ "note": "Rows from the 28 Oct 2026 Wikidata run (CC0) that the EntityData walk cannot reach: Argentina's second champion in split years and Belgium 1898-1902. Merged by football_champions_wikidata.py.",
+ "competitions": {
+  "belgian-pro-league": [
+   {
+    "season": "1898–99 in Belgian football",
+    "year": 1898,
+    "winner": "R.F.C. de Liège",
+    "winner_qid": "Q1347229"
+   },
+   {
+    "season": "1899–1900 in Belgian football",
+    "year": 1899,
+    "winner": "Royal Racing Club de Bruxelles",
+    "winner_qid": "Q2171108"
+   },
+   {
+    "season": "1901–02 in Belgian football",
+    "year": 1901,
+    "winner": "Royal Racing Club de Bruxelles",
+    "winner_qid": "Q2171108"
+   }
+  ],
+  "liga-argentina": [
+   {
+    "season": "1911 Argentine Primera División",
+    "year": 1911,
+    "winner": "Newell's Old Boys",
+    "winner_qid": "Q221882"
+   },
+   {
+    "season": "1919 Argentine Primera División",
+    "year": 1919,
+    "winner": "Racing Club",
+    "winner_qid": "Q276533"
+   },
+   {
+    "season": "1920 Argentine Primera División",
+    "year": 1920,
+    "winner": "Club Atlético River Plate",
+    "winner_qid": "Q15799"
+   },
+   {
+    "season": "1921 Argentine Primera División",
+    "year": 1921,
+    "winner": "Racing Club",
+    "winner_qid": "Q276533"
+   },
+   {
+    "season": "1922 Argentine Primera División",
+    "year": 1922,
+    "winner": "Club Atlético Independiente",
+    "winner_qid": "Q214978"
+   },
+   {
+    "season": "1923 Argentine Primera División",
+    "year": 1923,
+    "winner": "San Lorenzo de Almagro",
+    "winner_qid": "Q218282"
+   },
+   {
+    "season": "1924 Argentine Primera División",
+    "year": 1924,
+    "winner": "San Lorenzo de Almagro",
+    "winner_qid": "Q218282"
+   },
+   {
+    "season": "1925 Argentine Primera División",
+    "year": 1925,
+    "winner": "Racing Club",
+    "winner_qid": "Q276533"
+   },
+   {
+    "season": "1926 Argentine Primera División",
+    "year": 1926,
+    "winner": "Club Atlético Independiente",
+    "winner_qid": "Q214978"
+   },
+   {
+    "season": "1977 Argentine Primera División",
+    "year": 1977,
+    "winner": "Club Atlético Estudiantes",
+    "winner_qid": "Q2333719"
+   },
+   {
+    "season": "1980 Argentine Primera División",
+    "year": 1980,
+    "winner": "Club Atlético River Plate",
+    "winner_qid": "Q15799"
+   },
+   {
+    "season": "1981 Argentine Primera División",
+    "year": 1981,
+    "winner": "Boca Juniors",
+    "winner_qid": "Q170703"
+   },
+   {
+    "season": "1982 Argentine Primera División",
+    "year": 1982,
+    "winner": "Estudiantes de La Plata",
+    "winner_qid": "Q214940"
+   },
+   {
+    "season": "1984 Argentine Primera División",
+    "year": 1984,
+    "winner": "Argentinos Juniors",
+    "winner_qid": "Q220621"
+   }
+  ]
+ }
+}
