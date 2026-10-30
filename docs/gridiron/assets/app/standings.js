@@ -194,7 +194,8 @@ function tiles(rows, S) {
   return GI.kpis([
     GI.kpi('Best record', best ? esc(GI.teamAbbr(best.team)) + ' ' + GI.record(best.w, best.l, best.t) : '—', best ? (isNum(best.diff) ? GI.signed(best.diff, 0) + ' point difference' : '') : '', { href: best ? GI.teamHref(best.team, S) : null }),
     GI.kpi('Top-rated team', top ? esc(GI.teamAbbr(top.team)) + ' ' + GI.signed(top.rating, 1) : '—', 'points a game better than an average team', { href: top ? GI.teamHref(top.team, S) : null, tip: 'Our team-strength rating on a neutral field' }),
-    GI.kpi('Super Bowl favourite', fav ? esc(GI.teamAbbr(fav.team)) + ' ' + GI.pct(fav.p_sb, 0) : '—', 'our chance, from the season simulation', { signal: true, href: fav ? GI.teamHref(fav.team, S) : null }),
+    fav && fav.p_sb >= 0.9995 ? GI.kpi('Super Bowl champions', esc(GI.teamAbbr(fav.team)), 'the season is decided', { signal: true, href: GI.teamHref(fav.team, S) })   /* round 11 */
+      : GI.kpi('Super Bowl favourite', fav ? esc(GI.teamAbbr(fav.team)) + ' ' + GI.pct(fav.p_sb, 0) : '—', 'our chance, from the season simulation', { signal: true, href: fav ? GI.teamHref(fav.team, S) : null }),
     GI.kpi('Tightest division', race ? esc(race[0].division) : '—', race ? esc(GI.teamAbbr(race[0].team)) + ' ' + GI.pct(race[0].p_div, 0) + ' · ' + esc(GI.teamAbbr(race[1].team)) + ' ' + GI.pct(race[1].p_div, 0) : '', { text: true, tip: 'The division whose favourite has the lowest chance of winning it' })
   ]);
 }

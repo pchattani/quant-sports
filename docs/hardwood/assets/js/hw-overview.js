@@ -84,17 +84,23 @@ function heroNote(L, g, why) {
   return why ? '<b>Why this game?</b> ' + esc(why) : false;
 }
 /* "This week in the <league>": the stage line, then the top lines as black tiles. */
-function stageLine(L, st, ph) {
+function stageLine(L, st, ph, champ) {
+  if (champ) return 'The ' + HW.teamName(L, champ) + ' won the ' + (L === 'wnba' ? 'WNBA' : 'NBA') + ' Finals. The recap, every series and the award races are below.';
   if (!st) return '';
   if (/pre/.test(ph)) return 'Preseason. Opening night is ' + day(st.first) + '; the regular season runs to ' + day(st.last) + '.';
   if (/play/.test(ph)) return 'The playoffs' + (st.round ? ': the ' + String(st.round).replace(/^the /i, '') + ' ' + (/s$/i.test(st.round) ? 'are' : 'is') + ' on' : '') + '. Our series and title chances update after every game.';
   if (/off/.test(ph)) return 'The off-season. Our numbers pick up again with the next schedule.';
   return 'Regular season, week ' + st.week + ' of ' + st.weeks + ': ' + QK.fmt.num(st.played) + ' of ' + QK.fmt.num(st.total) + ' games played. It runs to ' + day(st.last) + (L === 'nba' ? ', then the play-in and the playoffs.' : ', then the playoffs.');
 }
-function weekTiles(L, S, dig, feat, sim, extra) {
+function weekTiles(L, S, dig, feat, sim, extra, RB) {
   const T = [];
   const mv = dig.movers;
-  if (mv && (mv.up.length || mv.down.length)) {
+  if (RB && RB.champion) {
+    /* round 11: a decided Finals leads the week with its champion */
+    const ch = RB.champion, ru = RB.runnerUp, w = (RB.final || {}).wins || {};
+    T.push({ label: 'Champions', value: HW.teamAbbr(L, ch), href: HW.teamHref(L, ch, S), signal: true,
+      sub: 'The ' + HW.teamName(L, ch) + (ru ? ' beat the ' + HW.teamShort(L, ru) + ' ' + (w[ch] || 0) + '–' + (w[ru] || 0) + ' in the Finals.' : ' won the Finals.') });
+  } else if (mv && (mv.up.length || mv.down.length)) {
     const up = mv.up[0], dn = mv.down[0], lead = up || dn, what = mv.metric === 'p_title' ? 'title' : 'playoff';
     T.push({ label: 'Biggest mover', value: HW.teamAbbr(L, lead.key) + ' ' + ptsOf(lead.d), href: HW.teamHref(L, lead.key, S), signal: true,
       sub: 'The ' + HW.teamName(L, lead.key) + (lead.d > 0 ? ' climbed' : ' slipped') + ' to ' + U.pct(lead.p) + ' in our ' + what + ' chance since ' + day(mv.since) + '.' + (up && dn ? ' Biggest fall: ' + HW.teamAbbr(L, dn.key) + ' ' + ptsOf(dn.d) + '.' : '') });
@@ -327,7 +333,10 @@ function render(el, params) {
     const sub = (isCur ? 'Our win chance for every game, playoff and title chances from simulated seasons, team ratings and the players behind it all. ' : '') + (P[ph] || '');
     const openSim = Object.keys(sim).some(t => isNum(sim[t].w_p05) && sim[t].w_p95 > sim[t].w_p05);
     const series = (season && season.postseason && season.postseason.series) || [];
-    const liveSeries = isCur && ph === 'playoffs' ? series.filter(x => !/wins series/i.test(x.summary || '')) : [];
+    /* round 11: a decided Finals (this season's too) opens like a finished season: the recap, never a title race at 100% */
+    const RB = isCur && HW.bracket ? HW.bracket.rounds(season, L) : null;
+    const champNow = RB && RB.champion ? String(RB.champion) : null;
+    const liveSeries = isCur && ph === 'playoffs' && !champNow ? series.filter(x => !/wins series/i.test(x.summary || '')) : [];
     const lev = isCur ? leverage(sim, today.concat(next)) : [];
     const ld = (season && season.leaders) || {};
     const ldKeys = ['pts', 'reb', 'ast', '3pm', 'stl', 'blk', 'ts', 'hpm'].filter(k => (ld[k] || []).length);
@@ -341,7 +350,8 @@ function render(el, params) {
     if (isCur) {
       h += intro({ tag: U.kicker(L, S),
         title: 'Every ' + LN + ' game, player and team, by the numbers.',
-        lede: 'Our chance for tonight’s games, playoff and title chances from ' + Number(nSims || 20000).toLocaleString('en-GB') + ' simulated seasons, and who’s for real, in plain English.',
+        lede: champNow ? 'The ' + HW.seasonLabel(L, S) + ' season is over: the ' + HW.teamName(L, champNow) + ' won the title. How they won it, every series, the award races and the players behind it, in plain English.'
+          : 'Our chance for tonight’s games, playoff and title chances from ' + Number(nSims || 20000).toLocaleString('en-GB') + ' simulated seasons, and who’s for real, in plain English.',
         links: [{ label: 'Games', sub: 'Every game, our chance', href: HW.href(L, 'games') }, { label: 'Standings', sub: 'The playoff picture', href: HW.href(L, 'standings', S) }, { label: 'Scouting Room', sub: 'Every player, every metric', href: HW.href(L, 'scout', S) }] });
       const extra = liveSeries.slice(0, 2).map(x => { const t = x.teams || [], w = x.wins || {}, a = t[0], b = t[1];
         return { label: x.round || 'Series', value: HW.teamAbbr(L, a) + ' ' + (w[a] || 0) + '–' + (w[b] || 0) + ' ' + HW.teamAbbr(L, b), href: HW.href(L, 'standings') + '?tab=bracket',
@@ -349,10 +359,11 @@ function render(el, params) {
       if (power[0]) extra.push({ label: 'Top-rated team', value: HW.teamAbbr(L, power[0].tid) + ' ' + U.signed(power[0].net, 1), href: HW.teamHref(L, power[0].tid, S),
         sub: 'The ' + HW.teamName(L, power[0].tid) + ': ' + U.f(Math.abs(power[0].net), 1) + ' points per 100 possessions ' + (power[0].net >= 0 ? 'better' : 'worse') + ' than an average team, opponent-adjusted.' });
       if (mvp && isNum(mvp.p)) extra.push({ label: 'MVP favourite', value: mvp.name, text: true, href: HW.playerHref(L, mvp.id, S), sub: 'Our chance of winning the vote: ' + U.pct(mvp.p) + '.' });
-      const T = weekTiles(L, S, dig, feat, sim, extra);
-      const sl = stageLine(L, dig.stage, ph) || (P[ph] || '');
+      const T = weekTiles(L, S, dig, feat, sim, champNow ? [] : extra, champNow ? RB : null);
+      const sl = stageLine(L, dig.stage, ph, champNow) || (P[ph] || '');
       h += '<section class="qk-section ql-week">' + QK.sectionHead({ kicker: 'This week in the ' + LN, title: T.length >= 3 ? 'The week in ' + WORDS[T.length].toLowerCase() + ' lines' : 'The week so far', sub: sl }) +
-        (T.length ? QK.stats(T) : '') + '<div class="ql-feat">' + featHero(L, S, feat, sim, recs, LN) + '</div></section>';
+        (T.length ? QK.stats(T) : '') + '<div class="ql-feat">' + (champNow && !(feat && feat.c) ? '' : featHero(L, S, feat, sim, recs, LN)) + '</div></section>';
+      if (champNow) h += '<div id="ov-recap"></div>';
     } else {
       h += U.secHead('How the ' + LN + ' ' + HW.seasonLabel(L, S) + ' season went', esc(sub), null, null, U.kicker(L, S), '<a class="qk-btn" href="' + esc(HW.href(L, 'standings', S)) + '">Final standings</a>');
     }
@@ -394,10 +405,11 @@ function render(el, params) {
     /* round 9: no module twice. With no featured game the hero is already the title race, so the race card here is left
        out (the award races stay) */
     const heroRace = isCur && !(feat && feat.c);
-    const tTeams = heroRace ? [] : Object.keys(sim).filter(t => isNum(sim[t].p_title) && sim[t].p_title > 0);
+    const tTeams = heroRace || champNow ? [] : Object.keys(sim).filter(t => isNum(sim[t].p_title) && sim[t].p_title > 0);
     const awKeys = awards ? (awards.keys || Object.keys(AWN)).filter(k => awards[k] && awards[k].model && Object.keys(awards[k].model).length) : [];
     if (isCur && (tTeams.length || awKeys.length)) {
-      h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'Title race', title: 'Who lifts the trophy?', html: true,
+      h += '<section class="qk-section">' + QK.sectionHead(champNow ? { kicker: 'Award races', title: 'The award races', html: true, sub: 'Our chance for each award, from the full regular season.',
+        actions: '<a class="qk-more" href="' + esc(HW.href(L, 'standings', S) + (HW.sq(L, S) ? '&' : '?') + 'tab=races') + '">Every race</a>' } : { kicker: 'Title race', title: 'Who lifts the trophy?', html: true,
         sub: '<span id="ov-title-lede">Our title chances from ' + Number(nSims || 20000).toLocaleString('en-GB') + ' simulated seasons, and our chance for each award.</span>',
         actions: '<a class="qk-more" href="' + esc(HW.href(L, 'standings', S) + (HW.sq(L, S) ? '&' : '?') + 'tab=chances') + '">Every season forecast</a>' }) + '<div class="qk-grid">';
       if (tTeams.length) h += '<div class="qk-span-' + (awKeys.length ? 6 : 12) + '">' + U.card2('Title chances', 'Our chance from the season simulation, in team colours', '<div id="ov-title"></div>',
@@ -416,8 +428,8 @@ function render(el, params) {
     const st = (season && season.standings) || {};
     const confs = Object.keys(st).filter(c => (st[c] || []).length);
     if (confs.length) {
-      h += '<section class="qk-section">' + U.head({ kicker: 'Standings', title: ph === 'preseason' ? 'Projected standings' : isCur ? 'Playoff picture' : 'Final standings',
-        sub: isCur ? 'Projected wins, our chance of a playoff place (play-in excluded) and of the title.' : 'Records and seeds.', actions: '<a class="qk-btn" href="' + esc(HW.href(L, 'standings', S)) + '">Full standings →</a>' }) + '<div class="qk-grid">' +
+      h += '<section class="qk-section">' + U.head({ kicker: 'Standings', title: ph === 'preseason' ? 'Projected standings' : isCur && !champNow ? 'Playoff picture' : 'Final standings',
+        sub: isCur && !champNow ? 'Projected wins, our chance of a playoff place (play-in excluded) and of the title.' : 'Records and seeds.', actions: '<a class="qk-btn" href="' + esc(HW.href(L, 'standings', S)) + '">Full standings →</a>' }) + '<div class="qk-grid">' +
         confs.map((c, i) => '<div class="qk-span-6">' + U.card2(c, '', '<div id="ov-st-' + i + '"></div>', { flush: true }) + '</div>').join('') + '</div></section>';
     }
     // value and leverage
@@ -445,7 +457,7 @@ function render(el, params) {
     if (isCur) h += '<p class="qk-sub hw-ov-doing"><a class="qk-link" href="' + esc(HW.href(L, 'model') + '?tab=calibration') + '">How we’re doing →</a> Our record and every forecast checked against the result, on the Model page.</p>';
     el.innerHTML = h;
     /* round 9: a past season reads as a recap (hw-recap.js): champion, bracket, awards, our calls */
-    if (!isCur && HW.recap) HW.recap.fill(document.getElementById('ov-recap'), L, S, season, awards, hist);
+    if ((!isCur || champNow) && HW.recap) HW.recap.fill(document.getElementById('ov-recap'), L, S, season, awards, hist);
 
     // ── scoreboard
     if (first) {
@@ -513,7 +525,7 @@ function render(el, params) {
       const cols = [{ key: 'rk', label: '#', num: true },
         { key: 'nm', label: 'Team', type: 'entity', mark: r => U.team(L, r.team), href: r => HW.teamHref(L, r.team, S) },
         pre ? { key: 'exp', label: 'Proj W', num: true, fmt: v => U.f(v, 1), tip: 'Projected wins: mean of the simulated seasons' } : { key: 'w', label: 'W-L', num: true, fmt: (v, r) => HW.record(r.w, r.l) }];
-      if (isCur && Object.keys(sim).length) {
+      if (isCur && !champNow && Object.keys(sim).length) {
         cols.push({ key: 'pp', label: 'Playoffs', type: 'bar', max: 1, fmt: v => U.pct(v), tip: 'Our chance of a playoff place (play-in excluded)' });
         cols.push({ key: 'pt', label: 'Title', num: true, fmt: v => U.pct(v), tip: 'Our title chance' });
       } else {

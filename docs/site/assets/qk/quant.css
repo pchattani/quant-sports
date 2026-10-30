@@ -1518,3 +1518,36 @@ html.qk-tray-on .fv-notice { bottom: var(--qk-tray-h, 64px); }
 .qk-sw li .v { font: 600 13px/1 var(--font-cond); color: var(--ink-2); white-space: nowrap; }
 /* the tale of the tape's gap (QK.tape({ gap: true })) */
 .qk-tape-r .lb small.gap { display: block; margin-top: 2px; font: 700 10.5px/1 var(--font-cond); letter-spacing: 0.06em; text-transform: uppercase; color: var(--volt); }
+
+/* ── round 11: the champion hero (QK.champHero) ───────────────────────────────────────────────────────────── */
+.qk-champ { background: var(--s-1); min-width: 0; }
+.qk-champ-top { position: relative; overflow: hidden; padding: 26px 28px 24px; background: var(--tb, var(--signal-deep)); color: #fff; box-shadow: inset 0 -6px 0 var(--te, transparent); min-width: 0; }
+.qk-champ-top::after { content: ""; position: absolute; right: -30px; top: 0; bottom: 0; width: 110px; background: var(--volt); transform: skewX(var(--skew)); opacity: 0.9; }
+.qk-champ-ab { position: absolute; right: 110px; bottom: -18px; font: 400 clamp(6rem, 14vw, 12rem)/0.85 var(--font-display); opacity: 0.18; pointer-events: none; white-space: nowrap; }
+.qk-champ-k { display: inline-block; position: relative; background: var(--block); color: var(--volt); font: 700 var(--fs-2xs)/1 var(--font-cond); letter-spacing: 0.1em; text-transform: uppercase; padding: 7px 16px 7px 9px; clip-path: polygon(0 0, 100% 0, calc(100% - 8px) 100%, 0 100%); }
+.qk .qk-champ-nm { position: relative; margin: 14px 0 0; font: 400 clamp(2.75rem, 2rem + 3.4vw, 5.25rem)/0.88 var(--font-display); text-transform: uppercase; color: #fff; max-width: 80%; overflow-wrap: anywhere; }
+.qk .qk-champ-nm.qk-long { font: 800 clamp(1.75rem, 1.3rem + 1.6vw, 2.75rem)/1.02 var(--font-cond); }
+.qk-champ .qk-champ-nm a, .qk-champ .qk-champ-nm a:visited { color: #fff; text-decoration: none; }
+.qk-champ .qk-champ-nm a:hover { color: var(--volt); }
+.qk-champ-sub { position: relative; margin-top: 8px; font: 700 14px/1.2 var(--font-cond); letter-spacing: 0.06em; text-transform: uppercase; color: rgba(255, 255, 255, 0.88); }
+.qk-champ .qk-champ-top, .qk-champ .qk-champ-sub, .qk-champ .qk-champ-h { color: #fff; }
+.qk-champ-h { position: relative; margin: 14px 0 0; max-width: 64ch; font: 600 18px/1.4 var(--font-ui); }
+.qk-champ-games { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 6px; margin-top: 18px; max-width: 80%; }
+.qk-champ-g { display: grid; gap: 2px; min-width: 64px; padding: 8px 10px; background: rgba(0, 0, 0, 0.55); color: #fff; text-decoration: none; }
+.qk-champ a.qk-champ-g, .qk-champ a.qk-champ-g:visited { color: #fff; text-decoration: none; }
+.qk-champ-g .k { font: 700 11px/1 var(--font-cond); letter-spacing: 0.08em; text-transform: uppercase; color: var(--block-ink-2); }
+.qk-champ-g b { font: 400 1.75rem/0.9 var(--font-display); }
+.qk-champ-g small { font: 600 11px/1.1 var(--font-cond); letter-spacing: 0.04em; text-transform: uppercase; color: var(--block-ink-3); }
+.qk-champ-g.w { background: var(--block); box-shadow: inset 0 -3px 0 var(--volt); }
+.qk-champ-g.w b { color: var(--volt); }
+a.qk-champ-g:hover { outline: 2px solid var(--volt); outline-offset: -2px; }
+.qk-champ-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 20px; padding: 14px 22px 16px; }
+.qk-champ-foot p { margin: 0; max-width: 72ch; font: 500 14px/1.45 var(--font-ui); color: var(--ink-2); }
+@media (max-width: 640px) {
+  .qk-champ-top { padding: 18px 16px 20px; }
+  .qk-champ-top::after { width: 56px; right: -24px; }
+  .qk .qk-champ-nm, .qk-champ-games { max-width: 88%; }
+  .qk-champ-ab { right: 40px; }
+  .qk-champ-g { min-width: 54px; padding: 6px 8px; }
+  .qk-champ-foot { padding: 12px 14px 14px; }
+}

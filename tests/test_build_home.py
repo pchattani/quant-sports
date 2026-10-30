@@ -201,3 +201,22 @@ def test_record_widens_to_14_days_when_the_week_is_thin():
     assert rec["days"] == 14 and rec["n"] == 25                        # 5 this week: too few, so the last 14 days
     rec = bh.record_with_floor(pool[:5], now)
     assert rec["days"] == 7 and rec["n"] == 5                          # nothing more to widen to: the week, flagged small
+
+
+# ── round 11: a decided title (champions) ─────────────────────────────────────────────────────────────────────
+def test_decided_race_and_eve_chance():
+    assert bh.decided_race([{"p": 1.0}, {"p": 0.0}])
+    assert not bh.decided_race([{"p": 0.97}, {"p": 0.03}])
+    assert not bh.decided_race([])
+    log = {"p_title": {"2026-09-20": {"20": 0.31}, "2026-09-26": {"20": 0.35}, "2026-09-28": {"20": 0.5}, "_meta": {}}}
+    assert bh.eve_chance(log, "p_title", "20", "2026-09-27") == (0.35, "2026-09-26")
+    assert bh.eve_chance(log, "p_title", "99", "2026-09-27") == (None, None)
+
+
+def test_champion_row():
+    out = {"champions": []}
+    bh.champion(out, "baseball", "MLB", "World Series", {"name": "Brewers", "full": "Milwaukee Brewers", "abbr": "MIL", "colour": "#13294b", "href": "x"},
+                {"name": "Rays", "full": "Tampa Bay Rays", "abbr": "TB"}, "2026-10-28", result=[4, 1], pre_p=0.22831, pre_label="on the eve of the postseason")
+    c = out["champions"][0]
+    assert c["name"] == "Milwaukee Brewers" and c["short"] == "Brewers" and c["opp"]["short"] == "Rays"
+    assert c["result"] == [4, 1] and c["how"] == "in the World Series" and c["decided"] == "2026-10-28" and c["pre_p"] == 0.2283

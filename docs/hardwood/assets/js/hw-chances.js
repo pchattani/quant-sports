@@ -28,9 +28,11 @@ function chancesTab(node, L, S) {
     if (!U.ok(season)) { node.innerHTML = U.empty('Not built yet', 'The season payload for ' + HW.seasonLabel(L, S) + ' is not available.'); return; }
     const sim = HW.simTeams(season), st = season.standings || {}, fmt = season.format || {};
     const open = Object.keys(sim).some(t => isNum(sim[t].w_p05) && sim[t].w_p95 > sim[t].w_p05);
-    const anyTitle = Object.keys(sim).some(t => isNum(sim[t].p_title) && sim[t].p_title > 0 && sim[t].p_title < 1);
+    /* round 11: a decided Finals (the played series has a winner) is settled even before the simulation catches up */
+    const RB = HW.bracket ? HW.bracket.rounds(season, L) : null, champ = RB && RB.champion ? String(RB.champion) : null;
+    const anyTitle = !champ && Object.keys(sim).some(t => isNum(sim[t].p_title) && sim[t].p_title > 0 && sim[t].p_title < 1);
     if (!open && !anyTitle) {
-      node.innerHTML = QK.explain('The ' + esc(HW.seasonLabel(L, S)) + ' season is over, so its chances are settled. The <a class="qk-link" href="' + esc(HW.href(L, '', S)) + '">season recap</a> has the champion, the bracket and our calls against what happened; the <a class="qk-link" href="' + esc(HW.href(L, 'standings', S) + (HW.sq(L, S) ? '&' : '?') + 'tab=bracket') + '">Bracket</a> has every series.', { title: 'Chances end with the season.' });
+      node.innerHTML = QK.explain((champ ? '<b>The ' + esc(HW.teamName(L, champ)) + ' won the ' + esc(HW.seasonLabel(L, S)) + ' title.</b> ' : '') + 'The ' + esc(HW.seasonLabel(L, S)) + ' season is over, so its chances are settled. The <a class="qk-link" href="' + esc(HW.href(L, '', S)) + '">season recap</a> has the champion, the bracket and our calls against what happened; the <a class="qk-link" href="' + esc(HW.href(L, 'standings', S) + (HW.sq(L, S) ? '&' : '?') + 'tab=bracket') + '">Bracket</a> has every series.', { title: 'Chances end with the season.' });
       return;
     }
     const confs = Object.keys(st).filter(c => (st[c] || []).length).sort();

@@ -106,26 +106,36 @@ function recap(el, post, season, games, L, S) {
   const ranked = Object.keys(pre).sort((a, b) => pre[b] - pre[a]);
   const fav = ranked[0];
   const upsets = list.filter(x => { const w = BP.charts.winnerOf(x); return w && x.teams[1] === w; }).length;
+  /* round 11: a decided postseason's tiles: champion, runner-up, the series result, our call for the champion */
   const tiles = [];
-  if (champ) tiles.push({ label: S + ' champions', value: BP.teamAbbr(champ), signal: true, sub: BP.teamName(champ) + (wsW ? ', beat the ' + BP.teamShort(runner) + ' ' + wsW[0] + '–' + wsW[1] : ''), href: BP.teamHref(champ, L, S) });
-  if (champ && isNum(pre[champ])) tiles.push({ label: 'Our call for them', value: BP.ui.pct(pre[champ]), sub: 'on the eve of the postseason, ' + ordinal(ranked.indexOf(champ) + 1) + ' of ' + ranked.length + (isNum(first[champ]) ? '; ' + BP.ui.pct(first[champ]) + ' after the first week' : '') });
-  if (fav && fav !== champ) tiles.push({ label: 'Our favourite', value: BP.teamAbbr(fav) + ' ' + BP.ui.pct(pre[fav]), sub: (reachOf(post, fav, champ) || 'did not win') + '.', href: BP.teamHref(fav, L, S) });
-  tiles.push({ label: 'Series won by the club without home field', value: String(upsets), sub: 'of ' + list.filter(x => BP.charts.winnerOf(x)).length + ' series' });
+  if (champ) tiles.push({ label: 'Champion', value: BP.teamAbbr(champ), signal: true, sub: BP.teamName(champ), href: BP.teamHref(champ, L, S) });
+  if (runner) tiles.push({ label: 'Runner-up', value: BP.teamAbbr(runner), sub: BP.teamName(runner), href: BP.teamHref(runner, L, S) });
+  if (wsW) tiles.push({ label: 'Series result', value: wsW[0] + '–' + wsW[1], sub: 'the World Series, in ' + (wsW[0] + wsW[1]) + ' games' });
+  if (champ && isNum(pre[champ])) tiles.push({ label: 'Our call for them', value: BP.ui.pct(pre[champ]), sub: 'on the eve of the postseason, ' + ordinal(ranked.indexOf(champ) + 1) + ' of ' + ranked.length +
+    (fav && fav !== champ ? '; our favourite, the ' + BP.teamShort(fav) + ' (' + BP.ui.pct(pre[fav]) + '), ' + (reachOf(post, fav, champ) || 'did not win').toLowerCase() : fav === champ ? ': our favourite' : '') +
+    (isNum(first[champ]) ? '; ' + BP.ui.pct(first[champ]) + ' after the first week' : '') });
+  const upNote = upsets + ' of ' + list.filter(x => BP.charts.winnerOf(x)).length + ' series went to the club without home field.';
   let h = QK.sectionHead({ kicker: 'Postseason · MLB ' + S, title: champ ? 'The ' + BP.teamShort(champ) + ' won it all' : 'How the ' + S + ' postseason went', sub: 'The bracket as it was played, every series score, and the chances we gave each club before the first pitch of October against how far it went.' }) +
     '<div class="bp-kpis">' + QK.stats(tiles) + '</div>';
-  if (ranked.length) h += '<section class="qk-section">' + BP.ui.card2('Our calls against what happened', 'Our World Series chance for each club on ' + BP.fmtDate((calls.preplayoff || {}).asof) + ', the morning of the first postseason game, and how far each went', '<div id="ps-calls" class="qk-chart" style="--h:' + Math.max(300, 34 * ranked.length + 60) + 'px" role="img" aria-label="Our pre-postseason World Series chances against how far each club went"></div>') + '</section>';
+  if (ranked.length) h += '<section class="qk-section">' + BP.ui.card2('Our calls against what happened', 'Our World Series chance for each club on ' + BP.fmtDate((calls.preplayoff || {}).asof) + ', on the eve of the postseason, and how far each went', '<div id="ps-calls" class="qk-chart" style="--h:' + Math.max(300, 34 * ranked.length + 60) + 'px" role="img" aria-label="Our pre-postseason World Series chances against how far each club went"></div>') + '</section>';
   h += '<section class="qk-section">' + BP.ui.card2('The bracket', 'Seeds, every series score; click a series for its games', '<div id="ps-bk"></div><div id="ps-sd" class="pad0"></div>') + '</section>' +
     '<section class="qk-section">' + BP.ui.card2('Every series', list.length + ' series', seriesTable(list, games, L, null), { flush: true }) + '</section>' +
-    QK.explain('Our calls are rebuilt walk-forward from what was known that morning: the season simulation on team ratings from each club’s run differential, the bracket as it stood. ' + (calls.method ? esc(calls.method) + ' ' : '') + 'A 15% favourite still loses 85 times in 100, and a 12-club bracket of short series is close to a lottery.', { title: 'How sure were we?' });
+    QK.explain((/as logged/.test(calls.method || '') ? esc(calls.method) + ' ' : 'Our calls are rebuilt walk-forward from what was known that morning: the season simulation on team ratings from each club’s run differential, the bracket as it stood. ' + (calls.method ? esc(calls.method) + ' ' : '')) + 'A 15% favourite still loses 85 times in 100, and a 12-club bracket of short series is close to a lottery: ' + esc(upNote), { title: 'How sure were we?' });
   el.innerHTML = h;
-  if (ranked.length) {
-    const T = QKC.tokens();
-    const rows = ranked.slice();
-    QKC.bar('#ps-calls', { cats: rows.map(t => BP.teamAbbr(t) + ' · ' + (reachOf(post, t, champ) || '')), series: [{ name: 'Our World Series chance', data: rows.map(t => pre[t]) }],
-      colors: rows.map(t => (t === champ ? T.volt : QK.color.ensure(BP.ui.raw(t) || T.model, T.s1, 3))), horizontal: true, labels: true, labelWidth: 230, fmt: v => BP.pct(v, 0),
-      valName: 'Our World Series chance before the postseason', catName: 'Club and how far it went', label: 'Our calls against what happened' });
-  }
+  if (ranked.length) callsChart('#ps-calls', post, calls);
 }
+/* Our calls against what happened: the World Series chance we gave each club on the eve of the postseason (season.json
+   "calls"), the champion in volt, each bar labelled with how far the club went. Shared with the overview's recap. */
+function callsChart(sel, post, calls) {
+  const pre = ((calls || {}).preplayoff || {}).p_ws || {}, champ = post.champion;
+  const rows = Object.keys(pre).sort((a, b) => pre[b] - pre[a]);
+  if (!rows.length) return;
+  const T = QKC.tokens();
+  QKC.bar(sel, { cats: rows.map(t => BP.teamAbbr(t) + ' · ' + (reachOf(post, t, champ) || '')), series: [{ name: 'Our World Series chance', data: rows.map(t => pre[t]) }],
+    colors: rows.map(t => (t === champ ? T.volt : QK.color.ensure(BP.ui.raw(t) || T.model, T.s1, 3))), horizontal: true, labels: true, labelWidth: 230, fmt: v => BP.pct(v, 0),
+    valName: 'Our World Series chance before the postseason', catName: 'Club and how far it went', label: 'Our calls against what happened' });
+}
+BP.recap = { callsChart: callsChart, reachOf: reachOf };
 function ordinal(n) { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
 
 function render(el, params) {
@@ -135,7 +145,8 @@ function render(el, params) {
   return BP.loadAll([BP.ypath('season.json', L, S), BP.ypath('schedule.json', L, S)]).then(arr => {
     if (!el.isConnected) return;
     const season = BP.ok(arr[0]) ? arr[0] : null;
-    const post = postOf(season, S === BP.currentSeason(L) ? idx.postseason : null);
+    /* round 11: a decided World Series opens as played (the recap), this season's too */
+    const post = BP.charts.asPlayed(postOf(season, S === BP.currentSeason(L) ? idx.postseason : null));
     const body = document.getElementById('ps-body');
     if (!post || (!(post.series || []).length && !Object.keys(post.teams || {}).length)) {
       body.innerHTML = QK.sectionHead({ kicker: 'Postseason · MLB ' + S, title: 'The bracket' }) + BP.ui.card2('Postseason', '', season && season.postseason && season.postseason.available === false ? BP.notBuilt('The bracket', season.postseason) : BP.muted('The ' + S + ' bracket is not set yet. Until it is, our playoff chances live on <a href="' + BP.href('chances', L, S) + '">Chances</a>.'));

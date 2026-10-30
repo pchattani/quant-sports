@@ -165,7 +165,7 @@ function raceFallback() {
   var F = D.futures || {}, best = null;
   Object.keys(F).forEach(function (k) {
     var rows = (F[k].rows || []).filter(function (r) { return r.p > 0; });
-    if (rows.length < 2) return;
+    if (rows.length < 2 || overRace(k, F[k].rows)) return;
     var gap = rows[0].p - rows[1].p;
     if (!best || gap < best.gap) best = { k: k, f: F[k], rows: rows, gap: gap };
   });
@@ -186,8 +186,29 @@ function tl(kicker, num, head, text, href, sport) {
 function pts(d) { var v = Math.round(Math.abs(d) * 100); return (d > 0 ? '+' : d < 0 ? '−' : '±') + v; }
 function sayPct(p) { return Math.round(p * 100) + '%'; }
 function inN(p) { var n = Math.round(1 / Math.max(p, 0.01)); return 'about 1 in ' + n; }
+/* ───────────────────────────── round 11: a decided title (home.json champions, scripts/build_home.py) */
+var CHAMP_DAYS = 10;   // a title runs as a story for about ten days after it is decided
+/* a race that is over: one side at 100% (QK.decided) in a sport whose title is decided (home.json champions) */
+function overRace(k, rows) { return !!QK.decided(rows || []) && champsOf(String(k).split('_')[0]).length > 0; }
+function champsOf(sport) { return (D.champions || []).filter(function (c) { return !sport || c.sport === sport; }); }
+function champLeague(c) { return c.sport === 'basketball' || c.sport === 'college' ? c.league + ' champions' : 'Champions'; }
+/* "beat Rays 4–1 in the World Series" */
+function champHow(c) {
+  var o = c.opp ? (c.opp.short || c.opp.name) : '';
+  var r = c.result && isNum(c.result[0]) ? ' ' + c.result[0] + '–' + c.result[1] : c.score && isNum(c.score[0]) ? ' ' + c.score[0] + '–' + c.score[1] : '';
+  return (o ? 'beat ' + (THE_SPORTS.indexOf(c.sport) >= 0 ? 'the ' : '') + o + r + ' ' : 'won ') + (c.how || ('the ' + c.event));
+}
+function champStories() {
+  return champsOf().filter(function (c) { var n = c.decided ? -dayDiff(c.decided + 'T12:00:00') : null; return n !== null && n >= 0 && n <= CHAMP_DAYS; }).slice(0, 2).map(function (c) {
+    var the = THE_SPORTS.indexOf(c.sport) >= 0 ? 'The ' : '';
+    var res = c.result && isNum(c.result[0]) ? c.result[0] + '–' + c.result[1] : c.score && isNum(c.score[0]) ? c.score[0] + '–' + c.score[1] : 'Won';
+    var call = isNum(c.pre_p) ? ' We gave them <b>' + sayPct(c.pre_p) + '</b> ' + esc(c.pre_label || 'before the playoffs') + '.' : '';
+    return tl(champLeague(c) + ' · ' + c.event, esc(res), the + (c.short || c.name) + ' are champions',
+      esc(c.name) + ' ' + esc(champHow(c)) + (c.decided ? ' (' + esc(ymd(c.decided)) + ')' : '') + '.' + call, c.href, c.sport);
+  });
+}
 function renderToplines() {
-  var G = D.digest || {}, out = [];
+  var G = D.digest || {}, out = champStories();
   var s = G.swing;
   if (s && isNum(s.delta)) {
     var up = s.delta > 0;
@@ -227,10 +248,19 @@ function renderAround() {
     var hot = (HOT_OF[q.key] || []).map(function (k) { var l = L[k]; return l && l.rows && l.rows[0] ? l : null; }).filter(Boolean)[0];
     var hr = hot ? hot.rows[0] : null;
     return '<article class="hm-ar" style="--sa:' + q.accent + '"><a class="hm-ar-top" href="' + esc(QK.sportUrl(q.key)) + '"><span class="hm-ar-ic" aria-hidden="true">' + QK.ICON[q.key] + '</span><span class="hm-ar-name">' + esc(q.label) + '</span>' + (lm[q.key] ? '<span class="qk-pill live">Live</span>' : '') + '<span class="hm-ar-site">' + esc(q.site) + ' →</span></a>' +
-      '<p class="hm-ar-stage">' + esc(s.ok === false ? 'Data unavailable right now' : (t.stage || s.status || q.leagues)) + (s.stale ? ' <span class="hm-ar-stale">· data ' + esc(Math.round(s.age_hours)) + ' h old</span>' : '') + '</p>' +
+      '<p class="hm-ar-stage">' + (s.ok === false ? esc('Data unavailable right now') : aroundStage(q.key, t.stage || s.status || q.leagues)) + (s.stale ? ' <span class="hm-ar-stale">· data ' + esc(Math.round(s.age_hours)) + ' h old</span>' : '') + '</p>' +
       (n ? '<a class="hm-ar-next" href="' + esc(n.href || QK.sportUrl(q.key)) + '"><span class="k">' + (n.live ? 'Now' : 'Next') + '</span><b>' + esc(n.title) + '</b><span class="w">' + esc(whenTag({ status: n.live ? 'live' : 'pre', start: n.start, tba: n.tba })) + '</span></a>' : '') +
       (hr ? '<a class="hm-ar-hot" href="' + esc(hr.href || '#') + '"><span class="k">Hot</span><b>' + esc(hr.name) + '</b><span class="w num">' + esc(hr.value) + ' ' + esc(hot.unit || hot.title || '') + '</span></a>' : '') + '</article>';
   }).join('');
+}
+
+/* the Around card's line: a decided title says "Champions: Milwaukee Brewers · beat the Rays 4–1 in the World Series"
+   in place of "Offseason"; the sport's other leagues keep their stage (the builder's "<L> champions: …" part drops) */
+function aroundStage(sport, stage) {
+  var C = champsOf(sport);
+  if (!C.length) return esc(stage);
+  var rest = String(stage || '').split(' · ').filter(function (x) { return x && !/champions|^off-?season$/i.test(x); });
+  return C.map(function (c) { return '<b>' + esc(champLeague(c)) + ':</b> ' + esc(c.name) + ' · ' + esc(champHow(c)); }).join('<br>') + (rest.length ? '<br>' + esc(rest.join(' · ')) : '');
 }
 
 /* ───────────────────────────── what to watch: "Six games. Our calls." (ranked by the significance score) */
@@ -366,7 +396,7 @@ var RACE_ORDER = ['hockey', 'basketball_2', 'basketball', 'nfl', 'baseball', 'f1
 function renderRaces() {
   var F = D.futures || {}, ft = (D.charts || {}).football_titles || [];
   /* the race already leading the page (the fallback hero) is not shown twice */
-  var tabs = RACE_ORDER.filter(function (k) { return k !== FEATURE_RACE && F[k] && F[k].rows && F[k].rows.filter(function (r) { return r.p > 0; }).length > 1; }).map(function (k) {
+  var tabs = RACE_ORDER.filter(function (k) { return k !== FEATURE_RACE && F[k] && F[k].rows && !overRace(k, F[k].rows) && F[k].rows.filter(function (r) { return r.p > 0; }).length > 1; }).map(function (k) {
     return { id: k, sport: k.split('_')[0], label: raceLabel(k, F[k].title), title: F[k].title || k };
   });
   if (ft.length) tabs.push({ id: 'football', sport: 'football', label: 'Football', title: 'League titles' });

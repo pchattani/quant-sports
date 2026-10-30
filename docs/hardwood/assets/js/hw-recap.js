@@ -42,11 +42,18 @@ function fill(host, L, S, season, awards, hist) {
   const ru = (R && R.runnerUp) || (hrow && hrow.runner_up ? String(hrow.runner_up) : null);
   const w = fin ? fin.wins || {} : {};
   const score = fin && ru ? (w[champ] || 0) + '-' + (w[ru] || 0) : '';
-  const bl = QK.color.block(HW.teamColourRaw(L, champ));
   const fmvp = hrow && hrow.finals_mvp ? (HW.NAMES[L].players[String(hrow.finals_mvp)] ? HW.playerName(L, hrow.finals_mvp) : String(hrow.finals_mvp)) : '';
+  /* round 11: the kit's champion hero (QK.champHero): the Finals result, each game as a chip, the Finals MVP */
+  const LGN = L === 'wnba' ? 'WNBA' : 'NBA';
+  const games = ((fin && fin.games) || []).filter(g => isNum(g.hs) && isNum(g.as)).map((g, i) => {
+    const home = String(g.home) === champ, a = home ? g.hs : g.as, b = home ? g.as : g.hs;
+    return { label: 'G' + (i + 1), score: a + '–' + b, won: a > b, sub: (home ? 'home' : 'away') + (g.date ? ' · ' + HW.fmtDate(g.date, { year: false }) : ''), href: g.id ? HW.gameHref(L, g.id, S) : null };
+  });
+  const t = U.team(L, champ) || {};
   let h = '<section class="qk-section">' + QK.sectionHead({ kicker: 'How it finished', title: 'The ' + HW.teamShort(L, champ) + ' win it all', sub: HW.leagueName(L) + ' ' + HW.seasonLabel(L, S) + ': the champion, every series, the awards and how our numbers called it.' }) +
-    '<a class="hw-champ" href="' + esc(HW.teamHref(L, champ, S)) + '" style="--tc:' + esc(bl.bg) + ';--te:' + esc(bl.edge || bl.bg) + '"><span class="k">' + esc(HW.seasonLabel(L, S)) + ' champions</span><b>' + esc(HW.teamName(L, champ)) + '</b>' +
-    '<span class="s">' + (ru ? 'Beat the ' + esc(HW.teamShort(L, ru)) + (score ? ' ' + esc(score) : '') + ' in the ' + esc(L === 'wnba' ? 'WNBA' : 'NBA') + ' Finals' : '') + (fmvp ? ' · Finals MVP ' + esc(fmvp) : '') + '</span></a>';
+    QK.champHero({ kicker: HW.seasonLabel(L, S) + ' ' + LGN + ' champions', name: HW.teamName(L, champ), href: HW.teamHref(L, champ, S), team: { abbr: HW.teamAbbr(L, champ), colour: HW.teamColourRaw(L, champ) || t.colour },
+      headline: ru ? 'Beat the ' + HW.teamName(L, ru) + (score ? ' ' + score.replace('-', '–') : '') + ' in the ' + LGN + ' Finals.' : '', games: games,
+      stats: fmvp ? [{ label: 'Finals MVP', value: fmvp, text: true }] : [] });
   if (R && R.rounds.length) h += '<div class="qk-card" style="margin-top:var(--sp-4)"><div class="qk-card-head"><div><div class="qk-card-title">The bracket</div><div class="qk-card-sub">Every series and its score; tap one for its games</div></div></div><div class="qk-card-body">' + HW.bracket.html(L, S, season, { playin: false, compact: true }) + '</div></div>';
   h += '<div class="qk-grid hw-sec"><div class="qk-span-6" id="rc-calls"></div><div class="qk-span-6" id="rc-awards"></div></div></section>';
   host.innerHTML = h;

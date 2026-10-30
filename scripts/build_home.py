@@ -55,6 +55,13 @@ Round 6 (the hub experience; the market quiet beside ours; our record off the pa
                          colour, href, w, l, d, gp, margin, players }] (each site digest's team of the week, best first) }
     digest.record and calibration stay in the payload; the page no longer shows them (they live on the Model pages).
 
+Round 11 (a decided title; added field):
+    champions            [{ sport, league, event, name, short, abbr, colour, href, opp: { name, short, abbr }, result: [w, l]
+                         | null, score (a one-game final, our side first) | null, how ("in the World Series"), decided
+                         (YYYY-MM-DD), pre_p, pre_label }]: every sport's title decided this season, newest first. The
+                         page says "Champions" on the sport's Around card and runs a story card for ten days after the
+                         title is decided; a decided race (one side at 100%) never shows as a title race or a favourite.
+
 Sites not launched yet (PENDING, e.g. The Quant Campus) are left out of home.json and search.json unless their key
 is in LAUNCHED or --with-pending is given, so the live home page never links a Pages site that does not exist.
 The kit hides them the same way (QK.SPORTS drops `pending` entries outside local preview).
@@ -296,6 +303,35 @@ def hot_team(out: dict, sport: str, league: str, hot, t: dict, players: bool = F
                              "short": t.get("name"), "abbr": t.get("abbr"), "colour": t.get("colour"), "href": t.get("href"),
                              "w": hot.get("w") or 0, "l": hot.get("l") or 0, "d": hot.get("d") or 0, "gp": hot.get("gp"),
                              "margin": hot.get("margin"), "players": players or None})
+
+
+def champion(out: dict, sport: str, league: str, event: str, t: dict, opp: dict | None, decided, result=None, score=None,
+             pre_p=None, pre_label: str | None = None, how: str | None = None):
+    """A title decided this season as a Home candidate (module docstring: champions)."""
+    out["champions"].append({"sport": sport, "league": league, "event": event, "name": t.get("full") or t.get("name"),
+                             "short": t.get("name"), "abbr": t.get("abbr"), "colour": t.get("colour"), "href": t.get("href"),
+                             "opp": {"name": opp.get("full") or opp.get("name"), "short": opp.get("name"), "abbr": opp.get("abbr")} if opp else None,
+                             "result": list(result) if result else None, "score": list(score) if score else None,
+                             "how": how or ("in the " + event), "decided": str(decided)[:10] if decided else None,
+                             "pre_p": r4(pre_p), "pre_label": pre_label})
+
+
+def eve_chance(log, metric: str, key: str, before: str | None):
+    """Our chance for `key` in a race log ({metric: {day: {key: p}}}) on the last day before `before` (the eve of the
+    playoffs): what we published then, no look-ahead. (p, day) or (None, None)."""
+    snaps = (log or {}).get(metric) or {}
+    days = sorted(d for d in snaps if not str(d).startswith("_") and (before is None or str(d) < str(before)))
+    for d in reversed(days):
+        v = (snaps.get(d) or {}).get(str(key))
+        if isinstance(v, (int, float)):
+            return float(v), d
+    return None, None
+
+
+def decided_race(rows: list) -> bool:
+    """A title race that is over: one row at 100% and the rest at 0 (the front end's QK.decided)."""
+    ps = [r.get("p") for r in rows if isinstance(r.get("p"), (int, float))]
+    return bool(ps) and max(ps) >= 0.9995 and sum(1 for x in ps if x > 0.0005) == 1
 
 
 def fan_stories(races, hots):
@@ -673,6 +709,22 @@ def build_basketball(ctx: Ctx, base: str, out: dict):
         hot_team(out, "basketball", LU, (lg.get("digest") or {}).get("hot"), tm((((lg.get("digest") or {}).get("hot")) or {}).get("key")))
         rows = sorted(sim.items(), key=lambda kv: -(kv[1].get("p_title") or 0))
         rows = [(k, v) for k, v in rows if (v.get("p_title") or 0) > 0][:8]
+        # round 11: a decided Finals (the played series has a winner) is a champion, never a title race at 100%
+        post = [x for x in ((season.get("postseason") or {}).get("series") or []) if isinstance(x, dict)]
+        fin = next((x for x in post if (x.get("rkey") == "finals" or ("Finals" in str(x.get("round") or "") and "Conference" not in str(x.get("round") or "")))
+                    and x.get("winner")), None)
+        champ_l = None
+        if fin:
+            champ_l = str(fin["winner"])
+            opp = next((str(t) for t in fin.get("teams") or [] if str(t) != champ_l), None)
+            w = fin.get("wins") or {}
+            gl = [g for g in fin.get("games") or [] if g.get("hs") is not None]
+            first_post = min((str(g.get("date") or "")[:10] for x in post for g in x.get("games") or [] if g.get("date")), default=None)
+            pp, _d = eve_chance(race_log(d / L / "race_log.json", lg.get("current_season")), "p_title", champ_l, first_post)
+            champion(out, "basketball", LU, f"{LU} Finals", tm(champ_l), tm(opp) if opp else None,
+                     max((str(g.get("date") or "")[:10] for g in gl), default=None), result=[w.get(champ_l, 0), w.get(opp, 0)] if opp else None,
+                     pre_p=pp, pre_label="on the eve of the playoffs")
+            rows = []
         if rows:
             futures[L] = {"title": f"{LU} title", "rows": [
                 {"name": (teams.get(k) or {}).get("name") or k, "abbr": (teams.get(k) or {}).get("abbr"),
@@ -682,7 +734,10 @@ def build_basketball(ctx: Ctx, base: str, out: dict):
         live_rnd = next((str((g.get("series") or {}).get("round")) for g in (lg.get("today") or []) + (lg.get("next_games") or [])
                          if (g.get("series") or {}).get("round")), None)
         ph = str(lg.get("phase") or "")
-        stages.append(live_rnd if live_rnd and live_rnd.startswith(LU) else LU + " " + (live_rnd or PHASE_WORD.get(ph, ph)))
+        if champ_l:
+            stages.append(f"{LU} champions: " + ((teams.get(champ_l) or {}).get("short") or champ_l))
+        else:
+            stages.append(live_rnd if live_rnd and live_rnd.startswith(LU) else LU + " " + (live_rnd or PHASE_WORD.get(ph, ph)))
         if rows:
             k0 = rows[0][0]
             kpis.append({"label": f"{LU} fav", "value": (teams.get(k0) or {}).get("short") or k0,
@@ -822,6 +877,18 @@ def build_baseball(ctx: Ctx, base: str, out: dict):
     pteams = ps.get("teams") or {}
     rows = sorted(pteams.items(), key=lambda kv: -(kv[1].get("p_ws") or 0))
     rows = [(k, v) for k, v in rows if (v.get("p_ws") or 0) > 0]
+    # round 11: a decided World Series (digest.stage.title, scripts/build_bullpen.py) is a champion, never a race at 100%
+    ttl = ((idx.get("digest") or {}).get("stage") or {}).get("title") or {}
+    champ = str(ttl.get("champion") or ((idx.get("digest") or {}).get("stage") or {}).get("champion") or "") or None
+    if champ:
+        if not ttl.get("runner_up"):
+            ws = next((s for s in ps.get("series") or [] if s.get("round") == "WS" and s.get("done")), None)
+            if ws:
+                i = [str(t) for t in ws["teams"]].index(champ) if champ in [str(t) for t in ws["teams"]] else 0
+                ttl = dict(ttl, runner_up=str(ws["teams"][1 - i]), result=[ws["wins"][i], ws["wins"][1 - i]])
+        champion(out, "baseball", "MLB", ttl.get("event") or "World Series", tm(champ), tm(ttl["runner_up"]) if ttl.get("runner_up") else None,
+                 ttl.get("decided"), result=ttl.get("result"), pre_p=ttl.get("pre_p"), pre_label="on the eve of the postseason")
+        rows = []
     if rows:
         out["futures"]["baseball"] = {"title": "World Series", "rows": [
             {"name": (teams.get(k) or {}).get("name") or v.get("name"), "abbr": (teams.get(k) or {}).get("abbr"),
@@ -848,7 +915,8 @@ def build_baseball(ctx: Ctx, base: str, out: dict):
         out["search"].append(["baseball", t.get("name"), "MLB team · " + (t.get("division") or ""),
                               base + "#/mlb/team/" + k])
     nxt = next((s for s in series), None)
-    kp = [{"label": "WS fav", "value": (teams.get(rows[0][0]) or {}).get("short") if rows else "—",
+    kp = [{"label": "Champions", "value": (teams.get(champ) or {}).get("short"), "sub": (ttl.get("event") or "World Series")} if champ else
+          {"label": "WS fav", "value": (teams.get(rows[0][0]) or {}).get("short") if rows else "—",
            "sub": f"{rows[0][1]['p_ws'] * 100:.0f}%" if rows else None}]
     if nxt:
         kp.append({"label": nxt["round"].replace("League Championship Series", "LCS").replace("Division Series", "DS"),
@@ -1517,14 +1585,14 @@ def main(argv=None):
     now = parse_ts(a.now) if a.now else datetime.now(timezone.utc).replace(microsecond=0)
     ctx = Ctx(a.links, now)
     out = {"games": [], "futures": {}, "leaders": {}, "charts": {}, "stats": [], "search": [], "pool": [], "series": [],
-           "races": [], "hot_teams": []}
+           "races": [], "hot_teams": [], "champions": []}
     sports = []
     for key, folder, repo, label, site in SPORTS + [x for x in PENDING if x[0] in LAUNCHED or a.with_pending]:
         base = ctx.base(folder, repo)
         entry = {"key": key, "label": label, "site": site, "url": base, "data": PUBLIC.format(repo) + "data/",
                  "ok": False}
         part = {"games": [], "futures": {}, "leaders": {}, "charts": {}, "stats": [], "search": [], "pool": [], "series": [],
-                "races": [], "hot_teams": []}
+                "races": [], "hot_teams": [], "champions": []}
         try:
             entry.update(BUILDERS[key](ctx, base, part))
             if key == "football":
@@ -1547,6 +1615,11 @@ def main(argv=None):
     pool, series = out.pop("pool"), out.pop("series")
     top = top_of_page(now, out["games"], pool, series, sports)
     top["stories"] = fan_stories(out.pop("races"), out.pop("hot_teams"))
+    top["champions"] = sorted(out.pop("champions"), key=lambda c: c.get("decided") or "", reverse=True)
+    # a race that is over never shows as a race (its champion is in `champions`); a race only our simulation calls
+    # settled (F1 at 100% before the maths clinch it) stays
+    done = {c["sport"] for c in top["champions"]}
+    out["futures"] = {k: v for k, v in out["futures"].items() if not (k.split("_")[0] in done and decided_race(v.get("rows") or []))}
     out["games"].sort(key=lambda g: ({"live": 0, "pre": 1, "final": 2}[g["status"]], g["start"] or ""))
     add_why(out["games"])
     for g in pool:

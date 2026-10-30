@@ -344,6 +344,11 @@ def with_league(b: Build, level: str, season: int, spl: dict | None, tms: dict |
         blk, log = RC.build(level, season, spl, tms, cards, prev, _digest_now(cfg["today"]), run_asof=runner)
         if log.get(str(season)):
             b.write(f"{level}/race_log.json", log)
+        # a decided World Series: our calls for the recap from the race log (season.calls_from_log, no simulation)
+        pst = spl.get("postseason") or {}
+        if level == "mlb" and pst.get("complete") and not spl.get("calls"):
+            from oddsmarkets.baseball.analytics import season as SN
+            spl["calls"] = SN.calls_from_log(log.get(str(season)), cards)
         return blk
     blk = b.step(f"league block {level} {season}", run, None)
     if blk:
@@ -675,7 +680,8 @@ def featured_payload(cards: list[dict], teams: dict, post: dict | None, now: dat
     return {"today": [row(x) for x in r["today"]], "week": row(r["week"]) if r.get("week") else None}
 
 
-def digest_payload(b: Build, cards: list[dict], teams: dict, post: dict | None, phase: str | None, season: int, today: date) -> dict:
+def digest_payload(b: Build, cards: list[dict], teams: dict, post: dict | None, phase: str | None, season: int, today: date,
+                   calls: dict | None = None) -> dict:
     """index.json "digest" (MLB): the "This week in MLB" top lines (oddsmarkets/common/digest.py), the stage and the
     featured candidates (featured.py). Finished games carry the frozen pre-game price (manifest "prices", written
     while the game was still to come, else the walk-forward backtest), so nothing here is look-ahead.
@@ -721,9 +727,36 @@ def digest_payload(b: Build, cards: list[dict], teams: dict, post: dict | None, 
         if champ:
             w = champ[0].get("wins") or [0, 0]
             st["champion"] = champ[0]["teams"][0] if w[0] > w[1] else champ[0]["teams"][1]
+            st["title"] = title_block(champ[0], st["champion"], cards, calls)
     out["stage"] = st
     out["featured"] = featured_payload(cards, teams, post, now)
     return out
+
+
+def title_block(ws: dict, champ: str, cards: list[dict], calls: dict | None) -> dict:
+    """digest.stage.title once the World Series is decided (read by the Bullpen overview and scripts/build_home.py):
+    the champion and runner-up, the series score from the champion's side, its games (gpk, date, the champion's runs
+    first), the day it was decided, and our World Series chance for the champion on the eve of the postseason."""
+    teams = [str(t) for t in ws.get("teams") or []]
+    i = teams.index(champ)
+    w = ws.get("wins") or [0, 0]
+    by = {str(c.get("gpk")): c for c in cards}
+    games = []
+    for gid in ws.get("games") or []:
+        c = by.get(str(gid)) or {}
+        if c.get("status") != "final" or c.get("hs") is None:
+            continue
+        home = str(c.get("home")) == champ
+        games.append({"gpk": str(gid), "date": str(c.get("date"))[:10], "home": home,
+                      "score": [c["hs"], c["as"]] if home else [c["as"], c["hs"]]})
+    games.sort(key=lambda g: g["date"])
+    pre = (calls or {}).get("preplayoff") or {}
+    p = (pre.get("p_ws") or {}).get(champ)
+    ranked = sorted((pre.get("p_ws") or {}).items(), key=lambda kv: -kv[1])
+    return {"event": ws.get("round_name") or "World Series", "champion": champ, "runner_up": teams[1 - i],
+            "result": [w[i], w[1 - i]], "games": games, "decided": games[-1]["date"] if games else None,
+            "pre_p": p, "pre_asof": pre.get("asof"), "pre_rank": next((k + 1 for k, (t, _) in enumerate(ranked) if t == champ), None),
+            "pre_n": len(ranked) or None}
 
 
 def index_payload(b: Build, levels: dict[str, dict], today: date) -> dict:
@@ -770,7 +803,8 @@ def index_payload(b: Build, levels: dict[str, dict], today: date) -> dict:
         sp = cur.get("season_payload") or {}
         post = sp.get("postseason") if isinstance(sp, dict) else None
         out["postseason"] = {"round": post.get("round"), "series": post.get("series"), "seeds": post.get("seeds"),
-                             "teams": post.get("teams")} if post else None
+                             "teams": post.get("teams"),
+                             **{k: post.get(k) for k in ("actual", "champion", "complete") if post.get(k)}} if post else None
         out["leaders"] = leaders
         tms = cur.get("teams") or {}
         # alt: the second kit colour for the Broadcast hero's clash rule (canon.ALT when the season payload predates it)
@@ -778,7 +812,8 @@ def index_payload(b: Build, levels: dict[str, dict], today: date) -> dict:
                         {"alt": r_.get("alt") or canon.team_alt(t_)} |
                         {k: (r_.get("values") or {}).get(k) for k in ("w", "l", "rating", "p_postseason", "p_ws")}
                         for t_, r_ in (tms.get("teams") or {}).items()}
-        out["digest"] = b.step("digest", lambda: digest_payload(b, cards, out["teams"], out["postseason"], out["phase"], out["season"], today), {}) or {}
+        calls = sp.get("calls") if isinstance(sp, dict) else None
+        out["digest"] = b.step("digest", lambda: digest_payload(b, cards, out["teams"], out["postseason"], out["phase"], out["season"], today, calls), {}) or {}
     return out
 
 

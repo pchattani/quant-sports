@@ -119,7 +119,9 @@ function weekTiles(dig, feat, po) {
       sub: The(lead.key) + (lead.d > 0 ? ' climbed' : ' slipped') + ' to ' + GI.pct(lead.p, 0) + ' in our ' + what + ' chance since ' + day(mv.since) + '.' + (up && dn ? ' Biggest fall: ' + GI.teamAbbr(dn.key) + ' ' + ptsOf(dn.d) + '.' : '') });
   } else {
     const fav = Object.keys(po).filter(t => isNum(po[t].p_sb)).sort((a, b) => po[b].p_sb - po[a].p_sb)[0];
-    if (fav) T.push({ label: 'Super Bowl favourite', value: GI.teamAbbr(fav) + ' ' + GI.pct(po[fav].p_sb, 0), href: GI.teamHref(fav), signal: true,
+    /* round 11: a decided Super Bowl (one team at 100%) is a champion, never a favourite */
+    if (fav && po[fav].p_sb >= 0.9995) T.push({ label: 'Super Bowl champions', value: GI.teamAbbr(fav), href: GI.teamHref(fav), signal: true, sub: The(fav) + ' won the Super Bowl.' });
+    else if (fav) T.push({ label: 'Super Bowl favourite', value: GI.teamAbbr(fav) + ' ' + GI.pct(po[fav].p_sb, 0), href: GI.teamHref(fav), signal: true,
       sub: (po[fav].p_sb < 0.25 ? 'Nobody is better than 1 in 4. ' : '') + The(fav) + ' lead our board, from 20,000 simulated seasons.' });
   }
   const u = dig.upset;

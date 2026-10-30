@@ -276,10 +276,19 @@ function render(el, params) {
     Object.keys(TA.NAMES[T]).forEach(pid => { if (TA.NAMES[T][pid].rank === 1) no1 = pid; });
     let yeFav = null;
     if (race && race.year_end_no1) Object.keys(race.year_end_no1).forEach(pid => { const p = race.year_end_no1[pid]; if (isNum(p) && (!yeFav || p > yeFav[1])) yeFav = [pid, p]; });
-    const ev0 = evNow.length ? evs[evNow[0].event] : null;
+    /* round 11: an event whose final is played (one player at 100% in its draw simulation, QK.decided) has a champion:
+       it never leads the title race, and its card says champion, not favourite */
+    const champOf = e => {
+      const ev = evs[e.event], sp = ev && ev.sim && ev.sim.players ? ev.sim.players : null;
+      if (ev && ev.champion) return String(ev.champion);
+      const w = sp ? QK.decided(Object.keys(sp).map(pid => ({ pid: pid, p: sp[pid].p_title }))) : null;
+      return w ? w.pid : (e.favourite && isNum(e.favourite[1]) && e.favourite[1] >= 0.9995 ? e.favourite[0] : null);
+    };
+    const evLive = evNow.filter(e => !champOf(e));
+    const ev0 = evLive.length ? evs[evLive[0].event] : null;
     const sim0 = ev0 && ev0.sim && ev0.sim.players ? ev0.sim.players : null;
     const titleRows = sim0 ? Object.keys(sim0).map(pid => ({ pid: pid, p: sim0[pid].p_title })).filter(r => isNum(r.p) && r.p > 0.002).sort((a, b) => b.p - a.p) : [];
-    const ev0Name = evNow.length ? (evNow[0].name || TA.eventName(T, evNow[0].event)) : '';
+    const ev0Name = evLive.length ? (evLive[0].name || TA.eventName(T, evLive[0].event)) : '';
 
     // ── head, ticker and stat tiles
     const kicker = [TA.tourName(T), Y, isCurrent ? (evNow.length ? evNow.map(e => e.name || TA.eventName(T, e.event)).join(' · ') + ' in play' : 'between tournaments') : 'season review'].join(' · ');
@@ -303,7 +312,7 @@ function render(el, params) {
         title: isCurrent ? 'Every ' + tourW + ' match, player and tournament, by the numbers.' : 'The ' + TA.tourName(T) + ' in ' + Y + ', as it finished.',
         lede: isCurrent ? 'Our chance for every match, title chances from simulating every draw, who’s for real, and the race to the Finals, in plain English.'
           : 'The ' + Y + ' season: the champions, the rankings and the ratings as they finished.',
-        links: [{ label: evNow.length ? 'Draws' : 'Tournaments', sub: evNow.length ? ev0Name : 'The calendar and every draw', href: evNow.length ? TA.eventHref(T, evNow[0].event) : TA.href(T, 'calendar', Y) },
+        links: [{ label: evNow.length ? 'Draws' : 'Tournaments', sub: evNow.length ? (evNow[0].name || TA.eventName(T, evNow[0].event)) : 'The calendar and every draw', href: evNow.length ? TA.eventHref(T, evNow[0].event) : TA.href(T, 'calendar', Y) },
           { label: 'Rankings', sub: 'And the race to the Finals', href: TA.href(T, 'rankings', Y) }, { label: 'Scouting Room', sub: 'Every player, every metric', href: TA.href(T, 'scout', Y) }] });
     if (isCurrent) {
       const wt = weekTiles(T, dig, race, feat, yeFav);
@@ -341,7 +350,7 @@ function render(el, params) {
           const col = TA.surfaceColour(e.surface || inf.surface, inf.indoor);
           return '<a class="ta-evcard" href="' + TA.eventHref(T, e.event) + '" style="--sf:' + col + '"><span class="k">' + esc(TA.levelLabel(e.level || inf.level, T)) + ' · ' + esc(TA.surfaceLabel(e.surface || inf.surface, inf.indoor)) + '</span>' +
             '<b>' + esc(e.name || TA.eventName(T, e.event)) + '</b><span class="m">' + esc(TA.fmtRange(e.start, e.end)) + (e.round_now ? ' · ' + esc(TA.roundLabel(e.round_now)) : '') + '</span>' +
-            (e.favourite && e.favourite[0] ? '<span class="f">Our favourite ' + esc(TA.playerShort(T, e.favourite[0])) + ' <b>' + TA.pct(e.favourite[1], 0) + '</b></span>' : '') + '</a>';
+            (champOf(e) ? '<span class="f">Champion <b>' + esc(TA.playerShort(T, champOf(e))) + '</b></span>' : e.favourite && e.favourite[0] ? '<span class="f">Our favourite ' + esc(TA.playerShort(T, e.favourite[0])) + ' <b>' + TA.pct(e.favourite[1], 0) + '</b></span>' : '') + '</a>';
         }).join('') + '</div></section>';
     }
 
@@ -389,8 +398,8 @@ function render(el, params) {
       const t0 = titleRows[0];
       html += '<section class="qk-section">' + QK.sectionHead({ kicker: 'Title race', title: showTitle ? 'Who lifts the trophy?' : 'Who finishes No. 1?',
         sub: (t0 ? (t0.p < 0.2 ? 'Nobody’s better than 1 in 5 in ' + ev0Name + '. ' : TA.playerShort(T, t0.pid) + ' leads our board in ' + ev0Name + ' at ' + TA.pct(t0.p, 0) + '. ') : '') + 'Our chances from simulating the rest of the draw and the season, match by match.',
-        actions: showTitle ? '<a class="qk-more" href="' + TA.eventHref(T, evNow[0].event) + '">The draw and every path</a>' : '' }) + '<div class="qk-grid">';
-      if (showTitle) html += '<div class="qk-span-6">' + V().card('Who wins ' + ev0Name, 'Our title chance from simulating the rest of the draw', '<div id="ov-title"></div>', { foot: '<span>Top ten</span><a href="' + TA.eventHref(T, evNow[0].event) + '">The draw and every path →</a>' }) + '</div>';
+        actions: showTitle ? '<a class="qk-more" href="' + TA.eventHref(T, evLive[0].event) + '">The draw and every path</a>' : '' }) + '<div class="qk-grid">';
+      if (showTitle) html += '<div class="qk-span-6">' + V().card('Who wins ' + ev0Name, 'Our title chance from simulating the rest of the draw', '<div id="ov-title"></div>', { foot: '<span>Top ten</span><a href="' + TA.eventHref(T, evLive[0].event) + '">The draw and every path →</a>' }) + '</div>';
       if (hasNo1) html += '<div class="qk-span-6">' + V().card('Year-end No. 1', 'Our chance of finishing the year ranked No. 1', '<div id="ov-no1"></div>', { foot: '<span>From ' + (race.n_sims ? Number(race.n_sims).toLocaleString('en-GB') + ' ' : '') + 'simulated seasons</span><a href="' + TA.href(T, 'rankings') + '">Rankings →</a>' }) + '</div>';
       html += '</div></section>';
     }

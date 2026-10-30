@@ -131,6 +131,8 @@ function weekTiles(dig, idx, feat, cup) {
     const up = mv.up[0], dn = mv.down[0], lead = up || dn, what = mv.metric === 'p_cup' ? 'Cup' : 'playoff';
     T.push({ label: 'Biggest mover', value: RK.teamAbbr(lead.key) + ' ' + ptsOf(lead.d), href: RK.teamHref(lead.key), signal: true,
       sub: RK.teamName(lead.key) + (lead.d > 0 ? ' climbed' : ' slipped') + ' to ' + pctOf(lead.p) + ' in our ' + what + ' chance since ' + day(mv.since) + '.' + (up && dn ? ' Biggest fall: ' + RK.teamAbbr(dn.key) + ' ' + ptsOf(dn.d) + '.' : '') });
+  } else if (cup && cup.model >= 0.9995) {   /* round 11: a decided Cup is a champion, never a favourite at 100% */
+    T.push({ label: 'Stanley Cup champions', value: RK.teamAbbr(cup.team), href: RK.teamHref(cup.team), signal: true, sub: RK.teamName(cup.team) + ' won the Stanley Cup.' });
   } else if (cup) {
     T.push({ label: 'Cup favourite', value: RK.teamAbbr(cup.team) + ' ' + pctOf(cup.model), href: RK.teamHref(cup.team), signal: true,
       sub: (cup.model < 0.2 ? 'Nobody is better than 1 in 5. ' : '') + RK.teamName(cup.team) + ' lead our board, from 20,000 simulated seasons.' });
@@ -349,7 +351,8 @@ function render(el, params) {
     const cupRows = cup.filter(r => isNum(r.model)).map(r => ({ label: nick(r.team), p: r.model, href: RK.teamHref(r.team), mark: U.team(r.team), color: RK.teamColourRaw(r.team) }));
     el.querySelector('#ov-cup').innerHTML = QK.chances(cupRows, { limit: 10, key: false });
     const cup0 = cupRows.slice().sort((a, b) => b.p - a.p)[0];
-    if (cup0) el.querySelector('#ov-cup-lede').textContent = (cup0.p < 0.2 ? 'Nobody’s better than 1 in 5. ' + cup0.label + ' lead our board at ' + U.pct(cup0.p) + '.' : cup0.label + ' lead at ' + U.pct(cup0.p) + '.') + ' From 20,000 simulated seasons.';
+    if (cup0 && QK.decided(cupRows)) el.querySelector('#ov-cup-lede').textContent = 'The ' + cup0.label + ' won the Stanley Cup.';
+    else if (cup0) el.querySelector('#ov-cup-lede').textContent = (cup0.p < 0.2 ? 'Nobody’s better than 1 in 5. ' + cup0.label + ' lead our board at ' + U.pct(cup0.p) + '.' : cup0.label + ' lead at ' + U.pct(cup0.p) + '.') + ' From 20,000 simulated seasons.';
 
     // projected points: mean and the 90% range from the simulation
     const sim = (season.sim && season.sim.teams) || {};

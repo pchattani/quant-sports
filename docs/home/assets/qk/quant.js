@@ -51,12 +51,15 @@
  *   QK.marketSource(src) QK.marketSides(g) QK.marketGap(g) QK.marketMark(g) QK.marketLine(g)   the quiet market's parts
  *   QK.storyCards(items, o)                             fan story cards: breakouts, surprises, records in reach
  *   QK.spotlight(o)                                     a player or team spotlight with deep stats and a season line
- *   QK.doing(el, o) (renders)                           "How we're doing" for the Model page: the record + QK.howSure */
+ *   QK.doing(el, o) (renders)                           "How we're doing" for the Model page: the record + QK.howSure
+ * Round 11 (a decided title):
+ *   QK.decided(rows, o)                                 the champion row of a race that is over (one at 100%, the rest 0)
+ *   QK.champHero(o)                                     the champion hero: team-colour block, the result, the games, a strip */
 (function (root) {
 'use strict';
 
 var QK = root.QK || {};
-QK.version = '4.1.0';
+QK.version = '4.2.0';
 
 /* ─────────────────────────────────────── helpers */
 function esc(s) {
@@ -2172,6 +2175,46 @@ QK.spotlight = function (o) {
     '<div class="qk-spot-k">' + esc(o.kicker || 'Spotlight') + '</div><h3 class="qk-spot-nm' + QK.longName(o.name, 16) + '">' + nm + '</h3>' +
     (o.sub ? '<div class="qk-spot-sub">' + esc(o.sub) + '</div>' : '') + (o.headline ? '<p class="qk-spot-h">' + esc(o.headline) + '</p>' : '') + '</div>' +
     '<div class="qk-spot-r">' + right + sp + (o.text ? '<p class="qk-spot-t">' + esc(o.text) + '</p>' : '') + (links ? '<div class="qk-spot-links">' + links + '</div>' : '') + '</div></article>';
+};
+/* Round 11 (a decided title). QK.decided(rows, o) -> the champion row of a title race that is over, else null: one row
+ * at 100% (>= 0.9995) and every other at 0 (<= 0.0005). rows: [{ p }] (o.key names another chance field). A page never
+ * shows a decided race as a race ("favourite", "lead at 100%", "still alive"): it says champion (QK.champHero). */
+QK.decided = function (rows, o) {
+  o = o || {};
+  var k = o.key || 'p', win = null, live = 0;
+  (rows || []).forEach(function (r) {
+    var p = r ? r[k] : null;
+    if (!isNum(p)) return;
+    if (p >= 0.9995) win = win ? false : r;
+    else if (p > 0.0005) live++;
+  });
+  return win && !live ? win : null;
+};
+/* QK.champHero({ kicker: '2026 World Series champions', name, sub, team: { name, abbr, colour }, href, headline,
+ * games: [{ label: 'G1', score: '3–2', won: true, sub, href }], stats: [{ label, value, sub }], text, links: [{ href,
+ * text }] }) -> the champion hero: the team colour as a diagonal block (white type >= 4.5:1 through QK.color.block),
+ * the name huge, the result line, each game of the final as a chip (a win in volt), then the black strip of numbers
+ * and a plain line. No team colour: the cobalt block. */
+QK.champHero = function (o) {
+  o = o || {};
+  var t = o.team || {};
+  var hex = color.parse(t.colour) ? t.colour : null;
+  var bk = hex ? color.block(hex) : { bg: cssVar('--signal-deep') || '#5a69b7', edge: null };
+  var nm = o.href ? '<a class="qk-champ-a" href="' + esc(o.href) + '">' + esc(o.name || '') + '</a>' : esc(o.name || '');
+  var games = (o.games || []).filter(Boolean).map(function (g) {
+    var tag = g.href ? 'a' : 'span';
+    return '<' + tag + ' class="qk-champ-g' + (g.won ? ' w' : '') + '" role="listitem"' + (g.href ? ' href="' + esc(g.href) + '"' : '') + ' title="' + esc((g.label || '') + ': ' + (g.won ? 'won ' : 'lost ') + (g.score || '') + (g.sub ? ', ' + g.sub : '')) + '">' +
+      '<span class="k">' + esc(g.label || '') + '</span><b class="num">' + esc(g.score || '') + '</b>' + (g.sub ? '<small>' + esc(g.sub) + '</small>' : '') + '</' + tag + '>';
+  }).join('');
+  var st = (o.stats || []).filter(Boolean);
+  var links = (o.links || []).filter(function (l) { return l && l.href; }).map(function (l) { return '<a class="qk-more" href="' + esc(l.href) + '">' + esc(l.text) + '</a>'; }).join('');
+  return '<article class="qk-champ" style="--tb:' + esc(bk.bg) + (bk.edge ? ';--te:' + esc(bk.edge) : '') + '">' +
+    '<div class="qk-champ-top"><div class="qk-champ-ab" aria-hidden="true">' + esc(t.abbr || '') + '</div>' +
+    '<div class="qk-champ-k">' + esc(o.kicker || 'Champions') + '</div><h2 class="qk-champ-nm' + QK.longName(o.name, 22) + '">' + nm + '</h2>' +
+    (o.sub ? '<div class="qk-champ-sub">' + esc(o.sub) + '</div>' : '') + (o.headline ? '<p class="qk-champ-h">' + esc(o.headline) + '</p>' : '') +
+    (games ? '<div class="qk-champ-games" role="list" aria-label="The games">' + games + '</div>' : '') + '</div>' +
+    (st.length ? QK.statStrip(st, { bleed: false }) : '') +
+    (o.text || links ? '<div class="qk-champ-foot">' + (o.text ? '<p>' + esc(o.text) + '</p>' : '') + (links ? '<div class="qk-spot-links">' + links + '</div>' : '') + '</div>' : '') + '</article>';
 };
 /* QK.doing(el, { record (a digest's record: { n, won, expected, expected_rate, upsets, draws, from, to, days }),
  * calibration | bins/brier/n (as QK.howSure), league, span, subject, unit, kicker, title, sub, note, caption }) ->

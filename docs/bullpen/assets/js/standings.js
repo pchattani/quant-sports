@@ -262,7 +262,10 @@ function render(el, params) {
     const lk = all.filter(r => isNum(r.pythag_w)).map(r => ({ r: r, v: r.w - r.pythag_w })).sort((a, b) => b.v - a.v)[0];
     const wsf = all.filter(r => r.sim && isNum(r.sim.p_ws)).sort((a, b) => b.sim.p_ws - a.sim.p_ws)[0];
     const tiles = [];
-    if (wsf && wsf.sim.p_ws > 0) tiles.push({ label: 'World Series favourite', value: BP.teamAbbr(wsf.tid) + ' ' + BP.ui.pct(wsf.sim.p_ws), signal: true, sub: 'our chance, season simulation', href: BP.teamHref(wsf.tid, L, S) });
+    /* round 11: a decided World Series shows its champion, never a favourite at 100% */
+    const champ = L === 'mlb' && d.postseason ? BP.charts.champOf(d.postseason) : null;
+    if (champ) tiles.push({ label: 'World Series champions', value: BP.teamAbbr(champ), signal: true, sub: BP.teamName(champ), href: BP.teamHref(champ, L, S) });
+    else if (wsf && wsf.sim.p_ws > 0) tiles.push({ label: 'World Series favourite', value: BP.teamAbbr(wsf.tid) + ' ' + BP.ui.pct(wsf.sim.p_ws), signal: true, sub: 'our chance, season simulation', href: BP.teamHref(wsf.tid, L, S) });
     if (best) tiles.push({ label: 'Best record', value: BP.teamAbbr(best.tid) + ' ' + best.w + '-' + best.l, sub: BP.fmtAvg(best.pct), href: BP.teamHref(best.tid, L, S) });
     if (rdb) tiles.push({ label: 'Best run differential', value: BP.teamAbbr(rdb.tid) + ' ' + BP.ui.signed(rdb.rd, 0), sub: rdb.rs + ' scored, ' + rdb.ra + ' allowed', href: BP.teamHref(rdb.tid, L, S) });
     if (lk) tiles.push({ label: 'Luckiest', value: BP.teamAbbr(lk.r.tid) + ' ' + BP.ui.signed(lk.v, 1), sub: 'wins above the Pythagorean record', href: BP.teamHref(lk.r.tid, L, S) });
@@ -303,13 +306,13 @@ function chancesView(el, params) {
     if (!BP.ok(d)) { body.innerHTML = QK.empty('Not built yet', 'The ' + S + ' season file is not available.'); return; }
     const rows = rowsOf(d), all = Object.keys(rows).map(t => rows[t]).filter(r => !BP.teamInfo(r.tid).placeholder);
     const post = d.postseason || {}, pt = post.teams || {};
-    const actual = !!post.actual || !(d.sim && d.sim.available);
+    const actual = !!post.actual || !(d.sim && d.sim.available) || !!BP.charts.champOf(post);
     const lo = leagueOpts(d, L, S);
     const team = t => ({ label: BP.teamShort(t), href: BP.teamHref(t, L, S), mark: BP.ui.team(t, L, S), color: BP.ui.raw(t) });
     const P = (r, k) => { const s = r.sim || r; return isNum(s[k]) ? s[k] : (pt[r.tid] && isNum(pt[r.tid][k]) ? pt[r.tid][k] : null); };
     let h = '';
     if (actual) {
-      const ch = post.champion;
+      const ch = BP.charts.champOf(post);
       h += QK.explain((ch ? '<b>' + esc(BP.teamName(ch)) + ' won the ' + S + ' World Series.</b> ' : '') + 'This season is over, so its chances are history: the race below shows how our numbers moved through the year, and the <a class="qk-link" href="' + BP.ghref('postseason', S) + '">Bracket</a> has every series as it was played.', { title: 'A finished season' });
     } else {
       const ws = all.filter(r => isNum(P(r, 'p_ws')) && P(r, 'p_ws') > 0.0005).sort((a, b) => P(b, 'p_ws') - P(a, 'p_ws'));

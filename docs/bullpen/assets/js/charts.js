@@ -808,7 +808,22 @@ function radar(el, series, opts) {
   }));
 }
 
+/* Round 11 (a decided title): the champion of a bracket whose World Series is over (post.champion from the builder,
+   analytics/season.py mark_decided; else the World Series winner from the series), null while it is being played; and
+   the bracket as played (actual, champion) so a decided current season opens like a finished one. */
+function champOf(post) {
+  if (!post) return null;
+  if (post.champion) return String(post.champion);
+  const ws = seriesList(post).filter(s => s.rk === 'WS')[0];
+  return ws ? winnerOf(ws) : null;
+}
+function asPlayed(post) {
+  const ch = champOf(post);
+  return ch && post && !post.actual ? Object.assign({}, post, { actual: true, champion: ch, complete: true }) : post;
+}
+
 BP.charts = Object.assign(BP.charts || {}, {
+  champOf: champOf, asPlayed: asPlayed,
   rows: rows, strikeZone: strikeZone, zoneShapes: zoneShapes, pitchHover: pitchHover, sprayChart: sprayChart, sprayXY: sprayXY, wallPoints: wallPoints,
   movementPlot: movementPlot, zoneHeatmap: zoneHeatmap, wpChart: wpChart, wpRows: wpRows,
   percentileSliders: percentileSliders, sliderRow: sliderRow, pitchTrend: pitchTrend, velocityTrend: pitchTrend,

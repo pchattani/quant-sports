@@ -125,7 +125,8 @@ function weekTiles(L, S, info, dig, feat, sim) {
     sub: CC.tname(L, h.key) + ': ' + h.w + ' win' + (h.w === 1 ? '' : 's') + ' in ' + h.gp + ' games, ' + (h.margin >= 0 ? '+' : '−') + Math.abs(Math.round(h.margin)) + ' points overall.' });
   /* a thin week (preseason, a one-game week): the title favourite, the top-rated team and AP No. 1 fill in */
   var t0 = (info.title_odds || [])[0];
-  if (T.length < 4 && t0 && !(mv && mv.metric === 'p_title')) T.unshift({ label: 'Title favourite', value: CC.tabbr(L, t0.team) + ' ' + CC.pct(t0.p), href: CC.teamHref(L, t0.team, S), signal: true,
+  if (T.length < 4 && t0 && t0.p >= 0.9995) T.unshift({ label: 'National champions', value: CC.tabbr(L, t0.team), href: CC.teamHref(L, t0.team, S), signal: true, sub: CC.tname(L, t0.team) + ' won the national title.' });   /* round 11 */
+  else if (T.length < 4 && t0 && !(mv && mv.metric === 'p_title')) T.unshift({ label: 'Title favourite', value: CC.tabbr(L, t0.team) + ' ' + CC.pct(t0.p), href: CC.teamHref(L, t0.team, S), signal: true,
     sub: (t0.p < 0.25 ? 'Nobody is better than 1 in 4. ' : '') + CC.tname(L, t0.team) + ' lead our board, from our simulated seasons.' });
   var m0 = (info.model_top || [])[0];
   if (T.length < 4 && m0) T.push({ label: 'Top-rated team', value: CC.tabbr(L, m0.team) + ' ' + CC.signed(m0.rating, 1), href: CC.teamHref(L, m0.team, S),
@@ -154,7 +155,8 @@ function tiles(L, S, d, nSims) {
   var sim = d.sim, tit = Object.keys(sim).filter(function (t) { return isNum(sim[t].p_title); }).sort(function (a, b) { return sim[b].p_title - sim[a].p_title; });
   if (isCur && tit.length) {
     var fav = tit[0];
-    out.push({ label: 'Title favourite', value: CC.tabbr(L, fav) + ' ' + CC.pct(sim[fav].p_title), signal: true, href: CC.teamHref(L, fav),
+    if (sim[fav].p_title >= 0.9995) out.push({ label: 'National champions', value: CC.tabbr(L, fav), signal: true, href: CC.teamHref(L, fav), sub: CC.tname(L, fav) + ' won the national title.' });   /* round 11 */
+    else out.push({ label: 'Title favourite', value: CC.tabbr(L, fav) + ' ' + CC.pct(sim[fav].p_title), signal: true, href: CC.teamHref(L, fav),
       sub: CC.tname(L, fav) + (nSims ? ' · from ' + QK.fmt.num(nSims) + ' simulated seasons' : ''), tip: 'Our chance of winning the national title: the share of simulated seasons the team wins it all' });
   } else if (d.champ) {
     out.push({ label: 'Champion', value: CC.tshort(L, d.champ), text: true, signal: true, href: CC.teamHref(L, d.champ, S), sub: CC.seasonLabel(L, S) });
@@ -354,9 +356,10 @@ CC.route('overview', function (el, p) {
     realOrNot(L, S, season, ap, QK.$('#ov-luck', el), QK.$('#ov-luck-cap', el));
     if (titleRows.length) {
       QK.$('#ov-title', el).innerHTML = QK.chances(titleRows.map(function (r) { return { label: CC.tshort(L, r.team), p: r.p, href: CC.teamHref(L, r.team, S), color: CC.traw(L, r.team), mark: U.mark(L, r.team) }; }), { key: false }) +
-        QK.explain('<b>What’s that number?</b> Even the favourite misses most seasons: ' + CC.pct(titleRows[0].p, 0) + ' means about ' + Math.max(1, Math.round(10 * (1 - titleRows[0].p))) + ' seasons in 10 end without the title.');
+        (QK.decided(titleRows) ? QK.explain('<b>Decided.</b> ' + esc(CC.tname(L, QK.decided(titleRows).team)) + ' won the national title.') : QK.explain('<b>What’s that number?</b> Even the favourite misses most seasons: ' + CC.pct(titleRows[0].p, 0) + ' means about ' + Math.max(1, Math.round(10 * (1 - titleRows[0].p))) + ' seasons in 10 end without the title.'));
       var t0 = titleRows.slice().sort(function (x, y) { return y.p - x.p; })[0], lede = QK.$('#ov-title-lede', el);
-      if (t0 && lede) lede.textContent = (t0.p < 0.25 ? 'Nobody’s better than 1 in 4. ' + CC.tshort(L, t0.team) + ' lead our board at ' + CC.pct(t0.p) + '.' : CC.tshort(L, t0.team) + ' lead at ' + CC.pct(t0.p) + '.') + (nSims ? ' From ' + QK.fmt.num(nSims) + ' simulated seasons.' : '');
+      if (t0 && lede && QK.decided(titleRows)) lede.textContent = CC.tshort(L, t0.team) + ' won the national title.';
+      else if (t0 && lede) lede.textContent = (t0.p < 0.25 ? 'Nobody’s better than 1 in 4. ' + CC.tshort(L, t0.team) + ' lead our board at ' + CC.pct(t0.p) + '.' : CC.tshort(L, t0.team) + ' lead at ' + CC.pct(t0.p) + '.') + (nSims ? ' From ' + QK.fmt.num(nSims) + ' simulated seasons.' : '');
     }
     if (top.length) QKC.bar('#ov-power', { cats: top.map(function (r) { return CC.tshort(L, r.team); }), horizontal: true, fmt: function (v) { return CC.signed(v, 1); },
       series: [{ name: 'Rating', data: top.map(function (r) { return r.rating; }), lo: top.map(function (r) { var R = ratings[String(r.team)] || {}; return isNum(R.se) ? r.rating - R.se : null; }), hi: top.map(function (r) { var R = ratings[String(r.team)] || {}; return isNum(R.se) ? r.rating + R.se : null; }) }],

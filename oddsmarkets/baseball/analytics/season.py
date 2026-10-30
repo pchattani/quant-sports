@@ -230,6 +230,54 @@ def _actual_seeds(ctx: SeasonContext, series: list[dict], reached: dict, teams: 
     return seeds
 
 
+def mark_decided(bracket: dict) -> dict:
+    """A simulated bracket whose final series is over is the bracket as played: each finished series gets its winner,
+    and the bracket "actual", "champion" and "complete", the same fields actual_postseason writes for a past season,
+    so the site opens a decided current season like a finished one (the recap) instead of a title race at 100%."""
+    series = bracket.get("series") or []
+    for s in series:
+        w = s.get("wins") or [0, 0]
+        if s.get("done") and len(w) == 2 and w[0] != w[1] and not s.get("winner"):
+            s["winner"] = s["teams"][0] if w[0] > w[1] else s["teams"][1]
+    fin = next((s for s in series if s.get("round") in ("WS", "CH") and s.get("done") and s.get("winner")), None)
+    if fin:
+        champ = fin["winner"]
+        bracket.update(actual=True, champion=champ, complete=True, round=fin["round"])
+        for t, rec in (bracket.get("teams") or {}).items():
+            rec["champion"] = t == champ
+            if not rec.get("reached"):
+                rnds = [s["round"] for s in series if t in (s.get("teams") or []) and s.get("round") in REACH_ORDER]
+                rec["reached"] = max(rnds, key=REACH_ORDER.index) if rnds else None
+    return bracket
+
+
+def calls_from_log(log_season: dict | None, cards: list[dict]) -> dict | None:
+    """Our calls for the current season once its World Series is decided, from the race log (data/mlb/race_log.json):
+    the World Series chances we published (or rebuilt walk-forward for the dates before live tracking) a week into the
+    regular season and on the last day before the first postseason game. Same layout as recap_calls; no simulation."""
+    pws = (log_season or {}).get("p_ws") or {}
+    pps = (log_season or {}).get("p_postseason") or {}
+    if not pws:
+        return None
+    reg = sorted(str(c.get("date"))[:10] for c in cards if str(c.get("gtype") or "R") == "R" and c.get("status") == "final")
+    post = sorted(str(c.get("date"))[:10] for c in cards if str(c.get("gtype") or "") in ("F", "D", "L", "W"))
+    if not reg or not post:
+        return None
+    from datetime import date as _date, timedelta
+    days = sorted(pws)
+    out: dict = {"method": "Our World Series chances as logged on those dates: published live, "
+                           "or rebuilt walk-forward from the games before each date for the days before live tracking began."}
+    wk = (_date.fromisoformat(reg[0]) + timedelta(days=7)).isoformat()
+    d1 = next((d for d in days if wk <= d < post[0]), None)
+    if d1:
+        out["first"] = {"asof": d1, "label": "After the first week", "p_ws": {t: v for t, v in pws[d1].items() if v},
+                        "p_postseason": {t: v for t, v in (pps.get(d1) or {}).items() if v is not None}}
+    d2 = next((d for d in reversed(days) if d < post[0]), None)
+    if d2:
+        out["preplayoff"] = {"asof": d2, "label": "On the eve of the postseason", "p_ws": {t: v for t, v in pws[d2].items() if v and v > 0}}
+    return out if ("first" in out or "preplayoff" in out) else None
+
+
 def current_round(series: list[dict]) -> str | None:
     live = [s["round"] for s in series if not s.get("done")]
     pool = live or [s["round"] for s in series]
@@ -305,6 +353,7 @@ def build(ctx: SeasonContext, teams: dict | None, sim: dict | None, markets: dic
         bracket = {"round": current_round(series), "series": series, "seeds": post.get("seeds"),
                    "teams": {t: {**v, "name": an.team_info(ctx.store, t)["name"]} for t, v in pt.items()},
                    "matrix": post.get("matrix"), "sims": post.get("sims")}
+        mark_decided(bracket)
     ratings = {t: {"off": v.get("off_rpg"), "def": v.get("def_rpg"), "pit": v.get("pit_rpg"), "total": v.get("rating")} for t, v in tv.items()}
     return {**CT.season_meta(ctx), "version": SEASON_VERSION, "standings": divisions, "ratings": ratings, "league_rpg": an.rnd(lg_rpg, 3),
             "sim": {"available": bool(sim.get("available")), "basis": sim.get("basis"), "reason": sim.get("reason"),
