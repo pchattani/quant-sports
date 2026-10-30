@@ -389,10 +389,10 @@ function question(id, title) {
   return 'Who wins the ' + String(title || 'title').replace(/^College football national title$/i, 'college football title') + '?';
 }
 function raceLabel(id, title) {
-  var L = { hockey: 'NHL', nfl: 'NFL', baseball: 'MLB', f1: 'F1', college: 'CFB', college_mbb: 'MBB', college_wbb: 'WBB' };
+  var L = { hockey: 'NHL', nfl: 'NFL', baseball: 'MLB', f1: 'F1', college: 'CFB', college_mbb: 'MBB', college_wbb: 'WBB', college_mch: 'MCH', college_wch: 'WCH' };
   return L[id] || String(title || id).replace(/ title$/i, '');
 }
-var RACE_ORDER = ['hockey', 'basketball_2', 'basketball', 'nfl', 'baseball', 'f1', 'college', 'college_mbb', 'college_wbb'];
+var RACE_ORDER = ['hockey', 'basketball_2', 'basketball', 'nfl', 'baseball', 'f1', 'college', 'college_mbb', 'college_wbb', 'college_mch', 'college_wch'];
 function renderRaces() {
   var F = D.futures || {}, ft = (D.charts || {}).football_titles || [];
   /* the race already leading the page (the fallback hero) is not shown twice */

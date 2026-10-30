@@ -26,8 +26,9 @@
 (function (CC) {
 'use strict';
 var U = CC.ui, esc = CC.esc, isNum = CC.isNum;
-var POWER = { cfb: ['SEC', 'Big Ten', 'Big 12', 'ACC'], mbb: ['SEC', 'Big Ten', 'Big 12', 'ACC', 'Big East'], wbb: ['SEC', 'Big Ten', 'Big 12', 'ACC', 'Big East'] };
-var PYTH = { cfb: 2.37, mbb: 11.5, wbb: 10.0 };
+var POWER = { cfb: ['SEC', 'Big Ten', 'Big 12', 'ACC'], mbb: ['SEC', 'Big Ten', 'Big 12', 'ACC', 'Big East'], wbb: ['SEC', 'Big Ten', 'Big 12', 'ACC', 'Big East'],
+  mch: ['HEA', 'B1G', 'NCHC', 'ECAC', 'CCHA', 'AHA'], wch: ['WCHA', 'HEA', 'ECAC', 'NEWHA', 'AHA'] };
+var PYTH = { cfb: 2.37, mbb: 11.5, wbb: 10.0, mch: 2.0, wch: 2.0 };
 
 var ST = { L: 'cfb', S: null, pw: 'top', scope: 'top', grid: '', gadd: [], gsort: null, map: 0, mx: '', my: '', a: '', b: '', trend: 'rating', clubs: [] };
 var T = null, META = {}, MS = [], SEA = null, R = {}, SIM = {}, REC = {}, RACE = null, AP = {};
@@ -43,17 +44,25 @@ var PRESETS = {
     ['Pace against efficiency', 'tempo', 'rating', ['Slow and good', 'Fast and good', 'Slow and struggling', 'Run and gun']],
     ['Three-point rate against shooting', 'tpar', 'efg', ['Efficient inside', 'Shoot and make', 'Struggling to score', 'Live by the three']],
     ['Offensive rebounding against ball security', 'orb_rate', 'tov_rate', ['Careful', 'Extra possessions', 'Wasteful', 'Crash the glass']],
-    ['Our rating against win %', 'rating', 'wpct', ['Winning on luck?', 'The real deal', 'Struggling', 'Due a run']]]
+    ['Our rating against win %', 'rating', 'wpct', ['Winning on luck?', 'The real deal', 'Struggling', 'Due a run']]],
+  /* college hockey (better up and to the right; lower-is-better axes flip) */
+  hk: [['Attack against defence', 'off', 'def', ['Defence first', 'Complete teams', 'Struggling', 'Outscore you']],
+    ['Shot share against PDO (shooting % + save %)', 'shot_share', 'pdo', ['Riding the bounces', 'Dominant and finishing', 'Struggling', 'Outshooting, unrewarded']],
+    ['Power play against penalty kill', 'pp_pct', 'pk_pct', ['Kill first', 'Special teams win games', 'Special teams cost games', 'Score on the power play']],
+    ['Shots for against shots against', 'sf_pg', 'sa_pg', ['Tight defence', 'Control the play', 'Chasing the game', 'Run and gun']],
+    ['Our rating against points %', 'rating', 'wpct', ['Winning on luck?', 'The real deal', 'Struggling', 'Due a run']]]
 };
 /* head to head */
 var H2H = {
   cfb: [['Strength', ['rating', 'off', 'def', 'sos']], ['Offence', ['epa_off', 'sr_off', 'off_pass_epa', 'off_rush_epa', 'explosive', 'third_pct', 'ypp']], ['Defence', ['epa_def', 'sr_def', 'def_pass_epa', 'def_rush_epa', 'ypp_allowed']], ['Results', ['ppg', 'papg', 'to_margin']]],
-  bb: [['Strength', ['rating', 'off', 'def', 'sos', 'tempo']], ['Offence', ['efg', 'tpar', 'tp_pct', 'ftr', 'ft_pct', 'tov_rate', 'orb_rate', 'ast_rate']], ['Defence', ['opp_efg', 'opp_tov_rate', 'drb_rate', 'blk_rate']]]
+  bb: [['Strength', ['rating', 'off', 'def', 'sos', 'tempo']], ['Offence', ['efg', 'tpar', 'tp_pct', 'ftr', 'ft_pct', 'tov_rate', 'orb_rate', 'ast_rate']], ['Defence', ['opp_efg', 'opp_tov_rate', 'drb_rate', 'blk_rate']]],
+  hk: [['Strength', ['rating', 'off', 'def', 'sos']], ['Shots', ['shot_share', 'sf_pg', 'sa_pg', 'sh_pct', 'sv_pct', 'pdo']], ['Special teams', ['pp_pct', 'pk_pct', 'ppo_pg', 'tsh_pg', 'pim_pg']], ['Results', ['gf_pg', 'ga_pg', 'wpct']]]
 };
 /* metrics a strength or weakness is read from: the process and the ratings, not results or style */
 var SW_POOL = {
   cfb: ['off', 'def', 'epa_off', 'epa_def', 'sr_off', 'sr_def', 'off_pass_epa', 'off_rush_epa', 'def_pass_epa', 'def_rush_epa', 'explosive', 'third_pct', 'ypp', 'ypp_allowed', 'to_margin'],
-  bb: ['off', 'def', 'efg', 'opp_efg', 'tov_rate', 'opp_tov_rate', 'orb_rate', 'drb_rate', 'ft_pct', 'tp_pct', 'ftr', 'ast_rate', 'blk_rate']
+  bb: ['off', 'def', 'efg', 'opp_efg', 'tov_rate', 'opp_tov_rate', 'orb_rate', 'drb_rate', 'ft_pct', 'tp_pct', 'ftr', 'ast_rate', 'blk_rate'],
+  hk: ['off', 'def', 'shot_share', 'sf_pg', 'sa_pg', 'sh_pct', 'sv_pct', 'pp_pct', 'pk_pct', 'pim_pg', 'ppo_pg']
 };
 /* the Team cards' plain-English chips: [metric, good at or above, text, bad at or below, text] */
 var CHIP = {
@@ -62,12 +71,16 @@ var CHIP = {
     ['to_margin', 85, 'Wins the turnover battle', 15, 'Turnover-prone'], ['third_pct', 88, 'Converts on third down', 12, 'Stalls on third down'], ['sos', 85, 'Battle-tested schedule', 12, 'Soft schedule so far']],
   bb: [['off', 90, 'Elite offence', 15, 'Struggling offence'], ['def', 90, 'Elite defence', 15, 'Leaky defence'], ['efg', 88, 'Efficient shooting', 12, 'Poor shot quality'],
     ['opp_efg', 88, 'Contests every shot', 12, 'Opponents shoot freely'], ['tov_rate', 88, 'Takes care of the ball', 12, 'Turnover-prone'], ['orb_rate', 88, 'Owns the offensive glass', 12, 'One shot and done'],
-    ['opp_tov_rate', 88, 'Forces turnovers', null, null], ['ft_pct', 90, 'Reliable at the line', 10, 'Misses at the line'], ['sos', 85, 'Battle-tested schedule', 12, 'Soft schedule so far']]
+    ['opp_tov_rate', 88, 'Forces turnovers', null, null], ['ft_pct', 90, 'Reliable at the line', 10, 'Misses at the line'], ['sos', 85, 'Battle-tested schedule', 12, 'Soft schedule so far']],
+  hk: [['off', 90, 'Elite attack', 15, 'Struggles to score'], ['def', 90, 'Elite defence', 15, 'Leaky defence'], ['shot_share', 88, 'Owns the puck', 12, 'Outshot most nights'],
+    ['pp_pct', 88, 'Deadly power play', 12, 'Power play misfires'], ['pk_pct', 88, 'Shuts down power plays', 12, 'Penalty kill leaks'], ['sv_pct', 90, 'Hot in goal', 10, 'Goaltending trouble'],
+    ['pim_pg', 88, 'Disciplined', 12, 'Penalty-prone'], ['sos', 85, 'Battle-tested schedule', 12, 'Soft schedule so far']]
 };
 var STYLE = { tempo: [80, 'Plays fast', 20, 'Slows it down'], tpar: [85, 'Lives behind the arc', 15, 'Works inside the arc'] };
 
 function fb() { return CC.fb(ST.L); }
-function sp() { return fb() ? 'cfb' : 'bb'; }
+function hk() { return CC.hk(ST.L); }
+function sp() { return fb() ? 'cfb' : hk() ? 'hk' : 'bb'; }
 function meta(id) {
   var m = META[id] || { key: id, label: id };
   var sm = CC.specMeta(ST.L, 'team', id), ours = CC.ours(id);
@@ -87,7 +100,7 @@ function pc(t, id) {
   return meta(id).lower ? 100 - q : q;
 }
 function tinfo(t) { var x = CC.team(ST.L, t) || {}; return { abbr: CC.tabbr(ST.L, t), name: x.name || (T[t] || {}).name || CC.tname(ST.L, t), short: x.short || x.name || CC.tshort(ST.L, t), colour: CC.traw(ST.L, t) || '', alt: CC.talt(ST.L, t) || '', conf: String(x.conference || (T[t] || {}).conference || '') }; }
-function rec(t) { var r = REC[t] || T[t] || {}; return CC.record(r.w, r.l); }
+function rec(t) { var r = REC[t] || T[t] || {}; return hk() ? CC.recW(r) : CC.record(r.w, r.l); }
 function rating(t) { var x = R[t] || {}; return isNum(x.rating) ? x.rating : v(t, 'rating'); }
 function ids() { return Object.keys(T).filter(function (t) { return isNum(rating(t)); }); }
 function byRating(list) { return list.slice().sort(function (a, b) { return (rating(b) || -99) - (rating(a) || -99); }); }
@@ -180,16 +193,16 @@ function power() {
   /* the split: football's rating is offence + defence (points added and prevented); basketball's is offence minus
      defence per 100, both around the same national average, so the parts are each side's distance from it */
   var avg = 0;
-  if (!fb()) { var os = all.map(function (t) { return (R[t] || {}).off; }).filter(isNum), ds = all.map(function (t) { return (R[t] || {}).def; }).filter(isNum); avg = (os.reduce(function (s, x) { return s + x; }, 0) / (os.length || 1) + ds.reduce(function (s, x) { return s + x; }, 0) / (ds.length || 1)) / 2; }
+  if (!fb() && !hk()) { var os = all.map(function (t) { return (R[t] || {}).off; }).filter(isNum), ds = all.map(function (t) { return (R[t] || {}).def; }).filter(isNum); avg = (os.reduce(function (s, x) { return s + x; }, 0) / (os.length || 1) + ds.reduce(function (s, x) { return s + x; }, 0) / (ds.length || 1)) / 2; }
   var prevRk = {}; ((SEA && SEA.power) || []).forEach(function (r) { if (r && isNum(r.prev_rank)) prevRk[String(r.team)] = r.prev_rank; });
   var cur = CC.isCur(ST.L, ST.S);
   var row = function (t) {
     var i = tinfo(t), x = R[t] || {}, s0 = SIM[t] || {};
-    var parts = fb() ? { off: x.off, def: x.def } : { off: isNum(x.off) ? x.off - avg : null, def: isNum(x.def) ? avg - x.def : null };
+    var parts = fb() || hk() ? { off: x.off, def: x.def } : { off: isNum(x.off) ? x.off - avg : null, def: isNum(x.def) ? avg - x.def : null };
     var mv = isNum(prevRk[t]) ? prevRk[t] - rk[t] : null;
     var po = fb() ? s0.p_cfp : s0.p_ncaa;
     return { rank: rk[t], name: i.name, abbr: i.abbr, colour: i.colour, href: thref(t), sub: rec(t) + ' · ' + CC.cname(ST.L, i.conf) + (AP[t] ? ' · AP No. ' + AP[t] : ''),
-      value: rating(t), text: CC.signed(rating(t), 1), parts: parts,
+      value: rating(t), text: CC.signed(rating(t), hk() ? 2 : 1), parts: parts,
       cells: [{ label: 'Since last week', html: mv === null ? '<span class="qk-muted">—</span>' : mv === 0 ? '<span class="qk-muted">=</span>' : '<span class="cc-mv ' + (mv > 0 ? 'pos' : 'neg') + '">' + (mv > 0 ? '▲' : '▼') + Math.abs(mv) + '</span>' },
         { label: 'Schedule', text: isNum(x.sos_rank) ? QK.ordinal(x.sos_rank) + ' hardest' : '—' }],
       chances: cur ? [{ label: fb() ? 'Playoff' : 'NCAA field', p: po }, { label: 'Title', p: s0.p_title }].filter(function (c) { return isNum(c.p) && c.p > 0; }) : [] };
@@ -200,12 +213,12 @@ function power() {
     var cs = confOrder(Array.from(new Set(all.map(function (t) { return tinfo(t).conf; }))));
     groups = cs.map(function (c) { return { label: c ? CC.cname(ST.L, c) : 'Independents', rows: all.filter(function (t) { return tinfo(t).conf === c; }).map(row) }; });
   } else groups = [{ label: '', rows: all.slice(0, 25).map(row) }];
-  var unit = fb() ? 'points v an average FBS team on a neutral field' : 'points per 100 possessions v an average D-I team';
-  host.innerHTML = QK.sectionHead({ kicker: 'Power board', title: 'Every team, ranked by our rating', sub: 'Our rating is the margin we expect against an average ' + (fb() ? 'FBS' : 'Division I') + ' team on a neutral field (' + (fb() ? 'points' : 'points per 100 possessions') + '). The bar splits it into offence and defence; the volt tick is the total.' +
+  var unit = fb() ? 'points v an average FBS team on a neutral field' : hk() ? 'goals a game v an average D-I team on neutral ice' : 'points per 100 possessions v an average D-I team';
+  host.innerHTML = QK.sectionHead({ kicker: 'Power board', title: 'Every team, ranked by our rating', sub: 'Our rating is the margin we expect against an average ' + (fb() ? 'FBS' : 'Division I') + ' team on ' + (hk() ? 'neutral ice (goals a game)' : 'a neutral field (' + (fb() ? 'points' : 'points per 100 possessions') + ')') + '. The bar splits it into ' + (hk() ? 'attack and defence' : 'offence and defence') + '; the volt tick is the total.' +
     (cur ? ' Playoff and title chances come from our simulated seasons.' : ''), actions: '<div class="qk-seg" id="tm-pw" role="group" aria-label="Group the board">' + [['top', 'Top 25'], ['conf', 'By conference'], ['all', 'All ' + all.length]].map(function (o) { return '<button type="button" data-value="' + o[0] + '" aria-pressed="' + (ST.pw === o[0]) + '">' + o[1] + '</button>'; }).join('') + '</div>' }) +
     '<div class="qk-card"><div class="qk-card-body' + (ST.pw === 'top' ? '' : ' tm-long') + '">' + QK.powerBars(null, { groups: groups, valueLabel: 'Our rating', unit: unit,
-      parts: [{ key: 'off', label: 'Offence', color: 'var(--c-2)' }, { key: 'def', label: 'Defence', color: 'var(--c-3)' }] }) + '</div></div>' +
-    QK.explain('A <b>rating of ' + (fb() ? '+14' : '+20') + '</b> means ' + (fb() ? 'two touchdowns better than an average FBS team on a neutral field' : 'twenty points per 100 possessions better than an average Division I team, about fourteen points a game') + '. This is our power ranking (it was on Standings › Polls); the AP and coaches’ polls stay on <a class="qk-link" href="' + esc(CC.href(ST.L, 'standings', null, ST.S, 'tab=polls')) + '">Standings › Polls</a>, beside it.', { title: 'What’s that number?' });
+      parts: [{ key: 'off', label: hk() ? 'Attack' : 'Offence', color: 'var(--c-2)' }, { key: 'def', label: 'Defence', color: 'var(--c-3)' }] }) + '</div></div>' +
+    QK.explain('A <b>rating of ' + (fb() ? '+14' : hk() ? '+1.0' : '+20') + '</b> means ' + (fb() ? 'two touchdowns better than an average FBS team on a neutral field' : hk() ? 'a goal a game better than an average Division I team on neutral ice: the best teams sit around +1.5' : 'twenty points per 100 possessions better than an average Division I team, about fourteen points a game') + '. This is our power ranking (it was on Standings › Polls); the AP and coaches’ polls stay on <a class="qk-link" href="' + esc(CC.href(ST.L, 'standings', null, ST.S, 'tab=polls')) + '">Standings › Polls</a>, beside it.', { title: 'What’s that number?' });
   var seg = document.getElementById('tm-pw');
   if (seg) QK.seg(seg, function (x) { ST.pw = x; writeQ(); power(); });
 }
@@ -270,6 +283,7 @@ function styleMap() {
 /* 4. strengths and weaknesses */
 function luck(t) {
   var r = REC[t];
+  if (r && hk()) r = { pf: r.gf, pa: r.ga, w: (r.w || 0) + 0.5 * (r.t || 0), l: (r.l || 0) + 0.5 * (r.t || 0) };
   if (!r || !isNum(r.pf) || !isNum(r.pa) || !(r.pf + r.pa > 0)) return null;
   var g = (r.w || 0) + (r.l || 0);
   if (!g) return null;
@@ -341,7 +355,7 @@ function continuity() {
   var go = function () {
     Promise.all([CC.load(CC.path(ST.L, ST.S, 'lab_players.json')), CC.load(CC.path(ST.L, prevS, 'lab_players.json'))]).then(function (a) {
       if (!U.alive(host)) return;
-      var rows = function (d) { if (!CC.ok(d) || !d.fields) return []; var ix = {}; d.fields.forEach(function (f, i) { ix[f] = i; }); return (d.rows || []).map(function (r) { return { id: String(r[ix.id]), team: String(r[ix.team]), v: r[ix.value] }; }).filter(function (r) { return r.id.charAt(0) !== '-'; }); };
+      var rows = function (d) { if (!CC.ok(d) || !d.fields) return []; var ix = {}; d.fields.forEach(function (f, i) { ix[f] = i; }); var vk = ix.value !== undefined ? ix.value : ix.gar; return (d.rows || []).map(function (r) { return { id: String(r[ix.id]), team: String(r[ix.team]), v: r[vk] }; }).filter(function (r) { return r.id.charAt(0) !== '-'; }); };
       var prev = {}, had = {}; rows(a[1]).forEach(function (r) { prev[r.id] = r.team; had[r.team] = 1; });
       var by = {};
       rows(a[0]).forEach(function (r) {
@@ -395,9 +409,9 @@ function trend() {
   var top = list.slice(0, 40).slice().sort(function (a, b) { return tinfo(a).abbr.localeCompare(tinfo(b).abbr); });
   clubs.forEach(function (t) { if (top.indexOf(t) < 0) top.push(t); });
   var chipsH = top.map(function (t) { return '<button type="button" class="qk-chip" data-club="' + esc(t) + '" aria-pressed="' + (clubs.indexOf(t) >= 0) + '">' + esc(tinfo(t).abbr) + '</button>'; }).join('');
-  var cs = confOrder(Array.from(new Set(list.map(function (t) { return tinfo(t).conf; }).filter(Boolean)))).slice(0, POWER[ST.L].length);
+  var cs = confOrder(Array.from(new Set(list.map(function (t) { return tinfo(t).conf; }).filter(Boolean)))).slice(0, (POWER[ST.L] || []).length || 6);
   host.innerHTML = QK.sectionHead({ kicker: 'Through the season', title: ST.trend === 'chance' ? 'The race, day by day' : 'Our rating, week by week',
-    sub: ST.trend === 'chance' ? 'Our chance of ' + (fb() ? 'a playoff place' : 'a place in the NCAA tournament') + ' for each team on each day, from the season simulation as it stood that day.' : 'Our rating after each week’s games (' + (fb() ? 'points v an average FBS team' : 'points per 100 v an average D-I team') + '). A line that climbs is a team getting better, or being found out as better.',
+    sub: ST.trend === 'chance' ? 'Our chance of ' + (fb() ? 'a playoff place' : 'a place in the NCAA tournament') + ' for each team on each day, from the season simulation as it stood that day.' : 'Our rating after each week’s games (' + (fb() ? 'points v an average FBS team' : hk() ? 'goals a game v an average D-I team' : 'points per 100 v an average D-I team') + '). A line that climbs is a team getting better, or being found out as better.',
     actions: days.length >= 2 ? '<div class="qk-seg" id="tm-tr" role="group" aria-label="Measure"><button type="button" data-value="rating" aria-pressed="' + (ST.trend === 'rating') + '">Our rating</button><button type="button" data-value="chance" aria-pressed="' + (ST.trend === 'chance') + '">' + (fb() ? 'Playoff chance' : 'NCAA chance') + '</button></div>' : '' }) +
     '<div class="qk-card"><div class="qk-card-body"><div class="tm-clubs"><span class="qk-within-l">Teams (our top 40; up to eight)</span><div class="qk-chips">' + chipsH + '</div>' +
     '<div class="qk-chips tm-divs">' + cs.map(function (c) { return '<button type="button" class="qk-chip" data-conf="' + esc(c) + '">' + esc(CC.cname(ST.L, c)) + ' top six</button>'; }).join('') + '<button type="button" class="qk-chip" data-conf="*top">Our top six</button></div>' +
@@ -412,7 +426,7 @@ function trend() {
     clubs.forEach(function (t) { (paths[t] || []).forEach(function (p0) { dates[p0[0]] = 1; }); });
     var xs = Object.keys(dates).sort();
     QKC.line(document.getElementById('tm-tr-c'), { x: xs.map(function (d) { return CC.date(d + 'T12:00:00Z'); }), series: clubs.map(function (t, i) { var m = {}; (paths[t] || []).forEach(function (p0) { m[p0[0]] = p0[1]; }); return { name: tinfo(t).abbr, color: colOf(t, i), symbols: true, data: xs.map(function (d) { return isNum(m[d]) ? m[d] : null; }) }; }),
-      yName: fb() ? 'Rating (points v average)' : 'Rating (per 100 v average)', xName: 'Week of', yScale: true, yFmt: function (x) { return CC.signed(x, 0); }, endLabels: true, label: 'Our rating through the season' });
+      yName: fb() ? 'Rating (points v average)' : hk() ? 'Rating (goals a game v average)' : 'Rating (per 100 v average)', xName: 'Week of', yScale: true, yFmt: function (x) { return CC.signed(x, hk() ? 1 : 0); }, endLabels: true, label: 'Our rating through the season' });
   }
   QK.$$('[data-club]', host).forEach(function (b) { b.addEventListener('click', function () {
     var t = b.getAttribute('data-club'), cur = clubs.slice(), i = cur.indexOf(t);

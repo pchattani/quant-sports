@@ -881,6 +881,22 @@ def main(argv: list[str] | None = None) -> int:
     b.step("copy the design kit", kit)
     from oddsmarkets.baseball.analytics import glossary as GL
     b.write_or_fail("glossary.json", "glossary", GL.build)
+
+    # Umpire Scorecards' per-umpire season numbers, a reference beside our umpire model on the umpire pages
+    # (oddsmarkets/baseball/sources/umpscorecards.py; SOURCE_UMPSCORECARDS_ENABLED=0 removes the file and the columns)
+    def usc():
+        from oddsmarkets.baseball.sources import umpscorecards as USC
+        dst = data / "mlb" / "umpscorecards.json"
+        d = USC.load_derived()
+        if d is None:
+            if dst.exists():
+                dst.unlink()
+            return
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        dst.write_text(json.dumps(d, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+        b.written.append(dst)
+    if "mlb" in args.levels:
+        b.step("umpire scorecards", usc)
     shared_all: dict = {}
     levels: dict[str, dict] = {}
     for level in ["mlb", "aaa"]:

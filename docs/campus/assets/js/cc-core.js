@@ -18,10 +18,12 @@
 var CC = root.CC = {};
 var esc = QK.esc, isNum = QK.isNum, fmt = QK.fmt;
 CC.esc = esc; CC.isNum = isNum;
-CC.LEVELS = ['cfb', 'mbb', 'wbb'];
-CC.LNAME = { cfb: 'College Football', mbb: "Men's College Basketball", wbb: "Women's College Basketball" };
-CC.LSHORT = { cfb: 'CFB', mbb: 'MBB', wbb: 'WBB' };
+CC.LEVELS = ['cfb', 'mbb', 'wbb', 'mch', 'wch'];
+CC.LNAME = { cfb: 'College Football', mbb: "Men's College Basketball", wbb: "Women's College Basketball", mch: "Men's College Hockey", wch: "Women's College Hockey" };
+CC.LSHORT = { cfb: 'CFB', mbb: 'MBB', wbb: 'WBB', mch: 'MCH', wch: 'WCH' };
 CC.fb = function (L) { return L === 'cfb'; };
+/* college hockey (30 Oct 2026; cc-hockey.js holds its own pages): men's mch, women's wch */
+CC.hk = function (L) { return L === 'mch' || L === 'wch'; };
 
 /* ── data ────────────────────────────────────────────────────────────── */
 CC.DATA = 'data/';
@@ -85,7 +87,7 @@ CC.seasonLabel = function (L, S) {
   if (!S) return '';
   return CC.fb(L) ? String(S) : (S - 1) + '–' + String(S).slice(2);
 };
-var TEAMS = { cfb: {}, mbb: {}, wbb: {} }, CONFS = { cfb: {}, mbb: {}, wbb: {} }, PLAYERS = { cfb: {}, mbb: {}, wbb: {} };
+var TEAMS = { cfb: {}, mbb: {}, wbb: {}, mch: {}, wch: {} }, CONFS = { cfb: {}, mbb: {}, wbb: {}, mch: {}, wch: {} }, PLAYERS = { cfb: {}, mbb: {}, wbb: {}, mch: {}, wch: {} };
 CC.addTeams = function (L, map) { Object.keys(map || {}).forEach(function (k) { var t = map[k]; if (t && t.name) TEAMS[L][String(k)] = Object.assign({}, TEAMS[L][String(k)] || {}, t); }); };
 CC.addConfs = function (L, map) { Object.keys(map || {}).forEach(function (k) { if (map[k]) CONFS[L][String(k)] = Object.assign({}, CONFS[L][String(k)] || {}, map[k]); }); };
 CC.addPlayers = function (L, map) { Object.keys(map || {}).forEach(function (k) { var p = map[k]; if (p && p.name) PLAYERS[L][String(k)] = p; }); };
@@ -215,23 +217,26 @@ CC.game = function (c, L) {
   if (c && !c.season && CC.state && CC.state.S) c = Object.assign({ season: CC.state.S }, c);
   var st = CC.status(c), m = c.model || {}, mk = c.market || null;
   var tag = CC.roundLabel(c);
-  var per = isNum(c.period) ? (CC.fb(L) ? (c.period > 4 ? 'OT' : 'Q' + c.period) : (L === 'mbb' || Number(c.season) < 2016 ? (c.period > 2 ? 'OT' : 'H' + c.period) : (c.period > 4 ? 'OT' : 'Q' + c.period))) : null;
+  var per = isNum(c.period) ? (CC.fb(L) ? (c.period > 4 ? 'OT' : 'Q' + c.period) : CC.hk(L) ? (c.period > 3 ? 'OT' : 'P' + c.period) : (L === 'mbb' || Number(c.season) < 2016 ? (c.period > 2 ? 'OT' : 'H' + c.period) : (c.period > 4 ? 'OT' : 'Q' + c.period))) : null;
+  /* hockey keeps ties: our chance of a tie travels as the kit's draw (CC.card says "Tie") */
+  var hk = CC.hk(L) && isNum(m.p_tie);
   return {
     sport: 'college', id: c.id, start: CC.gameDate(c), status: st, tba: CC.tba(c),
     league: CC.LSHORT[L] + (tag ? ' · ' + tag : (c.conf_game ? ' · Conference' : '')) + (c.neutral && !tag ? ' · Neutral' : ''),
     home: CC.side(L, c, 'home'), away: CC.side(L, c, 'away'), hs: isNum(c.hs) ? c.hs : null, as: isNum(c.as) ? c.as : null,
-    p_home: isNum(m.p_home) ? m.p_home : null, market_home: mk && isNum(mk.p_home) ? mk.p_home : null, market_src: mk ? CC.mkSource(mk) || undefined : undefined,
+    p_home: isNum(m.p_home) ? m.p_home : null, p_draw: hk && c.stype !== 'ncaa' && c.stype !== 'conf' ? m.p_tie : undefined, p_away: hk && isNum(m.p_away) ? m.p_away : undefined,
+    market_home: mk && isNum(mk.p_home) ? mk.p_home : null, market_src: mk ? CC.mkSource(mk) || undefined : undefined,
     /* no live chance in the payload: a live game shows our pre-game call, labelled so (kit v3) */
     pre_only: st === 'live' ? true : undefined, neutral: c.neutral ? true : undefined,
     note: '', period: per, clock: c.clock, href: CC.gameHref(L, c.id, c.season)
   };
 };
 /* Records (W-L) for the game cards, registered from each season's standings. */
-var RECS = { cfb: {}, mbb: {}, wbb: {} };
+var RECS = { cfb: {}, mbb: {}, wbb: {}, mch: {}, wch: {} };
 CC.addRecords = function (L, S, standings) {
   var k = String(S);
   RECS[L][k] = RECS[L][k] || {};
-  Object.keys(standings || {}).forEach(function (c) { (standings[c] || []).forEach(function (r) { if (r && isNum(r.w) && isNum(r.l)) RECS[L][k][String(r.team)] = r.w + '-' + r.l; }); });
+  Object.keys(standings || {}).forEach(function (c) { (standings[c] || []).forEach(function (r) { if (r && isNum(r.w) && isNum(r.l)) RECS[L][k][String(r.team)] = r.w + '-' + r.l + (CC.hk(L) && isNum(r.t) ? '-' + r.t : ''); }); });
 };
 CC.rec = function (L, S, tid) { var m = RECS[L][String(S)]; return (m && m[String(tid)]) || ''; };
 var MK_SRC = { kalshi: 'Kalshi', polymarket: 'Polymarket', espn_close: 'ESPN closing line', espn: 'ESPN line' };
@@ -246,7 +251,12 @@ CC.card = function (c, L, o) {
   var h = QK.gameCard(g, { sport: false, why: !!o.why, market: o.market === false ? false : 'quiet' });
   /* the kit's badge prints the start time: a TBA game shows its day and "TBA" instead of the midnight placeholder */
   if (g.tba) h = h.replace(QK.statusBadge(g), '<span class="qk-badge">' + esc(fmt.relDay(g.start)) + ' · TBA</span>');
+  if (CC.hk(L)) h = CC.tieWords(h);
   return h;
+};
+/* the kit says "Draw"; college hockey says "tie" */
+CC.tieWords = function (h) {
+  return String(h).replace(/>Draw </g, '>Tie <').replace(/Draw <b>/g, 'Tie <b>').replace(/A draw\./g, 'A tie.');
 };
 /* The game model's calibration record for "How sure are we?": a level's calibration.json in the kit's shape
  * (QK.calib.find), else the builder's own (calibration: [{lo, hi, n, p_mean, y_mean}], summary.model {n, brier}).
@@ -273,7 +283,8 @@ CC.uk = function (s) { return String(s === undefined || s === null ? '' : s).rep
 /* One player's position in words, singular ("Guard", not the catalogue's plural group name "Guards"). */
 var POS_NAME = { QB: 'Quarterback', RB: 'Running back', WR: 'Wide receiver', TE: 'Tight end', OL: 'Offensive line', DL: 'Defensive line', LB: 'Linebacker', DB: 'Defensive back',
   K: 'Kicker', P: 'Punter', G: 'Guard', F: 'Forward', C: 'Centre', W: 'Wing', B: 'Big' };
-CC.posName = function (L, pos) { return POS_NAME[String(pos || '').toUpperCase()] || String(pos || ''); };
+var POS_HK = { F: 'Forward', D: 'Defenceman', G: 'Goalie' };
+CC.posName = function (L, pos) { if (CC.hk(L)) return POS_HK[String(pos || '').toUpperCase()] || String(pos || ''); return POS_NAME[String(pos || '').toUpperCase()] || String(pos || ''); };
 /* Does a game have its own page? Game pages are written for the current season and the previous season's
  * postseason (PAYLOADS.md size budget; football's conference title games are not among them). Other games link to
  * the recap card on the game route, which then reads the schedule only (no 404 for a file never built). */
@@ -542,7 +553,7 @@ CC.defaultLevel = function () {
 };
 function sectionHrefs(L) {
   var map = { overview: '', fixtures: 'games', standings: 'standings', teams: 'teams', scout: 'scout', value: 'value', fantasy: 'fantasy', model: 'model' };
-  QK.$$('.qk-secnav a[data-sec]').forEach(function (a) { var k = a.getAttribute('data-sec'); a.setAttribute('href', '#/' + L + (map[k] ? '/' + map[k] : '')); });
+  QK.$$('.qk-secnav a[data-sec]').forEach(function (a) { var k = a.getAttribute('data-sec'); a.setAttribute('href', '#/' + L + (map[k] ? '/' + map[k] : '')); if (k === 'fantasy') { a.hidden = CC.hk(L); a.style.display = CC.hk(L) ? 'none' : ''; } });
 }
 function paintCtx(L, S) {
   QK.$$('#cc-level button').forEach(function (b) { b.setAttribute('aria-pressed', b.getAttribute('data-value') === L ? 'true' : 'false'); });

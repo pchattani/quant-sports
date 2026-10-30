@@ -202,6 +202,8 @@ CC.route('model', function (el, p) {
   var L = p.L, S = p.S, fb = CC.fb(L);
   /* the standing Model order (round 9): How it works, How we're doing, the other Model tabs, Glossary, Terms */
   var list = [['method', 'How it works'], ['calibration', 'How we’re doing'], ['market', 'Our forecasts v the market'], ['moves', 'Who moves next'], ['glossary', 'Glossary'], ['terms', 'Terms']];
+  /* college hockey: no market to compare (none listed) and no "who moves next" model; its own method and record */
+  if (CC.hk(L)) list = [['method', 'How it works'], ['calibration', 'How we’re doing'], ['glossary', 'Glossary'], ['terms', 'Terms']];
   var tab = U.tab(p, list.map(function (x) { return x[0]; }), 'method');
   el.innerHTML = U.head('Model', 'How our numbers are made, how well they have done, and what every term means.', U.kicker(L, S)) +
     U.tabs(L, 'model', list, null, tab) + (tab === 'calibration' ? '<div id="mb-sure"></div>' : '') + '<div id="mb">' + QK.skeleton('lines', 8) + '</div>';
@@ -209,6 +211,7 @@ CC.route('model', function (el, p) {
   /* round 6, "How we're doing" (QK.doing) at the top of its tab: our favourites' record this week (index.json
      levels.<L>.digest.record), then our chance against how often the home team won, walk-forward, from the level's
      calibration.json when it is there (CC.calib reads the kit's shape and the builder's own) */
+  if (CC.hk(L) && CC.hkModel && (tab === 'method' || tab === 'calibration')) { var hb = QK.$('#mb-sure', el); if (hb) hb.remove(); return CC.hkModel(el, p, tab, body); }
   if (QK.$('#mb-sure', el)) CC.load(CC.lpath(L, 'calibration.json')).then(function (cj) {
     var host = QK.$('#mb-sure', el);
     var cb = CC.calib(cj);
@@ -231,8 +234,8 @@ CC.route('model', function (el, p) {
     (g.groups || []).forEach(function (gr) {
       var es = (gr.entries || []).filter(function (e) { return !GLOSS_DROP[e.key]; }).map(function (e) { var o = GLOSS_V2[e.key] || {}; return { key: e.key, label: CC.uk(o.label || e.label), desc: CC.uk(o.desc || e.desc) }; });
       if (gr.name !== 'Metrics') { groups.push({ name: gr.name, entries: es }); return; }
-      ['CFB', 'MBB', 'WBB'].forEach(function (lv) {
-        var sub = es.filter(function (e) { return / \((CFB|MBB|WBB)\)$/.test(e.label) ? e.label.slice(-4, -1) === lv : lv === 'CFB'; }).map(function (e) { return { key: e.key, label: e.label.replace(/ \((CFB|MBB|WBB)\)$/, ''), desc: e.desc }; });
+      ['CFB', 'MBB', 'WBB', 'MCH', 'WCH'].forEach(function (lv) {
+        var sub = es.filter(function (e) { return / \((CFB|MBB|WBB|MCH|WCH)\)$/.test(e.label) ? e.label.slice(-4, -1) === lv : lv === 'CFB'; }).map(function (e) { return { key: e.key, label: e.label.replace(/ \((CFB|MBB|WBB|MCH|WCH)\)$/, ''), desc: e.desc }; });
         if (sub.length) groups.push({ name: 'Metrics: ' + CC.LNAME[lv.toLowerCase()], entries: sub });
       });
     });
@@ -263,7 +266,7 @@ CC.route('model', function (el, p) {
     var txt = a[0], season = CC.ok(a[1]) ? a[1] : null, val = CC.ok(a[2]) ? a[2] : null, cal = CC.ok(a[3]) ? a[3] : null;
     body.innerHTML = methodFans(L, Sx, season, val, cal) +
       '<details class="cc-tech qk-card"><summary>Technical detail: the models, the code and the tests</summary><div class="cc-prose">' + (txt ? CC.md(txt) : CC.md(fb ? FALLBACK.cfb : FALLBACK.bb) + '<p class="qk-muted">The full methodology document is published with the next build.</p>') +
-      '<h3>Data</h3><p>Schedules, scores, box scores, plays, rankings, rosters and betting lines come from ESPN’s public data; prediction-market probabilities from Kalshi and Polymarket where listed. Sources whose terms forbid reuse are left out: no Sports-Reference, KenPom, Barttorvik, 247Sports, On3, Rivals, Massey or NCAA.com data. ' +
+      '<h3>Data</h3><p>Schedules, scores, box scores, plays, rankings, rosters and betting lines come from ESPN’s public data; prediction-market probabilities from Kalshi and Polymarket where listed. Sources whose terms forbid reuse are left out: no Sports-Reference, KenPom, 247Sports, On3, Rivals, Massey or NCAA.com data. Barttorvik’s T-Rank (barttorvik.com) is shown on basketball team pages as a credited reference, never as a model input; our end-of-season ratings agree with it closely (correlation 0.97 to 0.99 a season, men 2008–2026 and women 2021–2026). ' +
       'Recruiting rankings and the official transfer portal are not used; transfers here are inferred from rosters and box scores.</p></div></details>';
     methodCharts(L, Sx, season, val, cal, body);
   });

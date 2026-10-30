@@ -75,7 +75,10 @@ function posLabel(cat, pos) { var n = CC.posName(CC.state.L, pos); if (n && n !=
 var SEASON_COLS = {
   cfb: [['gp', 'GP'], ['cmp', 'Cmp'], ['att', 'Att'], ['pass_yds', 'Pass yds', 'yds'], ['pass_td', 'Pass TD', 'td'], ['int', 'INT'], ['car', 'Car'], ['rush_yds', 'Rush yds'], ['rush_td', 'Rush TD'], ['rec', 'Rec'], ['rec_yds', 'Rec yds'], ['rec_td', 'Rec TD'],
     ['tkl', 'Tkl'], ['tfl', 'TFL'], ['sacks', 'Sacks'], ['pd', 'PD'], ['epa', 'EPA'], ['epa_play', 'EPA/play'], ['value', 'Value']],
-  bb: [['gp', 'GP'], ['min', 'MIN'], ['pts', 'PTS'], ['reb', 'REB'], ['ast', 'AST'], ['stl', 'STL'], ['blk', 'BLK'], ['tov', 'TOV'], ['fg_pct', 'FG%', 'pct'], ['tp_pct', '3P%', 'pct'], ['ft_pct', 'FT%', 'pct'], ['ts', 'TS%', 'pct'], ['usg', 'USG%'], ['ortg', 'ORtg'], ['value', 'Value'], ['value_pg', 'Value/G']]
+  bb: [['gp', 'GP'], ['min', 'MIN'], ['pts', 'PTS'], ['reb', 'REB'], ['ast', 'AST'], ['stl', 'STL'], ['blk', 'BLK'], ['tov', 'TOV'], ['fg_pct', 'FG%', 'pct'], ['tp_pct', '3P%', 'pct'], ['ft_pct', 'FT%', 'pct'], ['ts', 'TS%', 'pct'], ['usg', 'USG%'], ['ortg', 'ORtg'], ['value', 'Value'], ['value_pg', 'Value/G']],
+  /* college hockey (College Hockey News season lines) */
+  hk: [['gp', 'GP'], ['g', 'G'], ['a', 'A'], ['pts', 'PTS'], ['sh', 'SOG'], ['sh_pct', 'SH%', 'pct'], ['pm', '+/-'], ['pim', 'PIM'], ['ppg', 'PPG'], ['toi_pg', 'TOI'], ['tsa', 'Att'], ['blk', 'BLK'], ['fo_pct', 'FO%', 'pct'],
+    ['sv_pct', 'SV%'], ['gaa', 'GAA'], ['sa', 'SA'], ['gsaa', 'GSAA'], ['value', 'GAR'], ['value_pg', 'GAR/G']]
 };
 /* Football season rows may nest passing / rushing / receiving / defense objects (PAYLOADS.md lists them as groups). */
 function flat(r) {
@@ -101,7 +104,8 @@ var HEAD = {
   QB: [['pass_yds', 'Pass yds'], ['pass_td', 'Pass TD'], ['rush_yds', 'Rush yds']], RB: [['rush_yds', 'Rush yds'], ['rush_td', 'Rush TD'], ['rec_yds', 'Rec yds']],
   WR: [['rec', 'Rec'], ['rec_yds', 'Rec yds'], ['rec_td', 'Rec TD']], TE: [['rec', 'Rec'], ['rec_yds', 'Rec yds'], ['rec_td', 'Rec TD']],
   DL: [['tkl', 'Tackles'], ['tfl', 'TFL'], ['sacks', 'Sacks']], LB: [['tkl', 'Tackles'], ['tfl', 'TFL'], ['sacks', 'Sacks']], DB: [['tkl', 'Tackles'], ['pd', 'PD'], ['def_int', 'INT']],
-  bb: [['pts', 'PTS'], ['reb', 'REB'], ['ast', 'AST']]
+  bb: [['pts', 'PTS'], ['reb', 'REB'], ['ast', 'AST']],
+  hkF: [['g', 'Goals'], ['a', 'Assists'], ['pts', 'Points']], hkD: [['pts', 'Points'], ['pm', '+/-'], ['blk_pg', 'Blocks/G']], hkG: [['sv_pct', 'SV%'], ['gaa', 'GAA'], ['gsaa', 'GSAA']]
 };
 
 /* Who moves next: the player-page Movement card (MOVES_VIEWS.md, college), from movement.json when published. */
@@ -138,6 +142,8 @@ var SUB = {
   r: 'Points per 100 possessions the player adds over an average D-I player.', pts100: 'Points scored per 100 possessions on the floor.', ts_add: 'Points gained by shooting better than average.',
   ast_pct: 'Team-mates’ baskets the player sets up.', tov_pct: 'How rarely a possession ends in a turnover.', fta100: 'Trips to the line: pressure on the rim.', stl_pct: 'Steals per opponent possession.',
   trb_pct: 'Share of the available rebounds.', orb_pct: 'Share of the available offensive rebounds.', blk_pct: 'Share of opponent twos blocked.',
+  gar_pg: 'Goals above a replacement-level player, per game.', gar: 'Goals above replacement this season.', pts_pg: 'Goals and assists a game.', g_pg: 'Goals a game.', p1_pg: 'Goals and first assists a game.',
+  sh_pg: 'Shots on goal a game.', pm_rel: 'Plus-minus against the team’s goal difference.', toi_pg: 'Minutes a game: the coach’s trust.', sv_pct: 'Saves per shot faced.', gsaa: 'Saves above an average goalie on the same shots.', gaa: 'Goals allowed per 60 minutes.', sa60: 'Shots faced per 60 minutes.', blk_pg: 'Shots blocked a game.',
   value: 'Value above a replacement-level player this season.', pts: 'Points a game.', reb: 'Rebounds a game.', ast: 'Assists a game.', ts: 'Points per shooting chance.', usg: 'Share of possessions the player finishes.', ortg: 'Points produced per 100 possessions used.'
 };
 /* basketball box-score keys that share a name with a football one */
@@ -209,6 +215,8 @@ CC.route('player', function (el, p) {
     function lead() {
       var v = vals, gp = gpNow ? ' in ' + plural(gpNow, 'game') : '';
       var n = function (x) { return QK.fmt.num(Math.round(x)); };
+      if (CC.hk(L) && pos === 'G' && isNum(v.sv_pct)) return sur + ' has a ' + CC.f(v.sv_pct, 3).replace(/^0/, '') + ' save percentage' + (isNum(v.gaa) ? ' and a ' + CC.f(v.gaa, 2) + ' goals-against average' : '') + gp + '.';
+      if (CC.hk(L) && isNum(v.g)) return sur + ' has ' + plural(Number(v.g) || 0, 'goal') + ' and ' + plural(Number(v.a) || 0, 'assist') + gp + (isNum(v.toi_pg) ? ', playing ' + CC.f(v.toi_pg, 1) + ' minutes a night' : '') + '.';
       if (!fb && isNum(v.pts)) return sur + ' averages ' + CC.f(v.pts, 1) + ' points, ' + CC.f(v.reb, 1) + ' rebounds and ' + CC.f(v.ast, 1) + ' assists' + gp + '.';
       if (pos === 'QB' && isNum(v.pass_yds)) return sur + ' has thrown for ' + n(v.pass_yds) + ' yards and ' + plural(Number(v.pass_td) || 0, 'touchdown') + gp + '.';
       if (pos === 'RB' && isNum(v.rush_yds)) return sur + ' has run for ' + n(v.rush_yds) + ' yards and ' + plural(Number(v.rush_td) || 0, 'touchdown') + gp + '.';
@@ -227,18 +235,19 @@ CC.route('player', function (el, p) {
       if (gpNow && gpNow < (fb ? 5 : 10)) tx += ' Early days, so read it lightly.';
       return tx.trim();
     }
-    var hstats = (fb ? (HEAD[pos] || []) : HEAD.bb).filter(function (h0) { return isNum(vals[h0[0]]); }).map(function (h0) { return { label: h0[1], value: fb ? (vals[h0[0]] % 1 ? CC.f(vals[h0[0]], 1) : fmtInt(vals[h0[0]])) : CC.f(vals[h0[0]], 1) }; });
+    var hk = CC.hk(L);
+    var hstats = (fb ? (HEAD[pos] || []) : hk ? (HEAD['hk' + pos] || HEAD.hkF) : HEAD.bb).filter(function (h0) { return isNum(vals[h0[0]]); }).map(function (h0) { var x = vals[h0[0]]; return { label: h0[1], value: fb || hk ? (h0[0] === 'sv_pct' ? CC.f(x, 3).replace(/^0/, '') : x % 1 ? CC.f(x, 2) : fmtInt(x)) : CC.f(x, 1) }; });
     if (cp && isNum(cp.gp)) hstats.unshift({ label: 'GP', value: String(cp.gp) });
     var short0 = cp ? shortText() : '';
     var crumb = '<nav class="cc-crumb" aria-label="Breadcrumb"><a href="' + esc(CC.scoutHref(L, S)) + '">' + esc(CC.LNAME[L]) + ' · Scouting Room</a><span aria-hidden="true">›</span>' +
       (t ? '<a href="' + esc(CC.teamHref(L, team, cur.season || S)) + '">' + esc(t.short || t.name) + '</a><span aria-hidden="true">›</span>' : '') + esc(name) + '</nav>';
     // stat tiles: ours first (v4: the black strip of five numbers under the hero)
     var k = [];
-    if (vr) k.push({ label: fb ? 'Value (EPA above replacement)' : 'Value above replacement', value: CC.f(vr.value, fb ? 1 : 1), signal: true, pctl: isNum(pp.value) ? pp.value : (isNum(vr.pctl) ? vr.pctl : null), sub: isNum(vr.gp) ? vr.gp + ' games · ' + CC.f(vr.value_pg, 2) + ' a game' : '', tip: 'Our value model this season; the chip is the percentile against the same position' });
+    if (vr) k.push({ label: fb ? 'Value (EPA above replacement)' : hk ? 'GAR (goals above replacement)' : 'Value above replacement', value: CC.f(vr.value, fb ? 1 : 1), signal: true, pctl: hk ? (isNum(pp.gar) ? pp.gar : (isNum(vr.pctl) ? vr.pctl : null)) : isNum(pp.value) ? pp.value : (isNum(vr.pctl) ? vr.pctl : null), sub: isNum(vr.gp) ? vr.gp + ' games · ' + CC.f(vr.value_pg, 2) + ' a game' : '', tip: 'Our value model this season; the chip is the percentile against the same position' });
     if (isNum(vals.epa_play)) k.push({ label: 'EPA per play', value: CC.signed(vals.epa_play, 3), pctl: pp.epa_play, sub: 'expected points added per credited play' });
     if (!fb && isNum(vals.ts)) k.push({ label: 'True shooting', value: CC.pct(vals.ts, 1), pctl: pp.ts, sub: 'points per shooting chance' });
     if (!fb && isNum(vals.r)) k.push({ label: 'Rating per 100', value: CC.signed(vals.r, 1), pctl: pp.r, sub: 'on-court margin per 100 possessions v average' });
-    hstats.filter(function (h0) { return h0.label !== 'GP'; }).slice(0, 5 - k.length - (cur.fantasy && isNum(cur.fantasy.proj) ? 1 : 0)).forEach(function (h0) { k.push({ label: h0.label, value: h0.value, sub: fb ? 'this season' : 'a game' }); });
+    hstats.filter(function (h0) { return h0.label !== 'GP'; }).slice(0, 5 - k.length - (cur.fantasy && isNum(cur.fantasy.proj) ? 1 : 0)).forEach(function (h0) { k.push({ label: h0.label, value: h0.value, sub: fb || hk ? 'this season' : 'a game' }); });
     if (cur.fantasy && isNum(cur.fantasy.proj)) k.push({ label: 'Fantasy projection', value: CC.f(cur.fantasy.proj, 1), sub: 'points next ' + (fb ? 'week' : 'period') });
     /* v4 (Broadcast): the full-bleed team-colour hero (the alternate colour on the diagonal; slate behind a volt
        stripe until the payload has one) with the black strip of five numbers and "The short version" under it */
@@ -250,7 +259,7 @@ CC.route('player', function (el, p) {
     if (d && window.QPV) html += '<div class="qk-chips" style="margin-top:var(--sp-4)"><a class="qk-btn" href="' + esc(CC.playerHref(L, pid) + '?view=progression') + '">Season by season</a><a class="qk-btn" href="#/' + L + '/compare/progression/' + encodeURIComponent(pid) + '">Compare progression</a></div>';
 
     /* How sure are we: when the headline numbers are half signal at this playing time (the spec's M50 samples) */
-    var small = gpNow < (fb ? 6 : 12);
+    var small = gpNow < (fb ? 6 : hk ? 10 : 12);
     var settle = useSpec ? head.filter(function (r) { return r.m.m50 && r.m.mu && !r.style; }).map(function (r) {
       if (r.m.mu === 'games') return [r.label, Math.round(r.m.m50)];
       var n0 = CC.sampleIn(cp, r.m.mu);
@@ -258,7 +267,7 @@ CC.route('player', function (el, p) {
     }).filter(function (x) { return x && x[1] > 0 && x[1] < 400; }).slice(0, 3) : [];
     /* v4: "How sure are we?" is the explain strip under the meters */
     var settleNote = '<b>How sure are we?</b> ' + esc(gpNow ? (small ? (gpNow <= 10 ? NUMW[gpNow] : gpNow) + ' game' + (gpNow === 1 ? ' is' : 's is') + ' a small sample.' : gpNow + ' games: the picture is settling.') : 'No games yet this season.') + ' ' +
-      (small ? 'College seasons are short and schedules uneven, so rates swing a lot early on. ' : 'Schedules in college vary a lot, so read a rate with the opponents in mind. ') +
+      (small ? 'College seasons are short and schedules uneven, so rates swing a lot early on. ' : 'Schedules in college vary a lot, so read a rate with the opponents in mind. ') + (hk ? 'Shooting percentage and plus-minus are the noisiest numbers; shots a game settle fastest. ' : '') +
       (settle.length ? 'At this playing time, ' + settle.map(function (x) { return esc(lc(x[0])) + ' is half signal after about <b>' + plural(x[1], 'game') + '</b>'; }).join('; ') + '. ' : '') +
       'The ▼ on each meter is last season, where the player had one in the same group: rows that sit on it are the steady part of the profile.';
     var sim = ((d && d.similar) || []).filter(function (s0) { return s0 && s0.id; });
@@ -268,12 +277,12 @@ CC.route('player', function (el, p) {
         (same ? '<a class="v" href="' + esc(CC.compareHref(L, S, [pid, s0.id])) + '">Compare</a>' : '<span class="v">distance ' + CC.f(s0.distance, 2) + '</span>') + '</li>'; }).join('') + '</ul>' +
       '<div class="qk-aside" style="margin-top:10px">Closest statistical profiles: a smaller distance is a closer match.</div></div></article>' : '';
     var log = cur.log || [];
-    var vkLog = null, LOGK = { value: 'Value', epa: 'EPA', pts: 'Points', pass_yds: 'Passing yards', rush_yds: 'Rushing yards', rec_yds: 'Receiving yards', tkl: 'Tackles', sacks: 'Sacks', fgm: 'Field goals' }, lk = [];
+    var vkLog = null, LOGK = { value: 'Value', epa: 'EPA', pts: 'Points', pass_yds: 'Passing yards', rush_yds: 'Rushing yards', rec_yds: 'Receiving yards', tkl: 'Tackles', sacks: 'Sacks', fgm: 'Field goals', sv: 'Saves', g: 'Goals', sh: 'Shots' }, lk = [];
     if (log.length) {
       log.forEach(function (g) { Object.keys(g).forEach(function (k2) { if (lk.indexOf(k2) < 0 && ['game', 'date', 'opp', 'home', 'res'].indexOf(k2) < 0 && isNum(g[k2])) lk.push(k2); }); });
       lk = lk.slice(0, 10);
       var tot = function (k2) { return log.reduce(function (a0, g) { return a0 + (isNum(g[k2]) ? Math.abs(g[k2]) : 0); }, 0); };
-      vkLog = ['value', 'epa', 'pts', 'pass_yds', 'rush_yds', 'rec_yds', 'tkl', 'sacks', 'fgm'].filter(function (k2) { return lk.indexOf(k2) >= 0 && tot(k2) > 0; })[0] || null;
+      vkLog = ['value', 'epa', 'pts', 'sv', 'pass_yds', 'rush_yds', 'rec_yds', 'tkl', 'sacks', 'fgm'].filter(function (k2) { return lk.indexOf(k2) >= 0 && tot(k2) > 0; })[0] || null;
     }
     var gbg = log.length && vkLog ? U.card((LOGK[vkLog] || vkLog) + ', game by game', CC.seasonLabel(L, cur.season || S) + '; the best game is marked', U.chart('pp-log', 240, (LOGK[vkLog] || vkLog) + ' per game this season')) : '';
     /* 1. the LED meters (7) with "How sure are we?" under them, beside the tale of the tape against the closest match
@@ -303,17 +312,17 @@ CC.route('player', function (el, p) {
     if (!d) html += '<p class="cc-note">Career pages are kept for players with a game in the last two seasons; this season’s catalogue numbers are shown.</p>';
     var seasons = ((d && d.seasons) || []).map(flat);
     if (seasons.length) {
-      var C = (fb ? SEASON_COLS.cfb : SEASON_COLS.bb).filter(function (c) { return seasons.some(function (r) { return isNum(r[c[0]]); }); });
+      var C = (fb ? SEASON_COLS.cfb : hk ? SEASON_COLS.hk : SEASON_COLS.bb).filter(function (c) { return seasons.some(function (r) { return isNum(r[c[0]]); }); });
       html += U.section('Season by season', '', U.card('', '', U.table([{ label: 'Season', align: 'right' }, 'Team'].concat(C.map(function (c) { return { label: c[1], align: 'right' }; })), seasons.slice().sort(function (x, y) { return y.season - x.season; }).map(function (r) {
         return [{ v: r.season, html: esc(CC.seasonLabel(L, r.season)) }, { html: U.teamEnt(L, r.team, { season: r.season, abbr: true }), v: CC.tname(L, r.team) }].concat(C.map(function (c) {
           var v = r[c[0]];
-          return !isNum(v) ? '—' : (c[2] === 'pct' ? { v: v, html: CC.pct(v, 1) } : (Math.round(v) === v ? v : { v: v, html: CC.f(v, c[0] === 'epa_play' || c[0] === 'value_pg' ? 3 : 1) }));
+          return !isNum(v) ? '—' : (c[2] === 'pct' ? { v: v, html: CC.pct(v, 1) } : c[0] === 'sv_pct' ? { v: v, html: CC.f(v, 3).replace(/^0/, '') } : (Math.round(v) === v ? v : { v: v, html: CC.f(v, c[0] === 'epa_play' || c[0] === 'value_pg' ? 3 : c[0] === 'gaa' ? 2 : 1) }));
         }));
       }))), '', 'Career');
     }
     var mv = (d && d.moves) || [];
     if (mv.length) {
-      html += U.card('Moves', QK.tag('Inferred from box scores, not the official transfer portal'), U.table([{ label: 'Season', align: 'right' }, 'From', 'To', { label: 'Value before', align: 'right' }, { label: 'After', align: 'right' }], mv.map(function (m) {
+      html += U.card('Moves', QK.tag(hk ? 'Inferred from College Hockey News player lines, not the official transfer portal' : 'Inferred from box scores, not the official transfer portal'), U.table([{ label: 'Season', align: 'right' }, 'From', 'To', { label: 'Value before', align: 'right' }, { label: 'After', align: 'right' }], mv.map(function (m) {
         return [{ v: m.season, html: m.season ? esc(CC.seasonLabel(L, m.season)) : '—' }, { html: U.teamEnt(L, m.from, { abbr: true }), v: CC.tname(L, m.from) }, { html: U.teamEnt(L, m.to, { abbr: true }), v: CC.tname(L, m.to) }, CC.f(m.value_before, 1), CC.f(m.value_after, 1)];
       }), { sticky: false }));
     }
@@ -348,7 +357,8 @@ CC.route('player', function (el, p) {
       if (lastG) {
         var gm = (info.last_games || []).concat(info.today || []).filter(function (c) { return String(c.id) === String(lastG.game) && c.status === 'post'; })[0];
         var Lg = lastG;
-        var bits = !fb ? [isNum(Lg.pts) ? plural(Lg.pts, 'point') : '', isNum(Lg.reb) ? plural(Lg.reb, 'rebound') : '', isNum(Lg.ast) ? plural(Lg.ast, 'assist') : '', isNum(Lg.fga) ? Lg.fgm + ' of ' + Lg.fga + ' from the field' : '', isNum(Lg.min) ? CC.f(Lg.min, 0) + ' minutes' : '']
+        var bits = hk ? [isNum(Lg.g) ? plural(Lg.g, 'goal') : '', isNum(Lg.a) ? plural(Lg.a, 'assist') : '', isNum(Lg.sh) ? plural(Lg.sh, 'shot') : '', isNum(Lg.toi) ? Math.round(Lg.toi / 60) + ' minutes' : '', isNum(Lg.sv) ? Lg.sv + ' saves on ' + (Lg.sv + (Lg.ga || 0)) + ' shots' : '']
+          : !fb ? [isNum(Lg.pts) ? plural(Lg.pts, 'point') : '', isNum(Lg.reb) ? plural(Lg.reb, 'rebound') : '', isNum(Lg.ast) ? plural(Lg.ast, 'assist') : '', isNum(Lg.fga) ? Lg.fgm + ' of ' + Lg.fga + ' from the field' : '', isNum(Lg.min) ? CC.f(Lg.min, 0) + ' minutes' : '']
           : [isNum(Lg.pass_att) ? Lg.pass_cmp + ' of ' + Lg.pass_att + ' for ' + Lg.pass_yds + ' yards' : '', isNum(Lg.pass_td) && Lg.pass_td ? plural(Lg.pass_td, 'touchdown pass').replace('touchdown passs', 'touchdown passes') : '', isNum(Lg.rush_car) && Lg.rush_car ? Lg.rush_car + ' carries for ' + Lg.rush_yds + ' yards' : '',
             isNum(Lg.rec) && Lg.rec ? Lg.rec + ' catches for ' + Lg.rec_yds + ' yards' : '', isNum(Lg.tkl) && Lg.tkl ? plural(Lg.tkl, 'tackle') : '', isNum(Lg.sacks) && Lg.sacks ? CC.f(Lg.sacks, Lg.sacks % 1 ? 1 : 0) + ' sacks' : ''];
         var line = bits.filter(Boolean).join(', ');

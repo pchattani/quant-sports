@@ -5,7 +5,8 @@
  * AP v our rank, a percentile card against every team in the country, the schedule with our win chance, the roster
  * with value, strengths and needs, who moves next (movement payload, when published), inferred transfers in and out,
  * top performers (overall and by position, against the level), and the final-wins and seed distributions.
- * Reads <L>/<S>/teams.json, <L>/<S>/teams/<tid>.json, <L>/<S>/season.json. */
+ * Reads <L>/<S>/teams.json, <L>/<S>/teams/<tid>.json, <L>/<S>/season.json; basketball also <L>/<S>/trank.json
+ * (Barttorvik's T-Rank, a credited reference beside our rating; absent when the source is switched off). */
 (function (CC) {
 'use strict';
 var U = CC.ui, esc = CC.esc, isNum = CC.isNum;
@@ -65,10 +66,31 @@ function moveOutlook(L, S, d) {
   return U.section('Outlook: before ' + esc(nx), 'Who moves next: our chance each player leaves, and the arrivals a team like this usually gets. ' + QK.tag(INFERRED),
     tiles + '<div class="qk-grid cc-grid"><div class="qk-span-12">' + byPos + '</div></div>', '', 'Movement');
 }
+/* Barttorvik's T-Rank for the team (basketball), beside our rating: its rank, efficiencies, barthag and wins above
+   bubble, with our rank among the same teams. Empty when trank.json is missing (SOURCE_BARTTORVIK_ENABLED=0). */
+var TRANK_CREDIT = 'Barttorvik (barttorvik.com, T-Rank)';
+function trankCard(L, S, tid, tr, cat) {
+  var row = tr && tr.teams ? tr.teams[String(tid)] : null;
+  if (!row) return '';
+  var T = (cat && cat.teams) || {}, ours = null;
+  var our = (T[tid] || {}).values || {};
+  if (isNum(our.rating)) ours = 1 + Object.keys(T).filter(function (t) { var v = ((T[t] || {}).values || {}).rating; return isNum(v) && v > our.rating; }).length;
+  var tiles = U.stats([
+    { label: 'T-Rank', value: '#' + row.rank, signal: true, sub: (isNum(ours) ? 'our rank #' + ours : '') },
+    { label: 'Adj. offence', value: CC.f(row.adjoe, 1), sub: 'points per 100' },
+    { label: 'Adj. defence', value: CC.f(row.adjde, 1), sub: 'allowed per 100 (lower is better)' },
+    isNum(row.barthag) ? { label: 'Barthag', value: CC.f(row.barthag, 3), sub: 'chance to beat an average team' } : null,
+    isNum(row.wab) ? { label: 'Wins above bubble', value: CC.signed(row.wab, 1), sub: 'v a bubble team\u2019s schedule' } : null
+  ].filter(Boolean));
+  return U.section('Another view: T-Rank', 'Bart Torvik\u2019s ratings for the same season, a reference beside ours (' + (CC.isCur(L, S) ? 'to date' : 'end of season') + '). They are not used by our model.',
+    tiles + '<p class="cc-note">Source: <a href="https://barttorvik.com" target="_blank" rel="noopener">' + esc(TRANK_CREDIT) + '</a>. Shown with credit; removed if its owner asks.</p>', '', 'Reference');
+}
 CC.route('team', function (el, p) {
   var L = p.L, S = p.S, tid = p.id, fb = CC.fb(L);
   el.innerHTML = QK.skeleton('lines', 8);
-  return Promise.all([CC.load(CC.path(L, S, 'teams/' + tid + '.json')), CC.season(L, S), CC.load(CC.path(L, S, 'teams.json')), CC.metrics()]).then(function (a) {
+  var bb = L === 'mbb' || L === 'wbb';
+  return Promise.all([CC.load(CC.path(L, S, 'teams/' + tid + '.json')), CC.season(L, S), CC.load(CC.path(L, S, 'teams.json')), CC.metrics(),
+    bb ? CC.load(CC.path(L, S, 'trank.json')) : Promise.resolve(null)]).then(function (a) {
     /* archive team pages carry no schedule (size budget): the team's games come from the season's schedule.json */
     var d0 = CC.ok(a[0]) ? a[0] : null;
     if (!d0 || d0.schedule) return a;
@@ -88,25 +110,25 @@ CC.route('team', function (el, p) {
     var conf = t ? CC.conf(L, t.conference) : null;
     var stx = (d && d.stats) || {}, cpt = cat && cat.teams && cat.teams[tid] ? cat.teams[tid].pct || {} : {};
     var pc = function (k) { return stx[k] && isNum(stx[k].pct) ? stx[k].pct : (isNum(cpt[k]) ? cpt[k] : null); };
-    var peers = fb ? 'FBS teams' : 'Division I teams';
+    var peers = fb ? 'FBS teams' : 'Division I teams', hk = CC.hk(L), recS = function (r) { return hk ? CC.recW(r) : CC.record(r.w, r.l); };
     document.title = (t ? t.name : 'Team ' + tid) + ' · ' + CC.seasonLabel(L, S) + ' · The Quant Campus';
     /* The short version: the record, the rating and its rank, the schedule, and what the simulation says */
     var nm = t ? (t.short || t.name) : 'Team ' + tid;
-    var shortTxt = (isNum(rec.w) ? nm + ' ' + (CC.isCur(L, S) ? 'are' : 'went') + ' ' + CC.record(rec.w, rec.l) + (isNum(rec.conf_w) ? ' (' + CC.record(rec.conf_w, rec.conf_l) + ' in the conference)' : '') + '. ' : '') +
-      (isNum(R.rating) ? 'We rate them ' + CC.f(Math.abs(R.rating), 1) + (fb ? ' points' : ' points per 100 possessions') + ' ' + (R.rating >= 0 ? 'better' : 'worse') + ' than an average ' + (fb ? 'FBS' : 'D-I') + ' team' + (isNum(R.rank) ? ', ' + QK.ordinal(R.rank) + ' in the country' : '') + (isNum(R.se) ? ', give or take ' + CC.f(R.se, 1) : '') + '. ' : '') +
+    var shortTxt = (isNum(rec.w) ? nm + ' ' + (CC.isCur(L, S) ? 'are' : 'went') + ' ' + recS(rec) + (isNum(rec.conf_w) ? ' (' + recS({ w: rec.conf_w, l: rec.conf_l, t: rec.conf_t }) + ' in the conference)' : '') + '. ' : '') +
+      (isNum(R.rating) ? 'We rate them ' + CC.f(Math.abs(R.rating), hk ? 2 : 1) + (fb ? ' points' : hk ? ' goals a game' : ' points per 100 possessions') + ' ' + (R.rating >= 0 ? 'better' : 'worse') + ' than an average ' + (fb ? 'FBS' : 'D-I') + ' team' + (isNum(R.rank) ? ', ' + QK.ordinal(R.rank) + ' in the country' : '') + (isNum(R.se) ? ', give or take ' + CC.f(R.se, hk ? 2 : 1) : '') + '. ' : '') +
       (sim && isNum(sim.p_title) && sim.p_title >= 0.005 ? 'Our simulations give them a ' + CC.pct(sim.p_title) + ' chance to win the title.' : (isNum(R.sos_rank) ? 'Their schedule ranks ' + QK.ordinal(R.sos_rank) + ' for strength.' : ''));
     var html = '<nav class="cc-crumb" aria-label="Breadcrumb"><a href="' + esc(CC.href(L, 'teams', null, S)) + '">' + esc(CC.LNAME[L]) + '</a><span aria-hidden="true">›</span>' + esc(conf ? (conf.short || conf.name) : 'Independent') + '<span aria-hidden="true">›</span>' + esc(t ? t.name : 'Team ' + tid) + '</nav>';
     html += QK.playerHeader({ name: t ? t.name : 'Team ' + tid, split: false, pos: conf ? (conf.name || conf.short) : 'Independent', kicker: CC.LNAME[L] + ' · ' + CC.seasonLabel(L, S), face: t && t.abbr ? t.abbr : null,
       team: t ? { name: '', abbr: t.abbr, colour: t.colour, alt: CC.talt(L, tid) || undefined } : null,
-      meta: [['Record', CC.record(rec.w, rec.l)], isNum(rec.conf_w) ? ['Conference', CC.record(rec.conf_w, rec.conf_l)] : null, rec.streak ? ['Streak', rec.streak] : null, isNum(R.games) ? ['Games rated', String(R.games)] : null],
+      meta: [['Record', recS(rec)], isNum(rec.conf_w) ? ['Conference', recS({ w: rec.conf_w, l: rec.conf_l, t: rec.conf_t }) + (hk && isNum(rec.conf_pts) ? ' · ' + rec.conf_pts + ' pts' : '')] : null, rec.streak ? ['Streak', rec.streak] : null, isNum(R.games) ? ['Games rated', String(R.games)] : null],
       short: null }) + '%STRIP_HTML%' + (shortTxt.trim() ? '<div class="qk-ph-short">' + QK.shortVersion(shortTxt.trim()) + '</div>' : '');
     if (!d) html += '<p class="cc-note">The full team page has not been built for this season; ratings come from the season file.</p>';
     var dm = ((cat && cat.metrics) || []).filter(function (m0) { return m0.key === 'def'; })[0];
     var defLow = dm ? !!dm.lower : !fb;
-    var k = [{ label: 'Our rating', value: CC.signed(R.rating, 1), signal: true, pctl: pc('rating'), sub: (isNum(R.se) ? '± ' + CC.f(R.se, 1) + ' · ' : '') + (fb ? 'points v an average FBS team' : 'per 100 v an average D-I team'),
-      tip: (fb ? 'Expected margin against an average FBS team on a neutral field' : 'Adjusted efficiency margin per 100 possessions') + '; ± is one standard error; the chip is the national percentile' }];
-    if (isNum(R.off)) k.push({ label: 'Offence', value: CC.f(R.off, 1), pctl: pc('off'), sub: fb ? 'points a game added' : 'adjusted points per 100' });
-    if (isNum(R.def)) k.push({ label: 'Defence', value: CC.f(R.def, 1), pctl: pc('def'), sub: defLow ? 'points allowed per 100 (lower is better)' : 'points a game prevented' });
+    var k = [{ label: 'Our rating', value: CC.signed(R.rating, hk ? 2 : 1), signal: true, pctl: pc('rating'), sub: (isNum(R.se) ? '± ' + CC.f(R.se, hk ? 2 : 1) + ' · ' : '') + (fb ? 'points v an average FBS team' : hk ? 'goals a game v an average D-I team' : 'per 100 v an average D-I team'),
+      tip: (fb ? 'Expected margin against an average FBS team on a neutral field' : hk ? 'Expected goal difference a game against an average Division I team on neutral ice' : 'Adjusted efficiency margin per 100 possessions') + '; ± is one standard error; the chip is the national percentile' }];
+    if (isNum(R.off)) k.push({ label: hk ? 'Attack' : 'Offence', value: hk ? CC.signed(R.off, 2) : CC.f(R.off, 1), pctl: pc('off'), sub: fb ? 'points a game added' : hk ? 'goals a game above average' : 'adjusted points per 100' });
+    if (isNum(R.def)) k.push({ label: 'Defence', value: hk ? CC.signed(R.def, 2) : CC.f(R.def, 1), pctl: pc('def'), sub: hk ? 'goals a game kept out' : defLow ? 'points allowed per 100 (lower is better)' : 'points a game prevented' });
     if (CC.isCur(L, S)) k = k.concat(chanceTiles(L, sim));
     /* v4: the numbers are the black strip under the team-colour hero (QK.playerHeader strip), "The short version" after */
     html = html.replace('%STRIP_HTML%', QK.statStrip(k.slice(0, 6)));
@@ -145,9 +167,11 @@ CC.route('team', function (el, p) {
     var rh = (d && d.rank_history) || [];
     html += '<div class="qk-grid cc-grid"><div class="qk-span-5">' + pcard + '</div><div class="qk-span-7"><div class="qk-stack">' +
       U.card('Rating through the season', 'Re-fitted after each week' + (isNum(R.se) ? '; today’s rating is ± ' + CC.f(R.se, 1) + ' (one standard error)' : '') + '.', path.length > 1 ? U.chart('tp-path', 240, 'Rating through the season') : QK.empty('Not enough games yet', 'The path starts after the first games.')) +
-      U.card('AP rank v our rank', 'Week by week; 1 is the top.', rh.length > 1 ? U.chart('tp-rank', 220, 'AP and our rank by week') : QK.empty('No rank history', 'The polls and our ranking appear once the season starts.')) + '</div></div></div>';
+      U.card(hk ? 'USCHO rank v our rank' : 'AP rank v our rank', 'Week by week; 1 is the top.', rh.length > 1 ? U.chart('tp-rank', 220, 'AP and our rank by week') : QK.empty('No rank history', 'The polls and our ranking appear once the season starts.')) + '</div></div></div>';
+    if (bb && CC.ok(a[4])) html += trankCard(L, S, tid, a[4], cat);
     // schedule
     var sched = (d && d.schedule) || [];
+    if (hk) html += CC.hkCredit(true);
     if (sched.length) html += U.section('Schedule', 'Every game with our pre-game win chance for ' + esc(CC.tshort(L, tid)) + '.', U.card('', '', U.lb('tp-sched'), { flush: true, cls: 'cc-bare' }), '', 'Games');
     // roster + units
     var roster = (d && d.roster) || [];
@@ -155,7 +179,7 @@ CC.route('team', function (el, p) {
     var unitsH = units.length ? QK.pctCard({ title: 'Strengths and needs', peer: 'all ' + peers, sample: 'value by unit this season', groups: [{ label: 'Units, graded A to F', rows: units.map(function (u) { return { label: CC.unit(u.unit) + (u.grade ? ' · ' + u.grade : ''), pctl: isNum(u.pctl) ? u.pctl : null, value: isNum(u.value) ? CC.signed(u.value, 1) : '', tip: CC.unit(u.evidence || '') }; }) }],
       foot: swList(d) }) : U.card('Strengths and needs', '', QK.empty('Not graded yet', 'Units are graded once enough games are in.'));
     html += topPerformers(L, S, d, fb);
-    html += U.section('Roster', 'Value: ' + (fb ? 'EPA above replacement' : 'value above replacement') + ' this season.' + (!CC.isCur(L, S) && !fb && roster.length <= 12 && roster.length ? ' Archive seasons keep the top 12 by minutes.' : ''),
+    html += U.section('Roster', 'Value: ' + (fb ? 'EPA above replacement' : hk ? 'goals above replacement (GAR)' : 'value above replacement') + ' this season.' + (!CC.isCur(L, S) && !fb && roster.length <= 12 && roster.length ? ' Archive seasons keep the top 12 by minutes.' : ''),
       '<div class="qk-grid cc-grid"><div class="qk-span-8">' + (roster.length ? U.card('', '', U.lb('tp-roster'), { flush: true, cls: 'cc-bare' }) : U.card('Roster', '', QK.empty('No roster yet', 'Rosters come from ESPN; the current one is refreshed weekly.'))) + '</div><div class="qk-span-4">' + unitsH + '</div></div>', '', 'Players');
     // who moves next (published payload only)
     if (CC.isCur(L, S)) html += moveOutlook(L, S, d);
@@ -168,7 +192,7 @@ CC.route('team', function (el, p) {
           { v: m0.value_before, html: CC.f(m0.value_before, 1) }, { v: m0.value_after, html: CC.f(m0.value_after, 1) }];
       }), { sticky: false });
     }
-    html += U.section('Transfers', 'The same ESPN athlete on a new team since last season. ' + QK.tag(INFERRED),
+    html += U.section('Transfers', (hk ? 'The same College Hockey News player on a new team since last season. ' : 'The same ESPN athlete on a new team since last season. ') + QK.tag(hk ? 'Inferred from player lines, not the official transfer portal' : INFERRED),
       '<div class="qk-grid cc-grid"><div class="qk-span-6">' + U.card('In', '', mvT(mv['in'], 'in')) + '</div><div class="qk-span-6">' + U.card('Out', '', mvT(mv.out, 'out')) + '</div></div>', '', 'Moves');
     // season distributions
     if (CC.isCur(L, S) && sim && (sim.w_dist || sim.seed_dist)) {
@@ -183,7 +207,7 @@ CC.route('team', function (el, p) {
       QKC.forecast('#tp-path', { x: xs, xType: 'time', series: [{ name: 'Rating', label: CC.tabbr(L, tid), data: path.map(function (x0) { return x0[1]; }), color: col }],
         yFmt: function (v) { return CC.signed(v, 1); }, yName: fb ? 'Rating (points v average)' : 'Rating (per 100 v average)', xName: 'Date', label: 'Rating through the season' });
     }
-    if (rh.length > 1) QKC.line('#tp-rank', { x: rh.map(function (r) { return String(r[0]) === 'pre' ? 'Pre' : (String(r[0]) === 'final' ? 'Final' : 'Wk ' + r[0]); }), series: [{ name: 'AP', data: rh.map(function (r) { return isNum(r[1]) ? r[1] : null; }), color: QK.cssVar('--c-3'), symbols: true }, { name: 'Ours', data: rh.map(function (r) { return isNum(r[2]) ? r[2] : null; }), color: QK.cssVar('--signal'), symbols: true }],
+    if (rh.length > 1) QKC.line('#tp-rank', { x: rh.map(function (r) { return String(r[0]) === 'pre' ? 'Pre' : (String(r[0]) === 'final' ? 'Final' : /^\d{4}-/.test(String(r[0])) ? CC.date(r[0] + 'T12:00:00Z') : 'Wk ' + r[0]); }), series: [{ name: hk ? 'USCHO' : 'AP', data: rh.map(function (r) { return isNum(r[1]) ? r[1] : null; }), color: QK.cssVar('--c-3'), symbols: true }, { name: 'Ours', data: rh.map(function (r) { return isNum(r[2]) ? r[2] : null; }), color: QK.cssVar('--signal'), symbols: true }],
       yInverse: true, yMin: 1, yInterval: (function () { var v = []; rh.forEach(function (r) { if (isNum(r[1])) v.push(r[1]); if (isNum(r[2])) v.push(r[2]); }); var span = v.length ? Math.max.apply(null, v) - 1 : 5; return Math.max(1, Math.ceil(span / 6)); })(),
       yFmt: function (v) { return '#' + Math.round(v); }, xName: 'Week', yName: 'Rank' });
     if (sched.length) {
@@ -194,14 +218,14 @@ CC.route('team', function (el, p) {
         { key: 'resv', label: 'Result', fmt: function (v, r) { return r.res; } }
       ], rows: sched.map(function (c) {
         var home = String(c.home) === String(tid), opp = home ? c.away : c.home, m0 = c.model || {};
-        var pw = isNum(m0.p_home) ? (home ? m0.p_home : 1 - m0.p_home) : null;
+        var pw = isNum(m0.p_home) ? (home ? m0.p_home : (isNum(m0.p_away) ? m0.p_away : 1 - m0.p_home)) : null;
         var res = '<span class="qk-muted">' + (c.status === 'pre' ? 'to play' : '—') + '</span>', resv = '';
-        if (c.status === 'post' && isNum(c.hs)) { var my = home ? c.hs : c.as, op = home ? c.as : c.hs; res = '<b class="' + (my > op ? 'pos' : 'neg') + '">' + (my > op ? 'W' : 'L') + '</b> ' + my + '–' + op; resv = (my > op ? 'W' : 'L') + my; }
+        if (c.status === 'post' && isNum(c.hs)) { var my = home ? c.hs : c.as, op = home ? c.as : c.hs, wl = hk && (my === op || c.so) ? 'T' : my > op ? 'W' : 'L'; res = '<b class="' + (wl === 'W' ? 'pos' : wl === 'L' ? 'neg' : '') + '">' + wl + '</b> ' + my + '–' + op + (hk && c.ot ? ' <span class="qk-muted">OT' + (c.so ? '/SO' : '') + '</span>' : ''); resv = wl + my; }
         return { c: c, id: c.id, date: c.date, opp: opp, oppName: (c.neutral ? 'v ' : home ? 'v ' : '@ ') + CC.tshort(L, opp), tag: CC.roundLabel(c) || (c.conf_game ? 'conference' : ''), pw: pw, res: res, resv: resv };
       }) });
     }
     if (roster.length) {
-      var rcols = fb ? [['pass_yds', 'Pass yds', 0], ['rush_yds', 'Rush yds', 0], ['rec_yds', 'Rec yds', 0], ['tkl', 'Tkl', 0]] : [['min', 'MIN', 1], ['pts', 'PTS', 1], ['reb', 'REB', 1], ['ast', 'AST', 1]];
+      var rcols = fb ? [['pass_yds', 'Pass yds', 0], ['rush_yds', 'Rush yds', 0], ['rec_yds', 'Rec yds', 0], ['tkl', 'Tkl', 0]] : hk ? [['g', 'G', 0], ['a', 'A', 0], ['pts', 'PTS', 0], ['pm', '+/-', 0], ['toi', 'TOI', 1], ['sv_pct', 'SV%', 3]] : [['min', 'MIN', 1], ['pts', 'PTS', 1], ['reb', 'REB', 1], ['ast', 'AST', 1]];
       rcols = rcols.filter(function (c) { return roster.some(function (r) { return isNum(r[c[0]]); }); });
       var lv = {}; (((d && d.movement) || {}).roster || []).forEach(function (x) { lv[String(x[0])] = { p: x[1], pt: x[2] }; });
       var hasLv = Object.keys(lv).length > 0;
@@ -210,11 +234,11 @@ CC.route('team', function (el, p) {
         QK.leaderboard(QK.$('#tp-roster', el), { dense: true, maxHeight: 640, sort: { key: 'value', dir: 'desc' }, rowHref: function (r) { return CC.playerHref(L, r.id, S); }, columns: [
         { key: 'name', label: 'Player', type: 'entity', sub: 'sub', href: function (r) { return CC.playerHref(L, r.id, S); } },
         { key: 'gp', label: 'GP', num: true },
-        { key: 'value', label: 'Value', type: 'bar', max: mx, fmt: function (v) { return CC.f(v, fb ? 1 : 2); }, tip: fb ? 'EPA above replacement this season' : 'Value above replacement this season' },
+        { key: 'value', label: hk ? 'GAR' : 'Value', type: 'bar', max: mx, fmt: function (v) { return CC.f(v, fb || hk ? 1 : 2); }, tip: fb ? 'EPA above replacement this season' : hk ? 'Goals above replacement this season (our value model)' : 'Value above replacement this season' },
         { key: 'value_pg', label: 'Per game', num: true, fmt: function (v) { return CC.f(v, 2); } }
       ].concat(rcols.map(function (c) { return { key: c[0], label: c[1], num: true, fmt: function (v) { return isNum(v) ? CC.f(v, c[2]) : '—'; } }; }))
        .concat(hasLv ? [{ key: 'p_leave', label: 'Chance of leaving', type: 'bar', max: 1, fmt: function (v) { return isNum(v) ? CC.pct(v) : '—'; }, tip: 'Our chance the player is not with the team next season (an inferred transfer or no box-score line). ' + INFERRED }] : []),
-        rows: roster.map(function (r) { return Object.assign({ sub: [r.pos, r['class']].filter(Boolean).join(' · '), p_leave: lv[String(r.id)] ? lv[String(r.id)].p : null }, r); }) });
+        rows: roster.map(function (r) { return Object.assign({ sub: [hk ? CC.posName(L, r.pos) : r.pos, r['class'], hk && r.num ? '#' + r.num : ''].filter(Boolean).join(' · '), p_leave: lv[String(r.id)] ? lv[String(r.id)].p : null }, r); }) });
     }
     if (CC.isCur(L, S) && sim && sim.w_dist && QK.$('#tp-wd', el)) QKC.bar('#tp-wd', { cats: sim.w_dist.map(function (x, i) { return String(i); }), series: [{ name: 'Chance', color: 'model', data: sim.w_dist }], catName: 'Regular-season wins', valName: 'Chance', fmt: function (v) { return CC.pct(v); } });
     if (CC.isCur(L, S) && sim && sim.seed_dist && QK.$('#tp-sd', el)) { var ks = Object.keys(sim.seed_dist).sort(function (x, y) { return x - y; }); QKC.bar('#tp-sd', { cats: ks.map(function (k0) { return 'Seed ' + k0; }), series: [{ name: 'Chance', color: 'model', data: ks.map(function (k0) { return sim.seed_dist[k0]; }) }], catName: 'Seed', valName: 'Chance', fmt: function (v) { return CC.pct(v); } }); }
@@ -236,9 +260,9 @@ function topPerformers(L, S, d, fb) {
       '<small>' + esc((showPos ? r.pos + ' · ' : '') + (isNum(r.gp) ? r.gp + ' games' : '')) + '</small></span>' +
       '<span class="cc-tp-v num" data-tip="' + esc(lab(r.key)) + '">' + CC.f(r.v, fb ? 1 : 1) + '</span>' +
       (pc !== null ? QK.meter(pc, { label: esc(r.name || '') + ': ' + QK.ordinal(pc) + ' percentile among ' + r.pos + 's' }) + '<span class="qk-pbox num" style="background:' + QK.pctColor(pc) + ';color:' + QK.pctInk(pc) + '">' + pc + '</span>' : '<span></span><span></span>') +
-      '<span class="cc-tp-rank">' + QK.ordinal(r.rank) + ' of ' + QK.fmt.num(r.n) + ' ' + esc(r.pos) + 's</span></li>';
+      (isNum(r.rank) ? '<span class="cc-tp-rank">' + QK.ordinal(r.rank) + ' of ' + QK.fmt.num(r.n) + ' ' + esc(CC.hk(L) ? CC.posName(L, r.pos).toLowerCase() : r.pos) + 's</span>' : '<span class="cc-tp-rank"></span>') + '</li>';
   };
-  var ours = tp.ours ? ' ' + QK.ours({ model: fb ? 'value per game: EPA above a replacement-level player' : 'box rating and value above replacement' }) : '';
+  var ours = tp.ours ? ' ' + QK.ours({ model: fb ? 'value per game: EPA above a replacement-level player' : CC.hk(L) ? 'goals above replacement (GAR)' : 'box rating and value above replacement' }) : '';
   var ov = (tp.overall || []).length ? U.card('Overall', 'The team’s best by ' + esc(lab(tp.key).toLowerCase()) + '; each against the qualified ' + esc(tp.pool) + ' players at the same position.' + ours,
     '<ol class="cc-tp">' + tp.overall.map(function (r) { return row(r, true); }).join('') + '</ol>') : '';
   var bp = (tp.by_pos || []).length ? U.card('By position', 'The best qualified player at each position, by the position’s headline metric (' + Object.keys(tp.labels || {}).map(lab).join(', ') + ').' + ours,

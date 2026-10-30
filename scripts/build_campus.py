@@ -42,13 +42,17 @@ DOCS = ROOT / "docs"
 SITE = DOCS / "campus"
 BUDGET_MB = 800
 LEVEL_BUDGET_MB = 250          # per level (PAYLOADS.md size budget); reported, the build fails only over BUDGET_MB
-LEVELS = ("cfb", "mbb", "wbb")
+LEVELS = ("cfb", "mbb", "wbb", "mch", "wch")
+HOCKEY = ("mch", "wch")
 MODULE = {"cfb": "oddsmarkets.college.football.build", "mbb": "oddsmarkets.college.hoops.build",
-          "wbb": "oddsmarkets.college.hoops.build"}
+          "wbb": "oddsmarkets.college.hoops.build", "mch": "oddsmarkets.college.hockey.build",
+          "wch": "oddsmarkets.college.hockey.build"}
 # payloads a season must have; written as {"ok": false} when its build fails before writing them
 SEASON_FILES = {"cfb": ("season", "schedule", "cfp", "teams", "players", "value", "moves", "fantasy", "lab_teams", "lab_players"),
                 "mbb": ("season", "schedule", "bracket", "teams", "players", "value", "moves", "fantasy", "lab_teams", "lab_players")}
 SEASON_FILES["wbb"] = SEASON_FILES["mbb"]
+SEASON_FILES["mch"] = SEASON_FILES["wch"] = ("season", "schedule", "bracket", "teams", "players", "value", "moves",
+                                             "lab_teams", "lab_players")
 LEVEL_FILES = ("calibration", "history", "markets")
 
 log = logging.getLogger("build_campus")
@@ -109,7 +113,11 @@ def step(name: str, fn, report: dict):
 def seasons_for(level: str, wanted: list[int] | None, quick: bool) -> list[int]:
     from oddsmarkets.college import canon, store
     cur = canon.current_season(level)
-    have = store.seasons_on_disk(level)
+    if level in HOCKEY:
+        from oddsmarkets.college.hockey import data as HD
+        have = sorted(HD.seasons_on_disk(level), reverse=True)
+    else:
+        have = store.seasons_on_disk(level)
     if wanted:
         ss = [s for s in wanted if s in have or s == cur]
     elif quick:
@@ -154,6 +162,8 @@ def build_level(level: str, data: Path, seasons: list[int], a, report: dict, lev
                                (report.get(name) or {}).get("reason") or f"not built for {level} {s}")
         if missing:
             log.warning("%s: wrote ok:false for %s", name, ", ".join(missing))
+    if level in HOCKEY:      # college hockey writes its own performers and team-page leaders (hockey/build.py)
+        return
     # who moves next (oddsmarkets/college/movement.py): <S>/movement.json and `movement` on the team pages just written
     if cur in seasons:
         from oddsmarkets.college import movement
@@ -225,9 +235,31 @@ def print_size(rep: dict) -> None:
         print(f"  {v:9.2f} MB  {k}")
 
 
+def write_trank(data: Path, levels: list[str]) -> dict:
+    """<L>/<S>/trank.json for basketball from Barttorvik's committed T-Rank table (oddsmarkets/college/sources/
+    barttorvik.py): a credited reference on the team pages. SOURCE_BARTTORVIK_ENABLED=0 (or no table) removes them."""
+    from oddsmarkets.college.sources import barttorvik as BT
+    d = BT.load_derived()
+    n = 0
+    for L in levels:
+        by = ((d or {}).get("levels") or {}).get(L) or {}
+        for p in (data / L).glob("*/trank.json"):
+            if p.parent.name not in by:
+                p.unlink()
+        for s, teams in by.items():
+            sd = data / L / s
+            if not sd.is_dir():
+                continue
+            (sd / "trank.json").write_text(json.dumps({"ok": True, "level": L, "season": int(s), "source": "barttorvik",
+                                                       "credit": BT.CREDIT, "url": "https://barttorvik.com", "teams": teams},
+                                                      separators=(",", ":")), encoding="utf-8")
+            n += 1
+    return {"ok": True, "files": n}
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--levels", default=",".join(LEVELS), help="comma list of cfb,mbb,wbb")
+    ap.add_argument("--levels", default=",".join(LEVELS), help="comma list of cfb,mbb,wbb,mch,wch")
     ap.add_argument("--seasons", default="", help="comma list of seasons (default: every season with a store)")
     ap.add_argument("--sims", type=int, default=20000, help="season simulations per season (default 20000)")
     ap.add_argument("--no-market", action="store_true", help="skip prediction-market fetches")
@@ -260,6 +292,7 @@ def main(argv=None) -> int:
                 ss = every[: a.recent]
             log.info("%s: seasons %s", L, ss)
             build_level(L, data, ss, a, report, level_seasons=every)
+    step("barttorvik", lambda: write_trank(data, [L for L in levels if L in ("mbb", "wbb")]), report)
     res = step("site", lambda: site.build_all(data), report)
     if res:
         log.info("site: %s", res)

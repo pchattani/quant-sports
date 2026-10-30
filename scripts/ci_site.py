@@ -424,7 +424,9 @@ def cmd_seed(site: str) -> int:
 
 # ── feeds from the PC (sources that block datacenter addresses) ───────────────────────────────────
 
-FEEDS = {"ace": ["data/tennis/td"]}      # tennis-data.co.uk answers 403 to runners: the PC fetches its workbooks
+FEEDS = {"ace": ["data/tennis/td"],      # tennis-data.co.uk answers 403 to runners: the PC fetches its workbooks
+         # college hockey: College Hockey News is fetched from the PC only; its season stores come in the snapshot
+         "campus": ["data/college/stores/mch", "data/college/stores/wch"]}
 
 
 def cmd_feed(site: str) -> int:

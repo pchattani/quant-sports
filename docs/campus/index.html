@@ -8,10 +8,10 @@
 <meta name="theme-color" content="#000000">
 <meta property="og:site_name" content="The Quant Campus">
 <meta property="og:title" content="The Quant Campus">
-<meta property="og:description" content="College football and men's and women's college basketball, by the numbers: our win chance for every game, ratings with their uncertainty, title, College Football Playoff and NCAA tournament chances from simulated seasons, player percentiles and value, inferred transfers and fantasy.">
+<meta property="og:description" content="College football, men's and women's college basketball and men's and women's college hockey, by the numbers: our win chance for every game, ratings with their uncertainty, title, College Football Playoff and NCAA tournament chances from simulated seasons, player percentiles and value, inferred transfers and fantasy.">
 <meta property="og:type" content="website">
 <meta name="twitter:card" content="summary">
-<meta name="description" content="College football and men's and women's college basketball, by the numbers: our win chance for every game, ratings with their uncertainty, title, College Football Playoff and NCAA tournament chances from simulated seasons, player percentiles and value, inferred transfers and fantasy.">
+<meta name="description" content="College football, men's and women's college basketball and men's and women's college hockey, by the numbers: our win chance for every game, ratings with their uncertainty, title, College Football Playoff and NCAA tournament chances from simulated seasons, player percentiles and value, inferred transfers and fantasy.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23000000'/%3E%3Cpath d='M11 6h14l-6 20H5z' fill='%23d4ff3a'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -31,9 +31,9 @@
 <template id="disclaimer-template">
   <div class="qk-card cc-prose legal qk-legal">
     <h3>Disclaimer &amp; terms of use</h3>
-    <p class="qk-muted">Last updated 19 October 2026</p>
+    <p class="qk-muted">Last updated 30 October 2026</p>
     <p>The Quant Campus is an independent, non-commercial hobby project that applies statistical models to publicly
-    available college football and college basketball data. By using this site you agree to the terms below. If you do
+    available college football, college basketball and college hockey data. By using this site you agree to the terms below. If you do
     not agree, please do not use the site.</p>
 
     <h4>1. Not betting, financial or professional advice</h4>
@@ -85,9 +85,18 @@
 
     <h4>6. Data sources</h4>
     <p>Schedules, scores, box scores, plays, win probability, polls and rankings, rosters and betting lines come from
-    ESPN&rsquo;s public site data; market probabilities from the public Kalshi and Polymarket APIs where shown. Those sources own
+    ESPN&rsquo;s public site data; market probabilities from the public Kalshi and Polymarket APIs where shown.
+    <strong>College hockey:</strong> box scores, player and team statistics, rosters, shot attempts and College Hockey
+    News&rsquo;s own expected goals come from <a href="https://www.collegehockeynews.com" target="_blank" rel="noopener">College
+    Hockey News</a> (collegehockeynews.com), credited with thanks; results, schedules and the USCHO poll also come from
+    ESPN; the weekly USCHO polls come from <a href="https://www.uscho.com" target="_blank" rel="noopener">USCHO</a> (uscho.com). Only derived facts and our own model output are shown; College Hockey News pages are never re-hosted, and that
+    material will be removed on request. <strong>Basketball:</strong> the T-Rank figures on men&rsquo;s and women&rsquo;s
+    team pages (rank, adjusted efficiencies, barthag, wins above bubble) come from
+    <a href="https://barttorvik.com" target="_blank" rel="noopener">Barttorvik</a> (barttorvik.com, Bart Torvik&rsquo;s
+    T-Rank season files), shown with credit as a reference beside our ratings and never used by our models; its site
+    states no terms of use, and they will be removed on request. Those sources own
     their data and are not responsible for this site or its models. Sources whose terms forbid reuse are not used
-    (Sports-Reference, KenPom, Barttorvik, 247Sports, On3, Rivals, Massey and NCAA.com among them). Statistics shown here
+    (Sports-Reference, KenPom, 247Sports, On3, Rivals, Massey and NCAA.com among them). Statistics shown here
     are derived and transformed and may differ from official statistics.</p>
 
     <h4>7. Rights holders and corrections</h4>
@@ -97,8 +106,8 @@
 
     <h4>8. Privacy</h4>
     <p>The site sets no cookies, runs no analytics or advertising, and collects no personal data. Your browser remembers
-    only that you dismissed the first-visit notice and which level (football, men&rsquo;s or women&rsquo;s basketball)
-    you last viewed, locally on your device. The page loads its fonts from Google Fonts and its
+    only that you dismissed the first-visit notice and which level (football, men&rsquo;s or women&rsquo;s basketball or
+    hockey) you last viewed, locally on your device. The page loads its fonts from Google Fonts and its
     charting library from a content delivery network (cdn.jsdelivr.net), which receive your IP address when your browser
     makes the request, like any web server. The site itself is hosted on GitHub Pages, whose own privacy terms apply to
     its server logs.</p>
@@ -112,7 +121,7 @@
 
 <div class="cc-legal">
   <div class="cc-legal-in">
-    <p>Schedules, scores, box scores, plays, polls, rosters and betting lines from ESPN&rsquo;s public site data; market probabilities from Kalshi and Polymarket where shown. Transfers are inferred from rosters and box scores, not the official portal.</p>
+    <p>Schedules, scores, box scores, plays, polls, rosters and betting lines from ESPN&rsquo;s public site data; market probabilities from Kalshi and Polymarket where shown. College hockey box scores, player statistics and rosters from <a href="https://www.collegehockeynews.com" target="_blank" rel="noopener">College Hockey News</a>; polls from <a href="https://www.uscho.com" target="_blank" rel="noopener">USCHO</a>. Basketball T-Rank reference figures from <a href="https://barttorvik.com" target="_blank" rel="noopener">Barttorvik</a>. Transfers are inferred from rosters and box scores, not the official portal.</p>
     <p>For information and entertainment only &mdash; not betting, financial or professional advice. Probabilities are model estimates and can be wrong; no bets are offered. Unofficial: not affiliated with or endorsed by the NCAA, the College Football Playoff, any conference, school, team, player, ESPN or bookmaker; no logos are used and names belong to their owners. 18+. Gamble responsibly. <a href="#/disclaimer">Disclaimer &amp; terms</a></p>
   </div>
 </div>
@@ -146,6 +155,7 @@
 <script src="assets/qk/progression.js"></script>
 <script src="assets/js/qk-progview.js"></script>
 <script src="assets/js/cc-core.js"></script>
+<script src="assets/js/cc-hockey.js"></script>
 <script src="assets/js/cc-overview.js"></script>
 <script src="assets/js/cc-games.js"></script>
 <script src="assets/js/cc-race.js"></script>

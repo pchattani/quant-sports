@@ -34,6 +34,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
+from oddsmarkets.common.polite import flag_on as _flag_on
 from oddsmarkets.football.analytics import colours as club_colours
 from oddsmarkets.football.analytics.archive import season_row, sort_key
 from oddsmarkets.football.analytics.players import METRICS, add_percentiles, aggregate_players, player_incidents
@@ -1927,8 +1928,8 @@ class Unified:
             matches = [m for m in matches if not (m["id"] in seen or seen.add(m["id"]))]
             payload = {"id": int(tid), "name": club["name"], "slug": _slugify(club["name"]), "country": country,
                        "national": national, "names": club["names"]}
-            # Only a crest that is on disk (the public build ships none: docs/HOSTING_MIGRATION.md, D6).
-            if not national and (self.data_dir.parent / "assets" / "crests" / f"{tid}.png").exists():
+            # Only a crest that is on disk, and only while crests are switched on (D6, revised 30 Oct 2026).
+            if not national and _flag_on("SOURCE_SOFASCORE_CRESTS_ENABLED") and (self.data_dir.parent / "assets" / "crests" / f"{tid}.png").exists():
                 payload["crest"] = f"assets/crests/{tid}.png"
             # Kit colours for the Broadcast heroes and stripes, from the committed table (derived from the crests on
             # the PC, so CI has them without the crests): none for a national team or a club without a crest.

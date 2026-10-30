@@ -26,9 +26,11 @@ from typing import Any
 from . import canon
 from .packing import unpack
 
-LEVELS = ("cfb", "mbb", "wbb")
-NAMES = {"cfb": "College Football", "mbb": "Men's College Basketball", "wbb": "Women's College Basketball"}
-SHORT = {"cfb": "CFB", "mbb": "MBB", "wbb": "WBB"}
+LEVELS = ("cfb", "mbb", "wbb", "mch", "wch")
+NAMES = {"cfb": "College Football", "mbb": "Men's College Basketball", "wbb": "Women's College Basketball",
+         "mch": "Men's College Hockey", "wch": "Women's College Hockey"}
+SHORT = {"cfb": "CFB", "mbb": "MBB", "wbb": "WBB", "mch": "MCH", "wch": "WCH"}
+HOCKEY = ("mch", "wch")
 PHASE_LABEL = {"preseason": "Preseason", "regular": "Regular season", "conf_champ": "Conference championships",
                "bowls": "Bowl season", "playoff": "College Football Playoff", "offseason": "Offseason",
                "conf_tourneys": "Conference tournaments", "ncaa": "NCAA tournament"}
@@ -168,7 +170,7 @@ def _record(standings: dict) -> dict[str, str]:
     for rows in (standings or {}).values():
         for r in rows or []:
             if r.get("team") is not None:
-                rec[str(r["team"])] = f"{r.get('w', 0)}-{r.get('l', 0)}"
+                rec[str(r["team"])] = f"{r.get('w', 0)}-{r.get('l', 0)}" + (f"-{r['t']}" if "t" in r else "")   # hockey: W-L-T
     return rec
 
 
@@ -193,12 +195,13 @@ def headline(level: str, season: dict, title: list[dict], teams: dict, today: li
         return f"Week {season['week']}" + (f" · {fav_s}" if fav_s else " · CFP chances after Saturday")
     if ph == "preseason":
         when = min((parse_ts(c.get("date")) for c in today + nxt if parse_ts(c.get("date"))), default=None)
-        return ("Tip-off " + f"{when:%a} {when.day} {when:%b}" if when else lab) + (f" · {fav_s}" if fav_s else " · preseason ratings")
+        start = "Puck drop " if level in HOCKEY else "Tip-off "
+        return (start + f"{when:%a} {when.day} {when:%b}" if when else lab) + (f" · {fav_s}" if fav_s else " · preseason ratings")
     return lab + (f" · {fav_s}" if fav_s else "")
 
 
 # ───────────────────────────────────────────────────────────── this week (the overview's digest)
-LEAGUE = {"cfb": "CFB", "mbb": "MBB", "wbb": "WBB"}
+LEAGUE = {"cfb": "CFB", "mbb": "MBB", "wbb": "WBB", "mch": "MCH", "wch": "WCH"}
 _CFP_STAGE = {"first round": "playoff", "quarterfinal": "quarter", "semifinal": "semi", "championship": "final",
               "national championship": "final"}
 _NCAA_STAGE = {"elite 8": "quarter", "elite eight": "quarter", "regional final": "quarter", "final four": "semi",
@@ -222,6 +225,8 @@ def _game_sig(level: str, c: dict, sim: dict, teams: dict) -> dict:
         sig["playoff"] = [sh.get(po), sa.get(po)]
     elif st == "cfp":
         sig["stage"] = _CFP_STAGE.get(rd, "playoff")
+    elif st == "ncaa" and level in HOCKEY:
+        sig["stage"] = _HOCKEY_STAGE.get(rd, "knockout")
     elif st == "ncaa":
         sig["stage"] = _NCAA_STAGE.get(rd, "knockout")
     elif st in ("pre", "exh"):
@@ -230,6 +235,10 @@ def _game_sig(level: str, c: dict, sim: dict, teams: dict) -> dict:
     rv = FT.RIVALRIES.get(frozenset((nm(h), nm(a))))
     if rv:
         sig["rivalry"] = rv
+    if level in HOCKEY and "beanpot" in str(c.get("note") or "").lower():
+        sig["rivalry"] = "The Beanpot"                 # Boston's February tournament: a showcase whatever the stakes
+        if "championship" in str(c.get("note") or "").lower():
+            sig["stage"] = "conf_final"
     return sig
 
 
@@ -244,7 +253,11 @@ def _et_day(s: Any) -> str | None:
 
 RACE_LOG_KEEP = 400            # days: a whole season (scripts/ci_site.py RACE_LOG_KEEP restores it in full)
 RACE_METRICS = {"cfb": ("p_cfp", "p_title", "p_conf"), "mbb": ("p_ncaa", "p_title", "p_conf_reg"),
-                "wbb": ("p_ncaa", "p_title", "p_conf_reg")}
+                "wbb": ("p_ncaa", "p_title", "p_conf_reg"), "mch": ("p_ncaa", "p_title", "p_conf_reg"),
+                "wch": ("p_ncaa", "p_title", "p_conf_reg")}
+# college hockey's NCAA rounds (oddsmarkets/college/hockey/data.py classify) and its showcase games
+_HOCKEY_STAGE = {"frozen four": "semi", "final": "final", "regional final": "quarter", "quarterfinal": "quarter",
+                 "regional semifinal": "knockout", "first round": "knockout"}
 
 
 def write_race_log(data: Path, level: str, cur: int, sim: dict, now: datetime, floor: float | None = None) -> dict | None:
@@ -454,8 +467,26 @@ SITE_TERMS = [
 ]
 
 
+HOCKEY_TERMS = ("College hockey", [
+    ("npi", "NPI", "The NCAA Percentage Index: from 2025-26 the men's (and women's) selection number. A quarter a team's own "
+                   "winning share, three quarters its opponents' NPI, home and road weighted, with a bonus for wins over teams "
+                   "above 51 and 'bad wins' and 'good losses' dropped. Ours is computed from results and matches the published one."),
+    ("pairwise", "PairWise", "The selection method to 2024-25: every team compared with every other on the RPI, the record "
+                             "against common opponents and head to head; the comparisons won rank the field."),
+    ("rpi", "RPI", "Ratings Percentage Index: 25% winning share, 21% opponents' and 54% opponents' opponents', home and road weighted."),
+    ("gar", "GAR", "Goals above replacement: our player value, from goals created, a damped +/- share, penalties and faceoffs; "
+                   "goalies from goals saved above average. About six goals make a win (WAR)."),
+    ("tie", "Tie", "College hockey keeps ties: a regular-season game level after a five-minute overtime is a tie in the NCAA "
+                   "record (a conference shootout decides only its extra standings point)."),
+    ("gsaa", "GSAA", "Goals saved above average: saves above what a league-average goalie makes on the same number of shots."),
+    ("chn_xg", "CHN xG", "College Hockey News's own expected goals in its box scores (theirs, shown for reference; it does "
+                         "not publish shot locations, so we have no expected-goals model of our own)."),
+])
+
+
 def build_glossary(data: Path) -> dict:
-    groups = [{"name": n, "entries": [{"key": k, "label": lab, "desc": d} for k, lab, d in rows]} for n, rows in SITE_TERMS]
+    groups = [{"name": n, "entries": [{"key": k, "label": lab, "desc": d} for k, lab, d in rows]}
+              for n, rows in SITE_TERMS + [HOCKEY_TERMS]]
     seen = {e["key"] for g in groups for e in g["entries"]}
     extra = []
     for L in LEVELS:

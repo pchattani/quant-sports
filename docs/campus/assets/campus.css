@@ -401,3 +401,18 @@ a.cc-bt:hover .nm { color: var(--signal); }
   .cc-mvt-t > summary .cc-mvt-n { grid-column: 1 / -1; grid-row: 2; }
   .cc-mvt-t > summary .cc-mvt-l { white-space: normal; text-align: right; }
 }
+
+/* ── college hockey (cc-hockey.js, 30 Oct 2026) ───────────────────────────────────────────────────── */
+.cc-regions.hk { grid-template-columns: repeat(auto-fill, minmax(min(100%, 560px), 1fr)); }
+.cc-bracket.hk { grid-auto-columns: minmax(200px, 1fr); }
+.cc-champ.big { margin: 0 0 var(--sp-4); padding: 14px 16px; }
+.cc-champ.big b { font-size: var(--fs-lg); }
+.cc-hk-goals { list-style: none; margin: 0; padding: 0; }
+.cc-hk-goals li { display: grid; grid-template-columns: 52px 26px minmax(0, 1fr); gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--line-1); align-items: start; font-size: var(--fs-sm); }
+.cc-hk-goals li:last-child { border-bottom: 0; }
+.cc-hk-goals li.cc-hk-per { display: block; padding: 12px 0 4px; border-bottom: 0; color: var(--ink-3); font: 600 var(--fs-xs) var(--font-num); letter-spacing: .06em; text-transform: uppercase; }
+.cc-hk-goals .t { color: var(--ink-3); font: 500 var(--fs-xs) var(--font-num); padding-top: 3px; }
+.cc-hk-goals .tx { min-width: 0; overflow-wrap: anywhere; }
+.cc-hk-goals .tx small { display: block; color: var(--ink-3); margin-top: 2px; }
+.cc-hk-goals .tx .qk-tag { margin-left: 6px; }
+.cc-hk-credit { margin-top: var(--sp-6); }

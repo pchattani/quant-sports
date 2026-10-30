@@ -323,9 +323,16 @@ def _slug(team: str) -> str:
 CRESTS_DIR = SITE_DIR / "assets" / "crests"
 
 
+def crests_enabled() -> bool:
+    """Club crests are Sofascore team images, shown small as identifiers under the user's unclear-terms rule (30 Oct
+    2026, credited on the Terms page). SOURCE_SOFASCORE_CRESTS_ENABLED=0 drops every crest from the payloads."""
+    from oddsmarkets.common.polite import flag_on
+    return flag_on("SOURCE_SOFASCORE_CRESTS_ENABLED")
+
+
 def crest_path(league_slug: str, team_id: int | None) -> str | None:
-    """Relative path of a committed crest, or None when none has been fetched."""
-    if not team_id:
+    """Relative path of a committed crest, or None when none has been fetched (or crests are switched off)."""
+    if not team_id or not crests_enabled():
         return None
     rel = f"assets/crests/{team_id}.png"
     return rel if (SITE_DIR / rel).exists() else None
@@ -2746,7 +2753,7 @@ def main() -> int:
         _step("calibration", lambda: _write(DATA_DIR, "calibration.json", cal))
     # Which clubs have a crest file: the front end draws a monogram for any other id instead of requesting a 404.
     _step("crest list", lambda: _write(DATA_DIR, "crests.json", {"ids": sorted(
-        int(f.stem) for f in CRESTS_DIR.glob("*.png") if f.stem.isdigit())}))
+        int(f.stem) for f in CRESTS_DIR.glob("*.png") if f.stem.isdigit()) if crests_enabled() else []}))
     ordered = [prev[s] for s in list(LEAGUES) + [LIGA_ARGENTINA_SLUG] + list(CUPS) if s in prev]
     _write(DATA_DIR, "competitions.json", {"competitions": ordered, "updated_at": _now()})
 

@@ -22,6 +22,13 @@ LEVEL_NAMES = {"cfb": "College Football (FBS)", "mbb": "Men's College Basketball
                "wbb": "Women's College Basketball (Division I)"}
 LEVEL_SHORT = {"cfb": "CFB", "mbb": "MBB", "wbb": "WBB"}
 SPORT = {"cfb": "football", "mbb": "basketball", "wbb": "basketball"}
+# College hockey (30 Oct 2026): men's and women's Division I, built by oddsmarkets/college/hockey (its own ESPN
+# scoreboard reader and College Hockey News); not in LEVELS, which the basketball / football fetchers loop over.
+HOCKEY_LEVELS = ("mch", "wch")
+ALL_LEVELS = LEVELS + HOCKEY_LEVELS
+LEVEL_NAMES.update({"mch": "Men's College Hockey (Division I)", "wch": "Women's College Hockey (Division I)"})
+LEVEL_SHORT.update({"mch": "MCH", "wch": "WCH"})
+SPORT.update({"mch": "hockey", "wch": "hockey"})
 # ESPN (sport, league) path segments and the scoreboard `groups` filter (80 = FBS, 50 = Division I)
 ESPN = {"cfb": ("football", "college-football"), "mbb": ("basketball", "mens-college-basketball"),
         "wbb": ("basketball", "womens-college-basketball")}

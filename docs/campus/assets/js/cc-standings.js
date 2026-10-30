@@ -12,6 +12,7 @@ var U = CC.ui, esc = CC.esc, isNum = CC.isNum;
 var POWER = { cfb: ['SEC', 'Big Ten', 'Big 12', 'ACC'], mbb: ['SEC', 'Big Ten', 'Big 12', 'ACC', 'Big East'], wbb: ['SEC', 'Big Ten', 'Big 12', 'ACC', 'Big East'] };
 
 CC.route('standings', function (el, p) {
+  if (CC.hk(p.L) && CC.hkStandings) return CC.hkStandings(el, p);     /* college hockey: cc-hockey.js */
   var L = p.L, S = p.S, fb = CC.fb(L);
   var cur = CC.isCur(L, S);
   var list = fb ? [['conferences', 'Conferences'], ['polls', 'Polls'], ['playoff', 'Playoff'], ['bowls', 'Bowls']] : [['conferences', 'Conferences'], ['polls', 'Polls'], ['bracket', 'Bracket'], ['conftourneys', 'Conference tournaments']];

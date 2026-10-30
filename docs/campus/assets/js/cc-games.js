@@ -121,7 +121,8 @@ function excitement(L, S, cards, season, fb) {
     '<ol class="cc-race-l cc-ex">' + rows.map(function (r, i) {
       var c = r.c, g = CC.game(c, L);
       return '<li><span class="cc-race-rk num">' + (i + 1) + '</span>' + QK.teamMark(U.mark(L, c.home), 'sm') + '<span class="cc-race-nm"><a href="' + esc(CC.gameHref(L, c.id, S)) + '">' + esc(g.away.name + ' at ' + g.home.name) + '</a><small>' +
-        esc(CC.when(c) + ' · our call ' + CC.tabbr(L, c.model.p_home >= 0.5 ? c.home : c.away) + ' ' + CC.pct(Math.max(c.model.p_home, 1 - c.model.p_home))) + '</small><span class="cc-race-why">' +
+        esc(CC.when(c) + ' · our call ' + (function (m) { var pa = isNum(m.p_away) ? m.p_away : 1 - m.p_home; /* hockey: a tie is possible */
+          return CC.tabbr(L, m.p_home >= pa ? c.home : c.away) + ' ' + CC.pct(Math.max(m.p_home, pa)); })(c.model)) + '</small><span class="cc-race-why">' +
         esc('Closeness ' + Math.round(100 * r.close) + ' · quality ' + Math.round(100 * r.q) + ' · stakes ' + Math.round(100 * r.st)) + '</span></span><span class="cc-race-bar" aria-hidden="true"><i style="width:' + Math.max(3, r.x) + '%;background:var(--signal)"></i></span><b class="num">' + r.x + '</b></li>';
     }).join('') + '</ol>', { cls: 'cc-ex-card' });
 }
@@ -177,22 +178,33 @@ function hero(L, g, season) {
   var wpm = g.wp && g.wp.model && g.wp.model.length ? g.wp.model[g.wp.model.length - 1][1] : null;
   if (live && isNum(wpm)) { G.wp_home = wpm; G.pre_only = undefined; }
   if (isNum(m.p_home)) G.p_home = m.p_home;
-  var R = (season && season.ratings) || {}, ra = R[String(g.away)] || {}, rh = R[String(g.home)] || {}, fb = CC.fb(L);
+  var R = (season && season.ratings) || {}, ra = R[String(g.away)] || {}, rh = R[String(g.home)] || {}, fb = CC.fb(L), hk = CC.hk(L);
   var fx = [];
   var add = function (label, x, y, f, low) { if (isNum(x) && isNum(y)) fx.push({ label: label, a: f(x), b: f(y), better: Math.abs(x - y) < 1e-9 ? null : ((x > y) !== !!low ? 'a' : 'b') }); };
+  if (hk) {
+    add('Rating, goals v average', ra.rating, rh.rating, function (v) { return CC.signed(v, 2); });
+    add('Attack, goals a game above average', ra.off, rh.off, function (v) { return CC.signed(v, 2); });
+    add('Defence, goals a game kept out', ra.def, rh.def, function (v) { return CC.signed(v, 2); });
+    add('Power play', ra.pp_pct, rh.pp_pct, function (v) { return CC.pct(v, 1); });
+    add('Penalty kill', ra.pk_pct, rh.pk_pct, function (v) { return CC.pct(v, 1); });
+  } else
   add(fb ? 'Rating, points v average' : 'Rating, margin per 100', ra.rating, rh.rating, function (v) { return CC.signed(v, 1); });
+  if (!hk) {
   add(fb ? 'Offence, points a game' : 'Offence, points per 100', ra.off, rh.off, function (v) { return CC.f(v, 1); });
   add(fb ? 'Defence, points prevented' : 'Defence, allowed per 100', ra.def, rh.def, function (v) { return CC.f(v, 1); }, !fb);
   if (fb) add('Offensive EPA a play', ra.epa_off, rh.epa_off, function (v) { return CC.signed(v, 2); });
-  add('Strength of schedule', ra.sos, rh.sos, function (v) { return CC.signed(v, 1); });
+  }
+  add('Strength of schedule', ra.sos, rh.sos, function (v) { return CC.signed(v, hk ? 2 : 1); });
   var extra = [];
-  if (pre && isNum(m.margin) && isNum(m.total)) { var hs = (m.total + m.margin) / 2, as = (m.total - m.margin) / 2; extra.push('Our projected score is ' + CC.tshort(L, g.away) + ' ' + CC.f(as, 0) + ', ' + CC.tshort(L, g.home) + ' ' + CC.f(hs, 0)); }
+  if (pre && hk && isNum(m.xg_home)) extra.push('We expect ' + CC.tshort(L, g.away) + ' ' + CC.f(m.xg_away, 1) + ' goals and ' + CC.tshort(L, g.home) + ' ' + CC.f(m.xg_home, 1) + (isNum(m.p_tie) && g.stype !== 'ncaa' && g.stype !== 'conf' ? '; a tie ' + CC.pct(m.p_tie) : ''));
+  else if (pre && isNum(m.margin) && isNum(m.total)) { var hs = (m.total + m.margin) / 2, as = (m.total - m.margin) / 2; extra.push('Our projected score is ' + CC.tshort(L, g.away) + ' ' + CC.f(as, 0) + ', ' + CC.tshort(L, g.home) + ' ' + CC.f(hs, 0)); }
   if (pre && isNum(m.sd)) extra.push('the final margin usually lands within ' + CC.f(m.sd, 0) + ' points of that');
   var tag = CC.roundLabel(g) || (g.conf_game ? 'Conference game' : 'Non-conference');
   var venue = g.venue && g.venue.name ? g.venue.name : '';
   var src = CC.mkSource(mk);
-  return '<div class="cc-preview">' + QK.previewCard(G, { kicker: CC.LSHORT[L] + ' · ' + tag + (venue ? ' · ' + venue : ''), nick: function (x) { return x.name; }, colors: cols, factors: fx, factorsTitle: CC.isCur(L, g.season) ? 'How they match up this season' : 'How they matched up', vs: g.neutral ? 'v' : undefined,
-    noteExtra: extra.length ? esc(extra.join(', and ') + '.') : '', market: pre && isNum(mk.p_home) ? { p: mk.p_home, src: src || undefined, quiet: true } : null }) + '</div>';
+  if (hk && isNum(m.p_tie) && g.stype !== 'ncaa' && g.stype !== 'conf') { G.p_draw = m.p_tie; G.p_away = m.p_away; }
+  return '<div class="cc-preview">' + (hk ? CC.tieWords : String)(QK.previewCard(G, { kicker: CC.LSHORT[L] + ' · ' + tag + (venue ? ' · ' + venue : ''), nick: function (x) { return x.name; }, colors: cols, factors: fx, factorsTitle: CC.isCur(L, g.season) ? 'How they match up this season' : 'How they matched up', vs: g.neutral ? 'v' : undefined,
+    noteExtra: extra.length ? esc(extra.join(', and ') + '.') : '', market: pre && isNum(mk.p_home) ? { p: mk.p_home, src: src || undefined, quiet: true } : null })) + '</div>';
 }
 function heroMeta(L, g) {
   var venue = g.venue && g.venue.name ? g.venue.name + (g.venue.city ? ', ' + g.venue.city : '') + (g.venue.state ? ', ' + g.venue.state : '') : '';
@@ -204,13 +216,17 @@ function tiles(L, g) {
   var st = CC.status(g), pg = g.pregame || {}, m = pg.model || g.model || {};
   var out = [];
   if (isNum(m.p_home)) {
-    var hf = m.p_home >= 0.5;
-    out.push({ label: st === 'pre' ? 'Our win chance' : 'Our pre-game call', value: CC.tabbr(L, hf ? g.home : g.away) + ' ' + CC.pct(Math.max(m.p_home, 1 - m.p_home)), signal: true,
-      sub: isNum(m.margin) ? 'projected margin: ' + pickOf(L, g, m.margin) : '', tip: 'Our pre-game chance of winning, from the two teams’ ratings, home field and rest' });
+    /* hockey can end level: the away side's chance is p_away, not 1 - p_home */
+    var pAw = CC.hk(L) && isNum(m.p_away) ? m.p_away : 1 - m.p_home;
+    var hf = m.p_home >= pAw;
+    out.push({ label: st === 'pre' ? 'Our win chance' : 'Our pre-game call', value: CC.tabbr(L, hf ? g.home : g.away) + ' ' + CC.pct(hf ? m.p_home : pAw), signal: true,
+      sub: isNum(m.margin) ? 'projected margin: ' + pickOf(L, g, m.margin) : '', tip: CC.hk(L) ? 'Our pre-game chance of winning, from the two teams’ ratings and home ice' : 'Our pre-game chance of winning, from the two teams’ ratings, home field and rest' });
   }
   var wpm = g.wp && g.wp.model && g.wp.model.length ? g.wp.model[g.wp.model.length - 1][1] : null;
   if (st === 'live' && isNum(wpm)) out.push({ label: 'Live win chance', value: CC.tabbr(L, wpm >= 0.5 ? g.home : g.away) + ' ' + CC.pct(Math.max(wpm, 1 - wpm)), signal: true, sub: 'our in-game model, every play' });
-  if (isNum(m.margin) && isNum(m.total) && st === 'pre') {
+  if (CC.hk(L) && isNum(m.p_tie) && m.p_tie > 0.001 && g.stype !== 'ncaa' && g.stype !== 'conf') out.push({ label: st === 'pre' ? 'Tie chance' : 'Our tie chance', value: CC.pct(m.p_tie), sub: 'level after overtime: a tie in the record' });
+  if (CC.hk(L) && isNum(m.xg_home) && st === 'pre') out.push({ label: 'Expected goals (ours)', value: CC.f(m.xg_away, 1) + '–' + CC.f(m.xg_home, 1), sub: CC.tabbr(L, g.away) + ' – ' + CC.tabbr(L, g.home) + ' · from the two ratings' });
+  else if (isNum(m.margin) && isNum(m.total) && st === 'pre') {
     var hs = (m.total + m.margin) / 2, as = (m.total - m.margin) / 2;
     out.push({ label: 'Projected score', value: CC.f(as, 0) + '–' + CC.f(hs, 0), sub: CC.tabbr(L, g.away) + ' – ' + CC.tabbr(L, g.home) + ' · ' + CC.f(m.total, 1) + ' points expected' });
   }
@@ -227,6 +243,13 @@ function pregame(L, g) {
   var pg = g.pregame || {}, m = pg.model || g.model || {}, mk = pg.market || g.market || null;
   var h = CC.tabbr(L, g.home), a = CC.tabbr(L, g.away), hs = CC.tshort(L, g.home), as = CC.tshort(L, g.away);
   if (!isNum(m.p_home)) return U.card('Our forecast', '', QK.empty('No forecast for this game', 'Our forecast covers games between two rated teams.'));
+  if (CC.hk(L)) {
+    var tieOk = isNum(m.p_tie) && g.stype !== 'ncaa' && g.stype !== 'conf';
+    var hr = [['Win', h + ' ' + CC.pct(m.p_home) + (tieOk ? ' · tie ' + CC.pct(m.p_tie) : '') + ' · ' + a + ' ' + CC.pct(isNum(m.p_away) ? m.p_away : 1 - m.p_home)],
+      ['Expected goals', isNum(m.xg_home) ? a + ' ' + CC.f(m.xg_away, 1) + ' · ' + h + ' ' + CC.f(m.xg_home, 1) : '—'], ['Total goals', isNum(m.total) ? CC.f(m.total, 1) + ' expected' : '—']];
+    return U.card(CC.status(g) === 'pre' ? 'Our forecast' : 'Our pre-game forecast', 'From our game model: the two teams’ attack and defence ratings and home ice. ' + (tieOk ? 'A regular-season game level after five minutes of overtime is a tie.' : 'A tournament game is played until someone scores.'),
+      '<div class="qk-table-wrap"><table class="qk-table dense"><thead><tr><th>Question</th><th>Our forecast</th></tr></thead><tbody>' + hr.map(function (r) { return '<tr><td>' + esc(r[0]) + '</td><td class="num" style="text-align:left;color:var(--ink-1);font-weight:600">' + esc(r[1]) + '</td></tr>'; }).join('') + '</tbody></table></div>');
+  }
   var mkM = mk && isNum(mk.spread_home) ? -mk.spread_home : null;
   var rows = [
     ['Win', h + ' ' + CC.pct(m.p_home) + ' · ' + a + ' ' + CC.pct(1 - m.p_home), mk && isNum(mk.p_home) ? h + ' ' + CC.pct(mk.p_home) : '—'],
@@ -262,7 +285,17 @@ function pregame(L, g) {
 /* Tale of the tape: the two teams' season profile from the ratings (season.json ratings[team]). */
 function tape(L, g, season) {
   var R = (season && season.ratings) || {}, a = R[String(g.away)] || {}, h = R[String(g.home)] || {}, fb = CC.fb(L);
-  var rows = fb ? [
+  var rows = CC.hk(L) ? [
+    { label: 'Rating (goals v average)', a: a.rating, b: h.rating, fmt: function (v) { return CC.signed(v, 2); }, tip: 'Our rating: goals a game better than an average D-I team on neutral ice' },
+    { label: 'Attack (goals above average)', a: a.off, b: h.off, fmt: function (v) { return CC.signed(v, 2); } },
+    { label: 'Defence (goals kept out)', a: a.def, b: h.def, fmt: function (v) { return CC.signed(v, 2); } },
+    { label: 'Shots for a game', a: a.sf_pg, b: h.sf_pg, fmt: function (v) { return CC.f(v, 1); } },
+    { label: 'Shots against a game', a: a.sa_pg, b: h.sa_pg, fmt: function (v) { return CC.f(v, 1); }, better: 'low' },
+    { label: 'Power play', a: a.pp_pct, b: h.pp_pct, fmt: function (v) { return CC.pct(v, 1); } },
+    { label: 'Penalty kill', a: a.pk_pct, b: h.pk_pct, fmt: function (v) { return CC.pct(v, 1); } },
+    { label: 'Save %', a: a.sv_pct, b: h.sv_pct, fmt: function (v) { return CC.f(v, 3).replace(/^0/, ''); } },
+    { label: 'Strength of schedule', a: a.sos, b: h.sos, fmt: function (v) { return CC.signed(v, 2); } }
+  ] : fb ? [
     { label: 'Rating (points v average)', a: a.rating, b: h.rating, fmt: function (v) { return CC.signed(v, 1); }, tip: 'Our rating: expected margin against an average FBS team on a neutral field' },
     { label: 'Offence (points added a game)', a: a.off, b: h.off, fmt: function (v) { return CC.f(v, 1); } },
     { label: 'Defence (points prevented a game)', a: a.def, b: h.def, fmt: function (v) { return CC.f(v, 1); } },
@@ -283,6 +316,7 @@ function tape(L, g, season) {
 }
 
 function teamStats(L, g) {
+  if (CC.hk(L)) return CC.hkTeamStats(L, g);
   var ts = g.team_stats || {}, bx = g.box || {};
   var H = (bx[g.home] && bx[g.home].team) || ts[g.home] || null, A = (bx[g.away] && bx[g.away].team) || ts[g.away] || null;
   if (!H || !A) return '';
@@ -394,7 +428,8 @@ CC.route('game', function (el, p) {
     if ((g.plays || []).length) g.plays = g.plays.slice().sort(function (x, y) { return Math.abs(y.wpa || 0) - Math.abs(x.wpa || 0); });
     if ((g.plays || []).length) html += U.card('Highest-leverage plays', 'The plays that moved our win chance most (win chance added for the home side, in points).', '<ol class="cc-plays">' + g.plays.slice(0, 8).map(function (x) {
       return '<li><span class="t">' + esc(perLabel(L, g.season, x.period) + ' ' + (isNum(x.clock) ? fmtClock(x.clock / 60) : (x.clock || ''))) + '</span><span class="tx">' + (x.team ? QK.teamMark(CC.team(L, x.team) || {}, 'sm') : '') + esc(x.text || '') + '</span><b class="' + CC.cls(x.wpa) + '">' + (isNum(x.wpa) ? QK.fmt.pp(x.wpa) : '') + '</b></li>'; }).join('') + '</ol>');
-    html += '<div class="qk-grid cc-grid"><div class="qk-span-8">' + (fb ? boxFootball(L, g) : boxHoops(L, g)) + '</div><div class="qk-span-4"><div class="qk-stack">' + leadersBlock(L, g) + teamStats(L, g) + '</div></div></div>';
+    if (CC.hk(L)) html += '<div class="qk-grid cc-grid"><div class="qk-span-7"><div class="qk-stack">' + CC.hkBox(L, g) + '</div></div><div class="qk-span-5"><div class="qk-stack">' + leadersBlock(L, g) + teamStats(L, g) + '</div></div></div>' + CC.hkSkaters(L, g) + CC.hkAttempts(L, g) + (g.source && g.source !== 'ESPN' ? CC.hkCredit(true) : '');
+    else html += '<div class="qk-grid cc-grid"><div class="qk-span-8">' + (fb ? boxFootball(L, g) : boxHoops(L, g)) + '</div><div class="qk-span-4"><div class="qk-stack">' + leadersBlock(L, g) + teamStats(L, g) + '</div></div></div>';
     el.innerHTML = html;
     QK.$$('.qk-tabs[role="tablist"]', el).forEach(function (t) { QK.tabs(t.parentNode); });
     U.wire(el);
@@ -408,6 +443,7 @@ CC.route('game', function (el, p) {
     };
     if (wp) wp = { model: toMin(wp.model), espn: toMin(wp.espn) };
     flow = toMin(flow);
+    if (CC.hk(L)) { if (!CC.hkFlow(L, g, wpNode) && st !== 'pre') wpNode.innerHTML = U.card('Score flow', '', QK.empty('No goal-by-goal record', 'The scoring summary comes with the box score.')); return; }
     var hasWp = wp && ((wp.model && wp.model.length > 2) || (wp.espn && wp.espn.length > 2));
     var hasFlow = flow && flow.length > 2;
     if (hasWp || hasFlow) {

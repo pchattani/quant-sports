@@ -1269,7 +1269,7 @@ function bootShell() {
   var sel = document.getElementById('fb-comp-pick');
   if (sel) sel.addEventListener('change', function () { if (sel.value) go(href.comp(sel.value)); });
   var foot = document.getElementById('qk-footer');
-  if (foot) foot.insertAdjacentHTML('beforeend', '<div class="fb-footnote">The Quant Footballer · data from Sofascore · Dixon-Coles and Elo models, Monte Carlo seasons · ' +
+  if (foot) foot.insertAdjacentHTML('beforeend', '<div class="fb-footnote">The Quant Footballer · data and club crests from Sofascore · Dixon-Coles and Elo models, Monte Carlo seasons · ' +
     (INDEX.updated_at ? 'updated ' + esc(fmtStamp(INDEX.updated_at)) + ' · ' : '') + '<a href="#/model/disclaimer">Disclaimer and terms</a> · <a href="#/model/methodology">Methodology</a> · ' +
     'For information and entertainment only; not betting advice. 18+.</div>');
   var fv = document.getElementById('first-visit-notice');

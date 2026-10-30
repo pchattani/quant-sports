@@ -29,13 +29,17 @@ var U = CC.ui, esc = CC.esc, isNum = CC.isNum;
  * board, the chart and the profile lead with (a Position group takes its sets from the spec's view instead). */
 var BROAD = {
   cfb: [['off', 'Offence', ['QB', 'RB', 'WR', 'TE'], 'offensive players'], ['def', 'Defence', ['DL', 'LB', 'DB'], 'defenders'], ['st', 'Specialists', ['K', 'P'], 'specialists']],
-  bb: [['all', 'All players', null, 'players']]
+  bb: [['all', 'All players', null, 'players']],
+  hk: [['sk', 'Skaters', ['F', 'D'], 'skaters'], ['g', 'Goalies', ['G'], 'goalies']]
 };
 var BROAD_VIEW = {
   off: { why: '', x: 'epa_play', y: 'value_pg', color: 'value', sets: [['excellence', 'Efficiency', ['epa_play', 'sr_db', 'sr_rush', 'sr_tgt', 'ypa', 'ypc', 'yptpa']], ['production', 'Production', ['pass_yds', 'rush_yds', 'rec_yds', 'pass_td', 'rush_td', 'rec_td', 'rec']], ['aggregate', 'Value', ['value_pg', 'value', 'epa']]] },
   def: { why: '', x: 'havoc_pg', y: 'value_pg', color: 'value', sets: [['excellence', 'Disruption', ['havoc_pg', 'tfl_pg', 'sacks_pg', 'hurries_pg', 'pd_pg', 'def_int_pg']], ['production', 'Production', ['tkl', 'tfl', 'sacks', 'pd', 'def_int']], ['aggregate', 'Value', ['value_pg', 'value']]] },
   st: { why: '', x: 'fg_pct', y: 'value_pg', color: 'value', sets: [['excellence', 'Kicking and punting', ['fg_pct', 'xp_pct', 'gross', 'in20_rate', 'tb_rate']], ['production', 'Production', ['fgm', 'fga', 'fg_long']], ['aggregate', 'Value', ['value_pg', 'value']]] },
-  all: { why: '', x: 'ts', y: 'pts', color: 'r', sets: [['excellence', 'Efficiency', ['ts', 'ts_add', 'efg', 'ortg', 'pts100']], ['production', 'Scoring and more', ['pts', 'reb', 'ast', 'stl', 'blk', 'min']], ['aggregate', 'Value', ['r', 'value_pg', 'value']]] }
+  all: { why: '', x: 'ts', y: 'pts', color: 'r', sets: [['excellence', 'Efficiency', ['ts', 'ts_add', 'efg', 'ortg', 'pts100']], ['production', 'Scoring and more', ['pts', 'reb', 'ast', 'stl', 'blk', 'min']], ['aggregate', 'Value', ['r', 'value_pg', 'value']]] },
+  /* college hockey (College Hockey News lines): skaters and goalies are never pooled */
+  sk: { why: '', x: 'sh_pg', y: 'pts_pg', color: 'gar_pg', sets: [['excellence', 'Driving play', ['sh_pg', 'tsa_pg', 'p1_pg', 'pm_rel', 'sh_pct', 'p60']], ['production', 'Scoring', ['pts_pg', 'g_pg', 'a_pg', 'pts', 'g', 'a', 'toi_pg']], ['aggregate', 'Value', ['gar_pg', 'gar', 'war']]] },
+  g: { why: '', x: 'sa60', y: 'sv_pct', color: 'gsaa', sets: [['excellence', 'Stopping shots', ['sv_pct', 'sv_above', 'gaa']], ['production', 'Workload', ['sa60', 'gp', 'min']], ['aggregate', 'Value', ['gsaa', 'gar', 'war']]] }
 };
 var CLASSES = [['', 'Any year'], ['FR', 'Freshmen'], ['SO', 'Sophomores'], ['JR', 'Juniors'], ['SR', 'Seniors']];
 var LISTED_ROLE = { G: 'G', C: 'B', F: 'W' };
@@ -60,7 +64,7 @@ var SC = { L: 'cfb', S: null, view: 'board', within: 'broad', bg: 'off', pg: 'QB
 var D = null, DK = '', ROOT = null, TRAY = null, BOARD = null, PCT = {};
 
 function fb() { return CC.fb(SC.L); }
-function broadList() { return BROAD[fb() ? 'cfb' : 'bb']; }
+function broadList() { return BROAD[fb() ? 'cfb' : CC.hk(SC.L) ? 'hk' : 'bb']; }
 function posGroups() { return (CC.METRICS || []).filter(function (g) { return g.L === SC.L && g.e === 'player' && g.pc && g.pc.length; }).map(function (g) { return { code: g.pc[0], g: g }; }); }
 function posGroup(code) { return posGroups().filter(function (x) { return x.code === code; })[0] || null; }
 function code() { return SC.within === 'pos' ? 'p:' + SC.pg : 'b:' + SC.bg; }
@@ -88,7 +92,7 @@ function prep(raw) {
     var pos = String(g(r0, 'pos') || '');
     var role = g(r0, 'role');
     rows.push({ id: id, name: nm, team: String(g(r0, 'team') || ''), pos: pos, cls: g(r0, 'class') || '', gp: g(r0, 'gp') || 0,
-      role: role || (fb() ? null : LISTED_ROLE[pos] || null), roleListed: !role && !fb(), a: a });
+      role: role || (fb() || CC.hk(SC.L) ? null : LISTED_ROLE[pos] || null), roleListed: !role && !fb() && !CC.hk(SC.L), a: a });
   });
   var gmax = Math.max.apply(null, rows.map(function (r) { return r.gp; }).concat([1]));
   var withVals = mets.filter(function (m) { return rows.some(function (r) { return isNum(r.a[idx[m.key]]); }); });
@@ -239,7 +243,7 @@ function writeQuery() { try { history.replaceState(null, '', hashNow()); } catch
 function href(r) { return CC.playerHref(SC.L, r.id, SC.S); }
 function teamOf(r) { var t = CC.team(SC.L, r.team) || {}; return { abbr: CC.tabbr(SC.L, r.team), colour: t.colour || '', alt: CC.talt(SC.L, r.team) || '', name: t.short || t.name || '' }; }
 function clsName(c) { var x = CLASSES.filter(function (k) { return k[0] && String(c || '').toUpperCase().indexOf(k[0]) === 0; })[0]; return x ? x[1].replace(/men$/, 'man').replace(/s$/, '') : ''; }
-function posTxt(r) { return fb() ? r.pos : (r.role ? CC.posName(SC.L, r.role) : CC.posName(SC.L, r.pos)); }
+function posTxt(r) { return fb() ? r.pos : CC.hk(SC.L) ? CC.posName(SC.L, r.pos) : (r.role ? CC.posName(SC.L, r.role) : CC.posName(SC.L, r.pos)); }
 function subOf(r) { return [posTxt(r), CC.tabbr(SC.L, r.team), r.cls ? String(r.cls).toUpperCase() : '', r.gp + ' GP'].filter(Boolean).join(' · '); }
 function findRow(id) { var s = String(id); for (var i = 0; i < D.rows.length; i++) if (D.rows[i].id === s) return D.rows[i]; return null; }
 /* the group a row belongs to in the current mode */
@@ -283,7 +287,7 @@ function pickClick(ev) {
   if (ev.defaultPrevented || ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.button) return;
   var a = ev.target.closest ? ev.target.closest('a[href]') : null;
   if (!a || !D) return;
-  var m = /#\/(?:cfb|mbb|wbb)\/player\/([^/?#]+)/.exec(a.getAttribute('href') || '');
+  var m = /#\/(?:cfb|mbb|wbb|mch|wch)\/player\/([^/?#]+)/.exec(a.getAttribute('href') || '');
   if (!m || !findRow(decodeURIComponent(m[1]))) return;
   ev.preventDefault();
   openProfile(decodeURIComponent(m[1]));

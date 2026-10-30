@@ -6,6 +6,8 @@
  * they favoured, the per-game scorecards, and the 2026 automated ball-strike (ABS) challenges.
  *
  * Data: data/<L>/<S>/umpires.json ({"umpires": {id: {...}} | [...], "abs": {...}, "league": {...}}).
+ * Reference: data/mlb/umpscorecards.json (Umpire Scorecards' per-umpire season numbers, joined by name; absent when
+ * the source is switched off, and then nothing of it shows).
  * Uses BP.gk. */
 (function (BP) {
 'use strict';
@@ -24,6 +26,44 @@ const COLS = [
   ['abs_over', 'ABS overturned', ['abs_overturned', 'overturned', 'abs_rate', 'overturn_rate'], 'pct', 'Share of ABS challenges against the umpire\'s calls that were overturned (2026)']
 ];
 const LOWER = { run_impact: 1, abs_over: 1 };
+/* Umpire Scorecards (umpscorecards.com), a reference beside our model: its accuracy, consistency and run impact. */
+const USC_CREDIT = 'Umpire Scorecards (umpscorecards.com)';
+const USC_M = [
+  { key: 'usc_accuracy', label: 'USC accuracy', fmt: 'pct', desc: 'Umpire Scorecards\' accuracy: its correct calls over called pitches, by its own zone' },
+  { key: 'usc_consistency', label: 'USC consistency', fmt: 'pct', desc: 'Umpire Scorecards\' consistency, the mean of its game figures' },
+  { key: 'usc_run_impact', label: 'USC runs/game', fmt: '2', lower: true, desc: 'Umpire Scorecards\' run impact of missed calls per game' }
+];
+const isUsc = key => /^usc_/.test(key);
+function nameKey(s) {
+  return String(s || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+/* Join Umpire Scorecards' season numbers onto the payload's umpires (MLB only); the payload is returned unchanged when
+ * the reference file is missing. Marks the payload so a cached copy is joined once. */
+function withUsc(L, S, d) {
+  if (L !== 'mlb' || !d || d.ok === false || d._usc !== undefined) return Promise.resolve(d);
+  return Promise.resolve(BP.load('mlb/umpscorecards.json')).then(ref => {
+    const tab = ref && ref.seasons ? ref.seasons[String(S)] : null;
+    d._usc = false;
+    if (!tab) return d;
+    const by = {};
+    Object.keys(tab).forEach(n => { by[nameKey(n)] = tab[n]; });
+    const U = d.umpires || {};
+    let hit = 0;
+    Object.keys(U).forEach(id => {
+      const u = U[id];
+      if (!u || typeof u !== 'object') return;
+      const a = by[nameKey(u.name)];
+      if (!a) return;
+      hit++;
+      u.values = Object.assign({}, u.values || {}, { usc_accuracy: a.accuracy, usc_consistency: a.consistency, usc_run_impact: a.run_impact });
+    });
+    if (hit) { d._usc = true; d.metrics = (d.metrics || []).concat(USC_M); }
+    return d;
+  }, () => d);
+}
+function uscFoot(d) {
+  return d && d._usc ? ' <span class="bp-fn">USC columns: ' + USC_CREDIT + ', a reference beside our model; its zone and expectations are its own.</span>' : '';
+}
 function umpsOf(d) {
   if (!d || d.ok === false) return [];
   const U = d.umpires || d.rows || d;
@@ -72,7 +112,7 @@ function renderList(el, params, state) {
     '<section class="qk-section"><div id="um-card"></div></section>';
   return k.ready().then(() => {
     const S = k.S(params, state);
-    return k.loadY(L, S, 'umpires.json').then(d => ({ S: S, d: d }));
+    return k.loadY(L, S, 'umpires.json').then(d => withUsc(L, S, d)).then(d => ({ S: S, d: d }));
   }).then(o => {
     if (!k.alive(el)) return;
     const S = o.S, d = o.d, $ = id => document.getElementById(id);
@@ -103,7 +143,7 @@ function renderList(el, params, state) {
       const sk = r => { const v = ae(r); return k.isNum(v) ? v : -1; };
       list.sort((a, b) => sk(b) - sk(a));
       $('um-card').innerHTML = U.card2('Every umpire', list.length + ' of ' + rows.length + ' home-plate umpires, ' + S + ' · cells coloured by percentile among umpires (100 = best); expected accuracy and zone size describe style, so they are grey', '<div id="um-table"></div>', { flush: true,
-        foot: '<span class="bp-fn">Rule-book zone: |plate_x| ≤ 0.83 ft between sz_bot − 0.12 and sz_top + 0.12 ft. Expected accuracy comes from the called-strike model without the umpire\'s own effect.</span>' });
+        foot: '<span class="bp-fn">Rule-book zone: |plate_x| ≤ 0.83 ft between sz_bot − 0.12 and sz_top + 0.12 ft. Expected accuracy comes from the called-strike model without the umpire\'s own effect.</span>' + uscFoot(d) });
       if (!list.length) { $('um-table').innerHTML = QK.empty('Nobody here', 'Lower the minimum games.'); scatter([], pr, cols); return; }
       QK.leaderboard($('um-table'), { dense: true, rank: true, maxHeight: 620, rowHref: r => k.umpHref(r.id), columns: [{ key: 'name', label: 'Umpire', type: 'entity', href: r => k.umpHref(r.id) }]
         .concat(cols.map(c => (/^(games|called)$/.test(c[0]) || c[3] === 'int' ? { key: 'c_' + c[0], label: c[1], num: true, fmt: v => fmtC(c, v), tip: c[4] }
@@ -211,7 +251,7 @@ function renderOne(el, params, state) {
       if (has(d) || (L !== 'mlb' && L !== 'aaa')) return { S: S, d: d, L: L };
       const L2 = L === 'aaa' ? 'mlb' : 'aaa';
       return k.loadY(L2, S, 'umpires.json').then(d2 => (has(d2) ? { S: S, d: d2, L: L2 } : { S: S, d: d, L: L }), () => ({ S: S, d: d, L: L }));
-    });
+    }).then(o => withUsc(o.L, o.S, o.d).then(d => ({ S: o.S, d: d, L: o.L })));
   }).then(o => {
     L = o.L;
     if (!k.alive(el)) return;
@@ -224,7 +264,8 @@ function renderOne(el, params, state) {
     document.title = name + ' · ' + BP.SITE;
     const v = c => k.val(u, c[2]);
     const games = k.val(u, ['games', 'g']);
-    const metricCols = cols.filter(c => !/^(games|called)$/.test(c[0]) && c[3] !== 'int');
+    const metricCols = cols.filter(c => !/^(games|called)$/.test(c[0]) && c[3] !== 'int' && !isUsc(c[0]));
+    const uscCols = cols.filter(c => isUsc(c[0]));
     /* style, not quality: the accuracy his pitches made likely, and the size and lean of his zone get no percentile */
     const STYLE = /x_accuracy|exp_accuracy|zone_size|zone_effect|strikes_ae|zone_100/;
     const pq = c => (STYLE.test(c[0]) ? null : pr[c[0]](v(c), u));
@@ -236,8 +277,9 @@ function renderOne(el, params, state) {
     const tiles = metricCols.slice(0, 5).map((c, i) => ({ label: c[1], value: fmtC(c, v(c)), pctl: pq(c), signal: i === 0, tip: c[4] }));
     const pcard = QK.pctCard({ title: 'Against the other umpires', peer: 'MLB home-plate umpires', sample: (k.isNum(games) ? games + ' games · ' : '') + '100 = best',
       groups: [{ label: 'Calling the zone', rows: metricCols.filter(c => !STYLE.test(c[0])).map(c => ({ label: c[1], pctl: pq(c), value: fmtC(c, v(c)), tip: c[4] })) },
-        { label: 'Style (not better or worse)', rows: metricCols.filter(c => STYLE.test(c[0])).map(c => ({ label: c[1], pctl: pr[c[0]](v(c), u), value: fmtC(c, v(c)), tip: c[4], style: true })) }],
-      note: 'Grey rows describe the pitches seen and the zone, not the quality of the calls.' });
+        { label: 'Style (not better or worse)', rows: metricCols.filter(c => STYLE.test(c[0])).map(c => ({ label: c[1], pctl: pr[c[0]](v(c), u), value: fmtC(c, v(c)), tip: c[4], style: true })) }]
+        .concat(uscCols.length ? [{ label: 'Umpire Scorecards\' view', rows: uscCols.map(c => ({ label: c[1], pctl: pr[c[0]](v(c), u), value: fmtC(c, v(c)), tip: c[4] })) }] : []),
+      note: 'Grey rows describe the pitches seen and the zone, not the quality of the calls.' + (uscCols.length ? ' The Umpire Scorecards rows use its own zone and model (' + USC_CREDIT + ').' : '') });
     el.innerHTML = '<div class="qk-kicker" style="margin-bottom:10px"><a href="#/umpires">← Umpires</a></div>' + hero +
       '<div class="bp-kpis" style="margin-top:var(--sp-5)">' + QK.stats(tiles) + '</div>' +
       '<div class="qk-grid"><div class="qk-span-5">' + pcard + '</div><div class="qk-span-7"><div class="bp-stack">' +

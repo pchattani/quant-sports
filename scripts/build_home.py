@@ -1131,7 +1131,8 @@ def build_hockey(ctx: Ctx, base: str, out: dict):
 
 # ───────────────────────────────────────────────────────────── college
 COLLEGE_TITLE = {"cfb": "College football national title", "mbb": "Men's college basketball title",
-                 "wbb": "Women's college basketball title"}
+                 "wbb": "Women's college basketball title", "mch": "Men's college hockey title",
+                 "wch": "Women's college hockey title"}
 
 
 def build_college(ctx: Ctx, base: str, out: dict):
@@ -1147,7 +1148,7 @@ def build_college(ctx: Ctx, base: str, out: dict):
     phase_lab = {"preseason": "preseason", "regular": "regular season", "conf_champ": "championship week",
                  "bowls": "bowls", "playoff": "playoff", "offseason": "offseason", "conf_tourneys": "conference tournaments",
                  "ncaa": "NCAA tournament"}
-    for L in ("cfb", "mbb", "wbb"):
+    for L in ("cfb", "mbb", "wbb", "mch", "wch"):
         lg = (idx["levels"] or {}).get(L) or {}
         if not lg.get("ok"):
             continue
@@ -1170,15 +1171,17 @@ def build_college(ctx: Ctx, base: str, out: dict):
             m = g.get("model") or {}
             note = g.get("round") if g.get("stype") in ("cfp", "ncaa", "bowl") else None
             href = base + "#/" + L + "/game/" + str(g["id"]) + ("" if g.get("season") in (None, S) else f"?season={g['season']}")
+            hockey = L in ("mch", "wch")        # hockey games can end level (a tie): p_draw / p_away as the Rink sends them
             x = game("college", LU, g["id"], g.get("date"), g.get("status"), tm(g["home"], g.get("hr")),
                      tm(g["away"], g.get("ar")), g.get("hs"), g.get("as"), p_home=r4(m.get("p_home")), **mkt(g),
+                     p_draw=r4(m.get("p_tie")) if hockey else None, p_away=r4(m.get("p_away")) if hockey else None,
                      total=m.get("total"),
                      note=note, href=href)
             rnd = str(g.get("round") or "")
             stage = None
             if re.search(r"National Championship|Championship Game|^Final\b", rnd):
                 stage = "final"
-            elif re.search(r"Semifinal|Final Four", rnd):
+            elif re.search(r"Semifinal|Final Four|Frozen Four", rnd):
                 stage = "semi"
             elif g.get("stype") in ("cfp", "ncaa"):
                 stage = "playoff"
@@ -1558,7 +1561,8 @@ def season_files(docs: Path = DOCS):
     # the season's biggest surprises (fan stories) read each site's race log (fixed paths, for sites present)
     for folder, rels in (("rink", ["race_log.json"]), ("gridiron", ["race_log.json"]), ("bullpen", ["mlb/race_log.json"]),
                          ("hardwood", ["nba/race_log.json", "wnba/race_log.json"]),
-                         ("campus", ["cfb/race_log.json", "mbb/race_log.json", "wbb/race_log.json"])):
+                         ("campus", ["cfb/race_log.json", "mbb/race_log.json", "wbb/race_log.json", "mch/race_log.json",
+                                     "wch/race_log.json"])):
         if (docs / folder / "data" / "index.json").exists():
             rows += [(folder, f"the-quant-{folder}", rel) for rel in rels]
     # "How sure are we?" reads each site's calibration.json (fixed paths, listed here so CI fetches them too)

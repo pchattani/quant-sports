@@ -98,7 +98,7 @@ def test_search_teams_and_players_with_career_files(data):
 
 def test_build_all_writes_three_files(data):
     res = site.build_all(data, NOW)
-    assert res["levels"] == {"cfb": True, "mbb": True, "wbb": False}
+    assert res["levels"] == {"cfb": True, "mbb": True, "wbb": False, "mch": False, "wch": False}
     for f in ("index.json", "glossary.json", "search.json"):
         assert json.loads((data / f).read_text(encoding="utf-8"))
     assert isinstance(json.loads((data / "search.json").read_text(encoding="utf-8")), list)

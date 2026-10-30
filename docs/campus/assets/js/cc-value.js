@@ -17,7 +17,8 @@ CC.route('value', function (el, p) {
   var list = [['position', 'By position'], ['value', 'Value'], ['transfers', 'Transfers']];
   var tab = U.tab(p, ['value', 'position', 'transfers'], 'position');
   el.innerHTML = U.head('Value & Moves', 'What every player is worth on the field in our value model, the best at each position, and the transfers we can see in the box scores.', U.kicker(L, S)) + U.tabs(L, 'value', list, S, tab) +
-    QK.note('<b>Value above replacement</b> is what a player adds over a replacement-level player at the same position: ' + (CC.fb(L) ? 'expected points on the player’s plays' : 'a box-score rating scaled so a team’s players add up to its margin') + '. Transfers here are inferred from box scores and rosters, not the official portal.') + '<div id="vb">' + QK.skeleton('lines', 8) + '</div>';
+    QK.note(CC.hk(L) ? '<b>Goals above replacement (GAR)</b> is what a player adds over a replacement-level player at the same position: goals created, a damped share of plus-minus, penalties and faceoffs; goalies, goals saved above average. Transfers are inferred from College Hockey News player ids, not the official portal.' + CC.hkCredit(true)
+      : '<b>Value above replacement</b> is what a player adds over a replacement-level player at the same position: ' + (CC.fb(L) ? 'expected points on the player’s plays' : 'a box-score rating scaled so a team’s players add up to its margin') + '. Transfers here are inferred from box scores and rosters, not the official portal.') + '<div id="vb">' + QK.skeleton('lines', 8) + '</div>';
   var body = QK.$('#vb', el);
   return Promise.all([CC.load(CC.path(L, S, tab === 'transfers' ? 'moves.json' : 'value.json')), CC.season(L, S)]).then(function (a) {
     if (!U.alive(el)) return;
@@ -31,7 +32,7 @@ CC.route('value', function (el, p) {
     if (tab === 'value') {
       var pos = {}; rows.forEach(function (r) { if (r.pos) pos[r.pos] = (pos[r.pos] || 0) + 1; });
       var chips = '<div class="qk-chips scroll cc-filters" id="v-pos" role="group" aria-label="Position">' + ['all'].concat(Object.keys(pos).sort(function (x, y) { return pos[y] - pos[x]; })).map(function (k, i) {
-        return '<button type="button" class="qk-chip" style="--ca:var(--signal)" data-value="' + esc(k) + '" aria-pressed="' + (i === 0) + '">' + esc(k === 'all' ? 'All' : k) + '</button>'; }).join('') + '</div>';
+        return '<button type="button" class="qk-chip" style="--ca:var(--signal)" data-value="' + esc(k) + '" aria-pressed="' + (i === 0) + '">' + esc(k === 'all' ? 'All' : CC.hk(L) ? (CC.HKV.posPl[k] || k) : k) + '</button>'; }).join('') + '</div>';
       var r0 = rows[0], pg0 = rows.filter(function (r) { return isNum(r.value_pg); }).slice().sort(function (x, y) { return y.value_pg - x.value_pg; })[0];
       var tl = [];
       if (r0) tl.push({ label: 'Most valuable', value: QK.surname(r0.name || '') + ' ' + CC.f(r0.value, fb ? 1 : 1), signal: true, href: CC.playerHref(L, r0.id, S), sub: (r0.pos || '') + ' · ' + CC.tname(L, r0.team), tip: 'Our value model: ' + (cur.label || 'value') });
@@ -51,13 +52,13 @@ CC.route('value', function (el, p) {
       return;
     }
     var bp = d.by_position || {};
-    var order = fb ? ['QB', 'RB', 'WR', 'TE', 'OL', 'DL', 'EDGE', 'LB', 'DB', 'CB', 'S', 'K', 'P'] : ['G', 'F', 'C'];
+    var order = fb ? ['QB', 'RB', 'WR', 'TE', 'OL', 'DL', 'EDGE', 'LB', 'DB', 'CB', 'S', 'K', 'P'] : CC.hk(L) ? ['F', 'D', 'G'] : ['G', 'F', 'C'];
     var ks = Object.keys(bp).sort(function (x, y) { var a1 = order.indexOf(x), b1 = order.indexOf(y); return (a1 < 0 ? 99 : a1) - (b1 < 0 ? 99 : b1); });
     var bestAt = ks.filter(function (k) { return (bp[k] || []).length; }).map(function (k) { return { k: k, r: bp[k][0] }; });
     body.innerHTML = '<p class="cc-note">' + sub + '</p>' + (bestAt.length ? U.card('The best at each position', 'The most valuable player at each position' + (CC.isCur(L, S) ? ' this season' : '') + '; value compares best within a position, so read each bar against its own position’s list below.', U.chart('v-pos', Math.max(240, bestAt.length * 34 + 50), 'The most valuable player at each position')) : '') +
       '<div class="cc-auto wide">' + ks.map(function (k) {
-      return U.card(k, 'Top ' + bp[k].length, '<ol class="cc-rank">' + bp[k].map(function (r) {
-        return '<li><span class="n"></span>' + U.playerEnt(L, r.id, r.name, r.team, CC.tabbr(L, r.team), S) + '<b class="v">' + CC.f(r.value, fb ? 1 : 2) + '</b><div class="why">' + esc(r.why || '') + '</div></li>'; }).join('') + '</ol>');
+      return U.card(CC.hk(L) ? (CC.HKV.posPl[k] || k) : k, 'Top ' + bp[k].length, '<ol class="cc-rank">' + bp[k].map(function (r) {
+        return '<li><span class="n"></span>' + U.playerEnt(L, r.id, r.name, r.team, CC.tabbr(L, r.team), S) + '<b class="v">' + CC.f(r.value, fb || CC.hk(L) ? 1 : 2) + '</b><div class="why">' + esc(r.why || '') + '</div></li>'; }).join('') + '</ol>');
     }).join('') + '</div>';
     if (bestAt.length) QKC.bar('#v-pos', { cats: bestAt.map(function (b) { return b.k + ' · ' + QK.surname(b.r.name || ''); }), horizontal: true, labels: true, fmt: function (v) { return CC.f(v, 1); },
       series: [{ name: cur.label || 'Value', data: bestAt.map(function (b) { return b.r.value; }) }], colors: bestAt.map(function (b) { return CC.tcol(L, b.r.team); }), hrefs: bestAt.map(function (b) { return CC.playerHref(L, b.r.id, S); }), labelWidth: 130, valName: cur.label || 'Value', catName: 'Position' });

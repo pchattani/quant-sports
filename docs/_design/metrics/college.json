@@ -6,7 +6,9 @@
  "leagues": [
   "cfb",
   "mbb",
-  "wbb"
+  "wbb",
+  "mch",
+  "wch"
  ],
  "payloads": {
   "players": "docs/campus/data/<L>/<season>/players.json -> players{pid}.values / pct / pct_pos (cfb: rates in pct_pos only) / role + pct_role (mbb, wbb) / qualified / qualified_rate (cfb)",
@@ -14250,6 +14252,1894 @@
      }
     }
    ]
+  },
+  {
+   "id": "mch_forwards",
+   "entity": "player",
+   "league": "mch",
+   "display": "Forwards",
+   "role": "F",
+   "peer_group": "players.json pos == F (men's Division I, same season; College Hockey News lines)",
+   "position_field": "pos",
+   "position_codes": [
+    "F"
+   ],
+   "minimum": {
+    "field": "qualified",
+    "value": true,
+    "unit": "games",
+    "note": "players.json `qualified`: skaters 40% of the season's most games (min 5); goalies 25%"
+   },
+   "basis": "per game (time on ice only for men from 2025)",
+   "percentile_field": "pct_pos",
+   "metrics": [
+    {
+     "id": "gar_pg",
+     "display": "GAR per game",
+     "short": "GAR/G",
+     "unit": "goals",
+     "direction": "higher",
+     "set": "headline",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Our value model: goals above a replacement-level forward, per game.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "pts_pg",
+     "display": "Points per game",
+     "short": "P/G",
+     "unit": "points",
+     "direction": "higher",
+     "set": "headline",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Goals and assists a game.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "p1_pg",
+     "display": "Primary points per game",
+     "short": "P1/G",
+     "unit": "points",
+     "direction": "higher",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Goals and first assists a game: the points a player drives (box scores, 2025 on).",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "sh_pg",
+     "display": "Shots per game",
+     "short": "SOG/G",
+     "unit": "shots",
+     "direction": "higher",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Shots on goal a game: the steadiest sign of a scorer.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "g_pg",
+     "display": "Goals per game",
+     "short": "G/G",
+     "unit": "goals",
+     "direction": "higher",
+     "set": "headline",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Goals a game.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "pm_rel",
+     "display": "+/- v team",
+     "short": "+/- rel",
+     "unit": "goals",
+     "direction": "higher",
+     "set": "headline",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Plus-minus against the team's goal difference in the player's games: noisy, a small part of value.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "toi_pg",
+     "display": "Time on ice",
+     "short": "TOI",
+     "unit": "minutes",
+     "direction": "higher",
+     "set": "headline",
+     "order": 7,
+     "basis": "rate",
+     "explanation": "Minutes a game (men's box scores, 2025 on): the coach's trust.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "sh_pct",
+     "display": "Shooting %",
+     "short": "SH%",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 8,
+     "basis": "rate",
+     "explanation": "Goals per shot on goal: mostly luck year to year.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "a_pg",
+     "display": "Assists per game",
+     "short": "A/G",
+     "unit": "assists",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 9,
+     "basis": "rate",
+     "explanation": "Assists a game.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "tsa_pg",
+     "display": "Shot attempts per game",
+     "short": "Att/G",
+     "unit": "attempts",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 10,
+     "basis": "rate",
+     "explanation": "Attempts a game: on goal, missed or blocked (men from 2013-14).",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "ev_tsa_pg",
+     "display": "Even-strength attempts per game",
+     "short": "EV att/G",
+     "unit": "attempts",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 11,
+     "basis": "rate",
+     "explanation": "Five-on-five shot attempts a game.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "p60",
+     "display": "Points per 60",
+     "short": "P/60",
+     "unit": "points",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 12,
+     "basis": "rate",
+     "explanation": "Points per 60 minutes on ice (men, 2025 on).",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "g60",
+     "display": "Goals per 60",
+     "short": "G/60",
+     "unit": "goals",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 13,
+     "basis": "rate",
+     "explanation": "Goals per 60 minutes on ice.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "fo_pct",
+     "display": "Faceoff %",
+     "short": "FO%",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 14,
+     "basis": "rate",
+     "explanation": "Faceoffs won (centres).",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "pim_pg",
+     "display": "Penalty minutes per game",
+     "short": "PIM/G",
+     "unit": "minutes",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 15,
+     "basis": "rate",
+     "explanation": "Penalty minutes a game; fewer is better.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "pt_share",
+     "display": "Share of team goals",
+     "short": "Pt share",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 16,
+     "basis": "rate",
+     "explanation": "Points as a share of the team's goals.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "gar",
+     "display": "GAR",
+     "short": "GAR",
+     "unit": "goals",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 17,
+     "basis": "rate",
+     "explanation": "Goals above replacement over the season.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "war",
+     "display": "WAR",
+     "short": "WAR",
+     "unit": "wins",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 18,
+     "basis": "rate",
+     "explanation": "Wins above replacement: GAR / 6.",
+     "in_payload": true,
+     "payload_status": "published"
+    }
+   ],
+   "view": {
+    "excellence": {
+     "label": "Driving play",
+     "ids": [
+      "sh_pg",
+      "tsa_pg",
+      "p1_pg",
+      "pm_rel",
+      "sh_pct",
+      "p60"
+     ]
+    },
+    "production": {
+     "label": "Scoring",
+     "ids": [
+      "pts_pg",
+      "g_pg",
+      "a_pg",
+      "g60"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "gar_pg",
+      "gar",
+      "war"
+     ]
+    },
+    "default": {
+     "x": "sh_pg",
+     "y": "pts_pg",
+     "color": "gar_pg"
+    },
+    "why": "Forwards: shots a game against points a game, coloured by value per game."
+   }
+  },
+  {
+   "id": "mch_defence",
+   "entity": "player",
+   "league": "mch",
+   "display": "Defence",
+   "role": "D",
+   "peer_group": "players.json pos == D (men's Division I, same season; College Hockey News lines)",
+   "position_field": "pos",
+   "position_codes": [
+    "D"
+   ],
+   "minimum": {
+    "field": "qualified",
+    "value": true,
+    "unit": "games",
+    "note": "players.json `qualified`: skaters 40% of the season's most games (min 5); goalies 25%"
+   },
+   "basis": "per game (time on ice only for men from 2025)",
+   "percentile_field": "pct_pos",
+   "metrics": [
+    {
+     "id": "gar_pg",
+     "display": "GAR per game",
+     "short": "GAR/G",
+     "unit": "goals",
+     "direction": "higher",
+     "set": "headline",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Our value model: goals above a replacement-level defenceman, per game.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "pts_pg",
+     "display": "Points per game",
+     "short": "P/G",
+     "unit": "points",
+     "direction": "higher",
+     "set": "headline",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Goals and assists a game.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "pm_rel",
+     "display": "+/- v team",
+     "short": "+/- rel",
+     "unit": "goals",
+     "direction": "higher",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Plus-minus against the team's goal difference: a rough read of the goals for and against with him on the ice.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "toi_pg",
+     "display": "Time on ice",
+     "short": "TOI",
+     "unit": "minutes",
+     "direction": "higher",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Minutes a game (men's box scores, 2025 on).",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "sh_pg",
+     "display": "Shots per game",
+     "short": "SOG/G",
+     "unit": "shots",
+     "direction": "higher",
+     "set": "headline",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Shots on goal a game.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "blk_pg",
+     "display": "Blocks per game",
+     "short": "BLK/G",
+     "unit": "blocks",
+     "direction": "higher",
+     "set": "headline",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Opponent shots blocked a game (men from 2013-14).",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "a_pg",
+     "display": "Assists per game",
+     "short": "A/G",
+     "unit": "assists",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 7,
+     "basis": "rate",
+     "explanation": "Assists a game.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "p1_pg",
+     "display": "Primary points per game",
+     "short": "P1/G",
+     "unit": "points",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 8,
+     "basis": "rate",
+     "explanation": "Goals and first assists a game (box scores, 2025 on).",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "tsa_pg",
+     "display": "Shot attempts per game",
+     "short": "Att/G",
+     "unit": "attempts",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 9,
+     "basis": "rate",
+     "explanation": "Attempts a game (men from 2013-14).",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "g_pg",
+     "display": "Goals per game",
+     "short": "G/G",
+     "unit": "goals",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 10,
+     "basis": "rate",
+     "explanation": "Goals a game.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "p60",
+     "display": "Points per 60",
+     "short": "P/60",
+     "unit": "points",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 11,
+     "basis": "rate",
+     "explanation": "Points per 60 minutes on ice (men, 2025 on).",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "pim_pg",
+     "display": "Penalty minutes per game",
+     "short": "PIM/G",
+     "unit": "minutes",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 12,
+     "basis": "rate",
+     "explanation": "Penalty minutes a game; fewer is better.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "gar",
+     "display": "GAR",
+     "short": "GAR",
+     "unit": "goals",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 13,
+     "basis": "rate",
+     "explanation": "Goals above replacement over the season.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "war",
+     "display": "WAR",
+     "short": "WAR",
+     "unit": "wins",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 14,
+     "basis": "rate",
+     "explanation": "Wins above replacement.",
+     "in_payload": true,
+     "payload_status": "published"
+    }
+   ],
+   "view": {
+    "excellence": {
+     "label": "Defending and moving the puck",
+     "ids": [
+      "pm_rel",
+      "blk_pg",
+      "toi_pg",
+      "tsa_pg",
+      "a_pg"
+     ]
+    },
+    "production": {
+     "label": "Scoring",
+     "ids": [
+      "pts_pg",
+      "p1_pg",
+      "g_pg"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "gar_pg",
+      "gar",
+      "war"
+     ]
+    },
+    "default": {
+     "x": "pm_rel",
+     "y": "pts_pg",
+     "color": "gar_pg"
+    },
+    "why": "Defence: plus-minus against the team against points a game, coloured by value per game."
+   }
+  },
+  {
+   "id": "mch_goalies",
+   "entity": "player",
+   "league": "mch",
+   "display": "Goalies",
+   "role": "G",
+   "peer_group": "players.json pos == G (men's Division I, same season; College Hockey News lines)",
+   "position_field": "pos",
+   "position_codes": [
+    "G"
+   ],
+   "minimum": {
+    "field": "qualified",
+    "value": true,
+    "unit": "games",
+    "note": "players.json `qualified`: skaters 40% of the season's most games (min 5); goalies 25%"
+   },
+   "basis": "per game (time on ice only for men from 2025)",
+   "percentile_field": "pct_pos",
+   "metrics": [
+    {
+     "id": "sv_pct",
+     "display": "Save %",
+     "short": "SV%",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Saves per shot on goal faced.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "gsaa",
+     "display": "Goals saved above average",
+     "short": "GSAA",
+     "unit": "goals",
+     "direction": "higher",
+     "set": "headline",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Saves above what an average goalie makes on the same shots.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "gar_pg",
+     "display": "GAR per game",
+     "short": "GAR/G",
+     "unit": "goals",
+     "direction": "higher",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Our value: goals saved above average (shrunk on few shots) plus the replacement margin, per game.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "gaa",
+     "display": "Goals against average",
+     "short": "GAA",
+     "unit": "goals",
+     "direction": "lower",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Goals allowed per 60 minutes: as much the defence as the goalie.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "sa60",
+     "display": "Shots faced per 60",
+     "short": "SA/60",
+     "unit": "shots",
+     "direction": "higher",
+     "set": "headline",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Workload: shots on goal faced per 60 minutes (style, not quality).",
+     "in_payload": true,
+     "payload_status": "published",
+     "style": true
+    },
+    {
+     "id": "sv_above",
+     "display": "Save % above average",
+     "short": "SV+",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Save percentage above the league's.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "gar",
+     "display": "GAR",
+     "short": "GAR",
+     "unit": "goals",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 7,
+     "basis": "rate",
+     "explanation": "Goals above replacement over the season.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "war",
+     "display": "WAR",
+     "short": "WAR",
+     "unit": "wins",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 8,
+     "basis": "rate",
+     "explanation": "Wins above replacement.",
+     "in_payload": true,
+     "payload_status": "published"
+    }
+   ],
+   "view": {
+    "excellence": {
+     "label": "Stopping shots",
+     "ids": [
+      "sv_pct",
+      "sv_above",
+      "gsaa",
+      "gaa"
+     ]
+    },
+    "production": {
+     "label": "Workload",
+     "ids": [
+      "sa60"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "gar",
+      "gar_pg",
+      "war"
+     ]
+    },
+    "default": {
+     "x": "sa60",
+     "y": "sv_pct",
+     "color": "gsaa"
+    },
+    "why": "Goalies: shots faced per 60 against save percentage, coloured by goals saved above average."
+   }
+  },
+  {
+   "id": "mch_teams",
+   "entity": "team",
+   "league": "mch",
+   "display": "Division I teams",
+   "peer_group": "all Division I men's hockey teams, same season",
+   "position_field": null,
+   "position_codes": [],
+   "minimum": {
+    "field": null,
+    "value": null,
+    "unit": "games",
+    "note": "none; early-season values are noisy"
+   },
+   "basis": "per game",
+   "metrics": [
+    {
+     "id": "rating",
+     "display": "Team rating",
+     "short": "Rating",
+     "unit": "goals",
+     "direction": "higher",
+     "set": "headline",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Goals a game better than an average D-I team on neutral ice (our team rating model).",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "off",
+     "display": "Attack",
+     "short": "Attack",
+     "unit": "goals",
+     "direction": "higher",
+     "set": "headline",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Goals scored a game above average, against average defences.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "def",
+     "display": "Defence",
+     "short": "Defence",
+     "unit": "goals",
+     "direction": "higher",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Goals kept out a game below average, against average attacks.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "shot_share",
+     "display": "Shot share",
+     "short": "Shot%",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Share of the shots on goal: territory and possession in one number.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "pp_pct",
+     "display": "Power play",
+     "short": "PP%",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Power-play goals per opportunity.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "pk_pct",
+     "display": "Penalty kill",
+     "short": "PK%",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Penalties killed per time shorthanded.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "sv_pct",
+     "display": "Save %",
+     "short": "SV%",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 7,
+     "basis": "rate",
+     "explanation": "Team save percentage.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "sh_pct",
+     "display": "Shooting %",
+     "short": "SH%",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 8,
+     "basis": "rate",
+     "explanation": "Team shooting percentage.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "pdo",
+     "display": "PDO",
+     "short": "PDO",
+     "unit": "",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 9,
+     "basis": "rate",
+     "explanation": "Shooting % plus save %: far from 1.000 usually fades.",
+     "in_payload": true,
+     "payload_status": "published",
+     "style": true
+    },
+    {
+     "id": "sf_pg",
+     "display": "Shots for a game",
+     "short": "SF/G",
+     "unit": "shots",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 10,
+     "basis": "rate",
+     "explanation": "Shots on goal a game.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "sa_pg",
+     "display": "Shots against a game",
+     "short": "SA/G",
+     "unit": "shots",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 11,
+     "basis": "rate",
+     "explanation": "Shots on goal allowed a game.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "gf_pg",
+     "display": "Goals for a game",
+     "short": "GF/G",
+     "unit": "goals",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 12,
+     "basis": "rate",
+     "explanation": "Goals scored a game.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "ga_pg",
+     "display": "Goals against a game",
+     "short": "GA/G",
+     "unit": "goals",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 13,
+     "basis": "rate",
+     "explanation": "Goals allowed a game.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "pim_pg",
+     "display": "Penalty minutes",
+     "short": "PIM/G",
+     "unit": "minutes",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 14,
+     "basis": "rate",
+     "explanation": "Penalty minutes a game.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "ppo_pg",
+     "display": "Power plays drawn",
+     "short": "PPO/G",
+     "unit": "chances",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 15,
+     "basis": "rate",
+     "explanation": "Power plays a game.",
+     "in_payload": true,
+     "payload_status": "published",
+     "style": true
+    },
+    {
+     "id": "chn_xg_share",
+     "display": "CHN xG share",
+     "short": "xG%",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 16,
+     "basis": "rate",
+     "explanation": "College Hockey News's own expected-goals share (theirs; men's recent seasons).",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "sos",
+     "display": "Schedule strength",
+     "short": "SOS",
+     "unit": "goals",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 17,
+     "basis": "rate",
+     "explanation": "Average rating of the opponents played.",
+     "in_payload": true,
+     "payload_status": "published",
+     "style": true
+    },
+    {
+     "id": "luck",
+     "display": "Luck",
+     "short": "Luck",
+     "unit": "points",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 18,
+     "basis": "rate",
+     "explanation": "Points a game above our pregame chances.",
+     "in_payload": true,
+     "payload_status": "published",
+     "style": true
+    }
+   ]
+  },
+  {
+   "id": "wch_forwards",
+   "entity": "player",
+   "league": "wch",
+   "display": "Forwards",
+   "role": "F",
+   "peer_group": "players.json pos == F (women's Division I, same season; College Hockey News lines)",
+   "position_field": "pos",
+   "position_codes": [
+    "F"
+   ],
+   "minimum": {
+    "field": "qualified",
+    "value": true,
+    "unit": "games",
+    "note": "players.json `qualified`: skaters 40% of the season's most games (min 5); goalies 25%"
+   },
+   "basis": "per game (time on ice only for men from 2025)",
+   "percentile_field": "pct_pos",
+   "metrics": [
+    {
+     "id": "gar_pg",
+     "display": "GAR per game",
+     "short": "GAR/G",
+     "unit": "goals",
+     "direction": "higher",
+     "set": "headline",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Our value model: goals above a replacement-level forward, per game.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "pts_pg",
+     "display": "Points per game",
+     "short": "P/G",
+     "unit": "points",
+     "direction": "higher",
+     "set": "headline",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Goals and assists a game.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "p1_pg",
+     "display": "Primary points per game",
+     "short": "P1/G",
+     "unit": "points",
+     "direction": "higher",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Goals and first assists a game: the points a player drives (box scores, 2025 on).",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "sh_pg",
+     "display": "Shots per game",
+     "short": "SOG/G",
+     "unit": "shots",
+     "direction": "higher",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Shots on goal a game: the steadiest sign of a scorer.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "g_pg",
+     "display": "Goals per game",
+     "short": "G/G",
+     "unit": "goals",
+     "direction": "higher",
+     "set": "headline",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Goals a game.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "pm_rel",
+     "display": "+/- v team",
+     "short": "+/- rel",
+     "unit": "goals",
+     "direction": "higher",
+     "set": "headline",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Plus-minus against the team's goal difference in the player's games: noisy, a small part of value.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "toi_pg",
+     "display": "Time on ice",
+     "short": "TOI",
+     "unit": "minutes",
+     "direction": "higher",
+     "set": "headline",
+     "order": 7,
+     "basis": "rate",
+     "explanation": "Minutes a game (men's box scores, 2025 on): the coach's trust.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "sh_pct",
+     "display": "Shooting %",
+     "short": "SH%",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 8,
+     "basis": "rate",
+     "explanation": "Goals per shot on goal: mostly luck year to year.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "a_pg",
+     "display": "Assists per game",
+     "short": "A/G",
+     "unit": "assists",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 9,
+     "basis": "rate",
+     "explanation": "Assists a game.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "tsa_pg",
+     "display": "Shot attempts per game",
+     "short": "Att/G",
+     "unit": "attempts",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 10,
+     "basis": "rate",
+     "explanation": "Attempts a game: on goal, missed or blocked (men from 2013-14).",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "ev_tsa_pg",
+     "display": "Even-strength attempts per game",
+     "short": "EV att/G",
+     "unit": "attempts",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 11,
+     "basis": "rate",
+     "explanation": "Five-on-five shot attempts a game.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "p60",
+     "display": "Points per 60",
+     "short": "P/60",
+     "unit": "points",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 12,
+     "basis": "rate",
+     "explanation": "Points per 60 minutes on ice (men, 2025 on).",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "g60",
+     "display": "Goals per 60",
+     "short": "G/60",
+     "unit": "goals",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 13,
+     "basis": "rate",
+     "explanation": "Goals per 60 minutes on ice.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "fo_pct",
+     "display": "Faceoff %",
+     "short": "FO%",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 14,
+     "basis": "rate",
+     "explanation": "Faceoffs won (centres).",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "pim_pg",
+     "display": "Penalty minutes per game",
+     "short": "PIM/G",
+     "unit": "minutes",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 15,
+     "basis": "rate",
+     "explanation": "Penalty minutes a game; fewer is better.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "pt_share",
+     "display": "Share of team goals",
+     "short": "Pt share",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 16,
+     "basis": "rate",
+     "explanation": "Points as a share of the team's goals.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "gar",
+     "display": "GAR",
+     "short": "GAR",
+     "unit": "goals",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 17,
+     "basis": "rate",
+     "explanation": "Goals above replacement over the season.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "war",
+     "display": "WAR",
+     "short": "WAR",
+     "unit": "wins",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 18,
+     "basis": "rate",
+     "explanation": "Wins above replacement: GAR / 6.",
+     "in_payload": true,
+     "payload_status": "published"
+    }
+   ],
+   "view": {
+    "excellence": {
+     "label": "Driving play",
+     "ids": [
+      "sh_pg",
+      "tsa_pg",
+      "p1_pg",
+      "pm_rel",
+      "sh_pct",
+      "p60"
+     ]
+    },
+    "production": {
+     "label": "Scoring",
+     "ids": [
+      "pts_pg",
+      "g_pg",
+      "a_pg",
+      "g60"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "gar_pg",
+      "gar",
+      "war"
+     ]
+    },
+    "default": {
+     "x": "sh_pg",
+     "y": "pts_pg",
+     "color": "gar_pg"
+    },
+    "why": "Forwards: shots a game against points a game, coloured by value per game."
+   }
+  },
+  {
+   "id": "wch_defence",
+   "entity": "player",
+   "league": "wch",
+   "display": "Defence",
+   "role": "D",
+   "peer_group": "players.json pos == D (women's Division I, same season; College Hockey News lines)",
+   "position_field": "pos",
+   "position_codes": [
+    "D"
+   ],
+   "minimum": {
+    "field": "qualified",
+    "value": true,
+    "unit": "games",
+    "note": "players.json `qualified`: skaters 40% of the season's most games (min 5); goalies 25%"
+   },
+   "basis": "per game (time on ice only for men from 2025)",
+   "percentile_field": "pct_pos",
+   "metrics": [
+    {
+     "id": "gar_pg",
+     "display": "GAR per game",
+     "short": "GAR/G",
+     "unit": "goals",
+     "direction": "higher",
+     "set": "headline",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Our value model: goals above a replacement-level defenceman, per game.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "pts_pg",
+     "display": "Points per game",
+     "short": "P/G",
+     "unit": "points",
+     "direction": "higher",
+     "set": "headline",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Goals and assists a game.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "pm_rel",
+     "display": "+/- v team",
+     "short": "+/- rel",
+     "unit": "goals",
+     "direction": "higher",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Plus-minus against the team's goal difference: a rough read of the goals for and against with him on the ice.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "toi_pg",
+     "display": "Time on ice",
+     "short": "TOI",
+     "unit": "minutes",
+     "direction": "higher",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Minutes a game (men's box scores, 2025 on).",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "sh_pg",
+     "display": "Shots per game",
+     "short": "SOG/G",
+     "unit": "shots",
+     "direction": "higher",
+     "set": "headline",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Shots on goal a game.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "blk_pg",
+     "display": "Blocks per game",
+     "short": "BLK/G",
+     "unit": "blocks",
+     "direction": "higher",
+     "set": "headline",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Opponent shots blocked a game (men from 2013-14).",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "a_pg",
+     "display": "Assists per game",
+     "short": "A/G",
+     "unit": "assists",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 7,
+     "basis": "rate",
+     "explanation": "Assists a game.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "p1_pg",
+     "display": "Primary points per game",
+     "short": "P1/G",
+     "unit": "points",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 8,
+     "basis": "rate",
+     "explanation": "Goals and first assists a game (box scores, 2025 on).",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "tsa_pg",
+     "display": "Shot attempts per game",
+     "short": "Att/G",
+     "unit": "attempts",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 9,
+     "basis": "rate",
+     "explanation": "Attempts a game (men from 2013-14).",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "g_pg",
+     "display": "Goals per game",
+     "short": "G/G",
+     "unit": "goals",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 10,
+     "basis": "rate",
+     "explanation": "Goals a game.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "p60",
+     "display": "Points per 60",
+     "short": "P/60",
+     "unit": "points",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 11,
+     "basis": "rate",
+     "explanation": "Points per 60 minutes on ice (men, 2025 on).",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "pim_pg",
+     "display": "Penalty minutes per game",
+     "short": "PIM/G",
+     "unit": "minutes",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 12,
+     "basis": "rate",
+     "explanation": "Penalty minutes a game; fewer is better.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "gar",
+     "display": "GAR",
+     "short": "GAR",
+     "unit": "goals",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 13,
+     "basis": "rate",
+     "explanation": "Goals above replacement over the season.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "war",
+     "display": "WAR",
+     "short": "WAR",
+     "unit": "wins",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 14,
+     "basis": "rate",
+     "explanation": "Wins above replacement.",
+     "in_payload": true,
+     "payload_status": "published"
+    }
+   ],
+   "view": {
+    "excellence": {
+     "label": "Defending and moving the puck",
+     "ids": [
+      "pm_rel",
+      "blk_pg",
+      "toi_pg",
+      "tsa_pg",
+      "a_pg"
+     ]
+    },
+    "production": {
+     "label": "Scoring",
+     "ids": [
+      "pts_pg",
+      "p1_pg",
+      "g_pg"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "gar_pg",
+      "gar",
+      "war"
+     ]
+    },
+    "default": {
+     "x": "pm_rel",
+     "y": "pts_pg",
+     "color": "gar_pg"
+    },
+    "why": "Defence: plus-minus against the team against points a game, coloured by value per game."
+   }
+  },
+  {
+   "id": "wch_goalies",
+   "entity": "player",
+   "league": "wch",
+   "display": "Goalies",
+   "role": "G",
+   "peer_group": "players.json pos == G (women's Division I, same season; College Hockey News lines)",
+   "position_field": "pos",
+   "position_codes": [
+    "G"
+   ],
+   "minimum": {
+    "field": "qualified",
+    "value": true,
+    "unit": "games",
+    "note": "players.json `qualified`: skaters 40% of the season's most games (min 5); goalies 25%"
+   },
+   "basis": "per game (time on ice only for men from 2025)",
+   "percentile_field": "pct_pos",
+   "metrics": [
+    {
+     "id": "sv_pct",
+     "display": "Save %",
+     "short": "SV%",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Saves per shot on goal faced.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "gsaa",
+     "display": "Goals saved above average",
+     "short": "GSAA",
+     "unit": "goals",
+     "direction": "higher",
+     "set": "headline",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Saves above what an average goalie makes on the same shots.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "gar_pg",
+     "display": "GAR per game",
+     "short": "GAR/G",
+     "unit": "goals",
+     "direction": "higher",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Our value: goals saved above average (shrunk on few shots) plus the replacement margin, per game.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "gaa",
+     "display": "Goals against average",
+     "short": "GAA",
+     "unit": "goals",
+     "direction": "lower",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Goals allowed per 60 minutes: as much the defence as the goalie.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "sa60",
+     "display": "Shots faced per 60",
+     "short": "SA/60",
+     "unit": "shots",
+     "direction": "higher",
+     "set": "headline",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Workload: shots on goal faced per 60 minutes (style, not quality).",
+     "in_payload": true,
+     "payload_status": "published",
+     "style": true
+    },
+    {
+     "id": "sv_above",
+     "display": "Save % above average",
+     "short": "SV+",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Save percentage above the league's.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "gar",
+     "display": "GAR",
+     "short": "GAR",
+     "unit": "goals",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 7,
+     "basis": "rate",
+     "explanation": "Goals above replacement over the season.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "war",
+     "display": "WAR",
+     "short": "WAR",
+     "unit": "wins",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 8,
+     "basis": "rate",
+     "explanation": "Wins above replacement.",
+     "in_payload": true,
+     "payload_status": "published"
+    }
+   ],
+   "view": {
+    "excellence": {
+     "label": "Stopping shots",
+     "ids": [
+      "sv_pct",
+      "sv_above",
+      "gsaa",
+      "gaa"
+     ]
+    },
+    "production": {
+     "label": "Workload",
+     "ids": [
+      "sa60"
+     ]
+    },
+    "aggregate": {
+     "label": "Value",
+     "ids": [
+      "gar",
+      "gar_pg",
+      "war"
+     ]
+    },
+    "default": {
+     "x": "sa60",
+     "y": "sv_pct",
+     "color": "gsaa"
+    },
+    "why": "Goalies: shots faced per 60 against save percentage, coloured by goals saved above average."
+   }
+  },
+  {
+   "id": "wch_teams",
+   "entity": "team",
+   "league": "wch",
+   "display": "Division I teams",
+   "peer_group": "all Division I women's hockey teams, same season",
+   "position_field": null,
+   "position_codes": [],
+   "minimum": {
+    "field": null,
+    "value": null,
+    "unit": "games",
+    "note": "none; early-season values are noisy"
+   },
+   "basis": "per game",
+   "metrics": [
+    {
+     "id": "rating",
+     "display": "Team rating",
+     "short": "Rating",
+     "unit": "goals",
+     "direction": "higher",
+     "set": "headline",
+     "order": 1,
+     "basis": "rate",
+     "explanation": "Goals a game better than an average D-I team on neutral ice (our team rating model).",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "off",
+     "display": "Attack",
+     "short": "Attack",
+     "unit": "goals",
+     "direction": "higher",
+     "set": "headline",
+     "order": 2,
+     "basis": "rate",
+     "explanation": "Goals scored a game above average, against average defences.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "def",
+     "display": "Defence",
+     "short": "Defence",
+     "unit": "goals",
+     "direction": "higher",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "explanation": "Goals kept out a game below average, against average attacks.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "shot_share",
+     "display": "Shot share",
+     "short": "Shot%",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "explanation": "Share of the shots on goal: territory and possession in one number.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "pp_pct",
+     "display": "Power play",
+     "short": "PP%",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 5,
+     "basis": "rate",
+     "explanation": "Power-play goals per opportunity.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "pk_pct",
+     "display": "Penalty kill",
+     "short": "PK%",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 6,
+     "basis": "rate",
+     "explanation": "Penalties killed per time shorthanded.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "sv_pct",
+     "display": "Save %",
+     "short": "SV%",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 7,
+     "basis": "rate",
+     "explanation": "Team save percentage.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "sh_pct",
+     "display": "Shooting %",
+     "short": "SH%",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 8,
+     "basis": "rate",
+     "explanation": "Team shooting percentage.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "pdo",
+     "display": "PDO",
+     "short": "PDO",
+     "unit": "",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 9,
+     "basis": "rate",
+     "explanation": "Shooting % plus save %: far from 1.000 usually fades.",
+     "in_payload": true,
+     "payload_status": "published",
+     "style": true
+    },
+    {
+     "id": "sf_pg",
+     "display": "Shots for a game",
+     "short": "SF/G",
+     "unit": "shots",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 10,
+     "basis": "rate",
+     "explanation": "Shots on goal a game.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "sa_pg",
+     "display": "Shots against a game",
+     "short": "SA/G",
+     "unit": "shots",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 11,
+     "basis": "rate",
+     "explanation": "Shots on goal allowed a game.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "gf_pg",
+     "display": "Goals for a game",
+     "short": "GF/G",
+     "unit": "goals",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 12,
+     "basis": "rate",
+     "explanation": "Goals scored a game.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "ga_pg",
+     "display": "Goals against a game",
+     "short": "GA/G",
+     "unit": "goals",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 13,
+     "basis": "rate",
+     "explanation": "Goals allowed a game.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "pim_pg",
+     "display": "Penalty minutes",
+     "short": "PIM/G",
+     "unit": "minutes",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 14,
+     "basis": "rate",
+     "explanation": "Penalty minutes a game.",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "ppo_pg",
+     "display": "Power plays drawn",
+     "short": "PPO/G",
+     "unit": "chances",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 15,
+     "basis": "rate",
+     "explanation": "Power plays a game.",
+     "in_payload": true,
+     "payload_status": "published",
+     "style": true
+    },
+    {
+     "id": "chn_xg_share",
+     "display": "CHN xG share",
+     "short": "xG%",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 16,
+     "basis": "rate",
+     "explanation": "College Hockey News's own expected-goals share (theirs; men's recent seasons).",
+     "in_payload": true,
+     "payload_status": "published"
+    },
+    {
+     "id": "sos",
+     "display": "Schedule strength",
+     "short": "SOS",
+     "unit": "goals",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 17,
+     "basis": "rate",
+     "explanation": "Average rating of the opponents played.",
+     "in_payload": true,
+     "payload_status": "published",
+     "style": true
+    },
+    {
+     "id": "luck",
+     "display": "Luck",
+     "short": "Luck",
+     "unit": "points",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 18,
+     "basis": "rate",
+     "explanation": "Points a game above our pregame chances.",
+     "in_payload": true,
+     "payload_status": "published",
+     "style": true
+    }
+   ]
   }
  ],
  "payload_changes": [
@@ -14335,6 +16225,10 @@
    "team": {
     "name": "Team rating model",
     "about": "Our opponent-adjusted team rating, split into offence and defence."
+   },
+   "gar": {
+    "name": "Campus hockey value model",
+    "about": "Goals above a replacement-level player: goals created, a damped +/- share, penalties and faceoffs; goalies by goals saved above average."
    }
   },
   "metrics": {
@@ -14354,7 +16248,11 @@
    "rating": "team",
    "off": "team",
    "def": "team",
-   "sos": "team"
+   "sos": "team",
+   "gar": "gar",
+   "gar_pg": "gar",
+   "war": "gar",
+   "gar_off": "gar"
   }
  }
 }
