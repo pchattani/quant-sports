@@ -14284,7 +14284,14 @@
      "basis": "rate",
      "explanation": "Our value model: goals above a replacement-level forward, per game.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.569,
+      "n_pairs": 10572,
+      "m50": 24.5,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "pts_pg",
@@ -14297,7 +14304,14 @@
      "basis": "rate",
      "explanation": "Goals and assists a game.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.676,
+      "n_pairs": 10572,
+      "m50": 15.6,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "p1_pg",
@@ -14310,7 +14324,14 @@
      "basis": "rate",
      "explanation": "Goals and first assists a game: the points a player drives (box scores, 2025 on).",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.474,
+      "n_pairs": 926,
+      "m50": 36.4,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "sh_pg",
@@ -14323,7 +14344,14 @@
      "basis": "rate",
      "explanation": "Shots on goal a game: the steadiest sign of a scorer.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.755,
+      "n_pairs": 10559,
+      "m50": 10.5,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "g_pg",
@@ -14336,7 +14364,14 @@
      "basis": "rate",
      "explanation": "Goals a game.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.549,
+      "n_pairs": 10572,
+      "m50": 26.7,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "pm_rel",
@@ -14349,7 +14384,14 @@
      "basis": "rate",
      "explanation": "Plus-minus against the team's goal difference in the player's games: noisy, a small part of value.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.216,
+      "n_pairs": 10572,
+      "m50": 117.6,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "toi_pg",
@@ -14362,7 +14404,14 @@
      "basis": "rate",
      "explanation": "Minutes a game (men's box scores, 2025 on): the coach's trust.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.659,
+      "n_pairs": 924,
+      "m50": 16.9,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "sh_pct",
@@ -14375,7 +14424,14 @@
      "basis": "rate",
      "explanation": "Goals per shot on goal: mostly luck year to year.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.189,
+      "n_pairs": 10559,
+      "m50": 139.0,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "a_pg",
@@ -14388,7 +14444,14 @@
      "basis": "rate",
      "explanation": "Assists a game.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.608,
+      "n_pairs": 10572,
+      "m50": 20.9,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "tsa_pg",
@@ -14401,7 +14464,14 @@
      "basis": "rate",
      "explanation": "Attempts a game: on goal, missed or blocked (men from 2013-14).",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.775,
+      "n_pairs": 6059,
+      "m50": 9.2,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "ev_tsa_pg",
@@ -14414,7 +14484,14 @@
      "basis": "rate",
      "explanation": "Five-on-five shot attempts a game.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.739,
+      "n_pairs": 6059,
+      "m50": 11.2,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "p60",
@@ -14427,7 +14504,14 @@
      "basis": "rate",
      "explanation": "Points per 60 minutes on ice (men, 2025 on).",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.438,
+      "n_pairs": 924,
+      "m50": 42.1,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "g60",
@@ -14440,7 +14524,14 @@
      "basis": "rate",
      "explanation": "Goals per 60 minutes on ice.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.284,
+      "n_pairs": 924,
+      "m50": 82.5,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "fo_pct",
@@ -14453,7 +14544,14 @@
      "basis": "rate",
      "explanation": "Faceoffs won (centres).",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.173,
+      "n_pairs": 5541,
+      "m50": 152.9,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "pim_pg",
@@ -14466,7 +14564,14 @@
      "basis": "rate",
      "explanation": "Penalty minutes a game; fewer is better.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.527,
+      "n_pairs": 10572,
+      "m50": 29.1,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "pt_share",
@@ -14479,7 +14584,14 @@
      "basis": "rate",
      "explanation": "Points as a share of the team's goals.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.634,
+      "n_pairs": 10572,
+      "m50": 18.7,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "gar",
@@ -14492,7 +14604,14 @@
      "basis": "rate",
      "explanation": "Goals above replacement over the season.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.582,
+      "n_pairs": 10572,
+      "m50": 23.3,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "war",
@@ -14505,7 +14624,14 @@
      "basis": "rate",
      "explanation": "Wins above replacement: GAR / 6.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.582,
+      "n_pairs": 10572,
+      "m50": 23.3,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     }
    ],
    "view": {
@@ -14576,7 +14702,14 @@
      "basis": "rate",
      "explanation": "Our value model: goals above a replacement-level defenceman, per game.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.527,
+      "n_pairs": 5481,
+      "m50": 29.1,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "pts_pg",
@@ -14589,7 +14722,14 @@
      "basis": "rate",
      "explanation": "Goals and assists a game.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.653,
+      "n_pairs": 5481,
+      "m50": 17.2,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "pm_rel",
@@ -14602,7 +14742,14 @@
      "basis": "rate",
      "explanation": "Plus-minus against the team's goal difference: a rough read of the goals for and against with him on the ice.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.097,
+      "n_pairs": 5481,
+      "m50": 302.2,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "toi_pg",
@@ -14615,7 +14762,14 @@
      "basis": "rate",
      "explanation": "Minutes a game (men's box scores, 2025 on).",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.54,
+      "n_pairs": 507,
+      "m50": 27.6,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "sh_pg",
@@ -14628,7 +14782,14 @@
      "basis": "rate",
      "explanation": "Shots on goal a game.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.723,
+      "n_pairs": 5474,
+      "m50": 12.4,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "blk_pg",
@@ -14641,7 +14802,14 @@
      "basis": "rate",
      "explanation": "Opponent shots blocked a game (men from 2013-14).",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.546,
+      "n_pairs": 3218,
+      "m50": 26.3,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "a_pg",
@@ -14654,7 +14822,14 @@
      "basis": "rate",
      "explanation": "Assists a game.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.596,
+      "n_pairs": 5481,
+      "m50": 21.9,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "p1_pg",
@@ -14667,7 +14842,14 @@
      "basis": "rate",
      "explanation": "Goals and first assists a game (box scores, 2025 on).",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.449,
+      "n_pairs": 507,
+      "m50": 39.8,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "tsa_pg",
@@ -14680,7 +14862,14 @@
      "basis": "rate",
      "explanation": "Attempts a game (men from 2013-14).",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.739,
+      "n_pairs": 3218,
+      "m50": 11.2,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "g_pg",
@@ -14693,7 +14882,14 @@
      "basis": "rate",
      "explanation": "Goals a game.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.449,
+      "n_pairs": 5481,
+      "m50": 39.7,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "p60",
@@ -14706,7 +14902,14 @@
      "basis": "rate",
      "explanation": "Points per 60 minutes on ice (men, 2025 on).",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.387,
+      "n_pairs": 507,
+      "m50": 51.4,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "pim_pg",
@@ -14719,7 +14922,14 @@
      "basis": "rate",
      "explanation": "Penalty minutes a game; fewer is better.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.579,
+      "n_pairs": 5481,
+      "m50": 23.5,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "gar",
@@ -14732,7 +14942,14 @@
      "basis": "rate",
      "explanation": "Goals above replacement over the season.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.55,
+      "n_pairs": 5481,
+      "m50": 26.4,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "war",
@@ -14745,7 +14962,14 @@
      "basis": "rate",
      "explanation": "Wins above replacement.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.55,
+      "n_pairs": 5481,
+      "m50": 26.4,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     }
    ],
    "view": {
@@ -14814,7 +15038,14 @@
      "basis": "rate",
      "explanation": "Saves per shot on goal faced.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.313,
+      "n_pairs": 1052,
+      "m50": 54.8,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "gsaa",
@@ -14827,7 +15058,14 @@
      "basis": "rate",
      "explanation": "Saves above what an average goalie makes on the same shots.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.367,
+      "n_pairs": 1052,
+      "m50": 43.1,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "gar_pg",
@@ -14840,7 +15078,14 @@
      "basis": "rate",
      "explanation": "Our value: goals saved above average (shrunk on few shots) plus the replacement margin, per game.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.35,
+      "n_pairs": 1052,
+      "m50": 46.3,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "gaa",
@@ -14853,7 +15098,14 @@
      "basis": "rate",
      "explanation": "Goals allowed per 60 minutes: as much the defence as the goalie.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.455,
+      "n_pairs": 1052,
+      "m50": 29.9,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "sa60",
@@ -14867,7 +15119,14 @@
      "explanation": "Workload: shots on goal faced per 60 minutes (style, not quality).",
      "in_payload": true,
      "payload_status": "published",
-     "style": true
+     "style": true,
+     "reliability": {
+      "yoy_r": 0.569,
+      "n_pairs": 1052,
+      "m50": 18.9,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "sv_above",
@@ -14880,7 +15139,14 @@
      "basis": "rate",
      "explanation": "Save percentage above the league's.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.314,
+      "n_pairs": 1052,
+      "m50": 54.4,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "gar",
@@ -14893,7 +15159,14 @@
      "basis": "rate",
      "explanation": "Goals above replacement over the season.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.392,
+      "n_pairs": 1052,
+      "m50": 38.7,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "war",
@@ -14906,7 +15179,14 @@
      "basis": "rate",
      "explanation": "Wins above replacement.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.392,
+      "n_pairs": 1052,
+      "m50": 38.7,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     }
    ],
    "view": {
@@ -15228,7 +15508,14 @@
      "basis": "rate",
      "explanation": "Our value model: goals above a replacement-level forward, per game.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.681,
+      "n_pairs": 2390,
+      "m50": 14.8,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "pts_pg",
@@ -15241,7 +15528,14 @@
      "basis": "rate",
      "explanation": "Goals and assists a game.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.756,
+      "n_pairs": 2390,
+      "m50": 10.2,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "p1_pg",
@@ -15254,7 +15548,14 @@
      "basis": "rate",
      "explanation": "Goals and first assists a game: the points a player drives (box scores, 2025 on).",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.708,
+      "n_pairs": 618,
+      "m50": 13.9,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "sh_pg",
@@ -15267,7 +15568,14 @@
      "basis": "rate",
      "explanation": "Shots on goal a game: the steadiest sign of a scorer.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.802,
+      "n_pairs": 2384,
+      "m50": 7.8,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "g_pg",
@@ -15280,7 +15588,14 @@
      "basis": "rate",
      "explanation": "Goals a game.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.662,
+      "n_pairs": 2390,
+      "m50": 16.1,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "pm_rel",
@@ -15293,7 +15608,14 @@
      "basis": "rate",
      "explanation": "Plus-minus against the team's goal difference in the player's games: noisy, a small part of value.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.404,
+      "n_pairs": 2371,
+      "m50": 46.7,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "toi_pg",
@@ -15319,7 +15641,14 @@
      "basis": "rate",
      "explanation": "Goals per shot on goal: mostly luck year to year.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.196,
+      "n_pairs": 2384,
+      "m50": 130.3,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "a_pg",
@@ -15332,7 +15661,14 @@
      "basis": "rate",
      "explanation": "Assists a game.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.682,
+      "n_pairs": 2390,
+      "m50": 14.7,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "tsa_pg",
@@ -15397,7 +15733,14 @@
      "basis": "rate",
      "explanation": "Faceoffs won (centres).",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.213,
+      "n_pairs": 485,
+      "m50": 126.8,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "pim_pg",
@@ -15410,7 +15753,14 @@
      "basis": "rate",
      "explanation": "Penalty minutes a game; fewer is better.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.58,
+      "n_pairs": 2390,
+      "m50": 22.9,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "pt_share",
@@ -15423,7 +15773,14 @@
      "basis": "rate",
      "explanation": "Points as a share of the team's goals.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.448,
+      "n_pairs": 2389,
+      "m50": 39.0,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "gar",
@@ -15436,7 +15793,14 @@
      "basis": "rate",
      "explanation": "Goals above replacement over the season.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.624,
+      "n_pairs": 2390,
+      "m50": 19.1,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "war",
@@ -15449,7 +15813,14 @@
      "basis": "rate",
      "explanation": "Wins above replacement: GAR / 6.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.624,
+      "n_pairs": 2390,
+      "m50": 19.1,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     }
    ],
    "view": {
@@ -15520,7 +15891,14 @@
      "basis": "rate",
      "explanation": "Our value model: goals above a replacement-level defenceman, per game.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.535,
+      "n_pairs": 1334,
+      "m50": 27.5,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "pts_pg",
@@ -15533,7 +15911,14 @@
      "basis": "rate",
      "explanation": "Goals and assists a game.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.655,
+      "n_pairs": 1334,
+      "m50": 16.7,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "pm_rel",
@@ -15546,7 +15931,14 @@
      "basis": "rate",
      "explanation": "Plus-minus against the team's goal difference: a rough read of the goals for and against with him on the ice.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.174,
+      "n_pairs": 1334,
+      "m50": 150.2,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "toi_pg",
@@ -15572,7 +15964,14 @@
      "basis": "rate",
      "explanation": "Shots on goal a game.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.767,
+      "n_pairs": 1327,
+      "m50": 9.6,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "blk_pg",
@@ -15598,7 +15997,14 @@
      "basis": "rate",
      "explanation": "Assists a game.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.603,
+      "n_pairs": 1334,
+      "m50": 20.8,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "p1_pg",
@@ -15611,7 +16017,14 @@
      "basis": "rate",
      "explanation": "Goals and first assists a game (box scores, 2025 on).",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.56,
+      "n_pairs": 367,
+      "m50": 26.1,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "tsa_pg",
@@ -15637,7 +16050,14 @@
      "basis": "rate",
      "explanation": "Goals a game.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.461,
+      "n_pairs": 1334,
+      "m50": 37.0,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "p60",
@@ -15663,7 +16083,14 @@
      "basis": "rate",
      "explanation": "Penalty minutes a game; fewer is better.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.522,
+      "n_pairs": 1334,
+      "m50": 29.0,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "gar",
@@ -15676,7 +16103,14 @@
      "basis": "rate",
      "explanation": "Goals above replacement over the season.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.553,
+      "n_pairs": 1334,
+      "m50": 25.6,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "war",
@@ -15689,7 +16123,14 @@
      "basis": "rate",
      "explanation": "Wins above replacement.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.553,
+      "n_pairs": 1334,
+      "m50": 25.6,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     }
    ],
    "view": {
@@ -15758,7 +16199,14 @@
      "basis": "rate",
      "explanation": "Saves per shot on goal faced.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.408,
+      "n_pairs": 253,
+      "m50": 31.7,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "gsaa",
@@ -15771,7 +16219,14 @@
      "basis": "rate",
      "explanation": "Saves above what an average goalie makes on the same shots.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.511,
+      "n_pairs": 253,
+      "m50": 20.9,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "gar_pg",
@@ -15784,7 +16239,14 @@
      "basis": "rate",
      "explanation": "Our value: goals saved above average (shrunk on few shots) plus the replacement margin, per game.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.449,
+      "n_pairs": 253,
+      "m50": 26.7,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "gaa",
@@ -15797,7 +16259,14 @@
      "basis": "rate",
      "explanation": "Goals allowed per 60 minutes: as much the defence as the goalie.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.62,
+      "n_pairs": 253,
+      "m50": 13.4,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "sa60",
@@ -15811,7 +16280,14 @@
      "explanation": "Workload: shots on goal faced per 60 minutes (style, not quality).",
      "in_payload": true,
      "payload_status": "published",
-     "style": true
+     "style": true,
+     "reliability": {
+      "yoy_r": 0.662,
+      "n_pairs": 253,
+      "m50": 11.1,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "sv_above",
@@ -15824,7 +16300,14 @@
      "basis": "rate",
      "explanation": "Save percentage above the league's.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.413,
+      "n_pairs": 253,
+      "m50": 30.9,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "gar",
@@ -15837,7 +16320,14 @@
      "basis": "rate",
      "explanation": "Goals above replacement over the season.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.417,
+      "n_pairs": 253,
+      "m50": 30.5,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     },
     {
      "id": "war",
@@ -15850,7 +16340,14 @@
      "basis": "rate",
      "explanation": "Wins above replacement.",
      "in_payload": true,
-     "payload_status": "published"
+     "payload_status": "published",
+     "reliability": {
+      "yoy_r": 0.417,
+      "n_pairs": 253,
+      "m50": 30.5,
+      "m50_unit": "games",
+      "m50_basis": "yoy (Spearman-Brown, upper bound)"
+     }
     }
    ],
    "view": {

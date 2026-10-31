@@ -409,6 +409,8 @@ def assemble(level: str, season: int, chn_data: dict | None = None, use_chn: boo
                 if gid is None:
                     if pair_key in seen_pairs:
                         continue
+                    if not str(row.get("date") or "")[:2] in ("19", "20"):   # CHN lists a few games as 0000-00-00
+                        continue
                     gid = f"h{row['date'].replace('-', '')}{home}{away}".replace(":", "")
                     if gid in games:
                         continue
