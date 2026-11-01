@@ -129,3 +129,44 @@ def test_board_kit_round_10_api():
     assert "SpecCat.prototype.short = " in q and "short: r[7] || r[0], su: r[8] || ''" in q
     css = (design_kit.DESIGN / "quant.css").read_text(encoding="utf-8")
     assert ".qk-bd-v10 {" in css and ".qk-room {" in css
+
+
+def test_follow_kit_round_12_api_and_copies():
+    """Round 12 (My Teams): quant.js carries QK.follow (localStorage 'qk-follow-v1', at most 30 follows, through the
+    kit's try/catch store), the follow button, picker, card, chip and section; the card registry names the sites
+    that publish cards; quant.css styles them; every site and Home ship the same copy."""
+    q = (design_kit.DESIGN / "quant.js").read_text(encoding="utf-8")
+    for bit in ("var FOLLOW_KEY = 'qk-follow-v1', FOLLOW_MAX = 30;", "QK.follow = {", "QK.followButton = function",
+                "QK.followPicker = function", "QK.followCard = function", "QK.followChip = function", "QK.followSection = function",
+                "QK.toast = function", "QK.fetchCard = function", "QK.FOLLOW_CARDS = { bullpen: ['mlb', 'aaa'] };",
+                "root.addEventListener('storage'", "importHash: function", "shareUrl: function", "fromHref: function",
+                "cardUrl: function", "gameOf: function", "forSite: function", "onChange: function"):
+        assert bit in q, bit
+    # every read and write of the list goes through the kit's store() (try/catch: blocked storage never breaks a page)
+    blk = q[q.index("var FOLLOW_KEY"):q.index("root.QK = QK;")]
+    assert "localStorage" not in blk and "store(FOLLOW_KEY" in blk
+    assert "?." not in blk and "??" not in blk
+    # one route pattern per site, so a picker row or a share link maps to a key on every site
+    for site in design_kit.SITE_SPORT:
+        assert f"  {site}: function (r)" in blk, site
+    css = (design_kit.DESIGN / "quant.css").read_text(encoding="utf-8")
+    for cls in (".qk-fbtn {", ".qk-fbtn.on", ".qk-fp-dlg {", ".qk-fp-row {", ".qk-fc {", ".qk-fc-top {", ".qk-fchip {",
+                ".qk-fl-cards {", ".qk-fl-week-row {", ".qk-fl-empty {", ".qk-fl-prompt {", ".qk-fl-import {", ".qk-toast {", ".qk-pw-tw {"):
+        assert cls in css, cls
+    s = (design_kit.DESIGN / "scout.js").read_text(encoding="utf-8")
+    assert "if (r.follow && QK.followButton)" in s
+    for folder in list(design_kit.SITE_SPORT) + ["home"]:
+        for f in ("quant.js", "quant.css", "scout.js"):
+            assert (ROOT / "docs" / folder / "assets" / "qk" / f).read_bytes() == (design_kit.DESIGN / f).read_bytes(), (folder, f)
+
+
+def test_follow_card_registry_matches_the_published_scopes():
+    """A site listed in QK.FOLLOW_CARDS must write cards (its builder calls oddsmarkets/common/follow.py), so Home
+    never fetches a card that does not exist; the Bullpen's builder writes the scopes listed."""
+    import re
+    q = (design_kit.DESIGN / "quant.js").read_text(encoding="utf-8")
+    reg = re.search(r"QK\.FOLLOW_CARDS = \{(.*?)\};", q).group(1)
+    sites = dict((m.group(1), re.findall(r"'([a-z]+)'", m.group(2))) for m in re.finditer(r"(\w+): \[([^\]]*)\]", reg))
+    assert sites == {"bullpen": ["mlb", "aaa"]}
+    src = (ROOT / "scripts" / "build_bullpen.py").read_text(encoding="utf-8")
+    assert 'for lvl in ("mlb", "aaa"):' in src and "FLB.build(data, lvl" in src

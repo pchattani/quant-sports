@@ -54,12 +54,17 @@
  *   QK.doing(el, o) (renders)                           "How we're doing" for the Model page: the record + QK.howSure
  * Round 11 (a decided title):
  *   QK.decided(rows, o)                                 the champion row of a race that is over (one at 100%, the rest 0)
- *   QK.champHero(o)                                     the champion hero: team-colour block, the result, the games, a strip */
+ *   QK.champHero(o)                                     the champion hero: team-colour block, the result, the games, a strip
+ * Round 12 (My Teams: follows across every site, kept in this browser; localStorage 'qk-follow-v1'):
+ *   QK.follow.*                                         the list: list/has/add/remove/toggle, forSite, cardUrl, share links
+ *   QK.followButton(item, o) QK.followPicker(o)         the star toggle; the picker (search, sport -> league browse)
+ *   QK.followCard(card, o) QK.followChip(item, o)       a team's follow card (common/follow.py); a chip for one without
+ *   QK.followSection(el, o) QK.toast(text)              the "Your teams" section of Home and every overview; a status line */
 (function (root) {
 'use strict';
 
 var QK = root.QK || {};
-QK.version = '4.2.0';
+QK.version = '4.3.0';
 
 /* ─────────────────────────────────────── helpers */
 function esc(s) {
@@ -2662,6 +2667,585 @@ QK.within = {
       return '<a class="qk-chip" href="' + esc(x.href) + '"' + (x.sub ? ' title="' + esc(x.sub) + '"' : '') + '>' + esc(x.name) + '</a>';
     }).join('') + '</div></div>';
   }
+};
+
+/* ═══════════════════════════════════════ My Teams (round 12): follows across every site ═══ */
+/* A visitor's teams live in this browser only (localStorage 'qk-follow-v1'; every site shares the origin
+ * https://pchattani.github.io/, so a team followed on the Rink shows on Home). No account, nothing leaves the
+ * browser. A local preview (127.0.0.1) is its own origin and starts with no follows: that is expected.
+ *
+ *   key        '<site>:<scope>:<id>': the site folder (site, bullpen, hardwood, rink, gridiron, campus, ace, paddock),
+ *              a scope inside it (mlb, aaa, nba, wnba, club, team, cfb, atp, driver ...) and the site's own id
+ *   item       { k, name, abbr, colour, alt, href (the site route '#/mlb/team/158' or a full URL), added (YYYY-MM-DD) }
+ *   QK.follow  list() has(k) add(item) remove(k) toggle(item) update(k, fields) forSite(site, scope) parse(k)
+ *              cardUrl(k) siteUrl(k, route) fromHref(href, sport) onChange(fn) paint() hasCards(k)
+ *              encode(items) decode(text) shareUrl() importHash(o) gameOf(card, next)
+ *   QK.followButton(item, { compact, cls })   the star toggle ("Follow" / "Following"); wired once, by delegation
+ *   QK.followPicker(o)                        the picker: search and a sport -> league browse list, chips, share link
+ *   QK.followCard(card, { item, full })       one team's card from its follow card JSON (oddsmarkets/common/follow.py)
+ *   QK.followChip(item, o)                    a follow without a card yet: a chip with a link and a quiet note
+ *   QK.followSection(el, o)                   the whole "Your teams" section (Home and every sport overview)
+ *   QK.toast(text)                            a one-line status message
+ * A site publishes cards by adding its scopes to QK.FOLLOW_CARDS (below): Home fetches cards only for those, and
+ * shows the others as chips with "Cards coming soon", so no page ever asks for a file that does not exist. */
+var FOLLOW_KEY = 'qk-follow-v1', FOLLOW_MAX = 30;
+var FOLLOW_K = /^[a-z]+:[a-z0-9_]+:[A-Za-z0-9_.\-]+$/;
+/* the sites and scopes that publish follow cards (docs/<site>/data/follow/<scope>/<id>.json) */
+QK.FOLLOW_CARDS = { bullpen: ['mlb', 'aaa'] };
+/* what each scope is called, for chips, notes and the picker */
+QK.FOLLOW_SCOPES = { mlb: 'MLB', aaa: 'Triple-A', nba: 'NBA', wnba: 'WNBA', club: 'Football', team: 'Team', cfb: 'College football',
+  mbb: 'Men’s college basketball', wbb: 'Women’s college basketball', mch: 'Men’s college hockey', wch: 'Women’s college hockey',
+  atp: 'ATP', wta: 'WTA', driver: 'Driver' };
+var followFns = [], followCache = {};
+function folderSport(folder) { for (var i = 0; i < QK.ALL_SPORTS.length; i++) if (QK.ALL_SPORTS[i].folder === folder) return QK.ALL_SPORTS[i]; return null; }
+function fClean(x) {
+  if (!x || typeof x !== 'object' || !FOLLOW_K.test(String(x.k || ''))) return null;
+  var s = function (v, n) { return v === undefined || v === null ? '' : String(v).slice(0, n || 80); };
+  var out = { k: String(x.k), name: s(x.name) || String(x.k).split(':')[2] };
+  if (x.abbr) out.abbr = s(x.abbr, 6);
+  if (color.parse(x.colour)) out.colour = s(x.colour, 9);
+  if (color.parse(x.alt)) out.alt = s(x.alt, 9);
+  if (x.href && /^(#\/|https:\/\/pchattani\.github\.io\/)/.test(String(x.href))) out.href = s(x.href, 200);
+  if (x.added && /^\d{4}-\d\d-\d\d$/.test(String(x.added))) out.added = String(x.added);
+  return out;
+}
+function fRead() {
+  var raw = store(FOLLOW_KEY);
+  if (!raw) return [];
+  try {
+    var j = JSON.parse(raw), seen = {};
+    return (j && Array.isArray(j.items) ? j.items : []).map(fClean).filter(function (x) { if (!x || seen[x.k]) return false; seen[x.k] = 1; return true; }).slice(0, FOLLOW_MAX);
+  } catch (e) { return []; }
+}
+function fWrite(items, quiet) {
+  store(FOLLOW_KEY, JSON.stringify({ v: 1, items: items.slice(0, FOLLOW_MAX) }));
+  if (!quiet) fNotify();
+}
+function fNotify() {
+  var l = fRead();
+  QK.follow.paint();
+  followFns.slice().forEach(function (f) { try { f(l); } catch (e) { if (root.console) console.error(e); } });
+}
+function today() { var d = new Date(QK.now()); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+/* the route patterns that name a followable page, per site: [scope, id] from the part after '#' */
+var FOLLOW_ROUTES = {
+  bullpen: function (r) { var m = /^\/(mlb|aaa)\/team\/(\d+)/.exec(r); return m ? [m[1], m[2]] : null; },
+  hardwood: function (r) { var m = /^\/(nba|wnba)\/team\/([A-Za-z0-9]+)/.exec(r); return m ? [m[1], m[2]] : null; },
+  rink: function (r) { var m = /^\/team\/([A-Z]{2,4})(?:[/?]|$)/.exec(r); return m ? ['team', m[1]] : null; },
+  gridiron: function (r) { var m = /^\/team\/([A-Z]{2,4})(?:[/?]|$)/.exec(r); return m ? ['team', m[1]] : null; },
+  campus: function (r) { var m = /^\/(cfb|mbb|wbb|mch|wch)\/team\/([A-Za-z0-9]+)/.exec(r); return m ? [m[1], m[2]] : null; },
+  ace: function (r) { var m = /^\/(atp|wta)\/player\/([A-Za-z0-9]+)/.exec(r); return m ? [m[1], m[2]] : null; },
+  paddock: function (r) { var m = /^\/(driver|team)\/([A-Za-z0-9_\-]+)/.exec(r); return m ? [m[1], m[2]] : null; },
+  site: function (r) { var m = /^\/club\/(\d+)/.exec(r); return m ? ['club', m[1]] : null; }
+};
+QK.follow = {
+  KEY: FOLLOW_KEY, MAX: FOLLOW_MAX,
+  list: function () { return fRead(); },
+  has: function (k) { return fRead().some(function (x) { return x.k === k; }); },
+  /* -> true when added (or already there: its display fields are refreshed), false when the list is full */
+  add: function (item) {
+    var it = fClean(item); if (!it) return false;
+    var l = fRead(), i = -1;
+    l.forEach(function (x, j) { if (x.k === it.k) i = j; });
+    if (i >= 0) { l[i] = Object.assign({}, l[i], it, { added: l[i].added }); fWrite(l); return true; }
+    if (l.length >= FOLLOW_MAX) return false;
+    it.added = it.added || today();
+    l.push(it); fWrite(l); return true;
+  },
+  remove: function (k) { var l = fRead(), n = l.length; l = l.filter(function (x) { return x.k !== k; }); if (l.length !== n) fWrite(l); },
+  /* -> the new state: true following, false not, null when the list is full */
+  toggle: function (item) {
+    var it = fClean(item); if (!it) return null;
+    if (QK.follow.has(it.k)) { QK.follow.remove(it.k); return false; }
+    return QK.follow.add(it) ? true : null;
+  },
+  /* refresh a stored item's display fields (from its card) without telling the page: -> true when something changed */
+  update: function (k, fields) {
+    var l = fRead(), ch = false;
+    l.forEach(function (x, i) {
+      if (x.k !== k) return;
+      var y = fClean(Object.assign({}, x, fields, { k: k, added: x.added }));
+      if (y && JSON.stringify(y) !== JSON.stringify(x)) { l[i] = y; ch = true; }
+    });
+    if (ch) fWrite(l, true);
+    return ch;
+  },
+  /* the follows of one site (its folder, or its sport key), optionally one scope */
+  forSite: function (site, scope) {
+    var s = folderSport(site) || QK.sport(site);
+    var f = s ? s.folder : site;
+    return fRead().filter(function (x) { var p = x.k.split(':'); return p[0] === f && (!scope || p[1] === scope); });
+  },
+  parse: function (k) {
+    var p = String(k || '').split(':');
+    if (p.length !== 3) return null;
+    var s = folderSport(p[0]);
+    return { site: p[0], scope: p[1], id: p[2], sport: s ? s.key : null, s: s };
+  },
+  hasCards: function (k) { var p = QK.follow.parse(k); return !!p && (QK.FOLLOW_CARDS[p.site] || []).indexOf(p.scope) >= 0; },
+  /* the page this page is on (its <html data-sport>) */
+  here: function () { try { return document.documentElement.getAttribute('data-sport'); } catch (e) { return null; } },
+  siteBase: function (k) { var p = QK.follow.parse(k); if (!p || !p.s) return ''; return p.sport === QK.follow.here() ? '' : QK.sportUrl(p.sport); },
+  cardUrl: function (k) { var p = QK.follow.parse(k); if (!p || !p.s) return null; return QK.follow.siteBase(k) + 'data/follow/' + encodeURIComponent(p.scope) + '/' + encodeURIComponent(p.id) + '.json'; },
+  /* a link to the item's site: a route ('#/mlb/team/158') on its own site, a full URL as it is */
+  siteUrl: function (k, route) {
+    if (!route) return QK.follow.siteBase(k) || '#';
+    if (/^https?:/.test(route)) return route;
+    return QK.follow.siteBase(k) + route;
+  },
+  /* the follow key of a page link ('https://pchattani.github.io/the-quant-rink/#/team/TOR' -> 'rink:team:TOR'); a
+   * route alone ('#/mlb/team/158') needs the sport. null for anything that is not a team, tennis player or driver. */
+  fromHref: function (href, sport) {
+    var h = String(href || ''), site = null;
+    QK.ALL_SPORTS.forEach(function (s) { if (h.indexOf('/' + s.repo + '/') >= 0 || h.indexOf('/' + s.folder + '/') >= 0) site = s.folder; });
+    if (!site && sport) { var sp = QK.sport(sport); site = sp ? sp.folder : null; }
+    var i = h.indexOf('#'), r = i >= 0 ? h.slice(i + 1) : '';
+    var f = site ? FOLLOW_ROUTES[site] : null, m = f && r ? f(r) : null;
+    return m ? site + ':' + m[0] + ':' + m[1] : null;
+  },
+  onChange: function (fn) { followFns.push(fn); },
+  /* every follow button on the page shows the stored state */
+  paint: function () {
+    var on = {};
+    fRead().forEach(function (x) { on[x.k] = 1; });
+    $$('[data-qk-follow]').forEach(function (b) {
+      var k = b.getAttribute('data-k'), y = !!on[k];
+      b.classList.toggle('on', y);
+      b.setAttribute('aria-pressed', y ? 'true' : 'false');
+      var nm = b.getAttribute('data-name') || '';
+      b.setAttribute('aria-label', (y ? 'Following ' : 'Follow ') + nm + (y ? '. Press to unfollow' : ''));
+      var l = b.querySelector('.qk-fbtn-l'); if (l && !b.hasAttribute('data-fixed')) l.textContent = y ? 'Following' : 'Follow';
+    });
+  },
+  /* the share link's compact list: 'k;name;abbr;colour' per item (colour without '#'), items joined by ',' */
+  encode: function (items) {
+    return (items || fRead()).map(function (x) {
+      var f = [x.k, x.name || '', x.abbr || '', String(x.colour || '').replace('#', '')];
+      while (f.length > 1 && !f[f.length - 1]) f.pop();
+      return f.map(function (v, i) { return i ? encodeURIComponent(v) : v; }).join(';');
+    }).join(',');
+  },
+  decode: function (text) {
+    var out = [], seen = {};
+    String(text || '').split(',').forEach(function (e) {
+      var f = e.split(';').map(function (v, i) { try { return i ? decodeURIComponent(v) : v; } catch (x) { return ''; } });
+      var it = fClean({ k: f[0], name: f[1], abbr: f[2], colour: f[3] ? '#' + f[3] : '' });
+      if (it && !seen[it.k]) { seen[it.k] = 1; out.push(it); }
+    });
+    return out.slice(0, FOLLOW_MAX);
+  },
+  shareUrl: function (items) {
+    var base = QK.homeUrl();
+    try { base = new URL(base, root.location.href).href.split('#')[0]; } catch (e) { /* old browser: the relative link */ }
+    return base + '#follow=' + QK.follow.encode(items);
+  },
+  /* a share link opened (#follow=...): offer to add its teams. o.mount: where the offer goes (default the top of
+   * <main>). -> the decoded items, or null when the page has no share list. The hash is cleared after a choice. */
+  importHash: function (o) {
+    o = o || {};
+    var m = /[#&]follow=([^&]*)/.exec(root.location.hash || '');
+    if (!m) return null;
+    var items = QK.follow.decode(m[1]);
+    var clear = function () { try { root.history.replaceState(null, '', root.location.pathname + root.location.search); } catch (e) { root.location.hash = ''; } };
+    if (!items.length) { clear(); return items; }
+    var have = {}; fRead().forEach(function (x) { have[x.k] = 1; });
+    var fresh = items.filter(function (x) { return !have[x.k]; });
+    var host = o.mount || $('main') || document.body;
+    var box = h('<div class="qk-fl-import" role="region" aria-label="Teams from a share link"><div><b>Someone shared ' + (items.length === 1 ? 'a team' : items.length + ' teams') + ' with you.</b> ' +
+      esc(items.slice(0, 6).map(function (x) { return x.name; }).join(', ') + (items.length > 6 ? ' and ' + (items.length - 6) + ' more' : '')) + '.' +
+      (fresh.length < items.length ? ' <span class="qk-fl-q">You already follow ' + (items.length - fresh.length) + '.</span>' : '') + '</div>' +
+      '<div class="qk-fl-import-a">' + (fresh.length ? '<button type="button" class="qk-btn volt" data-act="add">Add ' + (fresh.length === 1 ? 'it' : 'all ' + fresh.length) + '</button>' : '') +
+      '<button type="button" class="qk-btn ghost" data-act="no">' + (fresh.length ? 'No thanks' : 'Close') + '</button></div></div>');
+    host.insertBefore(box, host.firstChild);
+    box.addEventListener('click', function (e) {
+      var b = e.target.closest ? e.target.closest('button[data-act]') : null;
+      if (!b) return;
+      if (b.getAttribute('data-act') === 'add') {
+        var l = fRead(), n = 0;
+        fresh.forEach(function (x) { if (l.length < FOLLOW_MAX) { l.push(Object.assign({}, x, { added: today() })); n++; } });
+        fWrite(l);
+        QK.toast(n === fresh.length ? 'Added ' + n + (n === 1 ? ' team.' : ' teams.') : 'Added ' + n + ': you can follow up to ' + FOLLOW_MAX + '.');
+      }
+      clear();
+      if (box.parentNode) box.parentNode.removeChild(box);
+    });
+    return items;
+  },
+  /* a card's next game as a QK.gameCard game (the card is written from the team's side) */
+  gameOf: function (card, n) {
+    var p = QK.follow.parse(card.k) || {}, T = card.team || {}, us = { name: T.short || T.name, abbr: T.abbr, colour: T.colour, alt: T.alt, full: T.name };
+    var op = n.opp || {}, them = { name: op.name, abbr: op.abbr, colour: op.colour };
+    var pd = isNum(n.p_draw) ? n.p_draw : null, pu = isNum(n.p) ? n.p : null;
+    var po = pu === null ? null : Math.max(0, 1 - pu - (pd || 0));
+    var mu = isNum(n.mkt) ? n.mkt : null;
+    return { sport: card.sport || p.sport, league: n.comp || T.league || '', id: n.id, start: n.start, status: n.status || 'pre', tba: !!n.tba,
+      home: n.home ? us : them, away: n.home ? them : us, p_home: n.home ? pu : po, p_away: n.home ? po : pu, p_draw: pd,
+      market_home: mu === null ? null : (n.home ? mu : 1 - mu), href: n.href ? QK.follow.siteUrl(card.k, n.href) : null };
+  }
+};
+/* another tab changed the list */
+try { root.addEventListener('storage', function (e) { if (e.key === FOLLOW_KEY) fNotify(); }); } catch (e) { /* no window */ }
+
+/* ─────────────────────────────────────── toast */
+var toastEl = null, toastT = null;
+QK.toast = function (txt) {
+  if (!toastEl) { toastEl = h('<div class="qk-toast" role="status" aria-live="polite"></div>'); document.body.appendChild(toastEl); }
+  toastEl.textContent = txt;
+  toastEl.classList.add('show');
+  if (toastT) clearTimeout(toastT);
+  toastT = setTimeout(function () { toastEl.classList.remove('show'); }, 3600);
+};
+
+/* ─────────────────────────────────────── the follow button */
+/* QK.followButton(item, { compact: true (the star alone), label: 'Brewers' (a fixed label: the suggestions), cls }) */
+var STAR = '<svg class="qk-star" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.9l2.75 5.75 6.3.78-4.62 4.36 1.18 6.25L12 16.95l-5.61 3.09 1.18-6.25-4.62-4.36 6.3-.78z"/></svg>';
+QK.ICON.star = STAR;
+QK.followButton = function (item, o) {
+  o = o || {};
+  var it = fClean(item); if (!it) return '';
+  var on = QK.follow.has(it.k);
+  delete it.added;
+  return '<button type="button" class="qk-fbtn' + (on ? ' on' : '') + (o.compact ? ' sm' : '') + (o.cls ? ' ' + esc(o.cls) : '') + '" data-qk-follow="' + esc(JSON.stringify(it)) + '" data-k="' + esc(it.k) + '" data-name="' + esc(it.name) + '"' + (o.label ? ' data-fixed="1"' : '') +
+    ' aria-pressed="' + on + '" aria-label="' + esc((on ? 'Following ' : 'Follow ') + it.name + (on ? '. Press to unfollow' : '')) + '"' + (o.compact ? ' title="' + esc('Follow ' + it.name) + '"' : '') + '>' + STAR +
+    (o.compact ? '' : '<span class="qk-fbtn-l">' + esc(o.label || (on ? 'Following' : 'Follow')) + '</span>') + '</button>';
+};
+var fbBound = false;
+function bindFollowButtons() {
+  if (fbBound || !root.document) return; fbBound = true;
+  document.addEventListener('click', function (e) {
+    var b = e.target && e.target.closest ? e.target.closest('[data-qk-follow]') : null;
+    if (!b) return;
+    e.preventDefault(); e.stopPropagation();
+    var it = null; try { it = JSON.parse(b.getAttribute('data-qk-follow')); } catch (x) { return; }
+    var r = QK.follow.toggle(it);
+    if (r === null) QK.toast('You follow ' + FOLLOW_MAX + ' teams, the most we keep. Remove one to add another.');
+    else QK.toast(r ? 'Following ' + it.name + '. They lead your landing pages now.' : 'Unfollowed ' + it.name + '.');
+  }, true);
+}
+bindFollowButtons();
+
+/* ─────────────────────────────────────── the picker */
+/* QK.followPicker({ sport: 'baseball' (open on that sport), rows: [{ sport, t, s, href, k?, abbr?, colour? }] |
+ * load: fn -> Promise<rows> (default Home's data/search.json), title, onClose }). Rows that do not name a team,
+ * tennis player or F1 driver/constructor are left out. Before anything is typed: sport -> league -> teams. */
+var fpRows = null;
+function fpLoadDefault() {
+  return QK.fetchJSON(QK.homeUrl() + 'data/search.json').then(function (j) {
+    return (j.rows || []).map(function (r) { return { sport: r[0], t: r[1], s: r[2], href: r[3] }; });
+  });
+}
+function fpGroup(r) {
+  var p = String(r.s || '').split(' · ');
+  if (/^(Club|National team)$/.test(p[0]) && p[1]) return p[1];
+  return p[0].replace(/ (team|player)$/i, '') || QK.sport(r.sport).label;
+}
+QK.followPicker = function (o) {
+  o = o || {};
+  var norm = function (s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); };
+  var dlg = h('<div class="qk-fp-dlg open" role="dialog" aria-modal="true" aria-labelledby="qk-fp-h"><div class="qk-fp-box">' +
+    '<header class="qk-fp-head"><div><div class="qk-sh-kicker">My teams</div><h2 id="qk-fp-h">' + esc(o.title || 'Pick your teams') + '</h2></div>' +
+    '<button type="button" class="qk-fp-x" data-act="close" aria-label="Close">×</button></header>' +
+    '<p class="qk-fp-sub">Your teams lead every landing page: next games, form, ratings and a few facts. They are kept in this browser only.</p>' +
+    '<div class="qk-fp-chips" aria-live="polite"></div>' +
+    '<div class="qk-search-field">' + ICON.search + '<input type="search" placeholder="Search a team, player or driver" aria-label="Search a team, player or driver" autocomplete="off" spellcheck="false"></div>' +
+    '<div class="qk-fp-body" role="list"></div>' +
+    '<footer class="qk-fp-foot"><span class="qk-fp-n"></span><button type="button" class="qk-btn ghost" data-act="share">Copy share link</button><button type="button" class="qk-btn primary" data-act="close">Done</button></footer></div></div>');
+  document.body.appendChild(dlg);
+  var prevFocus = document.activeElement;
+  var input = $('input', dlg), body = $('.qk-fp-body', dlg);
+  var st = { sport: o.sport || null, group: null, q: '' };
+  var rows = o.rows ? Promise.resolve(o.rows) : (fpRows || (fpRows = (o.load || fpLoadDefault)()));
+  var all = null;
+  function keyOf(r) { return r.k || QK.follow.fromHref(r.href, r.sport); }
+  function chips() {
+    var l = fRead();
+    $('.qk-fp-chips', dlg).innerHTML = l.length ? l.map(function (x) {
+      return '<span class="qk-fp-chip">' + QK.teamMark({ name: x.name, abbr: x.abbr, colour: x.colour }, 'sm') + '<span>' + esc(x.name) + '</span><button type="button" data-rm="' + esc(x.k) + '" aria-label="' + esc('Remove ' + x.name) + '">×</button></span>';
+    }).join('') : '<span class="qk-fp-none">Nothing yet. Search, or browse by sport below.</span>';
+    $('.qk-fp-n', dlg).textContent = l.length + ' of ' + FOLLOW_MAX;
+  }
+  function row(r) {
+    var k = r._k, on = QK.follow.has(k), s = QK.sport(r.sport) || {};
+    return '<button type="button" class="qk-fp-row' + (on ? ' on' : '') + '" role="listitem" data-k="' + esc(k) + '" aria-pressed="' + on + '">' +
+      (r.colour || r.abbr ? QK.teamMark({ name: r.t, abbr: r.abbr, colour: r.colour }, 'sm') : '<span class="qk-fp-ic" style="color:' + (s.accent || 'var(--ink-2)') + '" aria-hidden="true">' + (ICON[r.sport] || '') + '</span>') +
+      '<span class="qk-fp-t"><b>' + esc(r.t) + '</b><small>' + esc((st.sport ? '' : (s.label || '') + ' · ') + (r.s || '')) + '</small></span>' + STAR + '</button>';
+  }
+  function crumbs() {
+    var c = ['<button type="button" data-nav="top">All sports</button>'];
+    if (st.sport) c.push('<button type="button" data-nav="sport">' + esc((QK.sport(st.sport) || {}).label || st.sport) + '</button>');
+    if (st.group) c.push('<span>' + esc(st.group) + '</span>');
+    return '<nav class="qk-fp-crumbs" aria-label="Browse">' + c.join('<i aria-hidden="true">›</i>') + '</nav>';
+  }
+  function draw() {
+    if (!all) { body.innerHTML = '<div class="qk-search-empty">Loading every team…</div>'; return; }
+    var q = norm(st.q).trim();
+    if (q) {
+      var sc = [];
+      all.forEach(function (r) { var n = r._n || (r._n = norm(r.t)), i = n.indexOf(q); if (i >= 0) sc.push([i === 0 ? 0 : n.charAt(i - 1) === ' ' ? 1 : 2, n.length, r]); });
+      sc.sort(function (a, b) { return a[0] - b[0] || a[1] - b[1]; });
+      body.innerHTML = sc.length ? sc.slice(0, 40).map(function (x) { return row(x[2]); }).join('') : '<div class="qk-search-empty">Nothing matches “' + esc(st.q) + '”.</div>';
+      return;
+    }
+    if (!st.sport) {
+      var by = {}; all.forEach(function (r) { by[r.sport] = (by[r.sport] || 0) + 1; });
+      body.innerHTML = '<div class="qk-fp-sports">' + QK.SPORTS.filter(function (s) { return by[s.key]; }).map(function (s) {
+        return '<button type="button" data-sport="' + esc(s.key) + '" style="--sa:' + s.accent + '"><span aria-hidden="true">' + ICON[s.key] + '</span><b>' + esc(s.label) + '</b><small>' + by[s.key] + '</small></button>';
+      }).join('') + '</div>';
+      return;
+    }
+    var mine = all.filter(function (r) { return r.sport === st.sport; });
+    if (!st.group) {
+      var g = {}, order = [];
+      mine.forEach(function (r) { var k = fpGroup(r); if (!g[k]) { g[k] = 0; order.push(k); } g[k]++; });
+      if (order.length === 1) { st.group = order[0]; draw(); return; }
+      order.sort(function (a, b) { return g[b] - g[a] || a.localeCompare(b); });
+      body.innerHTML = crumbs() + '<div class="qk-fp-groups">' + order.map(function (k) { return '<button type="button" data-group="' + esc(k) + '"><b>' + esc(k) + '</b><small>' + g[k] + '</small></button>'; }).join('') + '</div>';
+      return;
+    }
+    var list = mine.filter(function (r) { return fpGroup(r) === st.group; }).sort(function (a, b) { return String(a.s).localeCompare(String(b.s)) || a.t.localeCompare(b.t); });
+    body.innerHTML = crumbs() + list.map(row).join('');
+  }
+  function close() {
+    if (dlg.parentNode) dlg.parentNode.removeChild(dlg);
+    document.removeEventListener('keydown', onKey, true);
+    if (prevFocus && prevFocus.focus) try { prevFocus.focus(); } catch (e) { /* gone */ }
+    if (o.onClose) o.onClose();
+  }
+  function onKey(e) { if (e.key === 'Escape') { e.preventDefault(); close(); } }
+  document.addEventListener('keydown', onKey, true);
+  dlg.addEventListener('click', function (e) {
+    var t = e.target;
+    if (t === dlg) { close(); return; }
+    var b = t.closest ? t.closest('button') : null;
+    if (!b) return;
+    if (b.getAttribute('data-act') === 'close') { close(); return; }
+    if (b.getAttribute('data-act') === 'share') {
+      var url = QK.follow.shareUrl();
+      var done = function () { QK.toast(fRead().length ? 'Share link copied. Open it on another device to bring your teams.' : 'Follow a team first, then share.'); };
+      if (root.navigator && navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done, function () { QK.toast(url); });
+      else QK.toast(url);
+      return;
+    }
+    if (b.hasAttribute('data-rm')) { QK.follow.remove(b.getAttribute('data-rm')); chips(); draw(); return; }
+    if (b.hasAttribute('data-sport')) { st.sport = b.getAttribute('data-sport'); st.group = null; draw(); return; }
+    if (b.hasAttribute('data-group')) { st.group = b.getAttribute('data-group'); draw(); return; }
+    if (b.hasAttribute('data-nav')) { if (b.getAttribute('data-nav') === 'top') { st.sport = null; } st.group = null; draw(); return; }
+    if (b.classList.contains('qk-fp-row')) {
+      var k = b.getAttribute('data-k'), r = null;
+      all.forEach(function (x) { if (x._k === k) r = x; });
+      if (!r) return;
+      var res = QK.follow.toggle({ k: k, name: r.t, abbr: r.abbr, colour: r.colour, alt: r.alt, href: r.route || r.href });
+      if (res === null) QK.toast('You follow ' + FOLLOW_MAX + ' teams, the most we keep. Remove one to add another.');
+      chips();
+      b.classList.toggle('on', res === true); b.setAttribute('aria-pressed', res === true ? 'true' : 'false');
+    }
+  });
+  input.addEventListener('input', function () { st.q = input.value; draw(); });
+  chips(); draw();
+  setTimeout(function () { try { input.focus(); } catch (e) { /* hidden */ } }, 10);
+  rows.then(function (rs) {
+    all = (rs || []).map(function (r) { var x = Object.assign({}, r); x._k = keyOf(r); return x; }).filter(function (r) { return r._k; });
+    draw();
+  }, function () { all = []; body.innerHTML = '<div class="qk-search-empty">The team list did not load. Try again in a moment.</div>'; });
+  return { close: close, el: dlg };
+};
+
+/* ─────────────────────────────────────── the card */
+var FACT_KICKER = { champion: 'Champions', franchise: 'Franchise history', streak: 'On a run', form_xp: 'Form', rating_move: 'Our ratings',
+  vs_last: 'On last season', split: 'Home and away', best_start: 'Best start', pctl: 'Against the league', best_record: 'Best record',
+  sos: 'Schedule', luck: 'Luck', swing: 'Big swing', clinch: 'The race', big_game: 'Big game', rivalry: 'Rivalry',
+  player_rank: 'Star player', player_run: 'Hot streak', call: 'Our call', rating: 'Our ratings' };
+QK.FACT_KICKER = FACT_KICKER;
+function fcWhen(n) {
+  if (!n || !n.start) return '';
+  return n.tba ? fmt.relDay(n.start) + ' · TBA' : fmt.relDay(n.start) + ' · ' + fmt.time(n.start);
+}
+function fcNext(card, n, o) {
+  var op = n.opp || {}, va = n.home ? 'v' : 'at';
+  var mkt = isNum(n.mkt) && !o.noMarket ? ' <span class="qk-fc-mq" data-tip="The market’s chance, a reference beside ours" tabindex="0">Market ' + fmt.pct(n.mkt) + '</span>' : '';
+  var ch = isNum(n.p) ? '<span class="qk-fc-p"><small>Our chance</small><b class="num">' + QK.pctSmall(n.p) + '</b>' + mkt + '</span>' : '';
+  var tag = n.href ? 'a' : 'div';
+  return '<' + tag + ' class="qk-fc-next"' + (n.href ? ' href="' + esc(QK.follow.siteUrl(card.k, n.href)) + '"' : '') + '><span class="qk-fc-nx"><small>' + esc(fcWhen(n)) + (n.comp ? ' · ' + esc(n.comp) : '') + '</small>' +
+    '<b>' + va + ' ' + QK.teamMark({ name: op.name, abbr: op.abbr, colour: op.colour }, 'sm') + esc(op.name || '') + (isNum(op.rank) ? '<i class="qk-fc-rk" title="Their place in our ratings">#' + esc(op.rank) + '</i>' : '') + '</b></span>' + ch + '</' + tag + '>';
+}
+function fcLast(card, x) {
+  if (!x) return '';
+  var op = x.opp || {}, sc = x.score && isNum(x.score[0]) ? x.score[0] + '–' + x.score[1] : '';
+  return '<div class="qk-fc-last"><small>Last</small><span class="qk-fc-res ' + (x.res === 'W' ? 'w' : x.res === 'D' ? 'd' : 'l') + '">' + esc(x.res || '') + '</span>' +
+    '<span>' + esc(sc) + ' ' + (x.home ? 'v' : 'at') + ' ' + esc(op.name || '') + (x.comp ? ' · ' + esc(x.comp) : '') + (x.upset ? ' · <b class="qk-fc-up">upset</b>' : '') +
+    (isNum(x.p) ? ' <span class="qk-fl-q">(we gave them ' + fmt.pct(x.p) + ')</span>' : '') + '</span></div>';
+}
+/* a card's facts as the page shows them: a champion card already says the title in its line, so the champion fact
+ * is not repeated */
+QK.followFacts = function (card) { return (card.facts || []).filter(function (f) { return !(card.champion && f.kind === 'champion'); }); };
+QK.followCard = function (card, o) {
+  o = o || {};
+  card = card || {};
+  var it = o.item || {}, T = card.team || {}, N = card.now || {};
+  var name = T.name || it.name || '', k = card.k || it.k;
+  var hex = color.parse(T.colour) ? T.colour : (color.parse(it.colour) ? it.colour : null);
+  var bk = hex ? color.block(hex) : { bg: cssVar('--signal-deep') || '#5a69b7', edge: null };
+  var alt = color.parse(T.alt) ? T.alt : null;
+  var off = card.phase === 'offseason';
+  var ch = (card.chances || []).filter(function (c) { return isNum(c.p); });
+  var head = ch.length ? ch[ch.length - 1] : null;
+  var item = { k: k, name: name, abbr: T.abbr || it.abbr, colour: hex || '', alt: alt || '', href: T.href || it.href };
+  var top = '<div class="qk-fc-top" style="--tb:' + esc(bk.bg) + (alt ? ';--ta:' + esc(alt) : '') + '">' +
+    '<a class="qk-fc-id" href="' + esc(QK.follow.siteUrl(k, T.href || it.href)) + '">' + QK.teamMark({ name: name, abbr: T.abbr || it.abbr, colour: hex }, 'md') +
+    '<span class="qk-fc-who"><small>' + esc([T.league, T.group].filter(Boolean).join(' · ')) + '</small><b class="qk-fc-nm' + QK.longName(name, 20) + '">' + esc(name) + '</b></span></a>' +
+    QK.followButton(item, { compact: true, cls: 'qk-fc-star' }) + '</div>';
+  var champ = card.champion ? '<div class="qk-fc-champ"><span class="qk-bchip volt">' + esc(card.champion.season + ' ' + card.champion.event + ' champions') + '</span></div>' : '';
+  var now = '<div class="qk-fc-now">' + (N.record ? '<span class="qk-fc-rec num">' + esc(N.record) + '</span>' : '') +
+    '<span class="qk-fc-st">' + esc(N.standing && N.standing.text ? N.standing.text : '') + (N.rating && N.rating.rank ? '<small>' + esc((N.rating.label || 'Rating') + ' ' + N.rating.text + ' · ' + QK.ordinal(N.rating.rank) + ' of ' + N.rating.of) + '</small>' : '') + '</span>' +
+    (!off && N.form ? '<span class="qk-fc-form">' + QK.formDots(N.form) + (N.streak ? '<small>' + esc(N.streak) + '</small>' : '') + '</span>' : '') + '</div>';
+  var chance = '';
+  if (head && !off) {
+    var d = isNum(head.d7) && Math.abs(head.d7) >= 0.005 ? '<small class="qk-fc-d ' + (head.d7 > 0 ? 'up' : 'dn') + '">' + (head.d7 > 0 ? '▲ ' : '▼ ') + Math.round(Math.abs(head.d7) * 100) + ' pts this week</small>' : '';
+    chance = '<div class="qk-fc-ch"><span>' + esc(head.label) + ' chance</span><b class="num">' + QK.pctSmall(head.p) + '</b>' + d + '</div>';
+  }
+  var line = card.line && (off || card.champion) ? '<p class="qk-fc-line">' + esc(card.line) + '</p>' : '';
+  var nx = (card.next || []).slice(0, o.full ? 3 : 1);
+  var next = nx.length ? '<div class="qk-fc-nexts"><div class="qk-fc-k">' + (nx.length > 1 ? 'Next games' : 'Next') + '</div>' + nx.map(function (n) { return fcNext(card, n, o); }).join('') + '</div>'
+    : (card.next_note ? '<div class="qk-fc-nexts"><div class="qk-fc-k">Next</div><p class="qk-fc-note">' + esc(card.next_note) + '</p></div>' : '');
+  var facts = QK.followFacts(card);
+  var fx = facts.length ? (o.full ? '<ul class="qk-fc-facts">' + facts.map(function (f) { return '<li><small>' + esc(FACT_KICKER[f.kind] || '') + '</small>' + esc(f.text) + '</li>'; }).join('') + '</ul>'
+    : '<p class="qk-fc-fact"><small>' + esc(FACT_KICKER[facts[0].kind] || 'Did you know') + '</small>' + esc(facts[0].text) + '</p>') : '';
+  var extra = '';
+  if (o.full) {
+    var P = card.profile || {};
+    var pr = (P.strong || []).concat(P.weak || []);
+    if (pr.length) extra += '<div class="qk-fc-prof"><div class="qk-fc-k">Strengths and weaknesses <span class="qk-fl-q">· percentile in the league</span></div>' +
+      QK.pctlBars(pr.map(function (r) { return { label: r.label, pctl: r.pct, value: r.text }; })) + '</div>';
+    if ((card.players || []).length) extra += '<div class="qk-fc-pl"><div class="qk-fc-k">Top players</div>' + card.players.map(function (p) {
+      return '<a href="' + esc(QK.follow.siteUrl(k, p.href)) + '"><b>' + esc(p.name) + '</b><small>' + esc(p.pos || '') + '</small><span class="num">' + esc(p.text) + ' <small>' + esc(p.metric || '') + '</small></span></a>';
+    }).join('') + '</div>';
+    if (card.last) extra += fcLast(card, card.last);
+  } else if (off && card.last) extra += fcLast(card, card.last);
+  return '<article class="qk-fc' + (o.full ? ' full' : '') + (off ? ' off' : '') + '" data-k="' + esc(k) + '">' + top + champ + now + chance + line + next + fx + extra + '</article>';
+};
+/* a follow with no card (its site has no cards yet, or the card did not load): a chip with a link and a quiet note */
+QK.followChip = function (item, o) {
+  o = o || {};
+  var p = QK.follow.parse(item.k) || {}, s = p.s || {};
+  var sub = [s.label, QK.FOLLOW_SCOPES[p.scope] && QK.FOLLOW_SCOPES[p.scope] !== s.label && p.scope !== 'team' && p.scope !== 'club' ? QK.FOLLOW_SCOPES[p.scope] : ''].filter(Boolean).join(' · ');
+  return '<div class="qk-fchip" data-k="' + esc(item.k) + '" style="--sa:' + (s.accent || 'var(--accent)') + '"><a href="' + esc(QK.follow.siteUrl(item.k, item.href)) + '">' +
+    (item.colour || item.abbr ? QK.teamMark({ name: item.name, abbr: item.abbr, colour: item.colour }, 'sm') : '<span class="qk-fp-ic" style="color:' + (s.accent || 'var(--ink-2)') + '" aria-hidden="true">' + (ICON[p.sport] || '') + '</span>') +
+    '<span><b>' + esc(item.name) + '</b><small>' + esc(sub) + (s.site ? ' · ' + esc(s.site) : '') + '</small></span></a>' +
+    '<span class="qk-fl-q">' + esc(o.note || 'Cards coming soon') + '</span>' + QK.followButton(item, { compact: true }) + '</div>';
+};
+
+/* ─────────────────────────────────────── the "Your teams" section */
+/* QK.followSection(el, {
+ *   site: 'bullpen' | null (Home: every site), scope: 'mlb' (multi-league sites: the league on screen; other leagues'
+ *   follows get a one-line note), scopeLabel: fn(scope) -> 'Triple-A', scopeHref: fn(scope) -> link to that league,
+ *   picker: QK.followPicker options (sport, rows | load), suggest: [items] (the empty state's suggestions, Home),
+ *   full: true (a sport page: the full card), week: true (the "Your week" strip), feed: true (the facts feed),
+ *   live: fn(game) -> a fresher copy of a game (Home's live scores), board: fn(cards) -> HTML (a sport page's mini board),
+ *   kicker, title }) -> { render() }. Renders now and again whenever the list changes (this tab or another). */
+QK.fetchCard = function (k) {
+  if (!QK.follow.hasCards(k)) return Promise.resolve(null);
+  if (!followCache[k]) followCache[k] = QK.fetchJSON(QK.follow.cardUrl(k), { cache: 'no-cache', timeout: 9000 }).then(function (c) { return c && c.k ? c : null; }, function () { return null; });
+  return followCache[k];
+};
+QK.followSection = function (el, o) {
+  o = o || {};
+  if (!el) return null;
+  var gen = 0;
+  function mine() { return o.site ? QK.follow.forSite(o.site) : fRead(); }
+  function openPicker() { QK.followPicker(Object.assign({}, o.picker || {}, { onClose: function () { render(); } })); }
+  function empty() {
+    if (o.site) {
+      return '<div class="qk-fl-prompt">' + STAR + '<span><b>Follow your teams</b> to see them here first: next games, form, ratings and facts.</span><button type="button" class="qk-btn ghost" data-fl="pick">Pick teams</button></div>';
+    }
+    var sug = (o.suggest || []).filter(function (x) { return x && x.k; }).slice(0, 3);
+    return '<div class="qk-fl-empty"><div class="qk-fl-empty-l"><div class="qk-sh-kicker">My teams</div><h2 class="qk-fl-empty-h">Follow your teams</h2>' +
+      '<p>Pick the teams, players and drivers you follow, in any sport. They lead this page and every sport site: next games, form, ratings and a few facts. Kept in this browser only.</p></div>' +
+      '<div class="qk-fl-empty-r">' + (sug.length ? '<div class="qk-fl-sug"><small>Try one</small>' + sug.map(function (x) { return QK.followButton(x, { cls: 'qk-fl-sugb', label: x.name }); }).join('') + '</div>' : '') +
+      '<button type="button" class="qk-btn volt" data-fl="pick">Pick your teams</button></div></div>';
+  }
+  function head(n) {
+    return QK.sectionHead({ kicker: o.kicker || 'My teams', title: o.title || 'Your teams', sub: o.sub || (o.site ? 'The teams you follow, first: next games, form, our ratings and the facts that stand out.' : 'Every team you follow, across the sports: next games, form, our ratings and the facts that stand out.'),
+      actions: '<button type="button" class="qk-more qk-fl-manage" data-fl="pick">Manage (' + n + ')</button>' });
+  }
+  function weekStrip(cards) {
+    var seen = {}, gs = [];
+    var lim = QK.now() + 7 * 864e5;
+    cards.forEach(function (c) {
+      (c.next || []).forEach(function (n) {
+        var t = new Date(n.start).getTime();
+        if (!isFinite(t) || t > lim || t < QK.now() - 6 * 36e5) return;
+        var g = QK.follow.gameOf(c, n), key = g.sport + ':' + g.id;
+        if (seen[key]) return;
+        seen[key] = 1;
+        gs.push(o.live ? (o.live(g) || g) : g);
+      });
+    });
+    gs.sort(function (a, b) { return String(a.start).localeCompare(String(b.start)); });
+    return '<div class="qk-fl-week"><div class="qk-fc-k">Your week</div>' + (gs.length ? '<div class="qk-fl-week-row">' + gs.slice(0, 14).map(function (g) { return QK.gameCard(g, { market: 'quiet', why: false }); }).join('') + '</div>'
+      : '<p class="qk-fc-note">None of your teams plays in the next seven days.' + (cards.some(function (c) { return c.phase === 'offseason'; }) ? ' Some are in their off-season.' : '') + '</p>') + '</div>';
+  }
+  function feed(cards) {
+    var rows = [], i;
+    for (i = 1; i < 5 && rows.length < 6; i++) cards.forEach(function (c) { var f = QK.followFacts(c)[i]; if (f && rows.length < 6) rows.push({ c: c, f: f }); });
+    if (!rows.length) return '';
+    return '<div class="qk-fl-feed"><div class="qk-fc-k">Worth knowing</div>' + QK.storyCards(rows.map(function (x) {
+      var T = x.c.team || {};
+      return { sport: x.c.sport, kicker: (FACT_KICKER[x.f.kind] || 'Did you know') + ' · ' + (T.short || T.name), name: T.name, sub: [T.league, T.group].filter(Boolean).join(' · '),
+        mark: { name: T.name, abbr: T.abbr, colour: T.colour }, colour: T.colour, text: x.f.text, href: QK.follow.siteUrl(x.c.k, T.href) };
+    }), { cols: 3 }) + '</div>';
+  }
+  function render() {
+    var my = gen + 1; gen = my;
+    var all = mine(), list = o.scope ? all.filter(function (x) { return x.k.split(':')[1] === o.scope; }) : all;
+    var other = o.scope ? all.filter(function (x) { return x.k.split(':')[1] !== o.scope; }) : [];
+    if (!list.length) {
+      var note = other.length && o.scopeLabel ? '<p class="qk-fl-other">You follow ' + other.length + ' ' + (other.length === 1 ? 'team' : 'teams') + ' in ' + other.map(function (x) { return x.k.split(':')[1]; }).filter(function (v, i, a) { return a.indexOf(v) === i; }).map(function (s) {
+        return o.scopeHref ? '<a class="qk-link" href="' + esc(o.scopeHref(s)) + '">' + esc(o.scopeLabel(s)) + '</a>' : esc(o.scopeLabel(s));
+      }).join(', ') + '.</p>' : '';
+      el.innerHTML = empty() + note;
+      el.classList.add('qk-fl-is-empty');
+      return;
+    }
+    el.classList.remove('qk-fl-is-empty');
+    var withCards = list.filter(function (x) { return QK.follow.hasCards(x.k); });
+    el.innerHTML = head(all.length) + '<div class="qk-fl-cards' + (o.full ? ' full' : '') + '">' + list.map(function (x) {
+      return QK.follow.hasCards(x.k) ? '<div class="qk-fl-slot" data-k="' + esc(x.k) + '"><div class="qk-skel block" style="height:' + (o.full ? 420 : 300) + 'px" aria-hidden="true"></div></div>' : '';
+    }).join('') + '</div>' +
+      (list.length > withCards.length ? '<div class="qk-fl-chips">' + list.filter(function (x) { return !QK.follow.hasCards(x.k); }).map(function (x) { return QK.followChip(x); }).join('') + '</div>' : '') +
+      '<div class="qk-fl-after"></div>' +
+      (other.length && o.scopeLabel ? '<p class="qk-fl-other">You also follow ' + other.length + ' ' + (other.length === 1 ? 'team' : 'teams') + ' in ' + other.map(function (x) { return x.k.split(':')[1]; }).filter(function (v, i, a) { return a.indexOf(v) === i; }).map(function (s) {
+        return o.scopeHref ? '<a class="qk-link" href="' + esc(o.scopeHref(s)) + '">' + esc(o.scopeLabel(s)) + '</a>' : esc(o.scopeLabel(s));
+      }).join(', ') + '.</p>' : '');
+    if (!withCards.length) { var c0 = $('.qk-fl-cards', el); if (c0) c0.parentNode.removeChild(c0); return; }
+    Promise.all(withCards.map(function (x) { return QK.fetchCard(x.k); })).then(function (cards) {
+      if (my !== gen) return;
+      var got = [];
+      withCards.forEach(function (x, i) {
+        var slot = $('.qk-fl-slot[data-k="' + x.k.replace(/"/g, '') + '"]', el), c = cards[i];
+        if (!slot) return;
+        if (c) {
+          got.push(c);
+          slot.outerHTML = QK.followCard(c, { item: x, full: !!o.full });
+          var T = c.team || {};
+          QK.follow.update(x.k, { name: T.name, abbr: T.abbr, colour: T.colour, alt: T.alt, href: T.href });
+        } else slot.outerHTML = QK.followChip(x, { note: 'Card not available right now' });
+      });
+      var after = $('.qk-fl-after', el);
+      if (after) after.innerHTML = (o.week !== false && got.length ? weekStrip(got) : '') + (o.board && got.length ? o.board(got) : '') + (o.feed !== false && got.length ? feed(got) : '');
+      QK.follow.paint();
+    });
+  }
+  el.addEventListener('click', function (e) {
+    var b = e.target && e.target.closest ? e.target.closest('[data-fl="pick"]') : null;
+    if (b) { e.preventDefault(); openPicker(); }
+  });
+  var onCh = function () {
+    if (!el.isConnected) { var i = followFns.indexOf(onCh); if (i >= 0) followFns.splice(i, 1); return; }   // the page moved on
+    render();
+  };
+  QK.follow.onChange(onCh);
+  render();
+  return { render: render, open: openPicker };
 };
 
 root.QK = QK;

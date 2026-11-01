@@ -44,6 +44,25 @@ U.team = (tid, L, S) => { const x = BP.teamInfo(tid) || {}; return { name: x.sho
 /* v4: the raw kit colour and the alternate, for team blocks (QK.color.block / blockPair) */
 U.raw = tid => (BP.teamInfo(tid) || {}).colour || '';
 U.alt = tid => (BP.teamInfo(tid) || {}).alt || '';
+/* round 12 (My Teams): a club as a follow item (QK.follow: 'bullpen:<L>:<tid>', the route, the colours), its star
+   toggle, and every club of MLB and Triple-A as picker rows (index.json teams and levels.aaa.teams) */
+U.followItem = (tid, L) => {
+  const l = L || BP.state.level || 'mlb', x = BP.teamInfo(tid) || {};
+  return { k: 'bullpen:' + l + ':' + tid, name: x.name || BP.teamName(tid), abbr: BP.teamAbbr(tid), colour: x.colour || '', alt: x.alt || '', href: '#/' + l + '/team/' + encodeURIComponent(tid) };
+};
+U.followStar = (tid, L, cls) => (QK.followButton ? QK.followButton(U.followItem(tid, L), { compact: true, cls: cls || 'qk-fl-mini' }) : '');
+U.followRows = () => {
+  const idx = BP.index() || {}, out = [];
+  const add = (L, teams) => Object.keys(teams || {}).forEach(t => {
+    const x = teams[t] || {};
+    if (!x.name) return;
+    out.push({ sport: 'baseball', t: x.name, s: (L === 'mlb' ? 'MLB' : 'Triple-A') + (x.division ? ' · ' + x.division : x.league ? ' · ' + x.league : ''), k: 'bullpen:' + L + ':' + t,
+      href: '#/' + L + '/team/' + t, abbr: x.abbr, colour: x.colour, alt: x.alt });
+  });
+  add('mlb', idx.teams);
+  add('aaa', ((idx.levels || {}).aaa || {}).teams);
+  return out;
+};
 U.tcol = tid => {
   const c = (BP.teamInfo(tid) || {}).colour;
   return c && QK.color.parse(c) ? QK.color.team(c) : QK.cssVar('--c-other');

@@ -164,6 +164,7 @@ function power() {
     return { rank: rk[t], name: i.name, abbr: i.abbr, colour: i.colour, href: thref(t), sub: rec(t) + (r.streak ? ' · ' + r.streak : ''), value: v(t, 'rating'), text: k.signed(v(t, 'rating'), 2),
       parts: { off: v(t, 'off_rpg'), pit: v(t, 'pit_rpg'), def: v(t, 'def_rpg') },
       cells: [{ label: 'Run diff', text: isNum(rd) ? k.signed(rd, 0) : '—' }, { label: 'Expected', text: isNum(ew) && g ? Math.round(ew) + '–' + Math.round(g - ew) : '—' }],
+      follow: BP.ui.followItem(t, ST.L),
       form: form(t), chances: ST.sim ? [{ label: 'Postseason', p: r.p_postseason, text: r.p_postseason === 1 ? 'In' : r.p_postseason === 0 ? 'Out' : '' }].concat(r.p_postseason === 0 ? [] : [{ label: 'Title', p: r.p_ws }]) : [] };
   };
   let groups;

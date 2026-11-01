@@ -998,6 +998,15 @@ def main(argv: list[str] | None = None) -> int:
             b.step("players_index", lambda: b.write("players_index.json", prev))
         logger.info("careers: %d player files", len(idx))
     b.write_or_fail("index.json", "index", lambda: index_payload(b, levels, today))
+    # My Teams: one small follow card per club (data/follow/<L>/<tid>.json; oddsmarkets/common/follow.py), from the
+    # payloads this run has just written; Home and the overview read only these
+    from oddsmarkets.baseball.analytics import follow_build as FLB
+    for lvl in ("mlb", "aaa"):
+        if lvl in levels:
+            fl = b.step(f"follow cards {lvl}", lambda: FLB.build(data, lvl, _digest_now(today)), None)
+            if fl:
+                b.written.extend(data / "follow" / lvl / f"{i}.json" for i in fl["ids"])
+                logger.info("follow cards %s: %d, %.0f KB, largest %d bytes", lvl, fl["n"], fl["bytes"] / 1024, fl["max"])
     total = sum(p.stat().st_size for p in set(b.written) if p.exists())
     logger.info("wrote %d files (%.1f MB) in %.1f s; %d step errors", len(set(b.written)), total / 1e6, time.perf_counter() - t_start,
                 len(b.errors))

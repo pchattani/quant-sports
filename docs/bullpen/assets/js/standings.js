@@ -137,7 +137,7 @@ function magicCell(r) {
 }
 
 function teamCell(r, L, S) {
-  return { v: BP.teamName(r.tid), html: (LO ? QKL.toggle(r.tid, BP.teamName(r.tid)) : '') + BP.teamLink(r.tid, { short: true, level: L, season: S }) + clinch(r) };
+  return { v: BP.teamName(r.tid), html: (LO ? QKL.toggle(r.tid, BP.teamName(r.tid)) : '') + BP.teamLink(r.tid, { short: true, level: L, season: S }) + clinch(r) + BP.ui.followStar(r.tid, L) };
 }
 /* the club's first chip ("Bullpen is the weak spot"); + under the club opens the full card */
 function profileCell(r) {

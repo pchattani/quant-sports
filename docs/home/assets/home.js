@@ -11,7 +11,12 @@
  * the week); the title race; every game; charts of the week; "How it works".
  * Round 6: our chance leads; the market sits beside it, small and grey (market: 'quiet', STYLE_GUIDE.md §3) on the
  * ticker, the game cards and under the game of the day. Our record and calibration live on each site's Model page
- * ("How we're doing"), linked from the foot. ?asof=<ISO> previews an older snapshot (QK.now). */
+ * ("How we're doing"), linked from the foot. ?asof=<ISO> previews an older snapshot (QK.now).
+ * Round 12 (My Teams): "Your teams" sits directly under the intro (QK.followSection, docs/_design/quant.js): a card
+ * per followed team from its site's follow card, "Your week" (their games in the next seven days, joining the live
+ * scores below), the facts feed and the picker over data/search.json. With no follows, a slim "Follow your teams"
+ * band with three suggestions from the games that matter. A follow on a site without cards yet is a chip with a
+ * link ("Cards coming soon"). A share link (#follow=...) offers to add its teams. */
 (function () {
 'use strict';
 var $ = QK.$, $$ = QK.$$, esc = QK.esc, fmt = QK.fmt, isNum = QK.isNum;
@@ -74,7 +79,7 @@ function prep(g) {
 }
 
 function renderAll() {
-  var jobs = [renderTicker, renderSportNav, renderFeature, renderToplines, renderAround, renderWatch, renderHot, renderSurprises, renderStats, renderReal, renderRoll, renderRaces, renderChips, renderGames, renderCharts, renderHow];
+  var jobs = [renderYours, renderTicker, renderSportNav, renderFeature, renderToplines, renderAround, renderWatch, renderHot, renderSurprises, renderStats, renderReal, renderRoll, renderRaces, renderChips, renderGames, renderCharts, renderHow];
   jobs.forEach(function (f) { try { f(); } catch (e) { if (window.console) console.error(e); } });
   $('#updated').textContent = 'Data built ' + fmt.ago(D.updated_at) + ' (' + fmt.date(D.updated_at) + ' ' + fmt.time(D.updated_at) + '). Live scores refresh every minute while games are on.';
   QK.seg($('#when'), function (v) { state.when = v; state.shown = PAGE; renderChips(); renderGames(); });
@@ -83,6 +88,35 @@ function renderAll() {
 function sportCount() { var n = D.sports.length; return (NUMS[n] || String(n)) + (n === 1 ? ' sport' : ' sports'); }
 function liveMap() { var m = {}; D.games.forEach(function (g) { if (g.status === 'live') m[g.sport] = true; }); return m; }
 function playable() { return D.games.filter(function (g) { return !g.event; }); }
+
+/* ───────────────────────────── round 12: your teams (QK.followSection) */
+var yours = null;
+/* the empty state's three suggestions: the teams in the games that matter (the builder's significance rule), then
+ * this week's champions, then the heaviest games coming up */
+function followSuggest() {
+  var out = [], seen = {}, m = byKey(), F = D.featured || {};
+  function add(t, sport) {
+    if (!t || !t.href || out.length >= 3) return;
+    var k = QK.follow.fromHref(t.href, sport);
+    if (!k || seen[k]) return;
+    seen[k] = 1;
+    out.push({ k: k, name: t.full || t.name, abbr: t.abbr, colour: t.colour, alt: t.alt, href: t.href });
+  }
+  [].concat(F.today || [], F.week ? [F.week] : []).forEach(function (r) { var g = m[r.key]; if (g && !g.event) { add(g.home, g.sport); add(g.away, g.sport); } });
+  champsOf().forEach(function (c) { add({ name: c.name, abbr: c.abbr, colour: c.colour, href: c.href }, c.sport); });
+  playable().filter(stillOn).sort(function (a, b) { return (b.weight || 0) - (a.weight || 0); }).forEach(function (g) { add(g.home, g.sport); add(g.away, g.sport); });
+  return out;
+}
+function renderYours() {
+  var el = $('#yours');
+  if (!el || !QK.followSection) return;
+  if (yours) { yours.render(); return; }
+  QK.follow.importHash({ mount: $('#main') });
+  window.addEventListener('hashchange', function () { QK.follow.importHash({ mount: $('#main') }); });   // a share link opened on this page
+  yours = QK.followSection(el, { suggest: followSuggest(), week: true, feed: true,
+    /* a followed team's game that is also in home.json takes the live score and chance from there */
+    live: function (g) { var x = byKey()[g.sport + ':' + g.id]; return x || g; } });
+}
 
 /* ───────────────────────────── ticker (broadcast black) */
 function renderTicker() {
@@ -581,7 +615,7 @@ function refreshLive() {
           prep(g); changed = true;
         }
       });
-      if (changed) { renderTicker(); renderSportNav(); renderFeature(); renderWatch(); renderGames(); }
+      if (changed) { renderTicker(); renderSportNav(); renderFeature(); renderWatch(); renderGames(); if (yours) yours.render(); }
     }, function () { /* offline or blocked: keep the built snapshot */ });
   });
 }

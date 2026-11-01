@@ -55,6 +55,46 @@ function hotItems(lead, L) {
 
 BP.ui.hotItems = hotItems;   // leaders.js draws the same power list
 
+/* ── round 12, My Teams: the clubs this visitor follows, above everything else (QK.followSection; the cards are
+   data/follow/<L>/<tid>.json from oddsmarkets/baseball/analytics/follow_build.py). The level on screen only; a
+   line names the other level's follows. Below the cards: their week, "Your clubs v the league" and the facts. */
+const FOLLOW_SLOT = '<section class="qk-section bp-ov-follow" id="ov-follow" aria-label="Your teams"></section>';
+function followFill(host, rows, L, S) {
+  if (!host || !QK.followSection) return;
+  QK.followSection(host, { site: 'bullpen', scope: L, full: true, feed: false, title: 'Your clubs',
+    sub: 'The clubs you follow, first: how their season stands, the next games, our ratings, strengths and weaknesses, and the facts that stand out.',
+    scopeLabel: s => BP.levelName(s) || s, scopeHref: s => BP.href('', s),
+    picker: { sport: 'baseball', title: 'Pick your clubs', rows: U.followRows() },
+    board: cards => followBoard(cards, rows, L, S) });
+}
+/* "Your clubs v the league": each followed club in our ranking with the clubs either side of it */
+function followBoard(cards, rows, L, S) {
+  if (!QK.powerBars) return '';
+  const rr = Object.keys(rows || {}).map(t => rows[t]).filter(r => r && r.rating && isNum(r.rating.net)).sort((a, b) => b.rating.net - a.rating.net);
+  if (rr.length < 3) return '';
+  const mine = {};
+  cards.forEach(c => { const p = String(c.k || '').split(':'); if (p[1] === L) mine[p[2]] = 1; });
+  const keep = {};
+  rr.forEach((r, i) => { if (mine[r.tid]) [i - 1, i, i + 1].forEach(j => { if (j >= 0 && j < rr.length) keep[j] = 1; }); });
+  const idx = Object.keys(keep).map(Number).sort((a, b) => a - b);
+  if (!idx.length) return '';
+  const groups = [];
+  idx.forEach((i, n) => { if (!n || i !== idx[n - 1] + 1) groups.push({ label: '', rows: [] }); groups[groups.length - 1].rows.push(i); });
+  const row = i => {
+    const r = rr[i], t = r.tid, x = BP.teamInfo(t) || {};
+    return { rank: i + 1, name: BP.teamName(t), abbr: BP.teamAbbr(t), colour: x.colour, href: BP.teamHref(t, L, S), sub: (isNum(r.w) ? r.w + '–' + r.l : '') + (mine[t] ? ' · you follow' : ''),
+      value: r.rating.net, text: U.signed(r.rating.net, 2), parts: { off: r.rating.off, pit: r.rating.pitch, def: r.rating.def }, follow: U.followItem(t, L) };
+  };
+  groups.forEach(g => {
+    g.rows = g.rows.map(row);
+    if (groups.length > 1) g.label = 'Around ' + g.rows.filter(x => mine[x.follow.k.split(':')[2]]).map(x => x.abbr).join(', ');
+  });
+  return '<div class="bp-ov-flboard"><div class="qk-fc-k">Your clubs v the league</div><div class="qk-card"><div class="qk-card-body">' +
+    QK.powerBars(null, { groups: groups, valueLabel: 'Our rating', unit: 'runs a game against an average club',
+      parts: [{ key: 'off', label: 'Offence', color: 'var(--c-2)' }, { key: 'pit', label: 'Pitching', color: 'var(--c-3)' }, { key: 'def', label: 'Defence', color: 'var(--c-5)' }] }) +
+    '<p class="qk-caption">Each club you follow in our ranking of all ' + rr.length + ', with the clubs either side. <a class="qk-link" href="' + BP.href('teams', L, S) + '">The full power board →</a></p></div></div></div>';
+}
+
 /* ── the landing top (the same shape on every sport overview) ──────────────────────────────────────────────── */
 const WORDS = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
 /* "Live now" | "Tonight" | "Today" | "Tomorrow" | the weekday | the date, in the reader's own time (QK.now()). */
@@ -429,14 +469,17 @@ function render(el, params) {
           decided ? { label: 'Bracket', sub: 'Every series as played', href: BP.ghref('postseason') }
             : inPost ? { label: 'Bracket', sub: 'Every series and path', href: BP.ghref('postseason') } : { label: 'Standings', sub: 'The race for October', href: BP.href('standings', L, S) },
           { label: 'Scouting Room', sub: 'Every player, every metric', href: BP.href('scout', L, S) }] });
+      h += FOLLOW_SLOT;
       h += '<section class="qk-section ql-week">' + QK.sectionHead({ kicker: 'This week in MLB', title: '<span id="ov-wk">The week so far</span>', html: true, sub: esc(stageLine(dig.stage, phase)) }) +
         '<div id="ov-week"></div><div id="ov-feat" class="ql-feat"></div></section>';
     } else if (isCurrent && today.length + next.length > 0) {
       h += intro({ tag: kicker, title: 'Triple-A, by the numbers.', lede: sub,
         links: [{ label: 'Games', sub: 'Every game, our chance', href: BP.href('games', L, S) }, { label: 'Standings', sub: 'The table', href: BP.href('standings', L, S) }, { label: 'Prospects', sub: 'Major-league translations', href: BP.href('prospects', L, S) }] });
+      h += FOLLOW_SLOT;
     } else {
       h += QK.sectionHead({ kicker: kicker, title: title, sub: sub, size: 'lg', tag: 'h1',
         actions: '<a class="qk-btn primary" href="' + BP.href('games', L, S) + '">' + (isCurrent ? 'All games' : 'Every game') + '</a><a class="qk-btn ghost" href="' + BP.href('standings', L, S) + '">Standings</a>' });
+      if (isCurrent) h += FOLLOW_SLOT;
     }
 
     /* round 9: a finished MLB season opens with its recap (the champion, our calls against what happened, the awards);
@@ -501,6 +544,7 @@ function render(el, params) {
     if (L === 'mlb') h += '<p class="qk-sub bp-ov-doing">Every forecast is checked against the result: <a class="qk-link" href="#/calibration">How we’re doing →</a></p>';
 
     el.innerHTML = h;
+    followFill(el.querySelector('#ov-follow'), rows, L, S);
     if (recapOn) recapFill(el.querySelector('#ov-recap'), played, season, L, S, { title: decided ? (dig.stage || {}).title : null });
     if (landing) { formFill(el.querySelector('#ov-form'), L, S); chaseFill(el.querySelector('#ov-chase'), L, S); }
     if (L === 'aaa') aaaFill(el, sp, L, S);

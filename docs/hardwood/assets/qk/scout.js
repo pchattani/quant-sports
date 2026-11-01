@@ -559,10 +559,12 @@ QK.powerBars = function (rows, o) {
       var nm = '<span class="qk-pw-nm' + QK.longName(r.name, 20) + '">' + esc(r.name) + '</span>';
       var team = (r.href ? '<a class="qk-pw-team" href="' + esc(r.href) + '">' : '<span class="qk-pw-team">') + QK.teamMark({ abbr: r.abbr, colour: r.colour, name: r.name }, 'sm') +
         '<span class="qk-pw-who">' + nm + (r.sub ? '<small>' + esc(r.sub) + '</small>' : '') + '</span>' + (r.href ? '</a>' : '</span>');
+      /* round 12 (My Teams): r.follow (a QK.follow item) puts the star toggle beside the club; a followed row is marked */
+      if (r.follow && QK.followButton) team = '<span class="qk-pw-tw">' + team + QK.followButton(r.follow, { compact: true, cls: 'qk-pw-fl' }) + '</span>';
       var cells = (r.cells || []).map(function (c) { return '<span class="qk-pw-cell"><small>' + esc(c.label) + '</small>' + (c.html !== undefined ? c.html : esc(c.text)) + '</span>'; }).join('');
       var form = r.form ? '<span class="qk-pw-cell"><small>' + esc(o.formLabel || 'Last 10') + '</small>' + QK.formDots(r.form, o.formN || 10) + '</span>' : '';
       var ch = (r.chances || []).filter(function (c) { return isNum(c.p) || c.text; }).map(function (c) { return '<span class="qk-pw-ch">' + esc(c.label) + ' <b>' + esc(c.text || QK.fmt.pct(c.p)) + '</b></span>'; }).join('');
-      return '<div class="qk-pw-row" role="listitem"><span class="qk-pw-rk qk-outline num" aria-hidden="true">' + esc(r.rank) + '</span>' + team +
+      return '<div class="qk-pw-row' + (r.follow && QK.follow && QK.follow.has(r.follow.k) ? ' is-followed' : '') + '" role="listitem"><span class="qk-pw-rk qk-outline num" aria-hidden="true">' + esc(r.rank) + '</span>' + team +
         '<div class="qk-pw-mid">' + bar(r) + '</div><span class="qk-pw-v num">' + esc(r.text || '') + '</span>' +
         '<div class="qk-pw-cells">' + cells + form + (ch ? '<span class="qk-pw-chs">' + ch + '</span>' : '') + '</div></div>';
     }).join('');
