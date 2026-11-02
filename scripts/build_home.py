@@ -103,7 +103,7 @@ PENDING = [
     # pchattani/the-quant-scrum serves Pages (and drop `pending: true` in docs/_design/quant.js)
     ("rugby", "scrum", "scrum", "Rugby", "The Quant Scrum"),
 ]
-LAUNCHED: set[str] = {"college"}   # The Quant Campus, launched 21 Oct 2026
+LAUNCHED: set[str] = {"college", "rugby"}   # The Quant Campus, launched 21 Oct 2026; The Quant Scrum, 2 Nov 2026
 STALE_HOURS = 6   # a sport whose input is older than this is flagged stale in home.json
 
 # Football competitions in rough order of how many fans care; used to pick which fixtures

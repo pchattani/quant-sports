@@ -314,8 +314,8 @@ QK.ALL_SPORTS = [
   { key: 'f1',         label: 'F1',         site: 'The Quant Paddock',    repo: 'the-quant-paddock',    folder: 'paddock',  leagues: 'Formula 1 · 1950 to today' },
   { key: 'tennis',     label: 'Tennis',     site: 'The Quant Ace',        repo: 'the-quant-ace',        folder: 'ace',      leagues: 'ATP · WTA' },
   { key: 'college',    label: 'College',    site: 'The Quant Campus',     repo: 'the-quant-campus',     folder: 'campus',   leagues: 'CFB · Men’s and women’s college basketball' },
-  /* The Quant Scrum (international rugby union, Nov 2026): pending until its Pages repo exists (QK.visible) */
-  { key: 'rugby',      label: 'Rugby',      site: 'The Quant Scrum',      repo: 'the-quant-scrum',      folder: 'scrum',    leagues: 'Men’s tests · Six Nations, Rugby Championship, World Cup', pending: true }
+  /* The Quant Scrum (international rugby union), launched 2 Nov 2026 */
+  { key: 'rugby',      label: 'Rugby',      site: 'The Quant Scrum',      repo: 'the-quant-scrum',      folder: 'scrum',    leagues: 'Men’s tests · Six Nations, Rugby Championship, World Cup' }
 ];
 QK.ALL_SPORTS.forEach(function (s) { s.url = PUB + s.repo + '/'; s.data = s.url + 'data/'; s.accent = 'var(--a-' + s.key + ')'; });
 QK.sport = function (key) { for (var i = 0; i < QK.ALL_SPORTS.length; i++) if (QK.ALL_SPORTS[i].key === key) return QK.ALL_SPORTS[i]; return null; };

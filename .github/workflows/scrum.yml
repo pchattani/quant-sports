@@ -6,7 +6,10 @@ name: Scrum (rugby)
 # comparison as an artifact. Raw data and model caches live in the Actions cache; nothing raw is committed.
 
 on:
-  # not launched yet: by hand only (scripts/gen_ci_workflows.py, SITES['scrum']['launched'])
+  schedule:
+    - cron: '42 * * * *'
+  repository_dispatch:
+    types: [hourly]
   workflow_dispatch:
     inputs:
       shadow:
