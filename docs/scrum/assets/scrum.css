@@ -137,3 +137,15 @@ body.qk { font-size: var(--fs-md); }
   .sc-bracket li, .sc-finals li { padding: 8px; }
   .sc-events .w { min-width: 0; }
 }
+
+/* roster strength grades (team page), 2 Nov 2026 */
+.sc-grades { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 14px; }
+.sc-grade { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.sc-grade b { flex: 0 0 auto; width: 30px; height: 30px; display: grid; place-items: center; font: 400 1.25rem/1 var(--font-display); color: #fff; }
+.sc-grade .t { display: block; font-weight: 700; color: var(--ink-1); }
+.sc-grade small { display: block; color: var(--ink-3); font-size: var(--fs-xs); }
+.sc-grade.g-a b { background: #3f5bd9; } .sc-grade.g-b b { background: #5b72c9; } .sc-grade.g-c b { background: #6a7387; }
+.sc-grade.g-d b { background: #b5603f; } .sc-grade.g-f b { background: #c8402e; }
+.sc-sn li { align-items: flex-start; flex-wrap: nowrap; }
+.sc-sn li > span:last-child { min-width: 0; }
+@media (max-width: 600px) { .sc-grades { grid-template-columns: minmax(0, 1fr); } }

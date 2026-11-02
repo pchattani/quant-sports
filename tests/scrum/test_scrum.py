@@ -97,6 +97,35 @@ def test_update_moves_by_the_learning_rate_and_caps_the_error():
     assert abs(mdl2.rating("England") - (8.0 + 0.1 * 20)) < 1e-9         # an 80-point win teaches no more than 20
 
 
+def test_kalman_rates_move_two_unproven_sides_less_and_clip_blowouts():
+    p = Params(H=0.0, split=False, kal=True, v0=400.0, q=0.0, s0=12.0, s1=0.0, cap=60.0, mclip=40.0, k_mu=0.0,
+               c_km=0, c_tz=0, c_rest=0)
+    mdl = Model(p)
+    for _ in range(30):                                                     # England and France become established
+        mdl.update(_m("England", "France", 20, 20, neutral=True))
+    assert mdl.v["England"] < 30.0
+    m = _m("Austria", "Slovakia", 117, 3, neutral=True)
+    mdl.update(m)
+    k = 400.0 / (400.0 + 400.0 + 144.0)                                    # v / (v_h + v_a + sd^2)
+    assert abs(mdl.rating("Austria") - (-22.0 + k * 40.0)) < 1e-6          # the 114-point win counts as 40
+    assert mdl.v["Austria"] == pytest.approx(400.0 * (1 - k))
+    m2 = _m("Germany", "England", 0, 20, neutral=True)                     # a new side against an established one
+    e = mdl.expect(m2)
+    before = mdl.rating("England")
+    mdl.update(m2, e)
+    assert abs(mdl.rating("England") - before) < abs(mdl.rating("Germany") + 22.0)   # the established side barely moves
+
+
+def test_ratings_ranks_are_consecutive_and_skip_provisional_and_invitational():
+    from types import SimpleNamespace
+    from oddsmarkets.rugby import pages
+    teams = [{"id": "a", "tier": 1, "n": 50, "conn": 10}, {"id": "b", "tier": 3, "n": 6, "conn": 0},
+             {"id": "c", "tier": 2, "n": 40, "conn": 9}, {"id": "d", "tier": 3, "n": 12, "conn": 4},
+             {"id": "e", "tier": 2, "n": 3, "conn": 3}]
+    assert [pages.comparable(t) for t in teams] == [True, False, True, True, False]
+    assert nations.invitational("British and Irish Lions") and not nations.invitational("Barbados")
+
+
 def test_walk_forward_never_sees_the_match_it_forecasts():
     ms = [_m("England", "France", 30, 10, date="2025-02-01T15:00Z"), _m("England", "France", 30, 10, date="2025-03-01T15:00Z")]
     rows = models.walk(ms, Params(split=False), keep_from=2000)
@@ -241,3 +270,21 @@ def test_follow_cards_one_per_team_under_8kb(tmp_path, monkeypatch):
     assert card["k"] == f"scrum:men:{files[0]}" and card["sport"] == "rugby" and card["team"]["href"].startswith("#/men/team/")
     fx = json.loads((tmp_path / "data" / "men" / "fixtures.json").read_text(encoding="utf-8"))
     assert all(c["date"] >= "2026-11-02" for c in fx["upcoming"])          # nothing past the clock is "upcoming"
+
+
+def test_win_chance_path_starts_at_the_pre_match_call_and_ends_at_the_result():
+    from oddsmarkets.rugby import pages
+    m = {"hs": 20, "as": 10, "status": "final", "events": [[10, "try", "h", "1", "A", 5, 0], [70, "pg", "a", "2", "B", 5, 3], [79, "try", "h", "1", "A", 20, 10]]}
+    path = pages.win_chance_path(m, {"margin": 0.0, "sd": 14.0})
+    assert path[0] == [0, 0.5] or abs(path[0][1] - 0.4859) < 0.02          # level before kick-off (the draw band aside)
+    assert path[-1] == [80, 1.0] and path[1][1] > 0.5
+    assert pages.win_chance_path({"hs": 1, "as": 0, "events": []}, {"margin": 0}) is None
+
+
+def test_game_value_counts_actions_minus_replacement_over_the_minutes():
+    from oddsmarkets.rugby import pages
+    w = {"m": 0.05, "cb": 0.9, "tk": 0.1, "pc": -0.7}
+    ana = {"repl": {"centres": 0.8}}
+    v = pages.game_value({"m": 100, "cb": 2, "tk": 10, "pc": 1}, 40.0, "centres", ana, w)
+    assert abs(v - (5.0 + 1.8 + 1.0 - 0.7 - 0.4)) < 1e-9
+    assert pages.game_value({}, 80, "centres", ana, w) is None

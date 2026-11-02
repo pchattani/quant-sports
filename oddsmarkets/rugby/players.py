@@ -41,8 +41,9 @@ JERSEY_POS = {1: "P", 2: "H", 3: "P", 4: "L", 5: "L", 6: "FL", 7: "FL", 8: "N8",
               13: "C", 14: "W", 15: "FB", 16: "H", 17: "P", 18: "P", 19: "L", 20: "FL", 21: "SH", 22: "FH", 23: "C"}
 PRIOR_MIN = 240.0
 QUAL_MIN = {"season": 160.0, "career": 400.0}       # minutes for a qualified percentile
-RATE_KEYS = ["pts", "tries", "ta", "m", "car", "cb", "db", "off", "pas", "tk", "mt", "lo", "rk", "ml", "toc", "ko", "pc",
+RATE_KEYS = ["pts", "tries", "ta", "m", "car", "cb", "db", "off", "pas", "tk", "mt", "lo", "lot", "rk", "ml", "toc", "ko", "pc",
              "kfh", "yc", "rc", "con", "pg", "dg"]
+LINEOUT_AVG, LINEOUT_PRIOR = 0.86, 30.0    # a hooker's throws: shrunk toward the average with 30 throws of weight
 # process stats the value model weighs (player keys; the team keys in models.VALUE_TEAM)
 # lineouts won is a team stat here: in the player feed it is the hooker's throws, so it is not a player's value
 VALUE_KEYS = ["m", "cb", "db", "off", "tk", "mt", "toc", "pc", "yc", "rc"]
@@ -185,6 +186,13 @@ def rates(a: dict, prior: dict | None = None, prior_min: float = PRIOR_MIN) -> d
     tk, mt = a["sums"].get("tk", 0.0), a["sums"].get("mt", 0.0)
     out["tkpct"] = (tk + 0.88 * 20) / (tk + mt + 20)                                         # tackle success, shrunk
     out["kpct"] = (a["kick_made"] + 0.72 * 8) / (a["kick_att"] + 8) if a["kick_att"] >= 1 else None
+    # rugby-specific (2 Nov 2026): the hooker's lineout throws (the player feed's "lineouts won" is the thrower's),
+    # shrunk; cards (a red counts as two yellows); goal-kicking points; involvements (carries + tackles + rucks)
+    lot = a["sums"].get("lot", 0.0)
+    out["lopct"] = (a["sums"].get("lo", 0.0) + LINEOUT_AVG * LINEOUT_PRIOR) / (lot + LINEOUT_PRIOR) if lot >= 5 else None
+    out["cards"] = out.get("yc", 0.0) + 2.0 * out.get("rc", 0.0)
+    out["gkp"] = 2.0 * out.get("con", 0.0) + 3.0 * out.get("pg", 0.0) + 3.0 * out.get("dg", 0.0)
+    out["inv"] = out.get("car", 0.0) + out.get("tk", 0.0) + out.get("rk", 0.0)
     return out
 
 

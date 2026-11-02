@@ -76,7 +76,7 @@ freezes it; it travels with the stores.
 
 `docs/scrum/index.html` and `assets/js/sc-*.js` on kit v4 (`assets/qk`, copied by `scripts/design_kit.py`). Routes:
 `#/<S>` overview, `/fixtures`, `/match/<id>`, `/standings?tab=nc|six|trc|rwc&view=`, `/rankings?tab=wr|ours`,
-`/teams`, `/team/<id>`, `/scout?view=board|leaders|chart&grp=`, `/player/<id>`, `/model?tab=method|doing|lab|records|glossary|terms`.
+`/teams`, `/team/<id>`, `/scout?view=board|chart|leaders&grp=all|fwd|back|<group>&min=&team=&tier=&age=&q=&p=&cmp=` (sc-scout.js), `/player/<id>`, `/model?tab=method|doing|lab|records|glossary|terms`.
 
 ## Running and publishing
 

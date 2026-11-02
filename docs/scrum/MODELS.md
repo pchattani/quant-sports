@@ -21,38 +21,55 @@ excludes zero, with calibration no worse)
 
 | Rung | Dev log loss | Dev Brier | Test log loss | Test Brier | Test ECE |
 |---|---|---|---|---|---|
-| Our World Rugby rebuild + a logistic (the baseline) | 0.5819 | 0.3495 | 0.5836 | 0.3674 | 0.041 |
+| Our World Rugby rebuild + a logistic (the baseline) | 0.5819 | 0.3495 | 0.5835 | 0.3674 | 0.041 |
 | Our margin rating with home advantage (`elo`) | 0.5558 | 0.3313 | 0.6326 | 0.3826 | 0.061 |
 | + uncertainty, Glicko-style (`unc`) | 0.5537 | 0.3303 | 0.6171 | 0.3797 | 0.053 |
 | + travel and rest (`ctx`) | 0.5537 | 0.3303 | 0.6171 | 0.3797 | 0.053 |
+| **+ the tier-three fix (`kal`, in use since 2 Nov 2026)** | **0.5484** | **0.3266** | **0.5779** | **0.3578** | **0.038** |
 | + attack and defence (`split`) | 0.5535 | 0.3304 | 0.6374 | 0.3838 | 0.067 |
-| **Hybrid (post hoc):** `unc`, with the rebuild's chance for tests involving a tier-three side | 0.5506 | 0.3281 | **0.5821** | **0.3655** | **0.036** |
+| Hybrid on `kal` (post hoc): the rebuild's chance for tests with a tier-three side | 0.5476 | 0.3260 | 0.5710 | 0.3580 | 0.043 |
+| The old hybrid on `unc` (in use until 2 Nov 2026, post hoc) | 0.5506 | 0.3281 | 0.5823 | 0.3657 | 0.036 |
 
 Paired differences on the test years (negative = the newer rung better):
-- our rating v the rebuild: +0.049 (95% interval +0.011 to +0.087, 825 tests; Lions tests are outside the rankings):
-  **worse**. By pairing (`unc`): level on tier one v one (348 tests, 0.618 v 0.612), better on tier one v two (144,
-  0.220 v 0.253), slightly worse on tier two v two (112, 0.787 v 0.776), much worse with a tier-three side (two v
-  three, 37, 0.557 v 0.395; three v three, 184, 0.840 v 0.710): the tests the development years never saw, where
-  our margin spread (chosen on tier-one rugby) is too confident;
-- uncertainty v rating: −0.0155 (−0.0258 to −0.0051): **promoted** (the sealed choice);
+- `elo` v the rebuild: +0.048 (95% interval +0.010 to +0.086, 830 tests; Lions tests are outside the rankings):
+  worse;
+- uncertainty v rating: −0.0155 (−0.0258 to −0.0051): promoted;
 - travel and rest: the development years chose zero weights (no change): not promoted;
-- attack and defence v the uncertainty rung: +0.020 (+0.007 to +0.034): not promoted (it supplies the total only).
+- **the tier-three fix v the uncertainty rung: −0.039 (−0.060 to −0.019): promoted** (chosen on 2004-2018, where it
+  scores −0.005, −0.015 to +0.005; calibration better, ECE 0.038 against 0.053);
+- attack and defence v the fix: +0.059 (+0.030 to +0.088): not promoted (it supplies the total only);
+- the model in use v the rebuild: −0.006 (−0.032 to +0.020): level (it was +0.048 worse before the fix);
+- the hybrid v the fix: −0.007 (−0.027 to +0.013): not clearly better, so **the hybrid is retired**; against the old
+  hybrid it is −0.011 (−0.023 to −0.000), but that comparison is after the fact.
 
-**In use: the hybrid.** It was decided after the test years showed the gap, so its test score is **not** a sealed
-result: on the same 838 tests it beats the sealed choice by 0.035 (−0.063 to −0.007) and ties the rebuild (−0.0015,
-−0.020 to +0.017), with the best calibration (ECE 0.036). The reasoning is coverage, not fit: with 10 development
-tests involving a tier-three side, our rating has no settings chosen for them, while the rebuild's logistic has no
-free parameter that depends on the tier. The margin and total for every test still come from our rating.
+By tier pairing on the test years (log loss: `unc`, `kal`, the rebuild): tier one v one (348 tests) 0.618, 0.609,
+0.612; one v two (144) 0.220, 0.205, 0.253; two v two (112) 0.787, 0.751, 0.776; two v three (37) 0.557, 0.471,
+0.395; three v three (189) 0.830, 0.723, 0.706. The fix closes most of the tier-three gap and widens our lead where
+tier-one and tier-two sides meet.
+
+**The tier-three fix (2 Nov 2026).** The rating jumps the site showed (Austria fifth after a 117-3 win over
+Slovakia, five other tier-three sides in the top 20) had one cause: sides that only play each other form islands whose
+ratings are identified only up to an offset, and the old learning rate (0.70 a point of surprise for a side's first
+eight tests, the surprise capped at 40) let two unproven sides throw each other ±28 points a match. Three changes, tuned
+together on the development years (`models.GRID_KAL`) and then scored once:
+1. **Kalman learning rates.** Each side carries a rating variance v (2,500 points² for a new side, a spread of 50;
+   +25 at each new year, never above the start). A result moves side i by v_i / (v_h + v_a + sd²) of the surprise
+   (sd = the test's base spread), and v_i shrinks by the same factor. A new side learns fast against an established
+   one; two new sides move each other much less. The margin spread is √(sd² + v_h + v_a).
+2. **A blow-out clip.** The final margin counts up to 60 points before the surprise is taken (cap 40 on the surprise).
+3. **A World Rugby anchor.** The 15% shrink between years aims halfway between the tier mean and the side's World
+   Rugby points (our rebuild from results to date, so no look-ahead) mapped onto our scale: 8 + 2.2 × (points − 78).
 
 Settings (`fitted/params.json`): home advantage 5.0 points (none at a neutral venue or a "home" test far from home);
-learning rate 0.15 a point of surprise (0.70 for a side's first 8 tests); surprise capped at 40 points; 15% shrink
-toward the tier mean each new year; margin spread 12.0 + 0.12 per point of expected margin, widened by 20 points ×
-√(1/(tests+1)) for each side's rating uncertainty; draw = final margin within ±0.5. The rebuild's logistic: P(home
-win | no draw) = 1 / (1 + e^−(0.084 + 0.169 × gap)), draws 2.4%.
+the Kalman rates above; margin spread 11.0 + 0.05 per point of expected margin plus the two sides' variances;
+draw = final margin within ±0.5. Ranking rule on the site (`pages.ratings_payload`): a side is ranked only with five
+or more tests rated and a tier-one or tier-two side or three or more tests against one in four years; the rest are
+provisional and unranked, and invitational sides (Lions, Barbarians) are not in the ratings table. (Barbados shared
+the Barbarians' code until 2 Nov 2026 and was wrongly treated as invitational; it is now BRB.)
 
-Calibration of the hybrid on the test years (our home-win chance, then how often it happened): 0-10% 5%→3% (39),
-10-20% 15%→14% (50), 20-30% 26%→38% (53), 30-40% 36%→40% (57), 40-50% 45%→43% (56), 50-60% 55%→49% (97),
-60-70% 65%→64% (131), 70-80% 74%→64% (99), 80-90% 85%→85% (114), 90-100% 95%→94% (142).
+Calibration of the model in use on the test years (our home-win chance, then how often it happened): 0-10% 5%→11%
+(70), 10-20% 15%→19% (43), 20-30% 26%→31% (54), 30-40% 35%→46% (56), 40-50% 44%→41% (74), 50-60% 55%→56% (102),
+60-70% 65%→66% (97), 70-80% 74%→69% (70), 80-90% 85%→82% (96), 90-100% 96%→93% (176).
 
 **Totals:** our expected total (the attack/defence ratings) misses by 13.8 points a test on the test years, against
 13.3 for the development years' average total: not better, so treat the total as a rough guide; it is kept because
@@ -109,16 +126,35 @@ group's replacement level (its 20th percentile), plus goal kicking above a 72% k
 each metric and the minutes it takes to settle (m50) are in the spec; ESPN's player "lineouts won" is the hooker's
 throws (it is zero for every lock), so it is not a player metric.
 
+**Rugby-specific player measures (2 Nov 2026).** Lineout throws won (the hooker's throws: our source credits the
+thrower; shrunk toward 86% with 30 throws of weight, shown from five throws), mauls won, knock-ons, cards (a red counts
+as two yellows), goal-kicking points and involvements (carries + tackles + rucks won), all per 80 and shrunk like the
+rest. Kicking success by distance and ruck speed are not possible: the feed has no kick distance or ruck timing.
+
+**Game value.** A player's value in one test: the value weights on his own counts, minus a replacement-level player of
+his group over the same minutes, plus goal kicking above an average kicker. It drives "who made the difference" on the
+match page and the test-by-test chart on the player page.
+
+**Team-page extras.** Position-group grades (each side's best regulars by Scrum value per 80: four front-rowers, two
+locks, three back-rowers, two half-backs, two centres, three in the back three; ranked against the ranked sides, A the
+top 15% and F the bottom 15%); the most-used starting pairs (9-10, 12-13, 4-5) with their record; wins against the wins
+our pre-test chances expected over the last 40 tests. **Win chance through a test:** from the pre-match margin and
+spread and the score at each scoring event, the remaining margin shrinking with the time left (spread × √(time left)).
+
 ## 6. Team profile
 
-23 per-test team measures over the last two years, opponent-adjusted (a team's average minus how far its opponents'
-average conceded is from the field's), percentiles among sides with six or more tests. Possession, territory, kicking
-metres and offloads are marked as style.
+30 per-test team measures over the last two years, opponent-adjusted (a team's average minus how far its opponents'
+average conceded is from the field's), percentiles among sides with six or more tests with team statistics. Groups:
+attack, defence, breakdown (turnovers won, ruck retention, breakdown penalties), set piece (scrum and lineout success,
+steals, maul metres, scrum penalties won), discipline (penalties, cards, turnovers conceded, offside penalties), kicking
+(kicking metres, goal kicking, kicks regathered, territory, possession) and conversion (points per 10% of territory and
+of possession). Possession, territory, kicking metres and offloads are marked as style. Our source has no team or
+player statistics for the 2026 Nations Championship, so only ten sides have a profile today.
 
 ## 7. What did not make it, and next
 
 - Travel and rest are built (distance in log-thousand-km, time zones, days since the last test; a "home" test played
   far from home is treated as neutral) but the development years gave them zero weight.
-- The tier-three gap: once enough tier-two/three tests are in the past (the feed has them from 2015), a re-split
+- The tier-three gap: the 2 Nov 2026 fix closed most of it (three v three 0.723 against the rebuild's 0.706). Once enough tier-two/three tests are in the past (the feed has them from 2015), a re-split
   (for example development 2004-2022, test 2023-) can choose settings that see them; decided in advance, scored once.
 - Women: no separate fit (88 matches). Sevens: only the Olympic tournaments are in the feed, not enough for ratings.

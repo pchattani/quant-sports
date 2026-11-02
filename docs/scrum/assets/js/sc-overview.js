@@ -43,7 +43,7 @@ function powerBoard(S, rows) {
     var t = SC.team(S, r.id) || {};
     return { rank: r.rank, name: t.name, abbr: t.abbr, colour: t.colour, href: SC.teamHref(S, r.id), value: r.rating, text: SC.signed(r.rating, 1),
       parts: { att: r.att, dfn: r.dfn }, form: r.form, follow: SC.followItem(S, r.id),
-      cells: [{ label: 'World Rugby', text: isNum(r.wr) ? SC.f(r.wr, 2) : '—' }, { label: 'Last 12 months', text: (r.rec12 || []).join('–') }],
+      cells: [{ label: 'World Rugby rank', text: r.wr_rank ? QK.ordinal(r.wr_rank) : '—' }, { label: 'Last 12 months', text: (r.rec12 || []).join('–') }],
       sub: isNum(r.d30) && Math.abs(r.d30) >= 0.05 ? SC.signed(r.d30, 1) + ' in 30 days' : '' };
   }) }], parts: parts, valueLabel: 'Our rating', unit: 'points v an average test side', formN: 5, formLabel: 'Last 5' });
 }
@@ -90,6 +90,61 @@ function stars(S, list) {
     })));
 }
 
+/* Top and bottom performers across test rugby (QKL.leaders, as Hardwood's league pages): every key number of each
+   position group, the five best and the five at the bottom among the regulars */
+var LD_HEAD = { all: ['val80', 'inv', 'm', 'cb', 'tk', 'tkpct', 'pc'], front_row: ['val80', 'tk', 'tkpct', 'car', 'lopct'], lock: ['val80', 'tk', 'tkpct', 'car', 'ml'],
+  back_row: ['val80', 'tk', 'car', 'm', 'db'], halves: ['val80', 'pts', 'pas', 'kfh', 'gkp'], centres: ['val80', 'm', 'cb', 'db', 'off'], back_three: ['val80', 'm', 'cb', 'db', 'tries'] };
+function leaders(el, S) {
+  if (!el || !window.QKL || !QKL.leaders || !QKL.board) return;
+  SC.load(S + '/players.json').then(function (bd) {
+    if (!SC.ok(bd) || !U.alive(el)) return;
+    var cols = bd.cols || [], rows = (bd.rows || []).map(function (r) { var o = {}; for (var i = 0; i < cols.length; i++) o[cols[i]] = r[i]; return o; }).filter(function (r) { return r.q; });
+    var M = {};
+    (bd.metrics || []).forEach(function (m) { M[m.id] = m; });
+    var mk = function (ids, rs) {
+      return ids.filter(function (id) { return M[id]; }).map(function (id) {
+        var m = M[id];
+        return QKL.board(rs.map(function (r) { return { id: r.id, name: r.n, team: r.team, v: r[id] }; }), { key: id, label: m.label, unit: '', dir: m.dir === 'lower' ? 'lower' : 'higher',
+          fmt: (id === 'tkpct' || id === 'kpct' || id === 'lopct') ? 'pct1' : id === 'val80' ? '+1' : '1', ours: id === 'val80' ? 'Scrum value' : '', tip: '' }, 5);
+      }).filter(function (x) { return x.n > 1; });
+    };
+    var views = [{ key: 'all', label: 'All players', entity: 'player', peer: 'regulars', min: '160 minutes in the last two years', metrics: mk(LD_HEAD.all, rows) }];
+    Object.keys(SC.GROUP).forEach(function (g) {
+      var rs = rows.filter(function (r) { return r.grp === g; });
+      if (rs.length >= 8) views.push({ key: g, label: SC.GROUP[g], entity: 'player', peer: SC.GROUP[g].toLowerCase(), min: '160 minutes in the last two years', metrics: mk(LD_HEAD[g], rs) });
+    });
+    QKL.leaders(el, { data: { views: views }, title: 'Who leads test rugby, and who is struggling',
+      sub: 'The leaders and the bottom of the regulars on each key number, overall and by position group. Rates per 80 minutes over the last two years, shrunk toward the position average.',
+      team: function (k) { var t = SC.team(S, k) || {}; return { abbr: t.abbr, name: t.name, colour: t.colour, href: SC.teamHref(S, k) }; },
+      href: function (id) { return SC.playerHref(S, id); }, scope: 'field' });
+  });
+}
+
+/* "Your teams in our ratings" (Rink's "Your clubs v the league"): each followed side with the sides either side of it */
+var RATED = {};
+function followBoard(S, cards) {
+  var rr = RATED[S];
+  if (!QK.powerBars || !rr || rr.length < 3) return '';
+  var mine = {};
+  cards.forEach(function (c) { var p = String(c.k || '').split(':'); if (p[0] === 'scrum' && p[1] === S) mine[p[2]] = 1; });
+  var keep = {};
+  rr.forEach(function (r, i) { if (mine[r.id]) [i - 1, i, i + 1].forEach(function (j) { if (j >= 0 && j < rr.length) keep[j] = 1; }); });
+  var ix = Object.keys(keep).map(Number).sort(function (a, b) { return a - b; });
+  if (!ix.length) return '';
+  var groups = [];
+  ix.forEach(function (i, n) { if (!n || i !== ix[n - 1] + 1) groups.push({ label: '', rows: [] }); groups[groups.length - 1].rows.push(i); });
+  groups.forEach(function (g) {
+    g.rows = g.rows.map(function (i) {
+      var r = rr[i], t = SC.team(S, r.id) || {};
+      return { rank: r.rank, name: t.name, abbr: t.abbr, colour: t.colour, href: SC.teamHref(S, r.id), value: r.rating, text: SC.signed(r.rating, 1), follow: SC.followItem(S, r.id),
+        sub: (r.rec12 || []).join('–') + ' in 12 months' + (mine[r.id] ? ' · you follow' : '') };
+    });
+  });
+  return '<div class="sc-flboard"><div class="qk-fc-k">Your teams in our ratings</div><div class="qk-card"><div class="qk-card-body">' +
+    QK.powerBars(null, { groups: groups, valueLabel: 'Our rating', unit: 'points v an average test side', key: false }) +
+    '<p class="qk-caption">Each side you follow in our ranking of ' + rr.length + ', with the sides either side. Provisional ratings are not ranked. <a class="qk-link" href="' + esc(SC.href(S, 'rankings', null, 'tab=ours')) + '">Every side →</a></p></div></div></div>';
+}
+
 function quadrant(el, S, pts) {
   if (!el || !pts || pts.length < 5 || !window.QKC || !QKC.quadrant) return;
   QKC.quadrant(el, { points: pts.map(function (p) {
@@ -101,7 +156,9 @@ function quadrant(el, S, pts) {
 SC.route('overview', function (page, P) {
   var S = P.S;
   page.innerHTML = QK.skeleton('lines', 8);
-  return SC.load(S + '/overview.json').then(function (d) {
+  return Promise.all([SC.load(S + '/overview.json'), SC.load(S + '/ratings.json')]).then(function (res) {
+    var d = res[0], rt = res[1];
+    if (SC.ok(rt)) RATED[S] = (rt.teams || []).filter(function (t) { return isNum(t.rank); });
     if (!SC.ok(d)) { page.innerHTML = U.head(SC.SNAME[S], '', SC.SITE) + U.missing('The overview', d); return; }
     var info = SC.info(S);
     var next = (d.upcoming || [])[0];
@@ -120,9 +177,9 @@ SC.route('overview', function (page, P) {
       'Our chance for each side, the draw where it is live, and the margin and total we expect. Click a test for the full forecast.', upcomingGrid(S, d.upcoming),
       '<a class="qk-more" href="' + esc(SC.href(S, 'fixtures')) + '">Every fixture</a>');
     html += '<div id="ov-races"></div>';
-    html += U.sec('Power board', 'Who is best right now?', 'Our rating is points better than an average test side on a neutral ground, split into attack (points scored above average) and defence (points kept out). Sides that rarely meet tier-one and tier-two opposition are left off: their ratings sit on a scale of their own. The World Rugby column is our rebuild of the official table.',
+    html += U.sec('Power board', 'Who is best right now?', 'Our rating is points better than an average test side on a neutral ground, split into attack (points scored above average) and defence (points kept out). The rank is ours; the World Rugby rank beside it is our rebuild of the official table, a different system, so the two can disagree. Sides that rarely meet tier-one and tier-two opposition are not ranked: their ratings are provisional.',
       powerBoard(S, d.power), '<a class="qk-more" href="' + esc(SC.href(S, 'rankings', null, 'tab=ours')) + '">Every side</a>');
-    html += '<div id="ov-stars"></div>';
+    html += '<div id="ov-stars"></div><div id="ov-leaders"></div>';
     html += U.sec('Stories', 'What the numbers say', 'Movers, runs and the sides doing more (or less) than their rating says.', stories(S, d.stories) +
       '<div class="qk-g75 sc-real"><div>' + U.card('Who’s for real?', 'Our rating across, the share of tests won over two years up. Top-left: winning more than the rating suggests (a soft schedule, close wins). Bottom-right: the reverse.', U.chart('ov-quad', 380, 'Rating against tests won')) +
       '</div><div>' + QK.newHere({ items: ['A <b>chance</b> is how often we think something happens. 70% still loses 3 times in 10.',
@@ -135,12 +192,13 @@ SC.route('overview', function (page, P) {
     var fl = QK.$('#sc-follow', page);
     if (fl && QK.followSection) QK.followSection(fl, { site: 'scrum', scope: S, full: true, feed: false, title: 'Your teams',
       scopeLabel: function (s) { return SC.SNAME[s] || s; }, scopeHref: function (s) { return '#/' + s; },
-      picker: { sport: 'rugby', rows: SC.followRows() } });
+      picker: { sport: 'rugby', rows: SC.followRows() }, board: function (cards) { return followBoard(S, cards); } });
     var rn = QK.$('#ov-races', page);
     if (rn && d.races && d.races.length) rn.innerHTML = '<section class="qk-section sc-sec">' + races(S, d.races) + '</section>';
     var st = QK.$('#ov-stars', page);
     if (st) st.innerHTML = stars(S, d.stars);
     quadrant(QK.$('#ov-quad', page), S, d.real);
+    leaders(QK.$('#ov-leaders', page), S);
   });
 });
 })();

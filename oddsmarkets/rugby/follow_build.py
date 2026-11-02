@@ -43,7 +43,7 @@ def build(res: dict, data_root: Path) -> dict:
     asof = S.now
     phase = _phase(S)
     rk = {t["id"]: t for t in ratings["teams"]}
-    n_rated = len(ratings["teams"])
+    n_rated = ratings.get("n_ranked") or sum(1 for t in ratings["teams"] if t.get("rank"))
     label = config.SCOPES[S.scope]["label"]
     cards = {}
     for tid, t in res["info"]["teams"].items():
@@ -68,11 +68,19 @@ def build(res: dict, data_root: Path) -> dict:
         st = FL.streak_of(results, asof)
         if st and st[1] >= 2:
             now_blk["streak"] = f"{st[0]}{st[1]}"
-        if r:
+        if r and r.get("rank"):
             now_blk["rating"] = {"value": r["rating"], "text": ("+" if r["rating"] >= 0 else "") + f"{r['rating']:.1f}",
                                  "rank": r["rank"], "of": n_rated, "label": "Our rating"}
-            now_blk["standing"] = {"pos": r["rank"], "of": n_rated, "text": f"{FL.ordinal(r['rank'])} in our ratings" +
-                                   (f" · World Rugby {r['wr']:.2f}" if r.get("wr") is not None and S.scope == "men" else "")}
+            wr_txt = ""
+            if r.get("wr_rank") and S.scope == "men":
+                wr_txt = " · " + FL.ordinal(r["wr_rank"]) + " in World Rugby's (our rebuild)"
+            now_blk["standing"] = {"pos": r["rank"], "of": n_rated, "text": FL.ordinal(r["rank"]) + " in our ratings" + wr_txt}
+        elif r:
+            # provisional: too few tests against the main pool to rank (pages.ratings_payload)
+            now_blk["rating"] = {"value": r["rating"], "text": ("+" if r["rating"] >= 0 else "") + f"{r['rating']:.1f}",
+                                 "label": "Our rating (provisional)"}
+            if r.get("wr_rank") and S.scope == "men":
+                now_blk["standing"] = {"pos": r["wr_rank"], "text": FL.ordinal(r["wr_rank"]) + " in World Rugby's (our rebuild)"}
         chances = []
         for key, c in comps_out.items():
             sim = (c.get("next") or {}).get("sim") or c.get("sim")
@@ -135,7 +143,7 @@ def build(res: dict, data_root: Path) -> dict:
                     "metric": "value per 80", "value": round(v, 2), "text": ("+" if v >= 0 else "") + f"{v:.1f}",
                     "href": f"#/{S.scope}/player/{aid}"} for v, aid, rec in pl[:2]]
         ctx = {"name": t["name"], "short": t["name"], "the": False, "phase": phase, "results": results,
-               "rating": {"rank": r["rank"], "of": n_rated, "text": now_blk["rating"]["text"], "unit": "points"} if r else None,
+               "rating": {"rank": r["rank"], "of": n_rated, "text": now_blk["rating"]["text"], "unit": "points"} if r and r.get("rank") else None,
                "league_name": label}
         if nxt:
             n0 = nxt[0]

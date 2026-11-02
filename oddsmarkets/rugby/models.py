@@ -15,6 +15,8 @@ per-match log-loss difference excludes zero, calibration no worse):
   unc    + uncertainty (Glicko-style): the margin spread widens for a side with few tests rated and for tests between
          lesser sides (by the weaker side's tier), and a new side's rating learns faster
   ctx    + travel (distance and time zones) and rest
+  kal    + the tier-three fix: Kalman learning rates from each side's rating variance, a blow-out clip on the final
+         margin and a between-years shrink toward the World Rugby replica mapped onto our scale (2 Nov 2026)
   split  attack and defence ratings (gives the expected total as well as the margin)
   hybrid (post hoc, reported as such) the best rung, with the chance of any test involving a tier-three side taken
          from the World Rugby rebuild: the development years hold 10 such tests, so our rating has no settings
@@ -102,6 +104,13 @@ GRID_ELO = {"H": [2.0, 3.0, 4.0, 5.0, 6.0, 7.0], "k": [0.06, 0.08, 0.10, 0.12, 0
             "k_new": [0.2, 0.3, 0.4, 0.5], "cap": [20.0, 25.0, 30.0, 40.0, 60.0], "revert": [0.0, 0.1, 0.2, 0.3],
             "s0": [9.0, 10.0, 11.0, 12.0, 13.0, 14.0], "s1": [0.0, 0.05, 0.1, 0.15, 0.2, 0.25]}
 GRID_UNC = {"s_n": [0.0, 10.0, 20.0, 30.0, 40.0, 60.0, 80.0], "s_tier": [0.0, 1.0, 2.0, 3.0, 4.0, 6.0, 8.0], "k_new": [0.2, 0.3, 0.4, 0.5, 0.7], "n_new": [4, 8, 12, 20]}
+# the tier-three fix (2 Nov 2026): Kalman learning rates (a test between two unproven sides moves both less), a
+# blow-out clip on the final margin, and a between-years shrink toward the World Rugby replica's points mapped onto
+# our scale; tuned together on the development years from the `unc` rung (with `kal` on, k/k_new/s_n are unused)
+GRID_KAL = {"v0": [100.0, 225.0, 400.0, 625.0, 900.0, 1600.0, 2500.0, 3600.0], "q": [0.0, 5.0, 10.0, 25.0, 50.0],
+            "s0": [9.0, 10.0, 11.0, 12.0, 13.0], "s1": [0.0, 0.05, 0.1, 0.15, 0.2], "cap": [20.0, 30.0, 40.0, 60.0],
+            "mclip": [0.0, 30.0, 40.0, 50.0, 60.0, 80.0], "anchor": [0.0, 0.25, 0.5, 0.75, 1.0],
+            "b_map": [1.0, 1.4, 1.8, 2.2, 2.6, 3.0]}
 GRID_CTX = {"c_km": [0.0, 0.5, 1.0, 1.5, 2.0, 3.0], "c_tz": [0.0, 0.1, 0.2, 0.3, 0.5], "c_rest": [0.0, 0.25, 0.5, 1.0]}
 
 

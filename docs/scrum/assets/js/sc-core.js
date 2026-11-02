@@ -106,6 +106,8 @@ SC.date = function (iso, withTime) {
   var d = s.length === 10 ? new Date(s + 'T12:00:00Z') : new Date(s);
   if (isNaN(d)) return '—';
   var t = fmt.date(d.toISOString());
+  /* a date outside the current year carries its year (a 2015 last test must not read as this October) */
+  if (d.getUTCFullYear() !== new Date(QK.now()).getUTCFullYear() && !/\d{4}/.test(t)) t += ' ' + d.getUTCFullYear();
   return withTime && s.length > 10 ? t + ' ' + fmt.time(s) : t;
 };
 SC.year = function (iso) { return String(iso || '').slice(0, 4); };

@@ -46,7 +46,7 @@ NATIONS = {
     "Nigeria": ("NGR", 6.52, 3.38, 1, 3), "Ghana": ("GHA", 5.60, -0.19, 0, 3), "Cameroon": ("CMR", 3.85, 11.50, 1, 3),
     "Peru": ("PER", -12.05, -77.04, -5, 3), "Venezuela": ("VEN", 10.48, -66.90, -4, 3), "Guyana": ("GUY", 6.80, -58.16, -4, 3),
     "Trinidad and Tobago": ("TTO", 10.65, -61.50, -4, 3), "Jamaica": ("JAM", 18.02, -76.80, -5, 3), "Bermuda": ("BER", 32.30, -64.78, -4, 3),
-    "Cayman Islands": ("CAY", 19.29, -81.37, -5, 3), "Barbados": ("BAR", 13.10, -59.61, -4, 3), "Taiwan": ("TPE", 25.03, 121.57, 8, 3),
+    "Cayman Islands": ("CAY", 19.29, -81.37, -5, 3), "Barbados": ("BRB", 13.10, -59.61, -4, 3), "Taiwan": ("TPE", 25.03, 121.57, 8, 3),
     "Chinese Taipei": ("TPE", 25.03, 121.57, 8, 3), "Thailand": ("THA", 13.76, 100.50, 7, 3), "India": ("IND", 19.08, 72.88, 5.5, 3),
     "Niue": ("NIU", -19.05, -169.92, -11, 3), "Tahiti": ("TAH", -17.53, -149.57, -10, 3), "Solomon Islands": ("SOL", -9.43, 159.95, 11, 3),
     "Vanuatu": ("VAN", -17.73, 168.32, 11, 3), "American Samoa": ("ASA", -14.28, -170.70, -11, 3),

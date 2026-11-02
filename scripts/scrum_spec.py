@@ -39,15 +39,29 @@ EXPLAIN = {
     "rk": "Rucks won per 80 minutes.", "toc": "Turnovers conceded per 80 minutes (fewer is better).",
     "pc": "Penalties conceded per 80 minutes (fewer is better).", "kfh": "Kicks from hand per 80 minutes.",
     "kpct": "Goal-kicking success: conversions and penalties kicked out of attempts.",
+    "lopct": "Lineout throws won: the share of a hooker's throws his side wins (our source credits the thrower), shrunk toward 86% with 30 throws of weight.",
+    "ml": "Mauls won per 80 minutes.", "ko": "Knock-ons per 80 minutes (fewer is better).",
+    "cards": "Yellow and red cards per 80 minutes, a red counting as two (fewer is better).",
+    "gkp": "Goal-kicking points per 80 minutes: conversions, penalty goals and drop goals.",
+    "inv": "Involvements per 80 minutes: carries, tackles and rucks won together, the work rate.",
 }
-UNIT = {"mpc": "metres per carry", "tkpct": "%", "kpct": "%", "val80": "points per 80"}
+UNIT = {"mpc": "metres per carry", "tkpct": "%", "kpct": "%", "lopct": "%", "val80": "points per 80"}
 HEAD = {
-    "front_row": ["val80", "tk", "tkpct", "car", "m", "rk", "db", "pc"], "lock": ["val80", "tk", "tkpct", "car", "m", "rk", "db", "pc"],
-    "back_row": ["val80", "tk", "car", "m", "db", "tkpct", "off", "pc"], "halves": ["val80", "pts", "pas", "kfh", "kpct", "ta", "m", "tk"],
+    "front_row": ["val80", "tk", "tkpct", "car", "lopct", "rk", "inv", "pc"], "lock": ["val80", "tk", "tkpct", "car", "m", "rk", "ml", "pc"],
+    "back_row": ["val80", "tk", "car", "m", "db", "tkpct", "inv", "pc"], "halves": ["val80", "pts", "pas", "kfh", "kpct", "gkp", "ta", "tk"],
     "centres": ["val80", "m", "cb", "db", "car", "off", "ta", "tk"], "back_three": ["val80", "m", "cb", "db", "tries", "mpc", "kfh", "tk"],
 }
+# the Position view of each group (QK.within.view): what makes the position good, its output, its value
+VIEW = {
+    "front_row": (("Work and the set piece", ["tkpct", "lopct", "rk", "mt", "pc"]), ("Carrying and tackling", ["tk", "car", "m", "inv", "ml"]), ("tk", "car")),
+    "lock": (("Work and discipline", ["tkpct", "rk", "mt", "pc", "ml"]), ("Carrying and tackling", ["tk", "car", "m", "inv", "db"]), ("tk", "car")),
+    "back_row": (("Contact and discipline", ["tkpct", "db", "mpc", "mt", "pc"]), ("Carrying and tackling", ["tk", "car", "m", "inv", "off", "rk"]), ("tk", "m")),
+    "halves": (("Control", ["kpct", "ta", "pas", "mt", "toc"]), ("Points and the kicking game", ["pts", "gkp", "kfh", "m", "tk"]), ("pas", "kfh")),
+    "centres": (("Breaking the line", ["cb", "db", "mpc", "tkpct", "off"]), ("Output", ["m", "car", "ta", "tries", "tk"]), ("m", "cb")),
+    "back_three": (("Breaking the line", ["cb", "db", "mpc", "tkpct"]), ("Output", ["m", "tries", "kfh", "car", "ta"]), ("m", "cb")),
+}
 VIEW_WHY = {
-    "front_row": "Props and hookers: the tackle count and its success, carries and rucks; the set piece itself is a team stat.",
+    "front_row": "Props and hookers: the tackle count and its success, carries and rucks, and the hooker's lineout throws (the scrum itself is a team stat).",
     "lock": "Locks: the tackle and carry work (lineout wins are a team stat in our source).", "back_row": "Flankers and number 8s: tackles, carries and the metres after contact.",
     "halves": "Scrum-halves and fly-halves: points (the goal kicker), passing, kicking and try assists.",
     "centres": "Centres: metres, breaks and defenders beaten, then offloads and try assists.",
@@ -75,6 +89,15 @@ def raw_rate(a: dict, k: str):
         return t / (t + m) if t + m else None
     if k == "kpct":
         return a["kick_made"] / a["kick_att"] if a["kick_att"] >= 3 else None
+    if k == "lopct":
+        t = a["sums"].get("lot", 0)
+        return a["sums"].get("lo", 0) / t if t >= 5 else None
+    if k == "cards":
+        return 80.0 * (a["sums"].get("yc", 0.0) + 2 * a["sums"].get("rc", 0.0)) / a["min"] if a["min"] else None
+    if k == "gkp":
+        return 80.0 * (2 * a["sums"].get("con", 0.0) + 3 * a["sums"].get("pg", 0.0) + 3 * a["sums"].get("dg", 0.0)) / a["min"] if a["min"] else None
+    if k == "inv":
+        return 80.0 * sum(a["sums"].get(x, 0.0) for x in ("car", "tk", "rk")) / a["min"] if a["min"] else None
     return 80.0 * a["sums"].get(k, 0.0) / a["min"] if a["min"] else None
 
 
@@ -149,7 +172,9 @@ def main() -> int:
         groups.append({"id": g, "entity": "player", "display": PL.GROUP_NAME[g], "peer_group": "position group " + g + " (" + ", ".join(p for p, gg in PL.POS_GROUP.items() if gg == g) + ")",
                        "position_field": "grp", "position_codes": [g], "minimum": {"field": "min", "value": PL.QUAL_MIN["season"], "unit": "minutes", "note": "minutes in the window (the last two years on the Board, a calendar year for a season row)"},
                        "basis": "per 80 minutes, shrunk toward the group with 240 minutes of prior", "metrics": mets,
-                       "view": {"why": VIEW_WHY[g], "excel": HEAD[g][1:4], "value": ["val80"], "x": HEAD[g][1], "y": HEAD[g][2], "color": "val80"}})
+                       "view": {"why": VIEW_WHY[g], "excellence": {"label": VIEW[g][0][0], "ids": VIEW[g][0][1]},
+                                "production": {"label": VIEW[g][1][0], "ids": VIEW[g][1][1]}, "aggregate": {"label": "Value", "ids": ["val80"]},
+                                "default": {"x": VIEW[g][2][0], "y": VIEW[g][2][1], "color": "val80"}}})
     tm = []
     for order, (i, l, d, grp, _h) in enumerate(AN.TEAM_METRICS, start=1):
         tm.append({"id": i, "display": l, "short": AN.TEAM_SHORT[i], "unit": AN.TEAM_UNITS.get(i, "per test"), "direction": d, "set": "headline" if order <= 12 else "secondary",

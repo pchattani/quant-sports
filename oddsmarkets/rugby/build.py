@@ -162,7 +162,7 @@ def walk(S: Scope) -> dict:
         total = et["total"]
         fc[m["id"]] = {"p_home": e["p_home"], "p_draw": e["p_draw"], "p_away": e["p_away"], "margin": mg, "total": total,
                        "exp_h": (total + mg) / 2, "exp_a": (total - mg) / 2, "edge": e["edge"],
-                       "r_h": mdl.rating(m["home"]["id"]), "r_a": mdl.rating(m["away"]["id"]), "ctx": e["ctx"]}
+                       "r_h": mdl.rating(m["home"]["id"]), "r_a": mdl.rating(m["away"]["id"]), "ctx": e["ctx"], "sd": e.get("sd")}
         mdl.update(m, e)
         tot.update(m, et)
         for t in (m["home"]["id"], m["away"]["id"]):

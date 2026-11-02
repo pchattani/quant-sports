@@ -57,21 +57,21 @@ SC.route('rankings', function (page, P) {
     return SC.load(S + '/ratings.json').then(function (d) {
       if (!U.alive(body)) return;
       if (!SC.ok(d)) { body.innerHTML = U.missing('Our ratings', d); return; }
-      var rows = (d.teams || []).filter(function (t) { return t.n >= 5 && ((t.tier || 3) <= 2 || (t.conn || 0) >= 3); });
-      var rest = (d.teams || []).filter(function (t) { return t.n >= 5 && rows.indexOf(t) < 0; });
+      var rows = (d.teams || []).filter(function (t) { return isNum(t.rank); });
+      var rest = (d.teams || []).filter(function (t) { return !isNum(t.rank); });
       var cols = [{ label: '#' }, { label: 'Team', align: 'left', sticky: true }, { label: 'Rtg' }, { label: 'Attack' }, { label: 'Defence' }, { label: '30 days' }, { label: '12 months' },
-        { label: 'Last 5', align: 'left' }, { label: 'Won-drawn-lost, 12 months' }, { label: 'WR' }, { label: 'Tests' }];
-      var html = '<div class="qk-g75"><div>' + U.card('Every side, by our rating', 'Sides with five or more tests and one in the last four years. Attack is points scored above an average side, defence points kept out; they add up to the rating.',
+        { label: 'Last 5', align: 'left' }, { label: 'Won-drawn-lost, 12 months' }, { label: 'World Rugby rank' }, { label: 'Tests' }];
+      var html = '<div class="qk-g75"><div>' + U.card('Every side, by our rating', 'Sides with five or more tests, one in the last four years, and a tie to the main pool (a tier-one or tier-two side, or three tests against one in four years). Attack is points scored above an average side, defence points kept out; they add up to the rating. The World Rugby rank is our rebuild of the official table, a different system.',
         U.table(cols, rows.map(function (t, i) {
-          return [{ v: i + 1, html: String(i + 1) }, { v: SC.tname(S, t.id), html: U.teamEnt(S, t.id) + SC.followStar(S, t.id) }, { v: t.rating, html: '<b class="sc-ours">' + SC.signed(t.rating, 1) + '</b>' },
+          return [{ v: t.rank, html: String(t.rank) }, { v: SC.tname(S, t.id), html: U.teamEnt(S, t.id) + SC.followStar(S, t.id) }, { v: t.rating, html: '<b class="sc-ours">' + SC.signed(t.rating, 1) + '</b>' },
             { v: t.att, html: SC.signed(t.att, 1) }, { v: t.dfn, html: SC.signed(t.dfn, 1) }, { v: t.d30 || 0, html: '<span class="' + SC.cls(t.d30) + '">' + (isNum(t.d30) ? SC.signed(t.d30, 1) : '—') + '</span>' },
             { v: t.d365 || 0, html: '<span class="' + SC.cls(t.d365) + '">' + (isNum(t.d365) ? SC.signed(t.d365, 1) : '—') + '</span>' }, { v: t.form, html: U.form(t.form) },
-            { v: (t.rec12 || [0])[0], html: (t.rec12 || []).join('–') }, { v: t.wr || 0, html: isNum(t.wr) ? SC.f(t.wr, 2) : '—' }, { v: t.n, html: String(t.n) }];
+            { v: (t.rec12 || [0])[0], html: (t.rec12 || []).join('–') }, { v: t.wr_rank || 999, html: t.wr_rank ? String(t.wr_rank) + ' <span class="qk-muted">(' + SC.f(t.wr, 2) + ')</span>' : '—' }, { v: t.n, html: String(t.n) }];
         }), { cls: 'sc-table', maxHeight: 900 }), { flush: true }) + '</div><div>' +
         U.card('The top eight, month by month', 'Our rating at the end of each month.', U.chart('rk-hist', 360, 'Rating history')) +
         U.card('Ours against World Rugby’s', 'Each side’s rating (across) against its World Rugby points (up, our rebuild). Sides off the diagonal trend are where the two systems disagree.', U.chart('rk-vs', 340, 'Our rating against World Rugby points')) + '</div></div>' +
-        (rest.length ? U.card('Sides on a scale of their own', 'These ' + rest.length + ' sides have played fewer than three tests against tier-one or tier-two opposition in four years, so their ratings measure them against each other, not against the sides above. Ranked here among themselves.', U.table([{ label: 'Team', align: 'left' }, { label: 'Rtg' }, { label: 'Last 5', align: 'left' }, { label: 'Tests' }],
-          rest.map(function (t) { return [{ v: SC.tname(S, t.id), html: U.teamEnt(S, t.id) }, { v: t.rating, html: SC.signed(t.rating, 1) }, { v: t.form, html: U.form(t.form) }, { v: t.n, html: String(t.n) }]; }), { cls: 'sc-table', maxHeight: 420 }), { flush: true }) : '') +
+        (rest.length ? U.card('Provisional: not ranked', 'These ' + rest.length + ' sides have fewer than five tests rated, or fewer than three tests against tier-one or tier-two opposition in four years. A rating is only pinned down against the sides a team actually plays, so theirs are rough and carry no rank; the World Rugby rank (our rebuild) is the better guide for them.', U.table([{ label: 'Team', align: 'left' }, { label: 'Rtg (provisional)' }, { label: 'World Rugby rank' }, { label: 'Last 5', align: 'left' }, { label: 'Tests' }],
+          rest.map(function (t) { return [{ v: SC.tname(S, t.id), html: U.teamEnt(S, t.id) + SC.followStar(S, t.id) }, { v: t.rating, html: '<span class="qk-muted">' + SC.signed(t.rating, 1) + '</span>' }, { v: t.wr_rank || 999, html: t.wr_rank ? String(t.wr_rank) : '—' }, { v: t.form, html: U.form(t.form) }, { v: t.n, html: String(t.n) }]; }), { cls: 'sc-table', maxHeight: 420 }), { flush: true }) : '') +
         QK.explain('<b>Why two rankings?</b> World Rugby’s exchange moves a fixed amount per result and ignores the score beyond 15 points, so it is slow and blunt by design. Ours uses the full margin, the venue, travel and rest, and it is what our chances come from. Home advantage in our model is about ' + SC.f(d.home_adv, 1) + ' points.');
       body.innerHTML = html;
       U.wire(body);
@@ -88,7 +88,8 @@ SC.route('rankings', function (page, P) {
     if (!SC.ok(d)) { body.innerHTML = U.missing('The rankings', d); return; }
     var rows = d.table || [];
     var cols = [{ label: '#' }, { label: 'Move' }, { label: 'Team', align: 'left', sticky: true }, { label: 'Points' }, { label: 'Week' }, { label: 'Tests' }, { label: 'Last test' }];
-    var html = '<div class="qk-g75"><div>' + U.card('The table', d.source === 'anchored' ? 'From the published points of 28 September 2026, plus every result since (' + (d.moves || []).length + ' in the last weeks shown below).' : 'Rebuilt from results.',
+    var html = '<div class="qk-g75"><div>' + U.card('The table: World Rugby’s system, our rebuild', (d.source === 'anchored' ? 'From the published points of 28 September 2026, plus every result since (' + (d.moves || []).length + ' in the last weeks shown below).' : 'Rebuilt from results.') +
+      ' This is not our rating: ours, a different system with its own order, is on the Our ratings tab.',
       U.table(cols, rows.slice(0, 60).map(function (r) {
         return [{ v: r.rank, html: String(r.rank) }, { v: (r.prev_rank || r.rank) - r.rank, html: mv((r.prev_rank || r.rank) - r.rank) }, { v: SC.tname(S, r.id), html: U.teamEnt(S, r.id) + SC.followStar(S, r.id) },
           { v: r.pts, html: '<b>' + SC.f(r.pts, 2) + '</b>' }, { v: r.pts - r.prev, html: '<span class="' + SC.cls(r.pts - r.prev) + '">' + (Math.abs(r.pts - r.prev) >= 0.005 ? SC.signed(r.pts - r.prev, 2) : '–') + '</span>' },

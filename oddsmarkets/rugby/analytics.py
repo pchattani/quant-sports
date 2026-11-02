@@ -31,25 +31,34 @@ TEAM_METRICS = [
     ("ta", "Tries conceded", "lower", "Defence", ("against", "tries")),
     ("tackle_pct", "Tackle success", "higher", "Defence", ("ratio", "tackles", "missed")),
     ("metres_a", "Metres conceded", "lower", "Defence", ("against", "metres")),
-    ("to_won", "Turnovers won", "higher", "Defence", ("for", "to_won")),
+    ("to_won", "Turnovers won", "higher", "Breakdown", ("for", "to_won")),
+    ("ruck_pct", "Ruck retention", "higher", "Breakdown", ("share", "rucks_won", "rucks")),
+    ("pens_ruck", "Breakdown penalties", "lower", "Breakdown", ("for", "pens_ruck")),
     ("scrum_pct", "Scrums won", "higher", "Set piece", ("share", "scrums_won", "scrums")),
     ("lineout_pct", "Lineouts won", "higher", "Set piece", ("share", "lineouts_won", "lineouts")),
     ("steals", "Lineout steals", "higher", "Set piece", ("for", "lineout_steals")),
     ("maul_m", "Maul metres", "higher", "Set piece", ("for", "maul_m")),
+    ("scrum_pens", "Scrum penalties won", "higher", "Set piece", ("for", "scrum_pens_won")),
     ("pens", "Penalties conceded", "lower", "Discipline", ("for", "pens")),
     ("cards", "Cards", "lower", "Discipline", ("sum", "yc", "rc")),
     ("to_conc", "Turnovers conceded", "lower", "Discipline", ("for", "to_conc")),
+    ("pens_offside", "Offside penalties", "lower", "Discipline", ("for", "pens_offside")),
     ("kick_m", "Kicking metres", "higher", "Kicking", ("for", "kick_m")),
     ("kick_pct", "Goal-kicking success", "higher", "Kicking", ("for", "kick_pct")),
+    ("kick_ret", "Kicks regathered", "higher", "Kicking", ("share", "kick_retained", "kicks")),
+    ("pts_terr", "Points per 10% of territory", "higher", "Conversion", ("per", "pts", "terr")),
+    ("pts_poss", "Points per 10% of possession", "higher", "Conversion", ("per", "pts", "poss")),
     ("terr", "Territory", "higher", "Kicking", ("for", "terr")),
     ("poss", "Possession", "higher", "Kicking", ("for", "poss")),
 ]
-TEAM_UNITS = {"gainline": "%", "tackle_pct": "%", "scrum_pct": "%", "lineout_pct": "%", "kick_pct": "%", "terr": "%", "poss": "%"}
+TEAM_UNITS = {"gainline": "%", "tackle_pct": "%", "scrum_pct": "%", "lineout_pct": "%", "kick_pct": "%", "terr": "%", "poss": "%",
+              "ruck_pct": "%", "kick_ret": "%", "pts_terr": "points", "pts_poss": "points"}
 TEAM_SHORT = {"pf": "Pts for", "tf": "Tries for", "metres": "Metres", "gainline": "Gain line", "breaks": "Breaks", "beaten": "Beaten",
               "offloads": "Offloads", "pa": "Pts against", "ta": "Tries agst", "tackle_pct": "Tackle %", "metres_a": "Metres agst",
               "to_won": "TO won", "scrum_pct": "Scrum %", "lineout_pct": "Lineout %", "steals": "Steals", "maul_m": "Maul m",
               "pens": "Pens", "cards": "Cards", "to_conc": "TO conc", "kick_m": "Kick m", "kick_pct": "Goal %", "terr": "Territory",
-              "poss": "Possession"}
+              "poss": "Possession", "ruck_pct": "Ruck %", "pens_ruck": "Ruck pens", "scrum_pens": "Scrum pens",
+              "pens_offside": "Offside", "kick_ret": "Regathered", "pts_terr": "Pts/terr", "pts_poss": "Pts/poss"}
 STYLE = {"poss", "terr", "kick_m", "offloads"}
 NO_ADJUST = {"poss", "terr"}
 
@@ -58,6 +67,9 @@ def _team_value(how, us: dict, them: dict, pf: int, pa: int):
     kind = how[0]
     if kind == "for":
         return pf if how[1] == "pts" else us.get(how[1])
+    if kind == "per":                     # points per 10 percentage points of territory or possession
+        d = us.get(how[2])
+        return pf / (10.0 * d) if isinstance(d, (int, float)) and d > 0.05 else None
     if kind == "against":
         return pa if how[1] == "pts" else them.get(how[1])
     a, b = us.get(how[1]), us.get(how[2])
@@ -147,6 +159,9 @@ PLAYER_METRICS = [
     ("rk", "Rucks won per 80", "Rucks", "higher", "breakdown"), ("toc", "Turnovers conceded per 80", "TO conc", "lower", "discipline"),
     ("pc", "Penalties conceded per 80", "Pens", "lower", "discipline"), ("kfh", "Kicks from hand per 80", "Kicks", "higher", "kicking"),
     ("kpct", "Goal-kicking success", "Goal %", "higher", "kicking"),
+    ("lopct", "Lineout throws won", "Throw %", "higher", "set piece"), ("ml", "Mauls won per 80", "Mauls", "higher", "set piece"),
+    ("ko", "Knock-ons per 80", "Knock-ons", "lower", "discipline"), ("cards", "Cards per 80", "Cards", "lower", "discipline"),
+    ("gkp", "Goal-kicking points per 80", "Kick pts", "higher", "kicking"), ("inv", "Involvements per 80", "Involve", "higher", "breakdown"),
 ]
 PM_IDS = [x[0] for x in PLAYER_METRICS]
 KICK_AVG = 0.72

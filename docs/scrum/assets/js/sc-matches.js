@@ -113,17 +113,48 @@ var STAT_ROWS = [
 var LINE_COLS = [['min', 'Min'], ['pts', 'Pts'], ['tries', 'T'], ['ta', 'TA'], ['m', 'M'], ['car', 'Car'], ['cb', 'CB'], ['db', 'DB'], ['off', 'Off'],
   ['pas', 'Pas'], ['tk', 'Tk'], ['mt', 'MT'], ['lo', 'LO'], ['rk', 'Rk'], ['toc', 'TO'], ['pc', 'Pen'], ['kfh', 'Kicks'], ['yc', 'YC']];
 
-function lineTable(S, rows, tid) {
-  var cols = [{ label: '#', align: 'left' }, { label: 'Player', align: 'left', sticky: true }, { label: 'Pos', align: 'left' }].concat(LINE_COLS.map(function (c) { return { label: c[1] }; }));
+function lineTable(S, rows, tid, stats) {
+  /* a test our source has line-ups for but no player statistics: the team sheet and the minutes only, never a row of zeros */
+  var lc = stats ? LINE_COLS : LINE_COLS.slice(0, 1);
+  var cols = [{ label: '#', align: 'left' }, { label: 'Player', align: 'left', sticky: true }, { label: 'Pos', align: 'left' }].concat(lc.map(function (c) { return { label: c[1] }; }))
+    .concat(stats ? [{ label: 'Value' }] : []);
   var trs = rows.map(function (r) {
     var s = r.s || {};
     return [{ v: r.j || 99, html: esc(r.j || '') }, { v: r.n, html: '<a href="' + esc(SC.playerHref(S, r.id)) + '">' + esc(r.n) + '</a>' + (r.c ? ' <span class="sc-capt" title="Captain">C</span>' : '') },
-      { v: r.pos, html: '<span title="' + esc(SC.posName(r.pos)) + '">' + esc(r.pos || '') + '</span>' }].concat(LINE_COLS.map(function (c) {
+      { v: r.pos, html: '<span title="' + esc(SC.posName(r.pos)) + '">' + esc(r.pos || '') + '</span>' }].concat(lc.map(function (c) {
       var v = c[0] === 'min' ? r.min : s[c[0]];
       return { v: isNum(v) ? v : -1, html: isNum(v) ? (c[0] === 'min' && r.est ? '<span title="Estimated: no substitutions in the feed">~' + v + '</span>' : String(v)) : '<span class="qk-muted">0</span>' };
-    }));
+    })).concat(stats ? [{ v: isNum(r.gv) ? r.gv : -99, html: isNum(r.gv) ? '<span class="sc-ours ' + SC.cls(r.gv) + '">' + SC.signed(r.gv, 1) + '</span>' : '—' }] : []);
   });
   return U.table(cols, trs, { cls: 'sc-lines dense', maxHeight: 900 });
+}
+
+/* our home-win chance through the test (pages.win_chance_path) */
+function winPath(el, S, M) {
+  if (!el || !window.QKC || !M.wp || M.wp.length < 3) return;
+  var c = M.match, cols = SC.lineColours(S, [c.home, c.away]);
+  QKC.line(el, { x: M.wp.map(function (p) { return p[0]; }), xType: 'value', step: 'end', series: [{ name: SC.tabbr(S, c.home) + ' win chance', data: M.wp.map(function (p) { return Math.round(p[1] * 1000) / 10; }), color: cols[0], step: 'end' }],
+    yName: SC.tname(S, c.home) + ' win chance (%)', xName: 'Minute', yMin: 0, yMax: 100, ref: { y: 50, label: 'Even' }, endLabels: false, yFmt: function (v) { return Math.round(v) + '%'; } });
+}
+
+/* who made the difference: the test's best and worst by game value (our value model on the player's own numbers) */
+function difference(S, M) {
+  if (!M.lines || !M.has_stats) return '';
+  var all = [];
+  ['h', 'a'].forEach(function (k) { (M.lines[k] || []).forEach(function (r) { if (isNum(r.gv)) all.push({ r: r, tid: k === 'h' ? M.match.home : M.match.away }); }); });
+  if (all.length < 6) return '';
+  all.sort(function (a, b) { return b.r.gv - a.r.gv; });
+  var row = function (x) {
+    var s = x.r.s || {}, bits = [];
+    if (s.tries) bits.push(s.tries + (s.tries === 1 ? ' try' : ' tries'));
+    if (s.m) bits.push(s.m + ' m');
+    if (s.cb) bits.push(s.cb + ' breaks');
+    if (s.tk) bits.push(s.tk + ' tackles');
+    if (s.pc) bits.push(s.pc + (s.pc === 1 ? ' penalty' : ' penalties'));
+    return '<li>' + QK.teamMark(SC.mark(S, x.tid), 'sm') + '<a href="' + esc(SC.playerHref(S, x.r.id)) + '">' + esc(x.r.n) + '</a><span class="s">' + esc(SC.posName(x.r.pos)) + (bits.length ? ' · ' + esc(bits.slice(0, 3).join(', ')) : '') + '</span><span class="v ' + SC.cls(x.r.gv) + '">' + SC.signed(x.r.gv, 1) + '</span></li>';
+  };
+  return '<div class="qk-g2 sc-gap">' + U.card('Who made the difference', 'The test’s top five by game value: our value model on each player’s own numbers, in points of margin above a replacement-level player of the position over the same minutes.', '<ul class="sc-list">' + all.slice(0, 5).map(row).join('') + '</ul>') +
+    U.card('A test to forget', 'The bottom five on the same scale (penalties, turnovers and missed tackles cost points).', '<ul class="sc-list">' + all.slice(-5).reverse().map(row).join('') + '</ul>') + '</div>';
 }
 
 function scoreRace(el, S, M) {
@@ -149,7 +180,8 @@ SC.route('match', function (page, P) {
     if (F.rating) factors.push({ label: 'Our rating', a: SC.signed(F.rating[1], 1), b: SC.signed(F.rating[0], 1), better: F.rating[0] >= F.rating[1] ? 'b' : 'a' });
     if (F.exp) factors.push({ label: 'Expected points', a: SC.f(F.exp[1], 0), b: SC.f(F.exp[0], 0), better: F.exp[0] >= F.exp[1] ? 'b' : 'a' });
     if (F.travel_km) factors.push({ label: 'Travel (km)', a: fmt.num(F.travel_km[1]), b: fmt.num(F.travel_km[0]), better: F.travel_km[0] <= F.travel_km[1] ? 'b' : 'a' });
-    if (F.rest && isNum(F.rest[0]) && isNum(F.rest[1])) factors.push({ label: 'Days since last test', a: String(Math.min(99, F.rest[1])), b: String(Math.min(99, F.rest[0])), better: '' });
+    var days = function (d) { return d >= 99 ? '99+' : String(Math.round(d)); };
+    if (F.rest && isNum(F.rest[0]) && isNum(F.rest[1])) factors.push({ label: 'Days since last test', a: days(F.rest[1]), b: days(F.rest[0]), better: '' });
     var kick = SC.compName(c.comp) + (c.venue ? ' · ' + c.venue : '') + (c.neutral ? ' · neutral' : '');
     var html = '<nav class="sc-crumb"><a href="' + esc(SC.href(S, 'fixtures')) + '">Fixtures</a> / ' + esc(SC.date(c.date)) + '</nav>';
     var extra = isNum(F.margin) ? 'We expected ' + esc(SC.tname(S, F.margin >= 0 ? c.home : c.away)) + ' by about ' + Math.max(1, Math.round(Math.abs(F.margin))) +
@@ -163,11 +195,19 @@ SC.route('match', function (page, P) {
       html += QK.stats([{ label: 'Our pre-match chance for the winner', value: SC.pct(pw), signal: true, sub: verdict, html: true },
         { label: 'Margin', value: SC.signed(mg, 0), sub: 'We expected ' + SC.signed(F.margin, 1) + ' (home side first).' },
         { label: 'Total', value: String(c.hs + c.as), sub: isNum(F.total) ? 'We expected ' + Math.round(F.total) + '.' : '' },
-        M.halves ? { label: 'Half-time', value: (M.halves[0][0] || 0) + '–' + (M.halves[1][0] || 0), sub: 'Second half ' + (M.halves[0][1] || 0) + '–' + (M.halves[1][1] || 0) } : null,
+        M.halves ? { label: 'Half-time' + (M.halves_est ? ' (from the scoring)' : ''), value: (M.halves[0][0] || 0) + '–' + (M.halves[1][0] || 0), sub: 'Second half ' + ((M.halves[0][1] || 0) - (M.halves[0][0] || 0)) + '–' + ((M.halves[1][1] || 0) - (M.halves[1][0] || 0)) } : null,
         M.wr ? { label: 'World Rugby points', value: SC.signed(M.wr.x, 2), sub: SC.tname(S, c.home) + ' took ' + SC.signed(M.wr.x, 2) + ' from ' + SC.tname(S, c.away) + ' (our replica; ' + SC.f(M.wr.before[0], 2) + ' v ' + SC.f(M.wr.before[1], 2) + ' before).' } : null]);
     } else if (M.wr === undefined && F.p) {
       html += '';
     }
+    var moments = M.events && M.events.length ? U.card('Key moments', 'Tries, kicks, cards and changes as the feed records them.', '<ol class="sc-events">' + M.events.filter(function (e) { return e[1] !== 'on' && e[1] !== 'off'; }).map(function (e) {
+      var tid = e[2] === 'h' ? c.home : c.away;
+      return '<li class="ev-' + esc(e[1]) + '"><span class="mn num">' + (isNum(e[0]) ? e[0] + '’' : '') + '</span>' + QK.teamMark(SC.mark(S, tid), 'sm') + '<span class="w">' + esc(EV_WORD[e[1]] || e[1]) + '</span>' +
+        (e[3] ? '<a href="' + esc(SC.playerHref(S, e[3])) + '">' + esc(e[4] || '') + '</a>' : '<span>' + esc(e[4] || '') + '</span>') + (isNum(e[5]) ? '<span class="sc num">' + e[5] + '–' + e[6] + '</span>' : '') + '</li>';
+    }).join('') + '</ol>') : '';
+    var flow = (M.events && M.events.length >= 2 ? U.card('The score, minute by minute', 'Each side’s points through the match, from the scoring events.', U.chart('mt-race', 280, 'Score by minute')) : '') +
+      (M.wp ? U.card('Our win chance through the test', 'From our pre-match margin and spread and the score at each scoring event: the time left shrinks the spread. 50% is even.', U.chart('mt-wp', 240, 'Win chance by minute')) : '');
+    if (!M.stats && (flow || moments)) html += '<div class="qk-g2 sc-gap"><div>' + flow + '</div><div>' + moments + '</div></div>';
     if (M.stats) {
       var hs = M.stats.home, as = M.stats.away;
       var rows = STAT_ROWS.filter(function (r) { return isNum(hs[r[1]]) && isNum(as[r[1]]); }).map(function (r) {
@@ -176,18 +216,15 @@ SC.route('match', function (page, P) {
       });
       html += '<div class="qk-g2 sc-gap">' + U.card('Tale of the tape', 'The two team stat lines. The better number in each row is solid.',
         QK.matchupBar({ left: Object.assign(SC.side(S, c.home), { abbr: SC.tabbr(S, c.home) }), right: Object.assign(SC.side(S, c.away), { abbr: SC.tabbr(S, c.away) }), rows: rows })) +
-        '<div>' + U.card('The score, minute by minute', 'Each side’s points through the match, from the scoring events.', U.chart('mt-race', 280, 'Score by minute')) +
-        (M.events ? U.card('Key moments', 'Tries, kicks, cards and changes as the feed records them.', '<ol class="sc-events">' + M.events.filter(function (e) { return e[1] !== 'on' && e[1] !== 'off'; }).map(function (e) {
-          var tid = e[2] === 'h' ? c.home : c.away;
-          return '<li class="ev-' + esc(e[1]) + '"><span class="mn num">' + (isNum(e[0]) ? e[0] + '’' : '') + '</span>' + QK.teamMark(SC.mark(S, tid), 'sm') + '<span class="w">' + esc(EV_WORD[e[1]] || e[1]) + '</span>' +
-            (e[3] ? '<a href="' + esc(SC.playerHref(S, e[3])) + '">' + esc(e[4] || '') + '</a>' : '<span>' + esc(e[4] || '') + '</span>') + (isNum(e[5]) ? '<span class="sc num">' + e[5] + '–' + e[6] + '</span>' : '') + '</li>';
-        }).join('') + '</ol>') : '') + '</div></div>';
+        '<div>' + flow + moments + '</div></div>';
     }
+    html += difference(S, M);
     if (M.lines) {
+      if (!M.has_stats) html += U.note('Our source has the line-ups for this test but no player statistics, so the team sheets below show the minutes only.');
       ['h', 'a'].forEach(function (k) {
         var tid = k === 'h' ? c.home : c.away;
         if (!M.lines[k]) return;
-        html += U.card(SC.tname(S, tid) + ': the matchday 23', 'Starters 1-15, then the replacements. Minutes come from the substitutions; "~" marks an estimate where the feed has none.', lineTable(S, M.lines[k], tid), { flush: true });
+        html += U.card(SC.tname(S, tid) + ': the matchday 23', 'Starters 1-15, then the replacements. Minutes come from the substitutions; "~" marks an estimate where the feed has none.' + (M.has_stats ? ' Value is the player’s game value (see above).' : ''), lineTable(S, M.lines[k], tid, !!M.has_stats), { flush: true });
       });
     } else if (c.status === 'final') {
       html += U.note('Our source has no line-ups or player statistics for this match.');
@@ -199,6 +236,7 @@ SC.route('match', function (page, P) {
     page.innerHTML = html;
     U.wire(page);
     scoreRace(QK.$('#mt-race', page), S, M);
+    winPath(QK.$('#mt-wp', page), S, M);
     document.title = SC.tabbr(S, c.home) + ' v ' + SC.tabbr(S, c.away) + ' · ' + SC.SITE;
   });
 });

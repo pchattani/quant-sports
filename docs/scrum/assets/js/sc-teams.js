@@ -28,22 +28,23 @@ SC.route('teams', function (page, P) {
     var M = {};
     (d.metrics || []).forEach(function (m) { M[m.id] = m; });
     var rows = (d.teams || []);
+    var prows = rows.filter(function (r) { return Object.keys(r.m || {}).length; });   /* sides with a team-stats profile */
     var q = P.query || {};
     var preset = PRESETS.filter(function (p) { return p.key === q.map; })[0] || PRESETS[0];
-    var html = U.sec('Power board', 'Every side with six tests in two years', 'Our rating split into attack and defence, the last ten results.', QK.powerBars ? QK.powerBars(null, { groups: [{ label: '', rows: rows.map(function (r, i) {
+    var html = U.sec('Power board', 'Every ranked side', 'Our rating split into attack and defence, the last ten results. The ranks are the ones on the Rankings page; sides with a provisional rating are listed there, unranked.', QK.powerBars ? QK.powerBars(null, { groups: [{ label: '', rows: rows.map(function (r, i) {
       var t = SC.team(S, r.id) || {};
-      return { rank: i + 1, name: t.name, abbr: t.abbr, colour: t.colour, href: SC.teamHref(S, r.id), value: r.rating, text: SC.signed(r.rating, 1), parts: { att: r.att, dfn: r.dfn }, form: r.form,
-        follow: SC.followItem(S, r.id), cells: [{ label: 'Tests', text: String(r.n) }] };
+      return { rank: isNum(r.rank) ? r.rank : i + 1, name: t.name, abbr: t.abbr, colour: t.colour, href: SC.teamHref(S, r.id), value: r.rating, text: SC.signed(r.rating, 1), parts: { att: r.att, dfn: r.dfn }, form: r.form,
+        follow: SC.followItem(S, r.id), cells: [{ label: 'Tests rated', text: String(r.tests || r.n) }] };
     }) }], parts: [{ key: 'att', label: 'Attack', color: 'var(--c-1)' }, { key: 'dfn', label: 'Defence', color: 'var(--c-3)' }], valueLabel: 'Our rating', unit: 'points', formN: 10 }) : '');
-    html += U.sec('Team profile', 'Every side on every measure', 'Per test since ' + SC.date(d.since) + ', opponent-adjusted (shifted by how much each opponent usually allows), coloured by percentile among these sides. Grey columns describe style, not quality.', '<div id="tm-grid"></div>');
+    html += U.sec('Team profile', 'Every side on every measure', 'Per test since ' + SC.date(d.since) + ', opponent-adjusted (shifted by how much each opponent usually allows), coloured by percentile among these sides. Grey columns describe style, not quality. Only the ' + prows.length + ' ranked sides with six or more tests that our source carries team statistics for are here (it has none for the 2026 Nations Championship).', '<div id="tm-grid"></div>');
     html += U.sec('Style map', 'How they play', 'Two measures at a time; the dashed lines are the averages. Pick a pair.', '<div class="qk-chips sc-filters" id="tm-map">' + PRESETS.map(function (p) {
       return '<a class="qk-chip" href="' + esc(SC.href(S, 'teams', null, 'map=' + p.key)) + '" aria-pressed="' + (p.key === preset.key) + '">' + esc(p.label) + '</a>';
     }).join('') + '</div>' + U.card('', '', U.chart('tm-scatter', 440, preset.label)));
-    var opts = rows.map(function (r) { return '<option value="' + esc(r.id) + '">' + esc(SC.tname(S, r.id)) + '</option>'; }).join('');
-    var a = q.a || (rows[0] || {}).id, b = q.b || (rows[1] || {}).id;
+    var opts = prows.map(function (r) { return '<option value="' + esc(r.id) + '">' + esc(SC.tname(S, r.id)) + '</option>'; }).join('');
+    var a = q.a || (prows[0] || {}).id, b = q.b || (prows[1] || {}).id;
     html += U.sec('Head to head', 'Tale of the tape', 'Two sides on the profile percentiles, the gap under each measure.', QK.scoutBar([{ label: 'Team', html: '<select class="qk-select" id="tm-a">' + opts + '</select>' },
       { label: 'v', html: '<select class="qk-select" id="tm-b">' + opts + '</select>' }]) + '<div id="tm-tape"></div>');
-    html += U.sec('Strengths and weaknesses', 'Best and worst, side by side', 'Each side’s three best and three weakest measures (percentile among these sides).', '<div class="sc-sws">' + rows.slice(0, 12).map(function (r) {
+    html += U.sec('Strengths and weaknesses', 'Best and worst, side by side', 'Each side’s three best and three weakest measures (percentile among these sides).', '<div class="sc-sws">' + prows.slice(0, 12).map(function (r) {
       var t = SC.team(S, r.id) || {};
       var list = Object.keys(r.m || {}).filter(function (k) { return M[k] && !M[k].style && isNum(r.m[k][1]); }).map(function (k) { return { label: M[k].label, pctl: r.m[k][1], text: mfmt(M[k], r.m[k][0]) }; });
       list.sort(function (x, y) { return y.pctl - x.pctl; });
@@ -55,10 +56,10 @@ SC.route('teams', function (page, P) {
     (d.metrics || []).forEach(function (m) { (groups[m.group] = groups[m.group] || []).push(m.id); });
     if (QK.heatGrid) QK.heatGrid(QK.$('#tm-grid', body), { id: 'sc-hg', sets: [{ key: 'all', label: 'Every measure', groups: Object.keys(groups).map(function (g) { return { label: g, ids: groups[g] }; }) }],
       meta: function (id) { var m = M[id] || {}; return { label: m.label || id, lower: m.dir === 'lower', style: !!m.style, fmt: function (v) { return mfmt(m, v); }, tip: m.label + (m.unit === '%' ? '' : ', per test') }; },
-      rows: rows.map(function (r) { var t = SC.team(S, r.id) || {}; return { id: r.id, name: t.name, sub: SC.signed(r.rating, 1), mark: { abbr: t.abbr, colour: t.colour }, href: SC.teamHref(S, r.id), vals: (function () { var o = {}; Object.keys(r.m || {}).forEach(function (k) { o[k] = r.m[k][0]; }); return o; })() }; }),
+      rows: prows.map(function (r) { var t = SC.team(S, r.id) || {}; return { id: r.id, name: t.name, sub: SC.signed(r.rating, 1), mark: { abbr: t.abbr, colour: t.colour }, href: SC.teamHref(S, r.id), vals: (function () { var o = {}; Object.keys(r.m || {}).forEach(function (k) { o[k] = r.m[k][0]; }); return o; })() }; }),
       entity: 'team', noun: 'sides', csv: 'scrum-team-profile.csv' });
     // style map
-    var pts = rows.filter(function (r) { return r.m[preset.x] && r.m[preset.y]; }).map(function (r) {
+    var pts = prows.filter(function (r) { return r.m[preset.x] && r.m[preset.y]; }).map(function (r) {
       var t = SC.team(S, r.id) || {};
       var sx = M[preset.x].unit === '%' ? 100 : 1, sy = M[preset.y].unit === '%' ? 100 : 1;
       return { x: r.m[preset.x][0] * sx, y: r.m[preset.y][0] * sy, label: t.abbr, name: t.name, color: t.colour, href: SC.teamHref(S, r.id) };
@@ -70,7 +71,7 @@ SC.route('teams', function (page, P) {
     var sa = QK.$('#tm-a', body), sb = QK.$('#tm-b', body);
     sa.value = a; sb.value = b;
     function tape() {
-      var A = rows.filter(function (r) { return r.id === sa.value; })[0], B = rows.filter(function (r) { return r.id === sb.value; })[0];
+      var A = prows.filter(function (r) { return r.id === sa.value; })[0], B = prows.filter(function (r) { return r.id === sb.value; })[0];
       if (!A || !B) return;
       var ta = SC.team(S, A.id) || {}, tb = SC.team(S, B.id) || {};
       QK.$('#tm-tape', body).innerHTML = QK.tape({ left: { name: ta.name, short: ta.abbr, sub: SC.signed(A.rating, 1), colour: ta.colour, alt: ta.alt, href: SC.teamHref(S, A.id) },
@@ -85,7 +86,106 @@ SC.route('teams', function (page, P) {
 });
 
 /* ── the team page ──────────────────────────────────────────────────── */
-var GROUP_ORDER = ['Attack', 'Defence', 'Set piece', 'Discipline', 'Kicking'];
+var GROUP_ORDER = ['Attack', 'Defence', 'Breakdown', 'Set piece', 'Discipline', 'Kicking', 'Conversion'];
+var POS_HEAD = { front_row: ['val80', 'tk', 'tkpct', 'car', 'lopct'], lock: ['val80', 'tk', 'tkpct', 'car', 'ml'], back_row: ['val80', 'tk', 'car', 'm', 'db'],
+  halves: ['val80', 'pts', 'pas', 'kfh', 'gkp'], centres: ['val80', 'm', 'cb', 'db', 'off'], back_three: ['val80', 'm', 'cb', 'db', 'tries'] };
+var GRADE_ORDER = ['front_row', 'lock', 'back_row', 'halves', 'centres', 'back_three'];
+
+function boardRows(bd) {
+  var cols = (bd && bd.cols) || [], out = [];
+  ((bd && bd.rows) || []).forEach(function (r) { var o = {}; for (var i = 0; i < cols.length; i++) o[cols[i]] = r[i]; out.push(o); });
+  return out;
+}
+function mfmtP(id, v) { return SC.vfmt ? SC.vfmt(id, v) : (isNum(v) ? fmt.num(v, 1) : '—'); }
+
+/* Top performers (QKL.performers, as the other sites): the side's best regulars by Scrum value per 80, overall and in
+   each position group, with the percentile and rank among every regular of that group in test rugby */
+function performers(node, S, tid, all) {
+  if (!node || !window.QKL || !QKL.performers) return;
+  var recent = new Date(QK.now() - 400 * 864e5).toISOString().slice(0, 10);
+  var q = all.filter(function (r) { return r.q && isNum(r.val80) && r.grp; });
+  var rank = {}, n = {};
+  GRADE_ORDER.forEach(function (g) {
+    var pool = q.filter(function (r) { return r.grp === g; }).sort(function (a, b) { return b.val80 - a.val80; });
+    n[g] = pool.length;
+    pool.forEach(function (r, i) { rank[r.id] = i + 1; });
+  });
+  var row = function (r) { return { name: r.n, href: SC.playerHref(S, r.id), pos: SC.posName(r.pos), value: SC.signed(r.val80, 1), pct: r.p_val80, rank: rank[r.id], n: n[r.grp], peer: (SC.GROUP[r.grp] || '').toLowerCase() }; };
+  var mine = q.filter(function (r) { return String(r.team) === String(tid) && String(r.last || '') >= recent; }).sort(function (a, b) { return b.val80 - a.val80; });
+  QKL.performers(node, { title: 'Who carries them, and how they compare',
+    sub: 'The best regulars by Scrum value per 80, overall and in each position group, against every regular of that group in test rugby.',
+    metric: { label: 'Scrum value per 80', unit: 'points of margin per 80 minutes above a replacement-level player', model: 'Scrum value' },
+    overall: mine.slice(0, 4).map(row),
+    groups: GRADE_ORDER.map(function (g) { return { label: SC.GROUP[g], rows: mine.filter(function (r) { return r.grp === g; }).slice(0, 3).map(row) }; }),
+    note: 'The box is the percentile among regulars of the same position group (160+ minutes in the last two years) on Scrum value per 80, our model; the rank counts the same players. Players capped in the last 13 months.',
+    empty: 'No regular has 160 minutes in the last two years for this side yet.' });
+}
+
+/* Top and bottom within the squad (QKL.leaders on the side's own regulars): every key number of each position group,
+   the best three and the bottom three in the squad */
+function squadBoards(node, S, tid, all, M) {
+  if (!node || !window.QKL || !QKL.leaders || !QKL.board) return;
+  var recent = new Date(QK.now() - 400 * 864e5).toISOString().slice(0, 10);
+  var mine = all.filter(function (r) { return String(r.team) === String(tid) && r.q && String(r.last || '') >= recent; });
+  var mk = function (ids, rows) {
+    return ids.map(function (id) {
+      var m = M[id] || { id: id, label: id };
+      return QKL.board(rows.map(function (r) { return { id: r.id, name: r.n, team: tid, v: r[id] }; }), { key: id, label: m.label || id, unit: '', dir: m.dir === 'lower' ? 'lower' : 'higher',
+        fmt: (id === 'tkpct' || id === 'kpct' || id === 'lopct') ? 'pct1' : '1', ours: id === 'val80' ? 'Scrum value' : '', tip: '' }, 3);
+    }).filter(function (x) { return x.n > 1; });
+  };
+  var views = [{ key: 'all', label: 'All players', entity: 'player', peer: 'regulars in the squad', min: '160 minutes in the last two years', metrics: mk(['val80', 'inv', 'm', 'tk', 'tkpct', 'pc', 'cards'], mine) }];
+  GRADE_ORDER.forEach(function (g) {
+    var rows = mine.filter(function (r) { return r.grp === g; });
+    if (rows.length >= 2) views.push({ key: g, label: SC.GROUP[g], entity: 'player', peer: (SC.GROUP[g] || '').toLowerCase() + ' in the squad', min: '160 minutes in the last two years', metrics: mk(POS_HEAD[g], rows) });
+  });
+  QKL.leaders(node, { data: { views: views }, kicker: 'Top and bottom performers', title: 'Who leads the squad, and who is struggling',
+    sub: 'The squad’s regulars on each key number, overall and by position group: the best three and the bottom three. Rates per 80 minutes over the last two years, shrunk toward the position average so a short stint cannot top the list.',
+    team: function () { var t = SC.team(S, tid) || {}; return { abbr: t.abbr, name: t.name, colour: t.colour, href: SC.teamHref(S, tid) }; },
+    href: function (id) { return SC.playerHref(S, id); }, scope: 'squad',
+    empty: 'Too few regulars with 160 minutes in the last two years.' });
+}
+
+/* Roster strength by position group: the side's best regulars' Scrum value against the other ranked sides */
+function gradesHtml(S, T) {
+  var G = T.grades;
+  if (!G) return '';
+  var rows = GRADE_ORDER.filter(function (g) { return G[g]; }).map(function (g) { return { g: g, x: G[g] }; });
+  if (!rows.length) return '';
+  var cls = { A: 'a', B: 'b', C: 'c', D: 'd', F: 'f' };
+  var tile = function (r) {
+    return '<li class="sc-grade g-' + cls[r.x.grade] + '"><b>' + r.x.grade + '</b><span><span class="t">' + esc(SC.GROUP[r.g]) + '</span><small>' + QK.ordinal(r.x.rank) + ' of ' + r.x.of + ' · ' + SC.signed(r.x.v, 2) + ' a player</small></span></li>';
+  };
+  var srt = rows.slice().sort(function (a, b) { return a.x.rank / a.x.of - b.x.rank / b.x.of; });
+  var line = function (r, best) {
+    var p = best ? r.x.lead : (r.x.weak || r.x.lead);
+    return '<li><span class="sc-res ' + (best ? 'W' : 'L') + '">' + r.x.grade + '</span><span><b>' + esc(SC.GROUP[r.g]) + '</b> · ' + QK.ordinal(r.x.rank) + ' of ' + r.x.of + '; ' + (best ? 'led by ' : 'weakest regular ') +
+      '<a href="' + esc(SC.playerHref(S, p.id)) + '">' + esc(p.n) + '</a> (' + SC.signed(p.v, 1) + ')</span></li>';
+  };
+  return U.sec('Roster strength', 'What they do well, and what they need', 'Each position group’s best regulars (four front-rowers, two locks, three back-rowers, two half-backs, two centres, three in the back three) by Scrum value per 80 over the last two years, ranked against the other ranked sides: A is the top 15%, F the bottom 15%.',
+    '<div class="qk-g3">' + U.card('Grades', 'A to F against the ranked sides', '<ul class="sc-grades">' + rows.map(tile).join('') + '</ul>') +
+    U.card('Strengths', 'The best-graded groups', '<ul class="sc-list sc-sn">' + srt.slice(0, 2).map(function (r) { return line(r, true); }).join('') + '</ul>') +
+    U.card('Needs', 'The lowest-graded groups', '<ul class="sc-list sc-sn">' + srt.slice(-2).reverse().map(function (r) { return line(r, false); }).join('') + '</ul>') + '</div>');
+}
+
+/* Who plays together: the most-used starting pairs */
+function combosHtml(S, T) {
+  var C = (T.combos || []).filter(function (c) { return (c.rows || []).length; });
+  if (!C.length) return '';
+  return U.sec('Combinations', 'Who plays together', 'The most-used starting pairs over the last four years (jerseys 9 and 10, 12 and 13, 4 and 5), with their record and points difference together.',
+    '<div class="qk-g3">' + C.map(function (c) {
+      return U.card(c.label, 'Starting ' + c.jerseys.join(' and '), U.table([{ label: 'Pair', align: 'left' }, { label: 'Tests' }, { label: 'W-D-L' }, { label: 'PD' }],
+        c.rows.map(function (r) { return [{ v: r.an, html: '<a href="' + esc(SC.playerHref(S, r.a)) + '">' + esc(QK.surname(r.an)) + '</a> · <a href="' + esc(SC.playerHref(S, r.b)) + '">' + esc(QK.surname(r.bn)) + '</a>' },
+          { v: r.n, html: String(r.n) }, { v: r.w, html: r.w + '–' + r.d + '–' + r.l }, { v: r.pd, html: '<span class="' + SC.cls(r.pd) + '">' + SC.signed(r.pd, 0) + '</span>' }]; }), { cls: 'sc-table dense' }), { flush: true });
+    }).join('') + '</div>');
+}
+
+function xwChart(el, S, T) {
+  if (!el || !window.QKC || !T.xw || T.xw.length < 4) return;
+  var t = SC.team(S, T.id) || {};
+  QKC.line(el, { x: T.xw.map(function (r) { return r[0] + 'T12:00:00Z'; }), xType: 'time', series: [{ name: 'Tests won', data: T.xw.map(function (r) { return r[1]; }), color: SC.traw(S, T.id) || 'var(--c-1)' },
+    { name: 'Wins we expected', data: T.xw.map(function (r) { return r[2]; }), color: 'var(--ink-3)', dash: true }], yName: 'Wins (running total)', xName: 'Date', endLabels: true, step: 'end' });
+}
 
 function ratingChart(el, S, T) {
   if (!el || !window.QKC || !T.rating_hist || T.rating_hist.length < 3) return;
@@ -102,13 +202,15 @@ function wrChart(el, S, T) {
 SC.route('team', function (page, P) {
   var S = P.S, tid = P.id;
   page.innerHTML = QK.skeleton('card', 2);
-  return Promise.all([SC.load(S + '/teams/' + tid + '.json'), SC.load(S + '/teams.json')]).then(function (res) {
-    var T = res[0], all = res[1];
+  return Promise.all([SC.load(S + '/teams/' + tid + '.json'), SC.load(S + '/teams.json'), SC.load(S + '/players.json')]).then(function (res) {
+    var T = res[0], all = res[1], bd = res[2];
+    var BR = SC.ok(bd) ? boardRows(bd) : [], BM = {};
+    ((SC.ok(bd) && bd.metrics) || []).forEach(function (m) { BM[m.id] = m; });
     if (!SC.ok(T)) { page.innerHTML = U.head(SC.tname(S, tid), '', SC.SNAME[S]) + U.missing('This team page', T); return; }
     var t = T.team || SC.team(S, tid) || {};
     var M = {};
     ((SC.ok(all) && all.metrics) || []).forEach(function (m) { M[m.id] = m; });
-    var rk = SC.ok(all) ? (all.teams || []).map(function (r) { return r.id; }).indexOf(tid) + 1 : 0;
+    var rk = isNum(T.rank) ? T.rank : 0;
     var rec = T.record || [0, 0, 0];
     var yr = (T.results || []).filter(function (c) { return String(c.date).slice(0, 10) >= new Date(QK.now() - 365 * 864e5).toISOString().slice(0, 10); });
     var y12 = [0, 0, 0];
@@ -118,12 +220,12 @@ SC.route('team', function (page, P) {
       ' (' + QK.ordinal(Math.round(sw.best[0].pct)) + ' percentile among test sides), and weakest on ' + (sw.worst[0] ? sw.worst[0].label.toLowerCase() : '') + '. Our rating has them ' + SC.signed(T.rating, 1) +
       ' points against an average side.' : t.name + ': our rating ' + SC.signed(T.rating, 1) + ' points against an average test side.';
     var html = '<nav class="sc-crumb"><a href="' + esc(SC.href(S, 'teams')) + '">Teams</a> / ' + esc(t.name) + '</nav>';
-    html += QK.playerHeader({ name: t.name, face: t.abbr, kicker: SC.SNAME[S] + (rk ? ' · ' + QK.ordinal(rk) + ' in our ratings' : ''), team: { name: '', colour: t.colour, alt: t.alt },
+    html += QK.playerHeader({ name: t.name, face: t.abbr, kicker: SC.SNAME[S] + (rk ? ' · ' + QK.ordinal(rk) + ' in our ratings' : (T.prov ? ' · provisional rating' : '')) + (T.wr_rank ? ' · ' + QK.ordinal(T.wr_rank) + ' in World Rugby’s (our rebuild)' : ''), team: { name: '', colour: t.colour, alt: t.alt },
       meta: [['Tests in our data', String(rec[0] + rec[1] + rec[2])], ['Since', SC.year(T.first)], ['All time', rec.join('–')]],
       tags: [SC.followStar(S, tid, 'sc-hero-star') || ''],
-      strip: [{ label: 'Our rating', value: SC.signed(T.rating, 1), sub: rk ? QK.ordinal(rk) + ' of the sides we rate' : '', signal: true },
+      strip: [{ label: T.prov ? 'Our rating (provisional)' : 'Our rating', value: SC.signed(T.rating, 1), sub: rk ? QK.ordinal(rk) + ' of the ' + (T.of || '') + ' sides we rank' : (T.prov ? 'too few tests against the main pool to rank' : (T.invitational ? 'an invitational side, not ranked' : '')), signal: true },
         { label: 'Attack', value: SC.signed(T.att, 1), sub: 'points scored v average' }, { label: 'Defence', value: SC.signed(T.dfn, 1), sub: 'points kept out v average' },
-        { label: 'World Rugby', value: isNum(T.wr) ? SC.f(T.wr, 2) : '—', sub: 'points, our rebuild' }, { label: 'Last 12 months', value: y12.join('–'), sub: 'won, drawn, lost' }],
+        { label: 'World Rugby', value: isNum(T.wr) ? SC.f(T.wr, 2) : '—', sub: T.wr_rank ? QK.ordinal(T.wr_rank) + ', points in our rebuild' : 'points, our rebuild' }, { label: 'Last 12 months', value: y12.join('–'), sub: 'won, drawn, lost' }],
       short: short });
     var nxt = (T.next || [])[0];
     html += '<div class="qk-g2 sc-gap"><div>' + (nxt ? U.card('Next test', SC.compName(nxt.comp) + (nxt.venue ? ' · ' + esc(nxt.venue) : ''), QK.previewCard(SC.game(S, nxt), { layout: 'bug', homeFirst: true, noun: 'test' }) +
@@ -148,6 +250,12 @@ SC.route('team', function (page, P) {
         QK.explain('<b>How sure are we?</b> ' + T.profile.n + ' tests is ' + (T.profile.n < 12 ? 'a small sample: one big win moves these a lot.' : 'a fair sample, though the opposition still matters: the percentiles are opponent-adjusted.')) +
         '</div><div>' + (QK.strengths && sw ? QK.strengths({ name: t.name, abbr: t.abbr, colour: t.colour, sub: 'Percentile among test sides', best: sw.best.map(function (x) { return { label: x.label, pctl: x.pct, text: mfmt(M[x.id], T.profile.m[x.id].v) }; }), worst: sw.worst.map(function (x) { return { label: x.label, pctl: x.pct, text: mfmt(M[x.id], T.profile.m[x.id].v) }; }) }) : '') + '</div></div>';
     }
+    html += '<div id="tp-top"></div>' + gradesHtml(S, T) + '<div id="tp-squad"></div>';
+    if (T.xw && T.xw.length >= 4) {
+      var last = T.xw[T.xw.length - 1], gap = last[1] - last[2];
+      html += '<div class="qk-g75 sc-gap"><div>' + U.card('Results against our chances', 'The last ' + T.xw.length + ' tests: wins (a draw counts half) against the wins our pre-test chances expected.', U.chart('tp-xw', 280, 'Wins against expected wins')) + '</div><div>' +
+        QK.explain('<b>Who’s for real?</b> ' + esc(t.name) + ' won ' + SC.f(last[1], 1) + ' of these tests against ' + SC.f(last[2], 1) + ' expected: ' + (Math.abs(gap) < 1.5 ? 'about what the numbers said.' : gap > 0 ? SC.f(gap, 1) + ' more, close wins and upsets that seldom last.' : SC.f(-gap, 1) + ' fewer, near misses that tend to turn.')) + '</div></div>';
+    }
     html += '<div class="qk-g2 sc-gap">' + U.card('Our rating over time', 'Month by month; 0 is an average test side.', U.chart('tp-rating', 300, 'Rating history')) +
       U.card('World Rugby points over time', 'Our rebuild of the official points, month by month.', U.chart('tp-wr', 300, 'World Rugby points history')) + '</div>';
     // results and fixtures
@@ -165,6 +273,7 @@ SC.route('team', function (page, P) {
           { v: h.w / h.p, html: SC.pct(h.w / h.p) }, { v: h.pf, html: String(h.pf) }, { v: h.pa, html: String(h.pa) },
           { v: h.last ? h.last.date : '', html: h.last ? '<a href="' + esc(SC.matchHref(S, h.last.id)) + '">' + h.last.us + '–' + h.last.them + ', ' + esc(SC.year(h.last.date)) + '</a>' : '' }];
       }), { cls: 'sc-table', maxHeight: 560 }), { flush: true });
+    html += combosHtml(S, T);
     // squad and the most capped
     var pcols = [{ label: 'Player', align: 'left', sticky: true }, { label: 'Pos', align: 'left' }, { label: 'Age' }, { label: 'Caps' }, { label: 'Pts' }, { label: 'Tries' }, { label: 'Value' }, { label: 'Last test', align: 'left' }];
     var prow = function (r) {
@@ -179,6 +288,9 @@ SC.route('team', function (page, P) {
     page.innerHTML = html;
     U.wire(page);
     ratingChart(QK.$('#tp-rating', page), S, T);
+    xwChart(QK.$('#tp-xw', page), S, T);
+    performers(QK.$('#tp-top', page), S, tid, BR);
+    squadBoards(QK.$('#tp-squad', page), S, tid, BR, BM);
     wrChart(QK.$('#tp-wr', page), S, T);
     document.title = t.name + ' · ' + SC.SITE;
   });

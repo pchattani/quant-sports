@@ -69,6 +69,11 @@ def main(argv=None) -> int:
     ctx_rows = M.walk(ms, ctx)
     rep["rungs"]["ctx"] = {"params": M.as_dict(ctx), "dev": M.score(ctx_rows, *M.DEV), "test": M.score(ctx_rows, *test),
                            "cal_test": M.calibration(ctx_rows, *test)}
+    # rung 3b: the tier-three fix (Kalman rates, blow-out clip, World Rugby anchor), tuned from the uncertainty rung
+    kal, _ = M.tune(ms, replace(unc, kal=True, s_n=0.0), M.GRID_KAL, rounds=a.rounds)
+    kal_rows = M.walk(ms, kal)
+    rep["rungs"]["kal"] = {"params": M.as_dict(kal), "dev": M.score(kal_rows, *M.DEV), "test": M.score(kal_rows, *test),
+                           "cal_test": M.calibration(kal_rows, *test)}
     # rung 3: attack and defence (re-tune the learning rates for the split)
     split0 = replace(ctx, split=True)
     split, _ = M.tune(ms, split0, {k: M.GRID_ELO[k] for k in ("k", "k_new", "cap", "s0", "s1")}, rounds=1)
@@ -90,6 +95,10 @@ def main(argv=None) -> int:
         chosen, chosen_rows, chosen_name = unc, unc_rows, "unc"
     if rep["paired"]["ctx_vs_unc"]["better"] and rep["rungs"]["ctx"]["cal_test"]["ece"] <= rep["rungs"][chosen_name]["cal_test"]["ece"] + tol:
         chosen, chosen_rows, chosen_name = ctx, ctx_rows, "ctx"
+    rep["paired"]["kal_vs_best"] = dict(M.paired(chosen_rows, kal_rows, *test), against=chosen_name)
+    rep["paired"]["kal_vs_best_dev"] = dict(M.paired(chosen_rows, kal_rows, *M.DEV), against=chosen_name)
+    if rep["paired"]["kal_vs_best"]["better"] and rep["rungs"]["kal"]["cal_test"]["ece"] <= rep["rungs"][chosen_name]["cal_test"]["ece"] + tol:
+        chosen, chosen_rows, chosen_name = kal, kal_rows, "kal"
     rep["paired"]["split_vs_best"] = M.paired(chosen_rows, split_rows, *test)
     rep["paired"]["split_vs_best"]["against"] = chosen_name
     if rep["paired"]["split_vs_best"]["better"] and rep["rungs"]["split"]["cal_test"]["ece"] <= rep["rungs"][chosen_name]["cal_test"]["ece"] + tol:
@@ -101,8 +110,18 @@ def main(argv=None) -> int:
                               "cal_test": M.calibration(hyb_rows, *test), "post_hoc": True}
     rep["paired"]["hybrid_vs_best"] = dict(M.paired(chosen_rows, hyb_rows, *test), against=chosen_name, post_hoc=True)
     rep["paired"]["hybrid_vs_wr"] = dict(M.paired(wr_rows, hyb_rows, *test), post_hoc=True)
+    # the published hybrid before the tier-three fix (the uncertainty rung + the rebuild), for the before/after
+    if chosen_name != "unc":
+        old_rows = M.walk(ms, replace(unc, wr3=True), wr_fit=wr_fit)
+        rep["rungs"]["hybrid_unc"] = {"params": M.as_dict(replace(unc, wr3=True)), "dev": M.score(old_rows, *M.DEV),
+                                      "test": M.score(old_rows, *test), "cal_test": M.calibration(old_rows, *test), "post_hoc": True}
+        rep["paired"]["hybrid_vs_hybrid_unc"] = dict(M.paired(old_rows, hyb_rows, *test), post_hoc=True)
     rep["sealed_choice"] = chosen_name
-    chosen, chosen_rows, chosen_name = hyb, hyb_rows, "hybrid"
+    rep["paired"]["best_vs_wr"] = dict(M.paired(wr_rows, chosen_rows, *test), best=chosen_name)
+    # the hybrid is published only if it clears the same rule against the sealed choice (since 2 Nov 2026: before
+    # the tier-three fix it beat the uncertainty rung; against the Kalman rung it no longer does)
+    if rep["paired"]["hybrid_vs_best"]["better"] and rep["rungs"]["hybrid"]["cal_test"]["ece"] <= rep["rungs"][chosen_name]["cal_test"]["ece"] + tol:
+        chosen, chosen_rows, chosen_name = hyb, hyb_rows, "hybrid"
     rep["chosen"] = chosen_name
     # the total: the split model's attack/defence total when chosen; else the split model still supplies it (the
     # total does not change the win chance), scored against the era-mean total
@@ -131,7 +150,9 @@ def main(argv=None) -> int:
     sfx = "" if a.scope == "men" else f"_{a.scope}"
     (FITTED / f"params{sfx}.json").write_text(json.dumps(params, indent=1), encoding="utf-8")
     (FITTED / f"report{sfx}.json").write_text(json.dumps(rep, indent=1), encoding="utf-8")
-    for k in ("wr", "elo", "unc", "ctx", "split", "hybrid"):
+    for k in ("wr", "elo", "unc", "ctx", "kal", "split", "hybrid", "hybrid_unc"):
+        if k not in rep["rungs"]:
+            continue
         print(k, rep["rungs"][k]["dev"], rep["rungs"][k]["test"], "ece", rep["rungs"][k]["cal_test"]["ece"])
     print("paired", json.dumps(rep["paired"]))
     print("chosen", chosen_name, "total", rep["total"], "tries", rep["tries"]["test"])

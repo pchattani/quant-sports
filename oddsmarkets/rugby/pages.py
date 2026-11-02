@@ -19,6 +19,45 @@ COMP_TIER = {"rwc": 50, "wrwc": 40, "nc": 38, "six": 40, "trc": 36, "lions": 42,
 r1 = B.r1
 
 
+def game_value(st: dict, mins: float, grp: str | None, ana: dict, weights: dict | None) -> float | None:
+    """A player's Scrum value for one test: the value model's points for what he did (models.VALUE_TEAM weights on
+    the player's counts), minus a replacement-level player of his group over the same minutes, plus goal kicking
+    above an average kicker (2.5 points a kick). None without statistics or minutes."""
+    if not st or not weights or mins <= 0:
+        return None
+    v = sum((weights.get(k) or 0.0) * float(st.get(k) or 0.0) for k in PL.VALUE_KEYS)
+    v -= (ana.get("repl") or {}).get(grp, 0.0) * mins / 80.0
+    made = (st.get("con") or 0) + (st.get("pg") or 0)
+    kp = st.get("kpct")
+    if made and isinstance(kp, (int, float)) and kp > 0:
+        v += 2.5 * (made - AN.KICK_AVG * made / kp)
+    return v
+
+
+def win_chance_path(m: dict, fc: dict | None) -> list | None:
+    """Our home-win chance through a finished test, from the scoring events: at minute t with the home side d points
+    up, the final margin is d plus the pre-match expected margin over the time left, spread by the pre-match spread
+    times the square root of the time left. [[minute, chance]] from kick-off to full time."""
+    evs = [e for e in (m.get("events") or []) if isinstance(e[0], (int, float)) and e[5] is not None and e[6] is not None]
+    if not fc or not evs or fc.get("margin") is None:
+        return None
+    mg, sd = float(fc["margin"]), float(fc.get("sd") or 14.0)
+
+    def p_at(t, d):
+        f = max(0.0, (80.0 - min(t, 80.0)) / 80.0)
+        if f <= 0:
+            return 1.0 if d > 0 else (0.0 if d < 0 else 0.5)
+        mu, s_ = d + mg * f, sd * math.sqrt(f)
+        return 1.0 - 0.5 * (1.0 + math.erf((0.5 - mu) / (s_ * math.sqrt(2.0))))
+    out = [[0, round(p_at(0, 0), 4)]]
+    for e in evs:
+        t = min(int(e[0]), 80)
+        out.append([t, round(p_at(t, e[5] - e[6]), 4)])
+    fin = m["hs"] - m["as"]
+    out.append([80, 1.0 if fin > 0 else (0.0 if fin < 0 else 0.5)])
+    return out
+
+
 def short_card(S, m, fc):
     c = B.card(S, m, fc)
     return c
@@ -30,8 +69,20 @@ def match_page(S, w, rep, m, ana) -> dict:
     fc = w["fc"].get(m["id"]) or w["up"].get(m["id"])
     out = {"ok": True, "match": B.card(S, m, fc), "season": int(m["date"][:4]), "comp_name": COMP_NAME.get(m.get("comp"), ""),
            "attendance": m.get("attendance")}
-    if m.get("hh"):
-        out["halves"] = [m.get("hh"), m.get("ah")]
+    hh, ah = m.get("hh"), m.get("ah")       # [half-time, full-time] for each side
+    evs = [e for e in (m.get("events") or []) if isinstance(e[0], (int, float)) and e[5] is not None]
+    if hh and ah and ((hh[0] or 0) + (ah[0] or 0) > 0 or (m.get("hs") or 0) + (m.get("as") or 0) == 0):
+        out["halves"] = [hh, ah]
+    elif evs and m.get("hs") is not None:
+        # the feed sends a 0-0 half-time when it has none: the score at the last scoring event of the first 40
+        # minutes instead (an estimate: stoppage time is not marked), else no half-time at all
+        first = [e for e in evs if e[0] <= 40]
+        ht = (first[-1][5], first[-1][6]) if first else (0, 0)
+        out["halves"] = [[ht[0], m["hs"]], [ht[1], m["as"]]]
+        out["halves_est"] = 1
+    wp = win_chance_path(m, fc) if m.get("status") == "final" else None
+    if wp:
+        out["wp"] = wp
     if fc:
         ctx = fc.get("ctx") or {}
         out["forecast"] = {"p": [r1(fc["p_home"], 4), r1(fc["p_draw"], 4), r1(fc["p_away"], 4)], "margin": r1(fc["margin"]),
@@ -47,6 +98,8 @@ def match_page(S, w, rep, m, ana) -> dict:
     if m.get("hstat") and m.get("astat"):
         out["stats"] = {"home": m["hstat"], "away": m["astat"]}
     lines = {}
+    weights = S.fit.get("value") or {}
+    any_stats = False
     for side in ("h", "a"):
         rows = m.get("l" + side) or []
         if not rows:
@@ -57,10 +110,17 @@ def match_page(S, w, rep, m, ana) -> dict:
             aid = r[0]
             a = S.athletes.get(aid) or {}
             mn, est = mins.get(aid, (0.0, True))
-            lines[side].append({"id": aid, "n": a.get("name") or aid, "j": r[1], "pos": r[2] if r[2] != "R" else (ana["pos"].get(aid) or "R"),
-                                "st": r[3], "c": r[4], "min": int(round(mn)), "est": 1 if est else 0, "s": r[5] or {}})
+            st = r[5] or {}
+            has = any(isinstance(v, (int, float)) and v for v in st.values())
+            any_stats = any_stats or has
+            pos = r[2] if r[2] != "R" else (ana["pos"].get(aid) or "R")
+            gv = game_value(st, mn, PL.POS_GROUP.get(ana["pos"].get(aid) or pos), ana, weights) if has else None
+            lines[side].append({"id": aid, "n": a.get("name") or aid, "j": r[1], "pos": pos,
+                                "st": r[3], "c": r[4], "min": int(round(mn)), "est": 1 if est else 0, "s": st if has else {},
+                                "gv": r1(gv, 2)})
     if lines:
         out["lines"] = lines
+        out["has_stats"] = 1 if any_stats else 0
     if m.get("events"):
         out["events"] = [e for e in m["events"]]
     return out
@@ -123,12 +183,26 @@ def monthly(hist: list) -> list:
     return [[k, v] for k, v in sorted(out.items())]
 
 
-def ratings_payload(S, w, rep) -> dict:
+# a rating is ranked only when it is tied to the main pool of test sides: five or more tests rated, and a tier-one or
+# tier-two side or three or more tests against one in the last four years. Ratings are identified only up to an offset
+# within each group of sides that play each other, so a side that meets only other tier-three sides gets a
+# provisional rating with no rank. Invitational sides (the Lions, the Barbarians) are outside the ratings table.
+RANK_MIN_TESTS = 5
+RANK_MIN_CONN = 3
+
+
+def comparable(t: dict) -> bool:
+    return (t.get("n") or 0) >= RANK_MIN_TESTS and ((t.get("tier") or 3) <= 2 or (t.get("conn") or 0) >= RANK_MIN_CONN)
+
+
+def ratings_payload(S, w, rep, wr_rank: dict | None = None) -> dict:
     mdl = w["model"]
     active_from = (S.now - timedelta(days=4 * 365)).date().isoformat()
     teams = []
     for tid, hist in w["hist"].items():
         if not hist or hist[-1][0] < active_from:
+            continue
+        if nations.invitational(S.name(tid)):
             continue
         now_r = mdl.rating(tid)
 
@@ -152,14 +226,18 @@ def ratings_payload(S, w, rep) -> dict:
                       "conn": sum(1 for m in res if m["date"][:10] >= active_from and
                                   (S.teams.get(m["away"]["id"] if m["home"]["id"] == tid else m["home"]["id"]) or {}).get("tier", 3) <= 2),
                       "hist": monthly([h for h in hist if h[0] >= "2003-01-01"])})
-    teams.sort(key=lambda t: -(t["rating"] or -99))
-    for i, t in enumerate(teams):
-        t["rank"] = i + 1
-    wr_sorted = sorted([t for t in teams if t["wr"] is not None], key=lambda t: -t["wr"])
-    for i, t in enumerate(wr_sorted):
-        t["wr_rank"] = i + 1
-    return {"ok": True, "asof": S.today, "teams": teams, "model": S.fit.get("model"), "home_adv": r1(S.p.H, 2),
-            "mu": r1(mdl.mu, 1)}
+    teams.sort(key=lambda t: -(t["rating"] if t["rating"] is not None else -99))
+    k = 0
+    for t in teams:
+        if comparable(t):
+            k += 1
+            t["rank"] = k
+        else:
+            t["rank"] = None
+            t["prov"] = 1
+        t["wr_rank"] = (wr_rank or {}).get(t["id"])
+    return {"ok": True, "asof": S.today, "teams": teams, "n_ranked": k, "model": S.fit.get("model"), "home_adv": r1(S.p.H, 2),
+            "mu": r1(mdl.mu, 1), "rank_rule": {"min_tests": RANK_MIN_TESTS, "min_conn": RANK_MIN_CONN}}
 
 
 def rankings_payload(S, w, rep) -> dict:
@@ -233,7 +311,7 @@ def h2h(S, tid) -> list:
     return out
 
 
-def team_page(S, w, rep, ana, prof, tid, comps_out) -> dict:
+def team_page(S, w, rep, ana, prof, tid, comps_out, ratings: dict | None = None) -> dict:
     t = S.teams.get(tid) or {}
     res = B.team_results(S, tid)
     mdl = w["model"]
@@ -290,12 +368,99 @@ def team_page(S, w, rep, ana, prof, tid, comps_out) -> dict:
         us = m["hs"] if m["home"]["id"] == tid else m["as"]
         th = m["as"] if m["home"]["id"] == tid else m["hs"]
         allrec["w" if us > th else ("d" if us == th else "l")] += 1
-    return {"ok": True, "id": tid, "team": t, "rating": r1(mdl.rating(tid), 2), "att": r1(mdl.att.get(tid), 2),
+    rr = next((x for x in (ratings or {}).get("teams") or [] if x["id"] == tid), None) or {}
+    # results against our chances: the last 40 tests, cumulative wins and the wins we expected
+    xw, cw, ce = [], 0.0, 0.0
+    for m in res[-40:]:
+        f = w["fc"].get(m["id"]) or {}
+        home = m["home"]["id"] == tid
+        us, th = (m["hs"], m["as"]) if home else (m["as"], m["hs"])
+        p = f.get("p_home") if home else f.get("p_away")
+        if p is None:
+            continue
+        cw += 1.0 if us > th else (0.5 if us == th else 0.0)
+        ce += p + 0.5 * (f.get("p_draw") or 0.0)
+        xw.append([m["date"][:10], round(cw, 2), round(ce, 2), m["id"]])
+    return {"ok": True, "id": tid, "team": t, "rank": rr.get("rank"), "of": (ratings or {}).get("n_ranked"),
+            "prov": 1 if rr and not rr.get("rank") else 0, "wr_rank": (rep.get("wr_rank") or {}).get(tid),
+            "invitational": 1 if nations.invitational(t.get("name") or "") else 0,
+            "rating": r1(mdl.rating(tid), 2), "att": r1(mdl.att.get(tid), 2),
             "dfn": r1(mdl.dfn.get(tid), 2), "wr": r1(rep["live"].points.get(tid), 2), "form": B.form_of(S, tid, n=10),
             "record": [allrec["w"], allrec["d"], allrec["l"]], "first": res[0]["date"][:10] if res else None,
             "results": rows, "next": nxt, "h2h": h2h(S, tid), "squad": squad, "most_capped": most,
             "top_points": top_pts, "top_tries": top_tries, "profile": profile,
-            "rating_hist": monthly([h for h in hist if h[0] >= "2003-01-01"]), "wr_hist": wr_hist, "chances": chances}
+            "rating_hist": monthly([h for h in hist if h[0] >= "2003-01-01"]), "wr_hist": wr_hist, "chances": chances,
+            "xw": xw, "combos": combos(S, ana, tid), "grades": (GRADES.get(S.scope) or {}).get(tid)}
+
+
+# the pairings that decide a test: the half-backs (9 and 10), the centres (12 and 13), the locks (4 and 5)
+PAIRS = [("halves", "Half-backs", (9, 10)), ("centres", "Centres", (12, 13)), ("locks", "Locks", (4, 5))]
+
+
+def combos(S, ana, tid) -> list:
+    """The most-used starting pairs over the last four years, with their record and points difference."""
+    since = (S.now - timedelta(days=4 * 365)).date().isoformat()
+    out = []
+    for key, label, (j1, j2) in PAIRS:
+        rec = defaultdict(lambda: {"n": 0, "w": 0, "d": 0, "l": 0, "pd": 0, "last": ""})
+        for m in B.team_results(S, tid):
+            if m["date"][:10] < since:
+                continue
+            side = "h" if m["home"]["id"] == tid else "a"
+            st = {r[1]: r[0] for r in (m.get("l" + side) or []) if r[3]}
+            if j1 not in st or j2 not in st:
+                continue
+            us, th = (m["hs"], m["as"]) if side == "h" else (m["as"], m["hs"])
+            x = rec[(st[j1], st[j2])]
+            x["n"] += 1
+            x["w" if us > th else ("d" if us == th else "l")] += 1
+            x["pd"] += us - th
+            x["last"] = max(x["last"], m["date"][:10])
+        rows = sorted(rec.items(), key=lambda kv: (-kv[1]["n"], -kv[1]["pd"]))[:5]
+        out.append({"key": key, "label": label, "jerseys": [j1, j2],
+                    "rows": [{"a": a, "an": (S.athletes.get(a) or {}).get("name") or a, "b": b, "bn": (S.athletes.get(b) or {}).get("name") or b,
+                              **v} for (a, b), v in rows]})
+    return out
+
+
+# position-group grades: each side's best regulars at the position (Scrum value per 80, the current window), ranked
+# against the other ranked sides; filled by build_scope before the team pages are written
+GRADES: dict = {}
+GRADE_TOP = {"front_row": 4, "lock": 2, "back_row": 3, "halves": 2, "centres": 2, "back_three": 3}
+
+
+def grade_table(S, ana, ratings) -> dict:
+    ranked = {t["id"] for t in ratings["teams"] if t.get("rank")}
+    last_year = (S.now - timedelta(days=400)).date().isoformat()
+    pool = defaultdict(lambda: defaultdict(list))
+    for aid, rec in ana["players"].items():
+        cur = rec.get("cur") or {}
+        g = rec.get("grp")
+        if not g or not cur.get("qual") or rec["career"]["last"] < last_year:
+            continue
+        team = Counter(x["team"] for x in ana["games"][aid] if x["date"] >= ana["cur_from"]).most_common(1)
+        if not team or team[0][0] not in ranked:
+            continue
+        pool[team[0][0]][g].append((cur["rates"]["val80"], aid))
+    score = defaultdict(dict)
+    for t, gs in pool.items():
+        for g, lst in gs.items():
+            lst.sort(reverse=True)
+            k = GRADE_TOP[g]
+            if len(lst) >= max(1, k // 2):
+                top = lst[:k]
+                score[g][t] = (sum(v for v, _a in top) / len(top), top)
+    out = defaultdict(dict)
+    for g, d in score.items():
+        order = sorted(d.items(), key=lambda kv: -kv[1][0])
+        n = len(order)
+        for i, (t, (v, top)) in enumerate(order):
+            q = i / max(1, n - 1)
+            grade = "A" if q < 0.15 else "B" if q < 0.4 else "C" if q < 0.65 else "D" if q < 0.85 else "F"
+            out[t][g] = {"rank": i + 1, "of": n, "v": round(v, 2), "grade": grade,
+                         "lead": {"id": top[0][1], "n": (S.athletes.get(top[0][1]) or {}).get("name") or top[0][1], "v": round(top[0][0], 2)},
+                         "weak": {"id": top[-1][1], "n": (S.athletes.get(top[-1][1]) or {}).get("name") or top[-1][1], "v": round(top[-1][0], 2)} if len(top) > 1 else None}
+    return dict(out)
 
 
 def _team_wr_hist(rep, tid):
@@ -321,14 +486,16 @@ def _team_wr_hist(rep, tid):
 def teams_payload(S, w, rep, prof, ratings: dict | None = None) -> dict:
     mdl = w["model"]
     rows = []
-    rt = {t["id"]: t for t in (ratings or {}).get("teams") or []}
-    for tid, p in prof["teams"].items():
-        r = rt.get(tid) or {}
-        if (r.get("tier") or 3) > 2 and (r.get("conn") or 0) < 3:
-            continue                     # a rating on a scale of its own (see ratings_payload): not ranked with the rest
+    # every ranked side (provisional and invitational sides are not ranked: see ratings_payload), so the board's ranks
+    # are the Rankings page's; the profile (`m`) only where the source has six tests with team stats in two years
+    for r in (ratings or {}).get("teams") or []:
+        if not r.get("rank"):
+            continue
+        tid = r["id"]
+        p = prof["teams"].get(tid) or {"n": 0, "m": {}}
         t = S.teams.get(tid) or {}
-        rows.append({"id": tid, "rating": r1(mdl.rating(tid), 2), "att": r1(mdl.att.get(tid), 2), "dfn": r1(mdl.dfn.get(tid), 2),
-                     "n": p["n"], "form": B.form_of(S, tid, n=10), "tier": t.get("tier"),
+        rows.append({"id": tid, "rank": r["rank"], "rating": r1(mdl.rating(tid), 2), "att": r1(mdl.att.get(tid), 2), "dfn": r1(mdl.dfn.get(tid), 2),
+                     "n": p["n"], "tests": r.get("n"), "form": B.form_of(S, tid, n=10), "tier": t.get("tier"),
                      "m": {k: [r1(v["raw"], 3), v["pct"]] for k, v in p["m"].items()}})
     rows.sort(key=lambda r: -(r["rating"] or -99))
     return {"ok": True, "asof": S.today, "since": prof["since"], "teams": rows,
@@ -357,13 +524,16 @@ def player_page(S, ana, aid, w) -> dict:
     # appearances before player stats exist (lineups only): caps by year
     caps_by_year = Counter(g["season"] for g in gs)
     log = []
+    weights = S.fit.get("value") or {}
     for g in gs[-40:][::-1]:
         st = g["stats"] or {}
         m = S.by_id.get(g["mid"]) or {}
+        gv = game_value(st, g["min"], rec.get("grp"), ana, weights) if any(isinstance(v, (int, float)) and v for v in st.values()) else None
         log.append({"id": g["mid"], "date": g["date"], "opp": g["opp"], "h": 1 if g["side"] == "h" else 0, "res": g["res"],
                     "sc": [m.get("hs"), m.get("as")] if g["side"] == "h" else [m.get("as"), m.get("hs")],
                     "comp": g["comp"], "j": g["jersey"], "st": 1 if g["starter"] else 0, "min": int(round(g["min"])),
-                    "s": {k: st.get(k) for k in ("pts", "tries", "ta", "m", "car", "cb", "db", "off", "tk", "mt", "pc", "lo", "toc") if st.get(k)}})
+                    "s": {k: st.get(k) for k in ("pts", "tries", "ta", "m", "car", "cb", "db", "off", "tk", "mt", "pc", "lo", "toc") if st.get(k)},
+                    "gv": r1(gv, 2)})
     cur = rec.get("cur") or {}
     # most similar: within the group, on the current percentile vector
     sim = []
@@ -392,12 +562,39 @@ def player_page(S, ana, aid, w) -> dict:
             "cur": {"from": ana["cur_from"], "n": cur["agg"]["n"], "min": int(cur["agg"]["min"]), "q": 1 if cur.get("qual") else 0,
                     "v": {k: r1(cur["rates"].get(k), 3) for k in AN.PM_IDS if cur["rates"].get(k) is not None},
                     "pc": {k: v for k, v in (cur.get("pct") or {}).items() if v is not None}} if cur else None,
-            "seasons": seasons, "log": log, "similar": sim}
+            "seasons": seasons, "log": log, "similar": sim, "splits": splits(S, ana, aid, rec)}
+
+
+SPLIT_KEYS = ["val80", "m", "car", "cb", "tk", "tkpct", "pc", "pts"]
+
+
+def splits(S, ana, aid, rec) -> list:
+    """Per-80 rates (shrunk toward the position like every rate on the site) over the current window, split by
+    venue, result, role and the last ten tests."""
+    grp = rec.get("grp")
+    prior = (ana.get("prior") or {}).get(grp)
+    weights = S.fit.get("value") or {}
+    repl = (ana.get("repl") or {}).get(grp, 0.0)
+    gs = [g for g in ana["games"][aid] if g["date"] >= ana["cur_from"] and g["stats"]]
+    if len(gs) < 4:
+        return []
+    groups = [("All tests", gs), ("Home", [g for g in gs if g["side"] == "h"]), ("Away", [g for g in gs if g["side"] == "a"]),
+              ("Won", [g for g in gs if g["res"] == "W"]), ("Lost", [g for g in gs if g["res"] == "L"]),
+              ("Started", [g for g in gs if g["starter"]]), ("From the bench", [g for g in gs if not g["starter"]]), ("Last 10", gs[-10:])]
+    out = []
+    for label, sel in groups:
+        if not sel:
+            continue
+        a = next(iter(PL.aggregate(sel).values()))
+        rt = PL.rates(a, prior)
+        rt["val80"] = PL.value_per80(rt, weights, {}) - repl
+        out.append({"label": label, "n": a["n"], "min": int(a["min"]), **{k: r1(rt.get(k), 3) for k in SPLIT_KEYS}})
+    return out
 
 
 def board_payload(S, ana) -> dict:
     """The Scouting Room's board: every player with minutes in the current window, column-oriented."""
-    cols = ["id", "n", "team", "pos", "grp", "age", "gp", "min", "q"] + AN.PM_IDS + ["p_" + k for k in AN.PM_IDS]
+    cols = ["id", "n", "team", "pos", "grp", "age", "gp", "min", "q", "tier", "last"] + AN.PM_IDS + ["p_" + k for k in AN.PM_IDS]
     rows = []
     for aid, rec in ana["players"].items():
         cur = rec.get("cur")
@@ -406,7 +603,8 @@ def board_payload(S, ana) -> dict:
         a = S.athletes.get(aid) or {}
         team = Counter(g["team"] for g in ana["games"][aid] if g["date"] >= ana["cur_from"]).most_common(1)
         row = [aid, a.get("name") or aid, team[0][0] if team else None, rec.get("pos"), rec.get("grp"), AN.age_on(a.get("dob"), S.today),
-               cur["agg"]["n"], int(cur["agg"]["min"]), 1 if cur.get("qual") else 0]
+               cur["agg"]["n"], int(cur["agg"]["min"]), 1 if cur.get("qual") else 0,
+               (S.teams.get(team[0][0]) or {}).get("tier") if team else None, rec["career"]["last"]]
         row += [r1(cur["rates"].get(k), 3) for k in AN.PM_IDS]
         row += [(cur.get("pct") or {}).get(k) for k in AN.PM_IDS]
         rows.append(row)
@@ -446,7 +644,95 @@ def model_payload(S, w, rep, flog) -> dict:
             "log": log, "record": rec}
 
 
-def lab_payload(S, w) -> dict:
+def territory_conversion(S) -> dict:
+    """Since 2015: each side's territory (and possession) share in a test against the points it scored and how often it
+    won, in five-point bins; and the share of the variation in points that territory explains."""
+    out = {}
+    for key in ("terr", "poss"):
+        bins = defaultdict(lambda: [0, 0.0, 0.0])
+        xs, ys = [], []
+        for m in S.finals:
+            if m["date"][:4] < "2015" or not m.get("hstat") or not m.get("astat"):
+                continue
+            for side, pf, pa in (("hstat", m["hs"], m["as"]), ("astat", m["as"], m["hs"])):
+                v = (m.get(side) or {}).get(key)
+                if not isinstance(v, (int, float)) or not 0.2 <= v <= 0.8:
+                    continue
+                b = int(round(v * 100 / 5.0) * 5)
+                x = bins[b]
+                x[0] += 1
+                x[1] += pf
+                x[2] += 1.0 if pf > pa else (0.5 if pf == pa else 0.0)
+                xs.append(v)
+                ys.append(pf)
+        n = len(xs)
+        r = None
+        if n > 20:
+            mx, my = sum(xs) / n, sum(ys) / n
+            sxy = sum((a - mx) * (b - my) for a, b in zip(xs, ys))
+            sxx = sum((a - mx) ** 2 for a in xs)
+            syy = sum((b - my) ** 2 for b in ys)
+            r = sxy / math.sqrt(sxx * syy) if sxx and syy else None
+        out[key] = {"bins": [[b, x[0], round(x[1] / x[0], 2), round(x[2] / x[0], 3)] for b, x in sorted(bins.items()) if x[0] >= 8],
+                    "n": n, "r2": None if r is None else round(r * r, 3)}
+    return out
+
+
+def setpiece_years(S) -> list:
+    """League-wide set piece and breakdown by year (tests with team statistics): scrum, lineout and ruck success,
+    lineout steals, turnovers won and penalties a test."""
+    by = defaultdict(lambda: defaultdict(float))
+    for m in S.finals:
+        for side in ("hstat", "astat"):
+            st = m.get(side) or {}
+            if not st:
+                continue
+            y = by[int(m["date"][:4])]
+            y["n"] += 1
+            for k in ("scrums_won", "scrums", "lineouts_won", "lineouts", "rucks_won", "rucks", "lineout_steals", "to_won", "pens"):
+                v = st.get(k)
+                if isinstance(v, (int, float)):
+                    y[k] += v
+                    y["n_" + k] += 1          # sides that carry the stat (the early feed has only some)
+    out = []
+    for yr in sorted(by):
+        y = by[yr]
+        if y["n"] < 20:
+            continue
+        sh = lambda a, b: round(y[a] / y[b], 4) if y[b] and y["n_" + b] >= 20 else None
+        per = lambda a: round(y[a] / y["n_" + a], 2) if y["n_" + a] >= 20 else None
+        out.append({"y": yr, "n": int(y["n"] / 2), "scrum": sh("scrums_won", "scrums"), "lineout": sh("lineouts_won", "lineouts"),
+                    "ruck": sh("rucks_won", "rucks"), "steals": per("lineout_steals"), "to_won": per("to_won"), "pens": per("pens")})
+    return out
+
+
+def position_profile(ana) -> list:
+    """Discipline, tackling and work by position group: the middle half (25th to 75th percentile) and the median of
+    the regulars' shrunk per-80 rates over the current window."""
+    keys = [("pc", "Penalties conceded per 80"), ("cards", "Cards per 80"), ("tkpct", "Tackle success"), ("mt", "Missed tackles per 80"),
+            ("inv", "Involvements per 80"), ("ko", "Knock-ons per 80")]
+    out = []
+    for g in PL.GROUP_ORDER:
+        vals = defaultdict(list)
+        for rec in ana["players"].values():
+            cur = rec.get("cur") or {}
+            if rec.get("grp") != g or not cur.get("qual"):
+                continue
+            for k, _l in keys:
+                v = cur["rates"].get(k)
+                if v is not None:
+                    vals[k].append(v)
+        row = {"grp": g, "label": PL.GROUP_NAME[g], "n": len(vals.get("pc", []))}
+        for k, _l in keys:
+            v = sorted(vals.get(k, []))
+            if len(v) >= 8:
+                q = lambda f: v[int(f * (len(v) - 1))]
+                row[k] = [round(q(0.25), 3), round(q(0.5), 3), round(q(0.75), 3)]
+        out.append(row)
+    return out
+
+
+def lab_payload(S, w, ana=None) -> dict:
     """League-wide analytics: home advantage and scoring by year, the try share of points, bonus-point rates,
     the margin distribution, and the value model's weights."""
     by = defaultdict(lambda: {"n": 0, "hw": 0, "d": 0, "pts": 0, "tries": 0, "tpts": 0, "n_t": 0, "tbp": 0, "lbp": 0, "margin": 0.0, "n_home": 0})
@@ -479,9 +765,10 @@ def lab_payload(S, w) -> dict:
                       "home_margin": r1(b["margin"] / b["n_home"], 2) if b["n_home"] else None, "draw": r1(b["d"] / b["n"], 3),
                       "pts": r1(b["pts"] / b["n"], 1), "tries": r1(b["tries"] / b["n_t"], 2) if b["n_t"] else None,
                       "try_share": r1(5 * b["tries"] / b["tpts"], 3) if b["tpts"] else None,
-                      "tbp": r1(b["tbp"] / (2 * b["n_t"]), 3) if b["n_t"] else None, "lbp": r1(b["lbp"] / b["n_t"], 3) if b["n_t"] else None})
+                      "tbp": r1(b["tbp"] / (2 * b["n_t"]), 3) if b["n_t"] >= 10 else None, "lbp": r1(b["lbp"] / b["n_t"], 3) if b["n_t"] >= 10 else None})
     val = (S.report or {}).get("value") or {}
     return {"ok": True, "years": years, "margins": [[k, margins[k]] for k in range(0, 61)], "value": val,
+            "territory": territory_conversion(S), "setpiece": setpiece_years(S), "positions": position_profile(ana) if ana else None,
             "home_adv": r1(S.p.H, 2), "travel": {"c_km": S.p.c_km, "c_tz": S.p.c_tz, "c_rest": S.p.c_rest}}
 
 
@@ -614,8 +901,7 @@ def overview_payload(S, w, rep, ratings, comps_out, ana) -> dict:
         feat = B.card(S, S.finals[-1], w["fc"].get(S.finals[-1]["id"]))
     # the power board ranks sides whose rating is tied to the main pool: tier one and two, or three or more tests
     # against them in four years (a side that only plays other tier-three sides has a rating on its own scale)
-    power = [t for t in ratings["teams"] if ((t.get("tier") or 3) <= 2 or (t.get("conn") or 0) >= 3)
-             and not nations.invitational(S.name(t["id"]))][:20]
+    power = [t for t in ratings["teams"] if t.get("rank")][:20]
     # stories: the biggest riser and faller of the last year among rated sides, the hottest run, who's for real
     act = [t for t in ratings["teams"] if t["d365"] is not None and t["n"] >= 15 and (t.get("tier") or 3) <= 2]
     up = max(act, key=lambda t: t["d365"]) if act else None
@@ -626,7 +912,7 @@ def overview_payload(S, w, rep, ratings, comps_out, ana) -> dict:
     if dn:
         stories.append({"kind": "faller", "team": dn["id"], "d": dn["d365"], "rating": dn["rating"], "hist": dn["hist"][-24:]})
     runs = []
-    for t in ratings["teams"][:30]:
+    for t in [x for x in ratings["teams"] if x.get("rank")][:30]:
         f = B.form_of(S, t["id"], n=30)
         k = len(f) - len(f.rstrip("W")) if f.endswith("W") else 0
         runs.append((k, t["id"]))
@@ -753,11 +1039,13 @@ def build_scope(scope: str, data_root: Path, sims: int = 20000, now: datetime | 
     ana = AN.player_tables(S.finals, S.athletes, S.today, S.fit.get("value"))
     prof = AN.team_profiles(S.finals, S.today)
     comps_out = B.comp_payloads(S, w, rep, sims)
-    ratings = ratings_payload(S, w, rep)
+    rk_pay = rankings_payload(S, w, rep)
+    rep["wr_rank"] = {r["id"]: r["rank"] for r in rk_pay["table"]}
+    ratings = ratings_payload(S, w, rep, rep["wr_rank"])
     flog = forecast_log(S, w)
     sizes = Counter()
     sizes["ratings"] += B.write(data / "ratings.json", ratings)
-    sizes["rankings"] += B.write(data / "rankings.json", rankings_payload(S, w, rep))
+    sizes["rankings"] += B.write(data / "rankings.json", rk_pay)
     sizes["overview"] += B.write(data / "overview.json", overview_payload(S, w, rep, ratings, comps_out, ana))
     fx = {"ok": True, "asof": S.today, "upcoming": [B.card(S, m, w["up"].get(m["id"])) for m in S.upcoming[:200]],
           "results": [B.card(S, m, w["fc"].get(m["id"])) for m in S.finals[-B.RECENT_RESULTS:]][::-1],
@@ -766,11 +1054,12 @@ def build_scope(scope: str, data_root: Path, sims: int = 20000, now: datetime | 
     yp = year_payloads(S, w, data)
     for key, c in comps_out.items():
         sizes["comps"] += B.write(data / "comps" / f"{key}.json", dict(ok=True, **c))
+    GRADES[S.scope] = grade_table(S, ana, ratings)
     sizes["teams"] += B.write(data / "teams.json", teams_payload(S, w, rep, prof, ratings))
     cut = (S.now - timedelta(days=10 * 365)).date().isoformat()
     team_ids = [t for t in S.teams if any(m["date"][:10] >= cut for m in B.team_results(S, t))]
     for tid in team_ids:
-        sizes["team_pages"] += B.write(data / "teams" / f"{tid}.json", team_page(S, w, rep, ana, prof, tid, comps_out))
+        sizes["team_pages"] += B.write(data / "teams" / f"{tid}.json", team_page(S, w, rep, ana, prof, tid, comps_out, ratings))
     for aid in ana["players"]:
         sizes["player_pages"] += B.write(data / "players" / f"{aid}.json", player_page(S, ana, aid, w))
     sizes["board"] += B.write(data / "players.json", board_payload(S, ana))
@@ -780,7 +1069,7 @@ def build_scope(scope: str, data_root: Path, sims: int = 20000, now: datetime | 
                 pass
             sizes["match_pages"] += B.write(data / "matches" / f"{m['id']}.json", match_page(S, w, rep, m, ana))
     sizes["model"] += B.write(data / "model.json", model_payload(S, w, rep, flog))
-    sizes["lab"] += B.write(data / "lab.json", lab_payload(S, w))
+    sizes["lab"] += B.write(data / "lab.json", lab_payload(S, w, ana))
     sizes["records"] += B.write(data / "records.json", records_payload(S, ana))
     info = {"ok": True, "label": config.SCOPES[scope]["label"], "short": config.SCOPES[scope]["short"],
             "teams": {tid: dict(S.teams[tid], **({"active": 1} if tid in set(team_ids) else {})) for tid in S.teams}, "years": yp["years"], "latest": S.finals[-1]["date"][:10],

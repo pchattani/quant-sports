@@ -48,6 +48,19 @@ GLOSSARY = [
      "else. We use tiers for a new side's starting rating and to say where our forecasts have been tested."),
     ("Development and test years", "We choose every setting on 2004-2018 and score once on 2019 onwards, so the "
      "published accuracy is honest."),
+    ("Provisional rating", "A side with fewer than five tests rated, or fewer than three tests against tier-one or tier-two "
+     "opposition in four years. A rating is only pinned down against the sides a team actually plays, so these carry no "
+     "rank; the World Rugby rank (our rebuild) is the better guide for them."),
+    ("Rating uncertainty", "How sure we are of a side's rating. A new side starts very unsure and learns fast against "
+     "established sides; a test between two unproven sides moves both much less (a Kalman filter)."),
+    ("Game value", "A player's Scrum value in one test: what his own numbers were worth to the margin, minus what a "
+     "replacement-level player of his position would have added in the same minutes."),
+    ("Involvements", "Carries, tackles and rucks won added together, per 80 minutes: a forward's work rate."),
+    ("Lineout throws won", "The share of a hooker's throws that his side wins; our source credits the lineout to the thrower."),
+    ("Win chance through the test", "Our chance for the home side at each score, from the pre-match margin and spread: "
+     "with less time left, the same lead is worth more."),
+    ("Grades", "Each position group's best regulars by Scrum value, ranked against the ranked sides: A is the top 15%, "
+     "F the bottom 15%."),
 ]
 
 
