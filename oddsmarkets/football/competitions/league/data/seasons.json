@@ -1,5 +1,5 @@
 {
-  "discovered_at": "2026-10-28T06:59:29Z",
+  "discovered_at": "2026-11-02T14:49:57Z",
   "leagues": {
     "premier-league": {
       "tournament_id": 17,
@@ -2390,6 +2390,1135 @@
       "conferences": {},
       "previous_rank": {},
       "family": "super"
+    },
+    "primera-a-colombia": {
+      "tournament_id": 11539,
+      "seasons": [
+        {
+          "season_id": 88503,
+          "name": "Liga DIMAYOR 2026",
+          "year": "2026",
+          "tournament_id": 11539
+        },
+        {
+          "season_id": 77825,
+          "name": "Primera A, Clausura 2025",
+          "year": "2025",
+          "tournament_id": 11536
+        },
+        {
+          "season_id": 70681,
+          "name": "Primera A, Apertura 2025",
+          "year": "2025",
+          "tournament_id": 11539
+        },
+        {
+          "season_id": 63819,
+          "name": "Primera A, Finalización 2024",
+          "year": "2024",
+          "tournament_id": 11536,
+          "detail": false
+        },
+        {
+          "season_id": 57374,
+          "name": "Primera A, Apertura 2024",
+          "year": "2024",
+          "tournament_id": 11539,
+          "detail": false
+        }
+      ],
+      "teams": [
+        "Atlético Nacional",
+        "Junior Barranquilla",
+        "Deportivo Pasto",
+        "América de Cali",
+        "Once Caldas",
+        "Deportes Tolima",
+        "Independiente Santa Fe",
+        "Internacional de Bogotá",
+        "Deportivo Cali",
+        "Millonarios",
+        "Independiente Medellín",
+        "Rionegro Águilas Doradas",
+        "Atlético Bucaramanga",
+        "Llaneros FC",
+        "Fortaleza FC",
+        "Jaguares de Córdoba",
+        "Alianza Valledupar FC",
+        "Boyacá Chicó FC",
+        "Cúcuta Deportivo",
+        "Deportivo Pereira"
+      ],
+      "conferences": {},
+      "previous_rank": {
+        "Independiente Medellín": 1,
+        "Deportes Tolima": 2,
+        "Atlético Nacional": 3,
+        "Atlético Bucaramanga": 4,
+        "Junior Barranquilla": 5,
+        "Fortaleza FC": 6,
+        "Independiente Santa Fe": 7,
+        "América de Cali": 8,
+        "Alianza Valledupar FC": 9,
+        "Rionegro Águilas Doradas": 10,
+        "Once Caldas": 11,
+        "Millonarios": 12,
+        "Llaneros FC": 13,
+        "Deportivo Cali": 14,
+        "Unión Magdalena": 15,
+        "Envigado FC": 16,
+        "Deportivo Pasto": 17,
+        "Deportivo Pereira": 18,
+        "Boyacá Chicó FC": 19,
+        "Deportivo La Equidad": 20
+      },
+      "standings_points": {
+        "Apertura": {
+          "Atlético Nacional": [
+            40,
+            19
+          ],
+          "Junior Barranquilla": [
+            35,
+            19
+          ],
+          "Deportivo Pasto": [
+            34,
+            19
+          ],
+          "América de Cali": [
+            33,
+            19
+          ],
+          "Once Caldas": [
+            33,
+            19
+          ],
+          "Deportes Tolima": [
+            31,
+            19
+          ],
+          "Independiente Santa Fe": [
+            29,
+            19
+          ],
+          "Internacional de Bogotá": [
+            28,
+            19
+          ],
+          "Deportivo Cali": [
+            27,
+            19
+          ],
+          "Millonarios": [
+            26,
+            19
+          ],
+          "Independiente Medellín": [
+            26,
+            19
+          ],
+          "Rionegro Águilas Doradas": [
+            26,
+            19
+          ],
+          "Atlético Bucaramanga": [
+            23,
+            19
+          ],
+          "Llaneros FC": [
+            22,
+            19
+          ],
+          "Fortaleza FC": [
+            22,
+            19
+          ],
+          "Jaguares de Córdoba": [
+            18,
+            19
+          ],
+          "Alianza Valledupar FC": [
+            17,
+            19
+          ],
+          "Boyacá Chicó FC": [
+            17,
+            19
+          ],
+          "Cúcuta Deportivo": [
+            16,
+            19
+          ],
+          "Deportivo Pereira": [
+            10,
+            19
+          ]
+        },
+        "Finalizacion": {
+          "Atlético Nacional": [
+            35,
+            16
+          ],
+          "América de Cali": [
+            34,
+            16
+          ],
+          "Deportivo Cali": [
+            33,
+            17
+          ],
+          "Atlético Bucaramanga": [
+            28,
+            16
+          ],
+          "Independiente Santa Fe": [
+            28,
+            16
+          ],
+          "Millonarios": [
+            26,
+            16
+          ],
+          "Independiente Medellín": [
+            26,
+            17
+          ],
+          "Once Caldas": [
+            24,
+            17
+          ],
+          "Rionegro Águilas Doradas": [
+            22,
+            16
+          ],
+          "Cúcuta Deportivo": [
+            21,
+            16
+          ],
+          "Deportes Tolima": [
+            20,
+            16
+          ],
+          "Internacional de Bogotá": [
+            20,
+            17
+          ],
+          "Llaneros FC": [
+            20,
+            17
+          ],
+          "Alianza Valledupar FC": [
+            18,
+            17
+          ],
+          "Deportivo Pereira": [
+            17,
+            16
+          ],
+          "Junior Barranquilla": [
+            16,
+            17
+          ],
+          "Boyacá Chicó FC": [
+            16,
+            17
+          ],
+          "Jaguares de Córdoba": [
+            13,
+            16
+          ],
+          "Fortaleza FC": [
+            12,
+            16
+          ],
+          "Deportivo Pasto": [
+            12,
+            16
+          ]
+        }
+      },
+      "standings_at": "2026-11-02T14:49:54Z",
+      "bands_seen": [
+        "Playoffs"
+      ]
+    },
+    "primera-division-uruguay": {
+      "tournament_id": 278,
+      "seasons": [
+        {
+          "season_id": 89288,
+          "name": "Primera Division 2026",
+          "year": "2026",
+          "tournament_id": 278
+        },
+        {
+          "season_id": 71306,
+          "name": "Liga AUF Uruguaya 2025",
+          "year": "2025",
+          "tournament_id": 278
+        }
+      ],
+      "teams": [
+        "Liverpool UY",
+        "Montevideo City Torque",
+        "Nacional",
+        "Club Atlético Peñarol",
+        "Deportivo Maldonado",
+        "Racing de Montevideo",
+        "Progreso",
+        "Juventud de Las Piedras",
+        "CA Cerro",
+        "Montevideo Wanderers",
+        "Boston River",
+        "Albion FC",
+        "Defensor Sporting",
+        "Danubio",
+        "Cerro Largo",
+        "Central Español"
+      ],
+      "conferences": {},
+      "previous_rank": {
+        "Club Atlético Peñarol": 1,
+        "Nacional": 2,
+        "Montevideo City Torque": 3,
+        "Boston River": 4,
+        "Cerro Largo": 5,
+        "Liverpool UY": 6,
+        "CA Cerro": 7,
+        "Defensor Sporting": 8,
+        "Danubio": 9,
+        "Progreso": 10,
+        "Racing de Montevideo": 11,
+        "Juventud de Las Piedras": 12,
+        "River Plate UY": 13,
+        "Miramar Misiones": 14,
+        "Plaza Colonia": 15,
+        "Montevideo Wanderers": 16
+      },
+      "standings_points": {
+        "Primera Division 2026, Clausura": {
+          "Liverpool UY": [
+            30,
+            13
+          ],
+          "Montevideo City Torque": [
+            28,
+            13
+          ],
+          "Nacional": [
+            26,
+            13
+          ],
+          "Club Atlético Peñarol": [
+            22,
+            13
+          ],
+          "Deportivo Maldonado": [
+            21,
+            12
+          ],
+          "Racing de Montevideo": [
+            19,
+            13
+          ],
+          "Progreso": [
+            19,
+            13
+          ],
+          "Juventud de Las Piedras": [
+            18,
+            13
+          ],
+          "CA Cerro": [
+            18,
+            13
+          ],
+          "Montevideo Wanderers": [
+            16,
+            13
+          ],
+          "Boston River": [
+            15,
+            13
+          ],
+          "Albion FC": [
+            12,
+            12
+          ],
+          "Defensor Sporting": [
+            12,
+            13
+          ],
+          "Danubio": [
+            10,
+            13
+          ],
+          "Cerro Largo": [
+            9,
+            13
+          ],
+          "Central Español": [
+            8,
+            13
+          ]
+        },
+        "Primera Division 2026, Torneo Intermedio, Group A": {
+          "Club Atlético Peñarol": [
+            16,
+            7
+          ],
+          "Cerro Largo": [
+            11,
+            7
+          ],
+          "Racing de Montevideo": [
+            10,
+            7
+          ],
+          "Liverpool UY": [
+            9,
+            7
+          ],
+          "Central Español": [
+            9,
+            7
+          ],
+          "CA Cerro": [
+            9,
+            7
+          ],
+          "Defensor Sporting": [
+            6,
+            7
+          ],
+          "Boston River": [
+            5,
+            7
+          ]
+        },
+        "Primera Division 2026, Torneo Intermedio, Group B": {
+          "Montevideo Wanderers": [
+            15,
+            7
+          ],
+          "Nacional": [
+            13,
+            7
+          ],
+          "Deportivo Maldonado": [
+            12,
+            7
+          ],
+          "Montevideo City Torque": [
+            12,
+            7
+          ],
+          "Juventud de Las Piedras": [
+            8,
+            7
+          ],
+          "Albion FC": [
+            6,
+            7
+          ],
+          "Progreso": [
+            6,
+            7
+          ],
+          "Danubio": [
+            4,
+            7
+          ]
+        },
+        "Primera Division 2026, Overall": {
+          "Club Atlético Peñarol": [
+            65,
+            35
+          ],
+          "Montevideo City Torque": [
+            63,
+            35
+          ],
+          "Deportivo Maldonado": [
+            62,
+            34
+          ],
+          "Nacional": [
+            61,
+            35
+          ],
+          "Racing de Montevideo": [
+            60,
+            35
+          ],
+          "Liverpool UY": [
+            59,
+            35
+          ],
+          "Montevideo Wanderers": [
+            51,
+            35
+          ],
+          "Albion FC": [
+            46,
+            34
+          ],
+          "Juventud de Las Piedras": [
+            41,
+            35
+          ],
+          "Central Español": [
+            41,
+            35
+          ],
+          "Defensor Sporting": [
+            39,
+            35
+          ],
+          "Cerro Largo": [
+            37,
+            35
+          ],
+          "Boston River": [
+            37,
+            35
+          ],
+          "CA Cerro": [
+            37,
+            35
+          ],
+          "Progreso": [
+            35,
+            35
+          ],
+          "Danubio": [
+            32,
+            35
+          ]
+        },
+        "Primera Division 2026, Apertura": {
+          "Racing de Montevideo": [
+            31,
+            15
+          ],
+          "Deportivo Maldonado": [
+            29,
+            15
+          ],
+          "Albion FC": [
+            28,
+            15
+          ],
+          "Club Atlético Peñarol": [
+            27,
+            15
+          ],
+          "Central Español": [
+            24,
+            15
+          ],
+          "Montevideo City Torque": [
+            23,
+            15
+          ],
+          "Nacional": [
+            22,
+            15
+          ],
+          "Defensor Sporting": [
+            21,
+            15
+          ],
+          "Liverpool UY": [
+            20,
+            15
+          ],
+          "Montevideo Wanderers": [
+            20,
+            15
+          ],
+          "Danubio": [
+            18,
+            15
+          ],
+          "Cerro Largo": [
+            17,
+            15
+          ],
+          "Boston River": [
+            17,
+            15
+          ],
+          "Juventud de Las Piedras": [
+            15,
+            15
+          ],
+          "Progreso": [
+            10,
+            15
+          ],
+          "CA Cerro": [
+            10,
+            15
+          ]
+        }
+      },
+      "standings_at": "2026-11-02T14:49:54Z",
+      "bands_seen": [
+        "Playoffs"
+      ]
+    },
+    "liga-de-primera": {
+      "tournament_id": 11653,
+      "seasons": [
+        {
+          "season_id": 88493,
+          "name": "Primera Division 2026",
+          "year": "2026",
+          "tournament_id": 11653
+        },
+        {
+          "season_id": 71131,
+          "name": "Liga de Primera 2025",
+          "year": "2025",
+          "tournament_id": 11653
+        }
+      ],
+      "teams": [
+        "Colo-Colo",
+        "Universidad de Chile",
+        "Universidad Católica",
+        "Everton de Viña del Mar",
+        "Palestino",
+        "Deportes Limache",
+        "Huachipato",
+        "Coquimbo Unido",
+        "Ñublense",
+        "Deportes La Serena",
+        "Deportes Concepción",
+        "O'Higgins",
+        "Audax Italiano",
+        "Cobresal",
+        "Universidad de Concepción",
+        "Unión La Calera"
+      ],
+      "conferences": {},
+      "previous_rank": {
+        "Coquimbo Unido": 1,
+        "Universidad Católica": 2,
+        "O'Higgins": 3,
+        "Universidad de Chile": 4,
+        "Audax Italiano": 5,
+        "Palestino": 6,
+        "Cobresal": 7,
+        "Colo-Colo": 8,
+        "Huachipato": 9,
+        "Ñublense": 10,
+        "Deportes Limache": 11,
+        "Unión La Calera": 12,
+        "Deportes La Serena": 13,
+        "Everton de Viña del Mar": 14,
+        "Deportes Iquique": 15,
+        "Unión Española": 16
+      },
+      "standings_points": {
+        "Primera Division 2026": {
+          "Colo-Colo": [
+            58,
+            26
+          ],
+          "Universidad de Chile": [
+            48,
+            26
+          ],
+          "Universidad Católica": [
+            46,
+            26
+          ],
+          "Everton de Viña del Mar": [
+            40,
+            26
+          ],
+          "Palestino": [
+            38,
+            25
+          ],
+          "Deportes Limache": [
+            37,
+            25
+          ],
+          "Huachipato": [
+            36,
+            26
+          ],
+          "Coquimbo Unido": [
+            35,
+            26
+          ],
+          "Ñublense": [
+            35,
+            26
+          ],
+          "Deportes La Serena": [
+            34,
+            26
+          ],
+          "Deportes Concepción": [
+            32,
+            25
+          ],
+          "O'Higgins": [
+            31,
+            26
+          ],
+          "Audax Italiano": [
+            30,
+            25
+          ],
+          "Cobresal": [
+            27,
+            26
+          ],
+          "Universidad de Concepción": [
+            23,
+            26
+          ],
+          "Unión La Calera": [
+            21,
+            26
+          ]
+        }
+      },
+      "standings_at": "2026-11-02T14:49:55Z",
+      "bands_seen": [
+        "Copa Libertadores",
+        "Copa Libertadores Qualification",
+        "Copa Sudamericana",
+        "Relegation"
+      ]
+    },
+    "liga-1-peru": {
+      "tournament_id": 406,
+      "seasons": [
+        {
+          "season_id": 88529,
+          "name": "Liga 1 2026",
+          "year": "2026",
+          "tournament_id": 406
+        },
+        {
+          "season_id": 70962,
+          "name": "Liga 1 2025",
+          "year": "2025",
+          "tournament_id": 406
+        }
+      ],
+      "teams": [
+        "Universitario de Deportes",
+        "Club Sporting Cristal",
+        "Sport Huancayo",
+        "Alianza Atlético de Sullana",
+        "Melgar",
+        "Deportivo Garcilaso",
+        "ACD Juan Pablo II",
+        "Alianza Lima",
+        "Sport Boys",
+        "Cusco FC",
+        "Club Atlético Grau",
+        "Cienciano",
+        "Comerciantes Unidos",
+        "Los Chankas CYC",
+        "FC Cajamarca",
+        "CD Moquegua",
+        "Asociación Deportiva Tarma",
+        "Universidad Técnica de Cajamarca"
+      ],
+      "conferences": {},
+      "previous_rank": {
+        "Universitario de Deportes": 1,
+        "Cusco FC": 2,
+        "Alianza Lima": 3,
+        "Club Sporting Cristal": 4,
+        "Alianza Atlético de Sullana": 5,
+        "Melgar": 6,
+        "Deportivo Garcilaso": 7,
+        "Cienciano": 8,
+        "Los Chankas CYC": 9,
+        "Asociación Deportiva Tarma": 10,
+        "Sport Huancayo": 11,
+        "Club Atlético Grau": 12,
+        "Comerciantes Unidos": 13,
+        "Sport Boys": 14,
+        "ACD Juan Pablo II": 15,
+        "Universidad Técnica de Cajamarca": 16,
+        "Ayacucho FC": 17,
+        "Alianza Universidad": 18,
+        "Deportivo Binacional": 19
+      },
+      "standings_points": {
+        "Liga 1 2026, Clausura": {
+          "Universitario de Deportes": [
+            30,
+            14
+          ],
+          "Club Sporting Cristal": [
+            28,
+            14
+          ],
+          "Sport Huancayo": [
+            28,
+            14
+          ],
+          "Alianza Atlético de Sullana": [
+            28,
+            15
+          ],
+          "Melgar": [
+            26,
+            14
+          ],
+          "Deportivo Garcilaso": [
+            25,
+            14
+          ],
+          "ACD Juan Pablo II": [
+            25,
+            15
+          ],
+          "Alianza Lima": [
+            25,
+            14
+          ],
+          "Sport Boys": [
+            24,
+            14
+          ],
+          "Cusco FC": [
+            24,
+            15
+          ],
+          "Club Atlético Grau": [
+            18,
+            15
+          ],
+          "Cienciano": [
+            17,
+            14
+          ],
+          "Comerciantes Unidos": [
+            14,
+            14
+          ],
+          "Los Chankas CYC": [
+            13,
+            15
+          ],
+          "FC Cajamarca": [
+            11,
+            14
+          ],
+          "CD Moquegua": [
+            11,
+            15
+          ],
+          "Asociación Deportiva Tarma": [
+            10,
+            14
+          ],
+          "Universidad Técnica de Cajamarca": [
+            0,
+            14
+          ]
+        },
+        "Liga 1 2026, Overall": {
+          "Alianza Lima": [
+            65,
+            31
+          ],
+          "Universitario de Deportes": [
+            59,
+            31
+          ],
+          "Melgar": [
+            54,
+            31
+          ],
+          "Deportivo Garcilaso": [
+            51,
+            31
+          ],
+          "Cusco FC": [
+            51,
+            32
+          ],
+          "Cienciano": [
+            50,
+            31
+          ],
+          "Alianza Atlético de Sullana": [
+            49,
+            32
+          ],
+          "Club Sporting Cristal": [
+            47,
+            31
+          ],
+          "Los Chankas CYC": [
+            47,
+            32
+          ],
+          "Sport Huancayo": [
+            44,
+            31
+          ],
+          "ACD Juan Pablo II": [
+            41,
+            32
+          ],
+          "Sport Boys": [
+            40,
+            31
+          ],
+          "Comerciantes Unidos": [
+            35,
+            31
+          ],
+          "Club Atlético Grau": [
+            34,
+            32
+          ],
+          "Asociación Deportiva Tarma": [
+            29,
+            31
+          ],
+          "CD Moquegua": [
+            29,
+            32
+          ],
+          "FC Cajamarca": [
+            26,
+            31
+          ],
+          "Universidad Técnica de Cajamarca": [
+            13,
+            31
+          ]
+        },
+        "Liga 1 2026, Apertura": {
+          "Alianza Lima": [
+            40,
+            17
+          ],
+          "Los Chankas CYC": [
+            34,
+            17
+          ],
+          "Cienciano": [
+            33,
+            17
+          ],
+          "Universitario de Deportes": [
+            29,
+            17
+          ],
+          "Melgar": [
+            28,
+            17
+          ],
+          "Cusco FC": [
+            27,
+            17
+          ],
+          "Deportivo Garcilaso": [
+            26,
+            17
+          ],
+          "Alianza Atlético de Sullana": [
+            21,
+            17
+          ],
+          "Comerciantes Unidos": [
+            21,
+            17
+          ],
+          "Asociación Deportiva Tarma": [
+            20,
+            17
+          ],
+          "Sport Boys": [
+            20,
+            17
+          ],
+          "Club Sporting Cristal": [
+            19,
+            17
+          ],
+          "CD Moquegua": [
+            18,
+            17
+          ],
+          "FC Cajamarca": [
+            17,
+            17
+          ],
+          "Club Atlético Grau": [
+            16,
+            17
+          ],
+          "Sport Huancayo": [
+            16,
+            17
+          ],
+          "ACD Juan Pablo II": [
+            16,
+            17
+          ],
+          "Universidad Técnica de Cajamarca": [
+            13,
+            17
+          ]
+        }
+      },
+      "standings_at": "2026-11-02T14:49:55Z",
+      "bands_seen": [
+        "Playoffs"
+      ]
+    },
+    "copa-colombia": {
+      "tournament_id": 1335,
+      "seasons": [
+        {
+          "season_id": 94090,
+          "name": "Copa Colombia 2026",
+          "year": "2026",
+          "tournament_id": 1335
+        },
+        {
+          "season_id": 76050,
+          "name": "Copa Colombia 2025",
+          "year": "2025",
+          "tournament_id": 1335
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "domestic"
+    },
+    "superliga-colombia": {
+      "tournament_id": 10756,
+      "seasons": [
+        {
+          "season_id": 88070,
+          "name": "Superliga 2026",
+          "year": "2026",
+          "tournament_id": 10756
+        },
+        {
+          "season_id": 70855,
+          "name": "Super Liga Cup 2025",
+          "year": "2025",
+          "tournament_id": 10756
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "super"
+    },
+    "supercopa-uruguaya": {
+      "tournament_id": 11705,
+      "seasons": [
+        {
+          "season_id": 89198,
+          "name": "Supercopa Uruguaya 2026",
+          "year": "2026",
+          "tournament_id": 11705
+        },
+        {
+          "season_id": 71172,
+          "name": "Supercopa Uruguaya 2025",
+          "year": "2025",
+          "tournament_id": 11705
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "super"
+    },
+    "copa-chile": {
+      "tournament_id": 1221,
+      "seasons": [
+        {
+          "season_id": 89063,
+          "name": "Copa Chile 2026",
+          "year": "2026",
+          "tournament_id": 1221
+        },
+        {
+          "season_id": 71100,
+          "name": "Copa Chile 2025",
+          "year": "2025",
+          "tournament_id": 1221
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "domestic"
+    },
+    "copa-de-la-liga-chile": {
+      "tournament_id": 32734,
+      "seasons": [
+        {
+          "season_id": 90922,
+          "name": "2026 ",
+          "year": "2026 ",
+          "tournament_id": 32734
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "domestic"
+    },
+    "supercopa-de-chile": {
+      "tournament_id": 1309,
+      "seasons": [
+        {
+          "season_id": 88573,
+          "name": "Supercup 2026",
+          "year": "2026",
+          "tournament_id": 1309
+        },
+        {
+          "season_id": 71096,
+          "name": "Supercup 2025",
+          "year": "2025",
+          "tournament_id": 1309
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "super"
+    },
+    "copa-de-la-liga-peru": {
+      "tournament_id": 35067,
+      "seasons": [
+        {
+          "season_id": 95197,
+          "name": "2026",
+          "year": "2026",
+          "tournament_id": 35067
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "domestic"
     }
   }
 }
