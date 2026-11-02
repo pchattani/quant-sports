@@ -135,6 +135,8 @@ GI.route('team', function (el, params) {
         GI.kpi('Make the playoffs', GI.pct(sim.p_playoffs, 0), 'from 20,000 simulated seasons'), GI.kpi('Win the division', GI.pct(sim.p_div, 0), ''), GI.kpi('Win the Super Bowl', GI.pct(sim.p_sb, 1), ''),
         GI.kpi('Projected wins', GI.num(sim.mean_wins, 1), isNum(sim.w_p05) ? 'likely ' + GI.num(sim.w_p05, 0) + ' to ' + GI.num(sim.w_p95, 0) : '')],
       tags: tags, short: shortTxt.trim() || null });
+    /* My Teams: follow the team; it then leads Home and this site's overview */
+    if (QK.followButton) h += '<div class="gi-flrow" style="display:flex;justify-content:flex-end;margin-top:var(--sp-4)">' + QK.followButton(GI.followItem(abbr)) + '</div>';
     h += '<nav class="qk-chips scroll" aria-label="On this page" style="margin-top:12px">' + [['#tp-season', 'How far they go'], ['#tp-top', 'Top performers'], ['#needs', 'Strengths and needs'], ['#tp-moves-host', 'Who moves next'], ['#roster', 'Roster'], ['#moves', 'Moves'], ['#tp-sched', 'Schedule'], ['#tp-profile', 'Profile'], ['#tp-4th', 'Fourth downs'], ['#tp-since', 'Since 1999']]
       .map(a => '<button type="button" class="qk-chip" data-jump="' + a[0] + '">' + esc(a[1]) + '</button>').join('') + '<a class="qk-chip" href="' + GI.ghref('teams', GI.state.season, { a: abbr, sec: 'h2h' }) + '">Head to head</a></nav>';
     if (!x) h += GI.notBuilt('The ' + S + ' page for ' + GI.teamName(abbr), res[0]);

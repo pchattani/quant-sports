@@ -84,6 +84,7 @@ FB.route('overview', function (el) {
     '<div class="fb-ov-quick">' + BIG.concat(['champions-league', 'brasileirao', 'mls', 'liga-argentina', 'libertadores']).filter(function (s) { return FB.comp(s) && FB.comp(s).ok; }).map(function (s) {
       return '<a class="qk-chip" href="' + esc(FB.href.comp(s)) + '">' + esc(FB.compName(s, true)) + '</a>';
     }).join('') + '<a class="qk-chip" href="#/competitions">All ' + nOk + ' →</a></div>' +
+    '<section class="qk-section fb-ov-follow" id="ov-follow" aria-label="Your teams"></section>' +
     '<section class="qk-section ql-week">' + QK.sectionHead({ kicker: 'This week in football', title: '<span id="ov-wk">The week so far</span>', html: true, sub: '<span id="ov-stage"></span>' }) +
       '<div id="ov-week">' + QK.skeleton('lines', 2) + '</div><div id="ov-feat" class="ql-feat"></div></section>' +
     '<section class="qk-section">' + QK.sectionHead({ kicker: 'What to watch', title: '<span id="ov-gh">Today</span>', html: true,
@@ -131,11 +132,12 @@ FB.route('overview', function (el) {
   var HUB = null, POOL = null;
   var hubP = FB.load('hub.json');
   var poolP = FB.load('pool.json');
-  var p = Promise.all([hubP, poolP]).then(function (arr) {
+  var p = Promise.all([hubP, poolP, FB.clubsIndex()]).then(function (arr) {
     if (!FB.alive(el)) return;
     HUB = arr[0] || { days: {} };
     POOL = arr[1];
     FORM = formMap(POOL);
+    followFill(el.querySelector('#ov-follow'), POOL);
     drawWeek(el, HUB);
     drawCards(el, HUB);
     drawTicker(el, HUB);
@@ -162,6 +164,45 @@ FB.route('overview', function (el) {
   }, 60000);
   return p;
 });
+
+/* ── round 12, My Teams: the clubs and national teams this visitor follows, above everything else (QK.followSection; the
+   cards are data/follow/club/<tid>.json from oddsmarkets/football/analytics/follow_build.py). Every competition at once:
+   one card per side, whatever it plays in. Below the cards: their week, then "Your clubs v the world" (pool.json). */
+function followFill(host, pool) {
+  if (!host || !QK.followSection) return;
+  QK.followSection(host, { site: 'site', full: true, feed: false, title: 'Your clubs',
+    sub: 'The clubs and national teams you follow, first: where they stand, the next fixtures in every competition, our ratings, strengths and weaknesses, and the facts that stand out.',
+    picker: { sport: 'football', title: 'Pick your clubs', rows: FB.followRows() },
+    board: function (cards) { return followBoard(cards, pool); } });
+}
+/* "Your clubs v the world": each followed club in our one-scale ranking of every club (pool.json), with the clubs either
+   side of it */
+function followBoard(cards, pool) {
+  if (!QK.powerBars) return '';
+  var rr = ((pool || {}).clubs || []).filter(function (r) { return r && isNum(r.strength) && isNum(r.rank); }).sort(function (a, b) { return a.rank - b.rank; });
+  if (rr.length < 3) return '';
+  var avg = rr.reduce(function (s, r) { return s + r.strength; }, 0) / rr.length;
+  var mine = {};
+  cards.forEach(function (c) { var p = String(c.k || '').split(':'); if (p[1] === 'club') mine[p[2]] = 1; });
+  var keep = {};
+  rr.forEach(function (r, i) { if (mine[String(r.team_id)]) [i - 1, i, i + 1].forEach(function (j) { if (j >= 0 && j < rr.length) keep[j] = 1; }); });
+  var idx = Object.keys(keep).map(Number).sort(function (a, b) { return a - b; });
+  if (!idx.length) return '';
+  var groups = [];
+  idx.forEach(function (i, n) { if (!n || i !== idx[n - 1] + 1) groups.push({ label: '', rows: [] }); groups[groups.length - 1].rows.push(i); });
+  var row = function (i) {
+    var r = rr[i], t = r.team_id ? String(r.team_id) : null, nm = (t && FB.clubName(t)) || r.team;
+    return { rank: r.rank, name: nm, abbr: FB.clubCode(nm), colour: t ? FB.clubColour(t) : null, href: t ? FB.href.club(t) : null, sub: (r.comp_name || '') + (t && mine[t] ? ' · you follow' : ''),
+      value: r.strength - avg, text: num(r.strength, 2), follow: t ? FB.followItem(t) : null, form: (r.form_results || []).join('') };
+  };
+  groups.forEach(function (g) {
+    g.rows = g.rows.map(row);
+    if (groups.length > 1) g.label = 'Around ' + g.rows.filter(function (x) { return x.follow && mine[x.follow.k.split(':')[2]]; }).map(function (x) { return x.name; }).join(', ');
+  });
+  return '<div class="fb-ov-flboard"><div class="qk-fc-k">Your clubs v the world</div><div class="qk-card"><div class="qk-card-body">' +
+    QK.powerBars(null, { groups: groups, valueLabel: 'Our rating', unit: 'points a game against an average side; the bar is the margin over the average club', formLabel: 'Form', formN: 6 }) +
+    '<p class="qk-caption">Each club you follow in our ranking of all ' + FB.int(rr.length) + ' clubs on one scale, with the clubs either side. The bar is its rating above or below the average club (' + num(avg, 2) + '). <a class="qk-link" href="#/clubs">The full power board →</a></p></div></div></div>';
+}
 
 /* ── league form for the cards (pool.json form_results, oldest first: checked against the fixtures) */
 function formMap(pool) {

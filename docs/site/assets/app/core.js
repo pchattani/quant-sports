@@ -446,6 +446,26 @@ function clubCode(name, other) {
   }
   return c;
 }
+/* round 12 (My Teams): a club or national team as a follow item (QK.follow 'site:club:<tid>': the Sofascore id, the same in
+   every league and cup), its star toggle, and the picker's rows: every club and national team with a season running now
+   (clubs_index.json; data/follow/club/<tid>.json from oddsmarkets/football/analytics/follow_build.py) */
+function followItem(tid) {
+  tid = String(tid);
+  var nm = clubName(tid) || tid;
+  return { k: 'site:club:' + tid, name: nm, abbr: clubCode(nm), colour: clubColour(tid) || '', alt: clubAlt(tid) || '', href: '#/club/' + tid };
+}
+function followStar(tid, cls) { return tid && window.QK.followButton ? window.QK.followButton(followItem(tid), { compact: true, cls: cls || 'qk-fl-mini' }) : ''; }
+function followRows() {
+  var on = {};
+  comps().forEach(function (c) { if (c.ok && !isLastEdition(c)) on[c.slug] = 1; });
+  var nat = function (r) { return r.national && !(r.home && (comp(r.home) || {}).scope === 'club'); };
+  return ((CLUBS || {}).list || []).filter(function (r) { return r.name && (r.comps || []).some(function (s) { return on[s]; }); }).map(function (r) {
+    var n = nat(r);
+    return { sport: 'football', t: r.name, s: n ? 'National team' + (r.country ? ' · ' + r.country : '') : 'Club · ' + (r.home ? compName(r.home, true) : r.country || 'Cups'),
+      k: 'site:club:' + r.id, href: '#/club/' + r.id, abbr: clubCode(r.name), colour: hexOk(r.colour) || '', alt: hexOk(r.alt) || '',
+      go: !n && r.home ? 0 : 1 };            // the picker's group order: league clubs' leagues before the cups-only groups
+  });
+}
 /* A game (FB.toGame) ready for a v4 hero or bug: both clubs' codes (told apart), and each side's full name kept. */
 function heroGame(g) {
   if (!g || !g.home || !g.away) return g;
@@ -1328,7 +1348,7 @@ return {
   load: load, reload: reload, loadAll: loadAll, rows: rows, FILES: FILES, KIND_FILES: KIND_FILES, FAMILIES: FAMILIES,
   comps: comps, comp: comp, familyOf: familyOf, compName: compName, hasFile: hasFile, compFile: compFile, compFiles: compFiles,
   currentSeason: currentSeason, isLastEdition: isLastEdition, shortSeason: shortSeason, seasonsOf: seasonsOf, loadPastSeason: loadPastSeason,
-  clubsIndex: clubsIndex, hasCrest: hasCrest, clubRow: clubRow, clubName: clubName, clubColour: clubColour, clubAlt: clubAlt, clubCode: clubCode, heroGame: heroGame, peopleIndex: peopleIndex, crestUrl: crestUrl, tidFromCrest: tidFromCrest,
+  clubsIndex: clubsIndex, hasCrest: hasCrest, clubRow: clubRow, clubName: clubName, clubColour: clubColour, clubAlt: clubAlt, clubCode: clubCode, followItem: followItem, followStar: followStar, followRows: followRows, heroGame: heroGame, peopleIndex: peopleIndex, crestUrl: crestUrl, tidFromCrest: tidFromCrest,
   MSET: MSET, ADJ_EXTRA: ADJ_EXTRA, peerGroup: peerGroup, groupKeys: groupKeys, metricInfo: metricInfo, isEarly: isEarly, peerLine: peerLine, peerMin: peerMin,
   roles: roles, rolesFor: rolesFor, rowRole: rowRole, rowGar: rowGar, roleOf: roleOf, garOver: garOver, peerPct: peerPct, fmtSet: fmtSet,
   personId: personId, labIndex: labIndex, labView: labView, labScopeName: labScopeName, labScopeOptions: labScopeOptions, labWindowText: labWindowText, labPct: labPct, LAB_SCOPES: LAB_SCOPES,

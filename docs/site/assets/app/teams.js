@@ -141,7 +141,7 @@ function power() {
       value: att + def, text: signed(att + def, 2), parts: { att: att, def: def },
       cells: [{ label: 'Our rating', text: isNum(r.strength_ppg) ? num(r.strength_ppg, 2) : '—' }, { label: 'Points', text: isNum(r.points) ? String(r.points) : '—' },
         { label: 'Expected', text: isNum(r.expected_points) ? num(r.expected_points, 1) : '—' }, { label: 'Elo', text: isNum(r.elo) ? num(r.elo, 0) : '—' }],
-      form: (r.form_results || []).join(''), chances: ch };
+      form: (r.form_results || []).join(''), chances: ch, follow: i.id ? FB.followItem(i.id) : null };
   };
   var confs = Array.from(new Set(rated.map(function (t) { return ROWS[t].conference; }).filter(Boolean))).sort();
   var groups = ST.pw === 'group' && confs.length > 1 ? confs.map(function (g) { return { label: g, rows: all.filter(function (t) { return ROWS[t].conference === g; }).map(row) }; }) : [{ label: '', rows: all.map(row) }];

@@ -487,7 +487,7 @@ function learn(p, d) {
     if (/\/schedule\.json$/.test(p)) cardNames(T, d.matches);
     if (/\/players_index\.json$/.test(p)) {
       const P = playersOf(d);
-      Object.keys(P).forEach(id => { const r = P[id]; if (Array.isArray(r)) put(id, { name: r[0], short: r[1], country: r[2], rank: r[3] }); });
+      Object.keys(P).forEach(id => { const r = P[id]; if (Array.isArray(r)) put(id, { name: r[0], short: r[1], country: r[2], rank: r[3], last: r.length > 4 ? r[4] : undefined, off: r[5] === 1 }); });
     }
     const ym = /^(atp|wta)\/(\d{4})\/events\.json$/.exec(p);
     if (ym) EVENTS[T][ym[2]] = Object.assign(EVENTS[T][ym[2]] || {}, eventsOf(d));

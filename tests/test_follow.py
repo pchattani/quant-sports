@@ -54,6 +54,15 @@ def test_label_case_keeps_inner_capitals():
     assert FL.label_case("xwOBA+") == "xwOBA+"
 
 
+def test_swing_label_keeps_its_own_capitals():
+    """The swing fact capitalises the first letter only: "Stanley Cup", not str.capitalize()'s "Stanley cup"."""
+    series = {"2026-08-08": 0.10, "2026-08-15": 0.22}
+    for lab, want in (("Stanley Cup", "Stanley Cup chance up 12 points"), ("playoff", "Playoff chance up 12 points"),
+                      ("AFC title", "AFC title chance up 12 points")):
+        sw = [f for f in FL.facts(base(chances=[{"label": lab, "series": series}]), NOW) if f["kind"] == "swing"][0]
+        assert sw["text"].startswith(want), sw["text"]
+
+
 # ───────────────────────────────────────────────────────────── no look-ahead
 def test_no_look_ahead_results_after_asof_are_ignored():
     rs = games("WWWW", start=-1) + [{"start": day(1), "res": "L", "p": 0.5}, {"start": day(2), "res": "L", "p": 0.5}]

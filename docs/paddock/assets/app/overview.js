@@ -150,6 +150,77 @@ function nextSim(race) {
   return sim && sim.drivers ? { sim: sim, post: !!post } : null;
 }
 
+/* ── round 12, My Teams: the drivers and constructors this visitor follows, above everything else
+   (QK.followSection; the cards are data/follow/driver|team/<id>.json from oddsmarkets/f1/analytics/follow_build.py, one
+   per driver and constructor of the current season). Below the cards: "Your drivers v the grid", each followed driver
+   (and a followed constructor's drivers) in our driver Elo ratings with the drivers either side. */
+function flItem(kind, id) {
+  if (kind === 'team') return { k: 'paddock:team:' + id, name: PD.teamName(id), abbr: PD.teamAbbr(id), colour: PD.teamColourRaw(id) || '', alt: PD.teamAlt(id) || '', href: '#/team/' + encodeURIComponent(id) };
+  var t = PD.driverTeam(id);
+  return { k: 'paddock:driver:' + id, name: PD.driverName(id), abbr: PD.driverCode(id), colour: (t && PD.teamColourRaw(t)) || '', alt: (t && PD.teamAlt(t)) || '', href: '#/driver/' + encodeURIComponent(id) };
+}
+/* the drivers and constructors with a card: this season's (index.json drivers and teams) */
+function flOk(kind, id) {
+  var idx = PD.index() || {};
+  return !!(kind === 'team' ? (idx.teams || {})[id] : (idx.drivers || {})[id]);
+}
+function flRows() {
+  var idx = PD.index() || {}, out = [];
+  Object.keys(idx.drivers || {}).forEach(function (id) {
+    var x = idx.drivers[id] || {}, it = flItem('driver', id);
+    out.push({ sport: 'f1', t: it.name, s: 'Driver · ' + PD.teamName(x.team), k: it.k, href: it.href, abbr: it.abbr, colour: it.colour, alt: it.alt });
+  });
+  Object.keys(idx.teams || {}).forEach(function (id) {
+    var it = flItem('team', id);
+    out.push({ sport: 'f1', t: it.name, s: 'Constructor', k: it.k, href: it.href, abbr: it.abbr, colour: it.colour, alt: it.alt });
+  });
+  return out;
+}
+PD.follow = {
+  item: flItem, ok: flOk, rows: flRows,
+  /* the header button (a driver or constructor page) and the table star; nothing outside this season */
+  button: function (kind, id) { return QK.followButton && flOk(kind, id) ? QK.followButton(flItem(kind, id)) : ''; },
+  star: function (kind, id, cls) { return QK.followButton && flOk(kind, id) ? QK.followButton(flItem(kind, id), { compact: true, cls: cls || 'qk-fl-mini' }) : ''; }
+};
+function followFill(host, season) {
+  if (!host || !QK.followSection) return;
+  QK.followSection(host, { site: 'paddock', full: true, feed: false, week: false, title: 'Your drivers and teams', noun: 'driver or team',
+    sub: 'The drivers and constructors you follow, first: the championship, our chances for the title and the next Grand Prix, strengths and weaknesses, and the facts that stand out.',
+    picker: { sport: 'f1', title: 'Pick your drivers and teams', rows: flRows() },
+    board: function (cards) { return followBoard(cards, season); } });
+}
+function followBoard(cards, season) {
+  if (!QK.powerBars || !season || !season.elo) return '';
+  var cur = (PD.index() || {}).drivers || {};
+  var rr = Object.keys(season.elo).filter(function (d) { return cur[d] && isNum((season.elo[d] || {}).elo); })
+    .map(function (d) { return { id: d, elo: season.elo[d].elo }; }).sort(function (a, b) { return b.elo - a.elo; });
+  if (rr.length < 3) return '';
+  var avg = rr.reduce(function (a, r) { return a + r.elo; }, 0) / rr.length;
+  var mine = {};
+  cards.forEach(function (c) {
+    var p = String(c.k || '').split(':');
+    if (p[1] === 'driver') mine[p[2]] = 1;
+    else if (p[1] === 'team') Object.keys(cur).forEach(function (d) { if ((cur[d] || {}).team === p[2]) mine[d] = 1; });
+  });
+  var keep = {};
+  rr.forEach(function (r, i) { if (mine[r.id]) [i - 1, i, i + 1].forEach(function (j) { if (j >= 0 && j < rr.length) keep[j] = 1; }); });
+  var idx = Object.keys(keep).map(Number).sort(function (a, b) { return a - b; });
+  if (!idx.length) return '';
+  var groups = [];
+  idx.forEach(function (i, n) { if (!n || i !== idx[n - 1] + 1) groups.push({ label: '', rows: [] }); groups[groups.length - 1].rows.push(i); });
+  groups.forEach(function (g) {
+    g.rows = g.rows.map(function (i) {
+      var r = rr[i], t = PD.driverTeam(r.id);
+      return { rank: i + 1, name: PD.driverName(r.id), abbr: PD.driverCode(r.id), colour: t ? PD.teamColourRaw(t) : null, href: PD.driverHref(r.id),
+        sub: (t ? PD.teamName(t) : '') + (mine[r.id] ? ' · you follow' : ''), value: r.elo - avg, text: PD.num(r.elo, 0), parts: { v: r.elo - avg }, follow: flItem('driver', r.id), id: r.id };
+    });
+    if (groups.length > 1) g.label = 'Around ' + g.rows.filter(function (x) { return mine[x.id]; }).map(function (x) { return PD.driverSurname(x.id); }).join(', ');
+  });
+  return '<div class="pd-ov-flboard"><div class="qk-fc-k">Your drivers v the grid</div><div class="qk-card"><div class="qk-card-body">' +
+    QK.powerBars(null, { groups: groups, valueLabel: 'Our Elo', unit: 'points against the grid average', parts: [{ key: 'v', label: 'Driver Elo against the grid average', color: 'var(--c-1)' }] }) +
+    '<p class="qk-caption">Each driver you follow (and a followed team’s drivers) in our driver Elo ratings of this season’s ' + rr.length + ', with the drivers either side. <a class="qk-link" href="#/scout">The Scouting Room →</a></p></div></div></div>';
+}
+
 function render(el) {
   var idx = PD.index() || {};
   var y = idx.current_season || PD.currentSeason();
@@ -164,6 +235,7 @@ function render(el) {
     lede: 'Our chance for this weekend’s Grand Prix, who’s fast right now, and the fight for both titles, from 20,000 simulated seasons, in plain English.',
     links: [{ label: 'Races', sub: next ? PD.shortRace(next.name) + ' next' : 'Every race centre', href: next ? PD.raceHref(next.year, next.round) : '#/races' },
       { label: 'Standings', sub: 'And the title race', href: '#/standings' }, { label: 'Scouting Room', sub: 'Every driver, every number', href: '#/scout' }] }) +
+    '<section class="qk-section pd-ov-follow" id="ov-follow" aria-label="Your drivers and teams"></section>' +
     '<section class="qk-section ql-week">' + QK.sectionHead({ kicker: 'This week in F1', title: '<span id="ov-wkh">The week so far</span>', html: true, sub: esc(stageLine(dig.stage)) }) +
     '<div id="ov-week"></div><div class="ql-feat" id="ov-feat">' + QK.skeleton('card', 1) + '</div></section>' +
     '<section class="qk-section">' + QK.sectionHead({ kicker: 'What to watch ' + when, title: '<span id="ov-wh">' + (next ? 'Our calls for ' + esc(where) : 'What the numbers say') + '</span>', html: true,
@@ -193,6 +265,7 @@ function render(el) {
   return Promise.all([PD.load(y + '/season.json'), raceP, PD.load(y + '/value.json'), PD.load(y + '/fantasy.json')]).then(function (arr) {
     if (!PD.alive(el)) return;
     var season = arr[0], race = arr[1], value = arr[2], fan = arr[3];
+    followFill(el.querySelector('#ov-follow'), PD.ok(season) ? season : null);
     var T = weekTiles(dig, season, wk, next);
     PD.set('ov-week', T.length ? QK.stats(T) : '');
     if (T.length >= 3) PD.set('ov-wkh', 'The week in ' + WORDS[T.length].toLowerCase() + ' lines');

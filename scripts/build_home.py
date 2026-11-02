@@ -763,6 +763,26 @@ def build_basketball(ctx: Ctx, base: str, out: dict):
 TENNIS_LEVEL = {"slam": "Grand Slam", "finals": "Tour Finals", "m1000": "1000", "500": "500", "250": "250"}
 
 
+def tennis_search_players(d: Path, tour: str, names: dict, now: datetime | None = None) -> list[tuple[str, str]]:
+    """[(pid, name)] for the hub's search: exactly the players with an Ace follow card, through the card builder's own
+    rule (oddsmarkets/tennis/analytics/follow_build.select: a current official ranking of 500 or better, or a rank of
+    500 or better with a tour-level match in the last 52 weeks, or playing this week), so the follow picker never
+    lists a player whose card does not exist. Full names from players_index.json ({pid: [name, short, country, rank,
+    last_match]}), else this week's match names (index.json `names`); ranked players first, by rank."""
+    from oddsmarkets.tennis.analytics import follow_build as TFB
+    pix = (load(d / tour / "players_index.json") or {}).get("players") or {}
+    ids, why = TFB.select(d, tour, now)
+    rows: dict[str, tuple] = {}
+    for pid in ids:
+        v = pix.get(pid)
+        full = v[0] if isinstance(v, list) and v and v[0] else (names or {}).get(pid)
+        if not full:
+            continue
+        rk = v[3] if why.get(pid) == "rank" and isinstance(v, list) and len(v) > 3 and isinstance(v[3], (int, float)) else None
+        rows[pid] = (rk if rk is not None and rk > 0 else 10 ** 6, full)
+    return [(pid, nm) for pid, (rk, nm) in sorted(rows.items(), key=lambda x: (x[1][0], x[1][1]))]
+
+
 def build_tennis(ctx: Ctx, base: str, out: dict):
     d = DOCS / "ace" / "data"
     idx = load(d / "index.json")
@@ -821,7 +841,7 @@ def build_tennis(ctx: Ctx, base: str, out: dict):
             status.append(e.get("name"))
             lv = TENNIS_LEVEL.get(str(e.get("level")))
             stages.append(f"{TU}: {e.get('name')}" + (f" ({lv})" if lv else ""))
-        for pid, nm in names.items():
+        for pid, nm in tennis_search_players(d, T, names, ctx.now):
             out["search"].append(["tennis", nm, f"{TU} player", base + "#/" + T + "/player/" + pid])
     if len(kpis) < 3:
         kpis.append({"label": "Events", "value": len(status), "sub": "in play"})
@@ -1505,16 +1525,30 @@ def leader_search(sport: str, leaders: dict, out: dict) -> None:
                 out["search"].append([sport, r["name"], "Player · " + str((lb or {}).get("title") or "leader"), r["href"]])
 
 
+def is_national_team(r: dict, club_comps: set) -> bool:
+    """A clubs_index.json row is a national team when it is flagged national and its home competition is not a club
+    competition. The flag alone is not enough: a club that once met a national team in a friendly (Qatar v Fiorentina
+    and v Lazio, 2022; Mexico v Valencia, 2024) was flagged national by that match (the unified registry marks both
+    sides of an international-scope match), and Home's search called Fiorentina "National team · ITA"."""
+    if not r.get("national"):
+        return False
+    home = r.get("home")
+    if home and home in club_comps:
+        return False
+    return not any(c in club_comps for c in (r.get("comps") or []))
+
+
 def football_search(base: str, out: dict):
     d = DOCS / "site" / "data"
     ci = load(d / "clubs_index.json") or {}
     f = ci.get("fields") or []
+    comps = load(d / "competitions.json") or {}
+    club_comps = {c["slug"] for c in comps.get("competitions", []) if c.get("slug") and c.get("scope") != "international"}
     for row in ci.get("rows") or []:
         r = dict(zip(f, row))
-        out["search"].append(["football", r.get("name"), ("National team" if r.get("national") else "Club")
+        out["search"].append(["football", r.get("name"), ("National team" if is_national_team(r, club_comps) else "Club")
                               + (" · " + r["country"] if r.get("country") else ""),
                               base + "#/club/" + str(r.get("id"))])
-    comps = load(d / "competitions.json") or {}
     for c in comps.get("competitions", []):
         out["search"].append(["football", c.get("name"), "Competition · " + (c.get("country") or ""),
                               base + "#/" + c["slug"]])
@@ -1527,6 +1561,45 @@ def football_search(base: str, out: dict):
         if r.get("name") and r.get("id"):
             out["search"].append(["football", r["name"], "Player" + (" · " + r["club"] if r.get("club") else ""),
                                   base + "#/player/" + str(r["id"])])
+
+
+# The follow picker's browse order (QK.followPicker): a sport's groups sort by their lowest "go", then by size. The
+# big leagues and levels lead; a row with no entry here carries no go (the kit's default, 50) and sorts by size.
+SEARCH_GO_SUB = {
+    "basketball": {"NBA team": 0, "WNBA team": 1},
+    "tennis": {"ATP player": 0, "WTA player": 1},
+    "baseball": {"MLB team": 0},
+    "f1": {"Driver": 0, "Constructor": 1},
+}
+SEARCH_GO_COUNTRY = {"ENG": 0, "ESP": 1, "ITA": 2, "DEU": 3, "FRA": 4}     # football: the big five's clubs first
+SEARCH_GO_LEVEL = {"cfb": 0, "mbb": 1, "wbb": 2, "mch": 3, "wch": 4}       # college: the Campus's own level order
+
+
+def search_go(row: list) -> int | None:
+    """The picker's group order for one search row [sport, name, sub, href], or None (the default)."""
+    sport, sub, href = row[0], str(row[2] or ""), str(row[3] or "")
+    head = sub.split(" · ")[0]
+    if sport == "football":
+        parts = sub.split(" · ")
+        return SEARCH_GO_COUNTRY.get(parts[1]) if head in ("Club", "National team") and len(parts) > 1 else None
+    if sport == "college":
+        m = re.search(r"#/([a-z]+)/", href)
+        return SEARCH_GO_LEVEL.get(m.group(1)) if m else None
+    for k, v in (SEARCH_GO_SUB.get(sport) or {}).items():
+        if head == k:
+            return v
+    return None
+
+
+def search_rows(search: list) -> list:
+    """search.json's rows: [sport, name, sub, href] plus the group order (a fifth column) where it has one."""
+    out = []
+    for r in search:
+        if not r[1]:
+            continue
+        go = search_go(r)
+        out.append(list(r[:4]) + ([go] if go is not None else []))
+    return out
 
 
 def copy_kit():
@@ -1558,6 +1631,15 @@ def season_files(docs: Path = DOCS):
         idx = load(docs / folder / "data" / "index.json") or {}
         if idx.get("season"):
             rows.append((folder, f"the-quant-{folder}", f"{idx['season']}/season.json"))
+    # tennis: the hub's search lists the players with an Ace follow card (follow_build.select reads players_index.json
+    # and rankings.json, fixed paths, and the draws of the tournaments in play, events/<id>.json)
+    idx = load(docs / "ace" / "data" / "index.json")
+    if idx is not None:
+        for T in ("atp", "wta"):
+            rows += [("ace", "the-quant-ace", f"{T}/players_index.json"), ("ace", "the-quant-ace", f"{T}/rankings.json")]
+            for e in (((idx.get("tours") or {}).get(T) or {}).get("events_now") or []):
+                if re.match(r"^[a-z0-9-]+$", str(e.get("event") or "")):
+                    rows.append(("ace", "the-quant-ace", f"{T}/events/{e['event']}.json"))
     # the season's biggest surprises (fan stories) read each site's race log (fixed paths, for sites present)
     for folder, rels in (("rink", ["race_log.json"]), ("gridiron", ["race_log.json"]), ("bullpen", ["mlb/race_log.json"]),
                          ("hardwood", ["nba/race_log.json", "wnba/race_log.json"]),
@@ -1635,7 +1717,7 @@ def main(argv=None):
     with open(OUT / "data" / "home.json", "w", encoding="utf-8") as fh:
         json.dump(home, fh, ensure_ascii=False, separators=(",", ":"))
     with open(OUT / "data" / "search.json", "w", encoding="utf-8") as fh:
-        json.dump({"fields": ["sport", "name", "sub", "href"], "rows": [s for s in search if s[1]]},
+        json.dump({"fields": ["sport", "name", "sub", "href", "go"], "rows": search_rows(search)},
                   fh, ensure_ascii=False, separators=(",", ":"))
     if not a.no_kit:
         copy_kit()

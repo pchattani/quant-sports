@@ -112,7 +112,8 @@ function draw(el, id, y, cat, career, elo, askedY) {
       tags: dP && dP.qualified(id) ? [QK.tag('In the ' + y + ' peer group', 'signal')] : [], strip: strip, short: shortVersion() }) +
     (askedY ? PD.note(esc(name) + ' did not race in ' + askedY + '; showing ' + y + ', the latest season with a driver catalogue.') : '');
   if (d) {
-    h += '<div class="pd-links pd-mt"><a class="qk-btn" href="#/compare/progression/' + encodeURIComponent(id) + (mate ? '/' + encodeURIComponent(mate) : '') + '">Compare progression</a>' + (mate ? '<a class="qk-btn" href="#/compare/drivers/' + encodeURIComponent(id) + '/' + encodeURIComponent(mate) + (y !== PD.currentSeason() ? '?y=' + y : '') + '">Compare with ' + esc(PD.driverSurname(mate)) + '</a>' : '') +
+    /* round 12 (My Teams): follow the driver; the card then leads Home and this site's overview */
+    h += '<div class="pd-links pd-mt">' + (PD.follow ? PD.follow.button('driver', id) : '') + '<a class="qk-btn" href="#/compare/progression/' + encodeURIComponent(id) + (mate ? '/' + encodeURIComponent(mate) : '') + '">Compare progression</a>' + (mate ? '<a class="qk-btn" href="#/compare/drivers/' + encodeURIComponent(id) + '/' + encodeURIComponent(mate) + (y !== PD.currentSeason() ? '?y=' + y : '') + '">Compare with ' + esc(PD.driverSurname(mate)) + '</a>' : '') +
       '<a class="qk-btn" href="#/scout?' + (y !== PD.currentSeason() ? 's=' + y + '&' : '') + 'cmp=' + encodeURIComponent(id) + '">Compare in the Scouting Room</a><a class="qk-btn" href="#/scout?view=chart' + (y !== PD.currentSeason() ? '&s=' + y : '') + '&q=' + encodeURIComponent(sur) + '">Chart against the grid</a>' + (curT ? '<a class="qk-btn" href="' + PD.teamHref(curT) + '">' + esc(PD.teamName(curT)) + '</a>' : '') + '</div>';
 
     /* How sure are we: the starts so far against where each headline metric settles (f1.json m50) */

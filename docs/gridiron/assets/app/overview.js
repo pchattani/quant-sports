@@ -314,6 +314,46 @@ function fanModules(el, S, rows, po) {
   });
 }
 
+/* ── My Teams: the teams this visitor follows, above everything else (QK.followSection; the cards are
+   data/follow/team/<ABBR>.json from oddsmarkets/nfl/analytics/follow_build.py). Below the cards: their week and
+   "Your teams v the league". */
+const FOLLOW_SLOT = '<section class="qk-section gi-ov-follow" id="ov-follow" aria-label="Your teams"></section>';
+function followFill(host, rows, ratings) {
+  if (!host || !QK.followSection) return;
+  QK.followSection(host, { site: 'gridiron', scope: 'team', full: true, feed: false, title: 'Your teams',
+    sub: 'The teams you follow, first: how their season stands, the next games, our ratings, strengths and weaknesses, and the facts that stand out.',
+    picker: { sport: 'nfl', title: 'Pick your teams', rows: GI.followRows() },
+    board: cards => followBoard(cards, rows, ratings) });
+}
+/* "Your teams v the league": each followed team in our ranking with the teams either side of it */
+function followBoard(cards, rows, ratings) {
+  if (!QK.powerBars) return '';
+  const val = r => { const x = ((ratings || {})[r.team] || {}).values || {}; return isNum(x.rating) ? x.rating : r.rating; };
+  const rr = (rows || []).filter(r => r && isNum(val(r))).sort((a, b) => val(b) - val(a));
+  if (rr.length < 3) return '';
+  const mine = {};
+  cards.forEach(c => { const p = String(c.k || '').split(':'); if (p[0] === 'gridiron') mine[p[2]] = 1; });
+  const keep = {};
+  rr.forEach((r, i) => { if (mine[r.team]) [i - 1, i, i + 1].forEach(j => { if (j >= 0 && j < rr.length) keep[j] = 1; }); });
+  const ix = Object.keys(keep).map(Number).sort((a, b) => a - b);
+  if (!ix.length) return '';
+  const groups = [];
+  ix.forEach((i, n) => { if (!n || i !== ix[n - 1] + 1) groups.push({ label: '', rows: [] }); groups[groups.length - 1].rows.push(i); });
+  const row = i => {
+    const r = rr[i], t = r.team, x = ((ratings || {})[t] || {}).values || {};
+    return { rank: i + 1, name: GI.teamName(t), abbr: GI.teamAbbr(t), colour: (GI.teamInfo(t) || {}).colour, href: GI.teamHref(t), sub: GI.record(r.w, r.l, r.t) + (mine[t] ? ' · you follow' : ''),
+      value: val(r), text: GI.signed(val(r), 1), parts: { off: x.off_rating, def: x.def_rating }, follow: GI.followItem(t) };
+  };
+  groups.forEach(g => {
+    g.rows = g.rows.map(row);
+    if (groups.length > 1) g.label = 'Around ' + g.rows.filter(x => mine[x.abbr]).map(x => x.abbr).join(', ');
+  });
+  return '<div class="gi-ov-flboard"><div class="qk-fc-k">Your teams v the league</div><div class="qk-card"><div class="qk-card-body">' +
+    QK.powerBars(null, { groups: groups, valueLabel: 'Our rating', unit: 'points a game against an average team',
+      parts: [{ key: 'off', label: 'Offence', color: 'var(--c-2)' }, { key: 'def', label: 'Defence', color: 'var(--c-3)' }] }) +
+    '<p class="qk-caption">Each team you follow in our ranking of all ' + rr.length + ', with the teams either side. <a href="#/teams">The full power board →</a></p></div></div></div>';
+}
+
 GI.route('overview', function (el) {
   const idx = GI.index() || {};
   if (!GI.ok(idx)) { el.innerHTML = GI.pageHead('NFL', 'The Quant Gridiron', '') + GI.notBuilt('The overview', idx); return; }
@@ -344,6 +384,7 @@ GI.route('overview', function (el) {
       intro({ tag: 'NFL · ' + S + ' · ' + phaseText + ' · ' + wk, title: 'Every NFL game, team and player, by the numbers.',
         lede: 'Our chance for every game this week, the playoff race from 20,000 simulated seasons, every fourth down graded, and the players behind it all, in plain English.',
         links: [{ label: 'Games', sub: 'All ' + wk + ', our chance', href: GI.weekHref(S, W) }, { label: 'Playoff race', sub: 'Standings and seeds', href: '#/standings' }, { label: 'Scouting Room', sub: 'Every player, every metric', href: '#/scout' }] }) +
+      FOLLOW_SLOT +
       '<section class="qk-section ql-week">' + QK.sectionHead({ kicker: 'This week in the NFL', title: '<span id="ov-wk">The week so far</span>', html: true, sub: esc(stageLine(dig.stage, ph)) }) +
         '<div id="ov-week"></div><div id="ov-feat" class="ql-feat"></div></section>' +
 
@@ -406,6 +447,7 @@ GI.route('overview', function (el) {
     GI.set('ov-hot', hot.length ? QK.band(QK.sectionHead({ kicker: 'Who’s hot', title: 'The leaders, board by board', sub: 'The top name on five of our leaderboards, qualified players only, and a line on what each number means.', actions: '<a class="qk-more" href="#/scout?view=leaders">Every leaderboard</a>' }) + QK.hotRow(hot)) : '');
 
     /* round 6: the fan modules, lazily (records in reach, breakout watch, the spotlight, the turnarounds) */
+    followFill(el.querySelector('#ov-follow'), rows, ratings);
     fanModules(el, S, rows, po);
 
     /* Who's for real?: win % against the EPA-per-play margin (offence EPA a play less the EPA a play allowed) */

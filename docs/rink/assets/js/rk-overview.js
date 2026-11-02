@@ -278,6 +278,44 @@ function fanModules(el, S, rows) {
   });
 }
 
+/* ── My Teams: the clubs this visitor follows, above everything else (QK.followSection; the cards are
+   data/follow/team/<ABBR>.json from oddsmarkets/nhl/analytics/follow_build.py). Below the cards: their week and
+   "Your clubs v the league". */
+const FOLLOW_SLOT = '<section class="qk-section rk-ov-follow" id="ov-follow" aria-label="Your teams"></section>';
+function followFill(host, rows) {
+  if (!host || !QK.followSection) return;
+  QK.followSection(host, { site: 'rink', scope: 'team', full: true, feed: false, title: 'Your clubs',
+    sub: 'The clubs you follow, first: how their season stands, the next games, our ratings, strengths and weaknesses, and the facts that stand out.',
+    picker: { sport: 'hockey', title: 'Pick your clubs', rows: U.followRows() },
+    board: cards => followBoard(cards, rows) });
+}
+/* "Your clubs v the league": each followed club in our ranking with the clubs either side of it */
+function followBoard(cards, rows) {
+  if (!QK.powerBars) return '';
+  const rr = (rows || []).filter(r => r && isNum(r.rating)).sort((a, b) => b.rating - a.rating);
+  if (rr.length < 3) return '';
+  const mine = {};
+  cards.forEach(c => { const p = String(c.k || '').split(':'); if (p[0] === 'rink') mine[p[2]] = 1; });
+  const keep = {};
+  rr.forEach((r, i) => { if (mine[r.team]) [i - 1, i, i + 1].forEach(j => { if (j >= 0 && j < rr.length) keep[j] = 1; }); });
+  const ix = Object.keys(keep).map(Number).sort((a, b) => a - b);
+  if (!ix.length) return '';
+  const groups = [];
+  ix.forEach((i, n) => { if (!n || i !== ix[n - 1] + 1) groups.push({ label: '', rows: [] }); groups[groups.length - 1].rows.push(i); });
+  const row = i => {
+    const r = rr[i], t = r.team;
+    return { rank: i + 1, name: RK.teamName(t), abbr: RK.teamAbbr(t), colour: RK.teamColourRaw(t), href: RK.teamHref(t), sub: RK.record(r.w, r.l, r.otl) + ' · ' + r.pts + ' pts' + (mine[t] ? ' · you follow' : ''),
+      value: r.rating, text: U.signed(r.rating, 2), follow: U.followItem(t) };
+  };
+  groups.forEach(g => {
+    g.rows = g.rows.map(row);
+    if (groups.length > 1) g.label = 'Around ' + g.rows.filter(x => mine[x.abbr]).map(x => x.abbr).join(', ');
+  });
+  return '<div class="rk-ov-flboard"><div class="qk-fc-k">Your clubs v the league</div><div class="qk-card"><div class="qk-card-body">' +
+    QK.powerBars(null, { groups: groups, valueLabel: 'Our rating', unit: 'goals a game against an average club' }) +
+    '<p class="qk-caption">Each club you follow in our ranking of all ' + rr.length + ', with the clubs either side. <a class="qk-link" href="#/teams">The full power board →</a></p></div></div></div>';
+}
+
 function render(el, params) {
   /* a past season (#/?s=<S>) reads as its recap (rk-recap.js), never as this season's page */
   const SP = params && params.season ? Number(params.season) : null;
@@ -291,6 +329,7 @@ function render(el, params) {
     title: 'Every NHL game, player and team, by the numbers.',
     lede: 'Our chance for tonight’s games, who’s for real, and the race for the Cup, from 20,000 simulated seasons and expected goals, in plain English.',
     links: [{ label: 'Games', sub: 'Every game, our chance', href: '#/games' }, { label: 'Playoff race', sub: 'Standings and the Cup', href: '#/standings' }, { label: 'Scouting Room', sub: 'Every player, every metric', href: '#/scout' }] }) +
+    FOLLOW_SLOT +
     '<section class="qk-section ql-week">' + QK.sectionHead({ kicker: 'This week in the NHL', title: '<span id="ov-wk">The week so far</span>', sub: '<span id="ov-stage">' + esc(stageLine(dig.stage, idx)) + '</span>', html: true }) +
     '<div id="ov-week"></div><div id="ov-feat" class="ql-feat"></div></section>' +
     '<section class="qk-section">' + QK.sectionHead({ kicker: 'What to watch', title: '<span id="ov-gh">Today</span>', html: true, sub: 'Our chance for each side, with a line on why it’s worth your time. Live games update as they go.', actions: seg }) +
@@ -316,6 +355,7 @@ function render(el, params) {
     const season = RK.ok(res[0]) ? res[0] : {}, mk = RK.ok(res[1]) ? res[1] : {};
     const rows = ((season.standings || {}).rows || []).slice();
     const byTeam = {}; rows.forEach(r => { byTeam[r.team] = r; });
+    followFill(el.querySelector('#ov-follow'), rows);
     const cup = (((mk.futures || {}).cup) || []).slice();
     const odds = idx.playoff_odds || {};
     if (!cup.length) Object.keys(odds).forEach(t => cup.push({ team: t, model: odds[t].p_cup, market: null }));

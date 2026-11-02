@@ -89,7 +89,7 @@ function conferences(node, L, S, season) {
         pc: fb ? s0.p_conf : (isNum(s0.p_conf_reg) ? s0.p_conf_reg : s0.p_conf_tourney) };
     });
     var cols = [
-      { key: 'conf_rank', label: '#', num: true },
+      { key: 'conf_rank', label: '#', num: true, fmt: function (v, r) { return esc(isNum(v) ? String(v) : '—') + (CC.isCur(L, S) ? CC.followStar(L, r.team) : ''); } },
       { key: 'name', label: 'Team', type: 'entity', sub: 'sub', mark: function (r) { return U.mark(L, r.team); }, href: function (r) { return CC.teamHref(L, r.team, S); } },
       { key: 'cdiff', label: 'Conf', num: true, fmt: function (v, r) { return esc(r.conf); }, tip: 'Conference record' },
       { key: 'odiff', label: 'Overall', num: true, fmt: function (v, r) { return esc(r.overall); } },

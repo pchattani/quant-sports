@@ -169,7 +169,7 @@ function power() {
     const pw = GI.first(r.mean_wins, sim.mean_wins), d = v(t, 'diff');
     const ch = CUR ? [{ label: 'Playoffs', p: GI.first(r.p_playoffs, sim.p_playoffs) }, { label: 'Super Bowl', p: GI.first(r.p_sb, sim.p_sb) }] : [];
     return { rank: rk[t], name: i.name, abbr: i.abbr, colour: i.colour, href: thref(t), sub: rec(t) + (r.streak ? ' · ' + r.streak : '') + ' · ' + i.division, value: v(t, 'rating'), text: GI.signed(v(t, 'rating'), 1),
-      parts: { off: v(t, 'off_rating'), def: v(t, 'def_rating'), st: v(t, 'st_rating') },
+      parts: { off: v(t, 'off_rating'), def: v(t, 'def_rating'), st: v(t, 'st_rating') }, follow: GI.followItem(t),
       cells: [{ label: 'Point diff', text: isNum(d) ? GI.signed(d, 0) : '—' }].concat(CUR && isNum(pw) ? [{ label: 'Projected wins', text: GI.num(pw, 1) }] : []),
       form: last || null, chances: ch };
   };

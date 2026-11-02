@@ -296,6 +296,13 @@ def main(argv=None) -> int:
     res = step("site", lambda: site.build_all(data), report)
     if res:
         log.info("site: %s", res)
+    # My Teams: one small follow card per team (data/follow/<L>/<id>.json; oddsmarkets/college/follow_build.py, on
+    # oddsmarkets/common/follow.py), from the team files and index.json written above; Home and the overview read only these
+    from oddsmarkets.college import follow_build as FLB
+    for L in levels:
+        fl = step(f"follow cards {L}", lambda: FLB.build(data, L), report)
+        if fl:
+            log.info("follow cards %s: %d, %.0f KB, largest %d bytes", L, fl["n"], fl["bytes"] / 1024, fl["max"])
     rep = size_report(SITE)
     print_size(rep)
     bad = {k: v for k, v in report.items() if not v.get("ok")}

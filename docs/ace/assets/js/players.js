@@ -618,7 +618,8 @@ function drawPlayer(el, T, pid, career, careerRaw, cat, elo, ranks, race) {
     meta: [age !== null ? age + ' years old' : null, hand || null, isNum(c.height) ? K.num(c.height, 0) + ' cm' : null, isNum(rank) ? 'Ranked No. ' + rank : null],
     tags: [p && p.qualified ? QK.tag('Qualified for percentiles', 'signal') : QK.tag('Below the match floor: no percentiles')], strip: strip, short: shortVersion() });
   const crumb = '<nav class="ta-crumb" aria-label="Breadcrumb"><a href="' + K.href(T, 'scout') + '">Tennis</a><span aria-hidden="true">›</span><a href="' + K.href(T, 'scout') + '">' + K.TN(T) + ' Scouting Room</a><span aria-hidden="true">›</span>' + K.esc(name) + '</nav>';
-  const links = '<div class="ta-pl-links">' + (rival ? '<a class="qk-btn" href="' + K.compareHref(T, pid, rival) + '">Compare with ' + K.esc(K.surname(K.name(T, rival))) + '</a>' : '') +
+  /* round 12 (My Teams): follow the player; the card then leads Home and this site's overview */
+  const links = '<div class="ta-pl-links">' + (TA.follow ? TA.follow.button(T, pid) : '') + (rival ? '<a class="qk-btn" href="' + K.compareHref(T, pid, rival) + '">Compare with ' + K.esc(K.surname(K.name(T, rival))) + '</a>' : '') +
     (h2hTop ? '<a class="qk-btn" href="' + K.h2hHref(T, pid, h2hTop) + '">Head to head v ' + K.esc(K.surname(K.name(T, h2hTop))) + '</a>' : '') +
     '<a class="qk-btn" href="#/' + T + '/compare/progression/' + encodeURIComponent(pid) + '">Compare progression</a>' +
     '<a class="qk-btn" href="' + K.href(T, 'scout') + '">Scouting Room</a></div>';

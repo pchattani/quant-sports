@@ -828,7 +828,7 @@ function standings(box, ctx, rows, bands, o) {
   var hasForm = !o.compact && (rows || []).some(function (r) { return (form[r.team] || []).length; });
   var cols = [
     { key: 'pos', label: '#', num: true, fmt: function (v) { return posCell(v, bands); } },
-    { key: 'team', label: clubW(), sticky: true, fmt: function (v, r) { return ctx.club(v, r.tid); } },
+    { key: 'team', label: clubW(), sticky: true, fmt: function (v, r) { return ctx.club(v, r.tid) + FB.followStar(r.tid || ctx.tidOf(v)); } },
     { key: 'played', label: 'P', num: true }, { key: 'w', label: 'W', num: true }, { key: 'd', label: 'D', num: true }, { key: 'l', label: 'L', num: true },
     { key: 'gf', label: 'GF', num: true }, { key: 'ga', label: 'GA', num: true },
     { key: 'gd', label: 'GD', num: true, fmt: function (v) { return isNum(v) ? signed(v, 0) : '—'; } },

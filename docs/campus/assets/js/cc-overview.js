@@ -29,6 +29,50 @@ function dataTable(cols, rows, label) {
   return '<details class="cc-data"><summary>' + esc(label || 'Show the numbers as a table') + '</summary>' + U.table(cols, rows, { maxHeight: 360 }) + '</details>';
 }
 
+/* ── round 12, My Teams: the teams this visitor follows, above everything else (QK.followSection; the cards are
+   data/follow/<L>/<id>.json from oddsmarkets/college/follow_build.py). The level on screen only; a line names the
+   other levels' follows. Below the cards: their week, "Your teams v the level" and the facts. */
+var FOLLOW_SLOT = '<section class="qk-section cc-ov-follow" id="ov-follow" aria-label="Your teams"></section>';
+function followFill(host, L, S, power, ratings) {
+  if (!host || !QK.followSection) return;
+  QK.followSection(host, { site: 'campus', scope: L, full: true, feed: false, title: 'Your teams',
+    sub: 'The teams you follow, first: how their season stands, the next games, our ratings, strengths and weaknesses, and the facts that stand out.',
+    scopeLabel: function (s) { return CC.FOLLOW_LABEL[s] || s; }, scopeHref: function (s) { return CC.href(s); },
+    picker: { sport: 'college', title: 'Pick your teams', rows: CC.followRows() },
+    board: function (cards) { return followBoard(cards, L, S, power, ratings); } });
+}
+/* "Your teams v the level": each followed team in our ranking with the teams either side of it */
+function followBoard(cards, L, S, power, ratings) {
+  if (!QK.powerBars || !power || power.length < 3) return '';
+  var R = ratings || {}, mine = {}, keep = {};
+  cards.forEach(function (c) { var p = String(c.k || '').split(':'); if (p[1] === L) mine[p[2]] = 1; });
+  power.forEach(function (r, i) { if (mine[String(r.team)]) [i - 1, i, i + 1].forEach(function (j) { if (j >= 0 && j < power.length) keep[j] = 1; }); });
+  var idx = Object.keys(keep).map(Number).sort(function (a, b) { return a - b; });
+  if (!idx.length) return '';
+  var rel = CC.fb(L) || CC.hk(L), avg = null;
+  if (!rel) {
+    var os = power.map(function (r) { return (R[String(r.team)] || {}).off; }).filter(isNum), ds = power.map(function (r) { return (R[String(r.team)] || {}).def; }).filter(isNum);
+    avg = (os.reduce(function (a, x) { return a + x; }, 0) / (os.length || 1) + ds.reduce(function (a, x) { return a + x; }, 0) / (ds.length || 1)) / 2;
+  }
+  var groups = [];
+  idx.forEach(function (i, n) { if (!n || i !== idx[n - 1] + 1) groups.push({ label: '', rows: [] }); groups[groups.length - 1].rows.push(i); });
+  var dp = CC.hk(L) ? 2 : 1;
+  var row = function (i) {
+    var r = power[i], t = String(r.team), x = R[t] || {};
+    var off = isNum(x.off) ? (rel ? x.off : x.off - avg) : null, def = isNum(x.def) ? (rel ? x.def : avg - x.def) : null;
+    return { rank: r.rank || i + 1, name: CC.tname(L, t), abbr: CC.tabbr(L, t), colour: CC.traw(L, t), href: CC.teamHref(L, t, S), sub: mine[t] ? 'you follow' : '',
+      value: r.rating, text: CC.signed(r.rating, dp), parts: { off: off, def: def }, follow: CC.followItem(L, t) };
+  };
+  groups.forEach(function (g) {
+    g.rows = g.rows.map(row);
+    if (groups.length > 1) g.label = 'Around ' + g.rows.filter(function (x) { return mine[x.follow.k.split(':')[2]]; }).map(function (x) { return x.abbr; }).join(', ');
+  });
+  return '<div class="cc-ov-flboard"><div class="qk-fc-k">Your teams v the level</div><div class="qk-card"><div class="qk-card-body">' +
+    QK.powerBars(null, { groups: groups, valueLabel: 'Our rating', unit: rwords(L),
+      parts: [{ key: 'off', label: CC.hk(L) ? 'Attack' : 'Offence', color: 'var(--c-2)' }, { key: 'def', label: 'Defence', color: 'var(--c-3)' }] }) +
+    '<p class="qk-caption">Each team you follow in our ranking of all ' + power.length + ', with the teams either side. <a class="qk-link" href="' + esc(CC.href(L, 'teams', null, S)) + '">The full power board →</a></p></div></div></div>';
+}
+
 /* ── the landing top (the same shape on every sport overview) ──────────────────────────────────────────────── */
 var WORDS = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
 var LEVEL_WORDS = { cfb: 'college football', mbb: 'men’s college basketball', wbb: 'women’s college basketball', mch: 'men’s college hockey', wch: 'women’s college hockey' };
@@ -311,6 +355,7 @@ CC.route('overview', function (el, p) {
           : CC.hk(L) ? 'Our chance for this weekend’s series, who’s for real, the NPI and the road to the Frozen Four, in plain English.' : 'Our chance for tonight’s games, who’s for real, and the road to March, in plain English.',
         links: [{ label: 'Games', sub: 'Every game, our chance', href: CC.href(L, 'games', null, S) }, { label: 'Standings', sub: fb ? 'The playoff picture' : CC.hk(L) ? 'The NPI and the bracket' : 'Bracketology', href: CC.href(L, 'standings', null, S) },
           { label: 'Scouting Room', sub: 'Every player, every metric', href: CC.scoutHref(L, S) }] });
+      html += FOLLOW_SLOT;
       var T = weekTiles(L, S, info, dig, feat, sim);
       var kick = 'This week in ' + lw;
       html += '<section class="qk-section ql-week">' + QK.sectionHead({ kicker: kick, title: T.length >= 3 ? 'The week in ' + WORDS[T.length].toLowerCase() + ' lines' : 'The week so far', sub: stageLine(L, dig.stage, info.phase || season.phase) }) +
@@ -356,6 +401,7 @@ CC.route('overview', function (el, p) {
     html += '<p class="qk-sub cc-ov-doing" style="margin-top:var(--sp-8)"><a class="qk-link" href="' + esc(CC.href(L, 'model', null, null, 'tab=calibration')) + '">How we’re doing →</a> Our recent record and how often our chances came true.</p>';
     el.innerHTML = html;
     U.wire(el);
+    if (isCur) followFill(QK.$('#ov-follow', el), L, S, power, ratings);
     if (isCur) drawWatch(el, L, W, G);
     if (isCur) { surprises(L, S, season, power, ap, rec, QK.$('#ov-surprise', el)); unsung(L, S, season, power, ap, QK.$('#ov-spot', el)); }
     realOrNot(L, S, season, ap, QK.$('#ov-luck', el), QK.$('#ov-luck-cap', el));

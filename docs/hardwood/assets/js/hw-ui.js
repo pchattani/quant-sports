@@ -84,6 +84,26 @@ U.foldTables = (node, keep, done) => Promise.resolve(done).then(() => setTimeout
 /* v4: the team as the kit draws it: full (the city line on the split hero), short (the nickname), alt (the second kit
    colour, for clashes; the kit's fallbacks cover a team without one) */
 U.team = (L, tid) => ({ name: HW.teamName(L, tid), full: HW.teamName(L, tid), short: HW.teamShort(L, tid), abbr: HW.teamAbbr(L, tid), colour: HW.teamColourRaw(L, tid), alt: HW.teamAlt(L, tid), href: HW.teamHref(L, tid) });
+/* round 12 (My Teams): a team as a follow item (QK.follow: 'hardwood:<L>:<tid>', the route, the colours), its star
+   toggle, and every NBA and WNBA team as picker rows (index.json leagues.<L>.teams) */
+U.followItem = (L, tid) => {
+  const l = L === 'wnba' ? 'wnba' : 'nba';
+  return { k: 'hardwood:' + l + ':' + tid, name: HW.teamName(l, tid), abbr: HW.teamAbbr(l, tid), colour: HW.teamColourRaw(l, tid) || '', alt: HW.teamAlt(l, tid) || '', href: '#/' + l + '/team/' + encodeURIComponent(tid) };
+};
+U.followStar = (L, tid, cls) => (QK.followButton ? QK.followButton(U.followItem(L, tid), { compact: true, cls: cls || 'qk-fl-mini' }) : '');
+U.followRows = () => {
+  const out = [];
+  ['nba', 'wnba'].forEach(L => {
+    const teams = (HW.leagueInfo(L) || {}).teams || {};
+    Object.keys(teams).forEach(t => {
+      const x = teams[t] || {};
+      if (!x.name) return;
+      out.push({ sport: 'basketball', t: x.name, s: HW.leagueName(L) + (x.conference ? ' · ' + x.conference : ''), k: 'hardwood:' + L + ':' + t,
+        href: '#/' + L + '/team/' + t, abbr: x.abbr, colour: x.colour, alt: x.alt || x.alt_colour });
+    });
+  });
+  return out;
+};
 U.tcol = (L, tid) => {
   const c = HW.teamColourRaw(L, tid);
   return QK.color.parse(c) ? HW.teamColour(L, tid) : QK.cssVar('--c-other');

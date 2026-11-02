@@ -27,6 +27,46 @@ const U = HW.ui, esc = HW.esc, isNum = HW.isNum;
 const AWN = { mvp: 'MVP', roy: 'Rookie', dpoy: 'Defence', sixth: 'Sixth', mip: 'Most improved', clutch: 'Clutch' };
 const WORDS = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen'];
 
+/* ── round 12, My Teams: the teams this visitor follows, above everything else (QK.followSection; the cards are
+   data/follow/<L>/<tid>.json from oddsmarkets/basketball/analytics/follow_build.py). The league on screen only; a
+   line names the other league's follows. Below the cards: their week, "Your teams v the league" and the facts. */
+const FOLLOW_SLOT = '<section class="qk-section hw-ov-follow" id="ov-follow" aria-label="Your teams"></section>';
+function followFill(host, L, S, power, season) {
+  if (!host || !QK.followSection) return;
+  QK.followSection(host, { site: 'hardwood', scope: L, full: true, feed: false, title: 'Your teams',
+    sub: 'The teams you follow, first: how their season stands, the next games, our ratings, strengths and weaknesses, and the facts that stand out.',
+    scopeLabel: s => HW.leagueName(s) || s.toUpperCase(), scopeHref: s => HW.href(s, ''),
+    picker: { sport: 'basketball', title: 'Pick your teams', rows: U.followRows() },
+    board: cards => followBoard(cards, L, S, power, season) });
+}
+/* "Your teams v the league": each followed team in our ranking with the teams either side of it */
+function followBoard(cards, L, S, power, season) {
+  if (!QK.powerBars || !power || power.length < 3) return '';
+  const R = (season && season.ratings) || {}, LO = season && isNum(season.league_ortg) ? season.league_ortg : null;
+  const mine = {};
+  cards.forEach(c => { const p = String(c.k || '').split(':'); if (p[1] === L) mine[p[2]] = 1; });
+  const keep = {};
+  power.forEach((r, i) => { if (mine[r.tid]) [i - 1, i, i + 1].forEach(j => { if (j >= 0 && j < power.length) keep[j] = 1; }); });
+  const idx = Object.keys(keep).map(Number).sort((a, b) => a - b);
+  if (!idx.length) return '';
+  const recs = U.records(season);
+  const groups = [];
+  idx.forEach((i, n) => { if (!n || i !== idx[n - 1] + 1) groups.push({ label: '', rows: [] }); groups[groups.length - 1].rows.push(i); });
+  const row = i => {
+    const r = power[i], t = r.tid, x = R[t] || {};
+    return { rank: i + 1, name: HW.teamName(L, t), abbr: HW.teamAbbr(L, t), colour: HW.teamColourRaw(L, t), href: HW.teamHref(L, t, S), sub: (recs[String(t)] || '') + (mine[t] ? ' · you follow' : ''),
+      value: r.net, text: U.signed(r.net, 1), parts: { off: isNum(x.off) && isNum(LO) ? x.off - LO : null, def: isNum(x.def) && isNum(LO) ? LO - x.def : null }, follow: U.followItem(L, t) };
+  };
+  groups.forEach(g => {
+    g.rows = g.rows.map(row);
+    if (groups.length > 1) g.label = 'Around ' + g.rows.filter(x => mine[x.follow.k.split(':')[2]]).map(x => x.abbr).join(', ');
+  });
+  return '<div class="hw-ov-flboard"><div class="qk-fc-k">Your teams v the league</div><div class="qk-card"><div class="qk-card-body">' +
+    QK.powerBars(null, { groups: groups, valueLabel: 'Our rating', unit: 'points per 100 possessions against an average team',
+      parts: [{ key: 'off', label: 'Offence', color: 'var(--c-2)' }, { key: 'def', label: 'Defence', color: 'var(--c-3)' }] }) +
+    '<p class="qk-caption">Each team you follow in our ranking of all ' + power.length + ', with the teams either side. <a class="qk-link" href="' + esc(HW.href(L, 'teams', S)) + '">The full power board →</a></p></div></div></div>';
+}
+
 /* ── the landing top (the same shape on every sport overview) ──────────────────────────────────────────────── */
 
 /* "Live now" | "Tonight" | "Today" | "Tomorrow" | the weekday | the date, in the reader's own time (QK.now()). */
@@ -353,6 +393,7 @@ function render(el, params) {
         lede: champNow ? 'The ' + HW.seasonLabel(L, S) + ' season is over: the ' + HW.teamName(L, champNow) + ' won the title. How they won it, every series, the award races and the players behind it, in plain English.'
           : 'Our chance for tonight’s games, playoff and title chances from ' + Number(nSims || 20000).toLocaleString('en-GB') + ' simulated seasons, and who’s for real, in plain English.',
         links: [{ label: 'Games', sub: 'Every game, our chance', href: HW.href(L, 'games') }, { label: 'Standings', sub: 'The playoff picture', href: HW.href(L, 'standings', S) }, { label: 'Scouting Room', sub: 'Every player, every metric', href: HW.href(L, 'scout', S) }] });
+      h += FOLLOW_SLOT;
       const extra = liveSeries.slice(0, 2).map(x => { const t = x.teams || [], w = x.wins || {}, a = t[0], b = t[1];
         return { label: x.round || 'Series', value: HW.teamAbbr(L, a) + ' ' + (w[a] || 0) + '–' + (w[b] || 0) + ' ' + HW.teamAbbr(L, b), href: HW.href(L, 'standings') + '?tab=bracket',
           sub: (x.summary ? x.summary + '. ' : 'Series level. ') + (isNum((sim[a] || {}).p_title) ? 'Our title chance: ' + HW.teamAbbr(L, a) + ' ' + U.pct(sim[a].p_title) + ', ' + HW.teamAbbr(L, b) + ' ' + U.pct((sim[b] || {}).p_title) + '.' : '') }; });
@@ -456,6 +497,7 @@ function render(el, params) {
     }
     if (isCur) h += '<p class="qk-sub hw-ov-doing"><a class="qk-link" href="' + esc(HW.href(L, 'model') + '?tab=calibration') + '">How we’re doing →</a> Our record and every forecast checked against the result, on the Model page.</p>';
     el.innerHTML = h;
+    if (isCur) followFill(el.querySelector('#ov-follow'), L, S, power, season);
     /* round 9: a past season reads as a recap (hw-recap.js): champion, bracket, awards, our calls */
     if ((!isCur || champNow) && HW.recap) HW.recap.fill(document.getElementById('ov-recap'), L, S, season, awards, hist);
 

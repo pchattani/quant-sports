@@ -20,7 +20,8 @@ The card (v1). Every block is optional except the identity and the freshness; a 
              "standing": {"pos", "of", "group", "text", "gb"}, "rating": {"value", "text", "rank", "of", "label"}},
      "chances": [{"key", "label", "p", "d7"}]   (d7: the change over 7 days from the race logs, None without one)
      "next": [{"id", "start", "home", "opp": {"name", "abbr", "colour", "rank"}, "comp", "p", "p_draw", "mkt",
-               "why": [...], "href"}]  (up to 3)
+               "why": [...], "href"}]  (up to 3; p and mkt are our side's chances; with a draw, the kit's "Your week"
+               shows a market only from "mkt_home", the home side's own, since 1 - mkt is not the other side's)
      "next_note": "Off-season. The 2027 schedule is not out yet.",
      "last": {"id", "start", "home", "opp", "score": [us, them], "res": "W" | "L" | "D", "p", "upset", "comp", "href"},
      "line": "Won the 2026 World Series, 4–1 over the Rays."   (one plain line on the season so far)
@@ -534,7 +535,8 @@ def _f_swing(ctx, asof, out):
     if best:
         d, p, lab = best
         up = d > 0
-        text = f"{lab.capitalize()} chance {'up' if up else 'down'} {round(abs(d) * 100)} points to {pct_text(p)} this week."
+        # the first letter up, the rest as given ("Stanley Cup", not str.capitalize()'s "Stanley cup")
+        text = f"{lab[:1].upper() + lab[1:]} chance {'up' if up else 'down'} {round(abs(d) * 100)} points to {pct_text(p)} this week."
         out.append({"kind": "swing", "score": 34 + 90 * min(abs(d), 0.4), "text": text})
 
 

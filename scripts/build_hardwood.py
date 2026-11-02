@@ -865,6 +865,16 @@ def main(argv: list[str] | None = None) -> int:
                 out["leagues"][lg]["digest"] = b.step(f"{lg} digest", lambda: league_digest(b, lg, r["ctx"].season, today), {}) or {}
         return out
     b.write_or_fail("index.json", "index", index)
+    # My Teams: one small follow card per team (data/follow/<L>/<tid>.json; oddsmarkets/basketball/analytics/
+    # follow_build.py, on oddsmarkets/common/follow.py), from the payloads on disk after index.json; every league with a
+    # current season, built this run or not (a decided Finals turns the cards to the champion and the off-season)
+    from oddsmarkets.basketball.analytics import follow_build as FLB
+    for lg in ("nba", "wnba"):
+        if lg in ((an.read_json(data / "index.json") or {}).get("leagues") or {}):
+            fl = b.step(f"follow cards {lg}", lambda: FLB.build(data, lg, _digest_now(today)), None)
+            if fl:
+                b.written.extend(data / "follow" / lg / f"{i}.json" for i in fl["ids"])
+                logger.info("follow cards %s: %d, %.0f KB, largest %d bytes", lg, fl["n"], fl["bytes"] / 1024, fl["max"])
 
     total = sum(p.stat().st_size for p in set(b.written) if p.exists())
     logger.info("wrote %d files (%.1f MB) in %.1f s; %d step errors", len(set(b.written)), total / 1e6, time.perf_counter() - t_start,

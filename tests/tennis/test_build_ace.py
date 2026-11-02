@@ -70,6 +70,7 @@ def test_build_writes_every_payload(ace_world_small, build_mod):
     pi = _j(a / "players_index.json")["players"]
     p0 = ace_world_small["order"][0]
     assert pi[p0][0] == f"Player {p0[-3:]}" and pi[p0][3] == 1
+    assert len(pi[p0]) == 6 and len(pi[p0][4]) == 10 and pi[p0][5] in (0, 1)        # last tour-level match, official flag
     lab = _j(a / "lab.json")
     assert lab["fields"][:7] == ["id", "name", "year", "qualified", "rank", "age", "hand"] and lab["rows"] and len(lab["rows"][0]) == len(lab["fields"])
     assert set(lab["years"]) == {2025, 2026}

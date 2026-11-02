@@ -582,6 +582,14 @@ def main(argv: list[str] | None = None) -> int:
             out["tours"][t] = r["entry"]
         return out
     b.write_or_fail("index.json", "index", index)
+    # My Teams: one small follow card per player (data/follow/<T>/<pid>.json; oddsmarkets/common/follow.py) for the
+    # top 500 and everyone playing this week, from the payloads this run has just written
+    from oddsmarkets.tennis.analytics import follow_build as FLB
+    for t in args.tours:
+        fl = b.step(f"follow cards {t}", lambda: FLB.build(data, t, digest_now(today)), None)
+        if fl:
+            b.written.extend(data / "follow" / t / f"{i}.json" for i in fl["ids"])
+            logger.info("follow cards %s: %d, %.0f KB, largest %d bytes", t, fl["n"], fl["bytes"] / 1024, fl["max"])
     b.step("manifests", b.save_manifests)
 
     total = sum(p.stat().st_size for p in set(b.written) if p.exists())

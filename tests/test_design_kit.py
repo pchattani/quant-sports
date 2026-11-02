@@ -138,7 +138,7 @@ def test_follow_kit_round_12_api_and_copies():
     q = (design_kit.DESIGN / "quant.js").read_text(encoding="utf-8")
     for bit in ("var FOLLOW_KEY = 'qk-follow-v1', FOLLOW_MAX = 30;", "QK.follow = {", "QK.followButton = function",
                 "QK.followPicker = function", "QK.followCard = function", "QK.followChip = function", "QK.followSection = function",
-                "QK.toast = function", "QK.fetchCard = function", "QK.FOLLOW_CARDS = { bullpen: ['mlb', 'aaa'] };",
+                "QK.toast = function", "QK.fetchCard = function", "QK.FOLLOW_CARDS = { bullpen: ['mlb', 'aaa'], site: ['club'],",
                 "root.addEventListener('storage'", "importHash: function", "shareUrl: function", "fromHref: function",
                 "cardUrl: function", "gameOf: function", "forSite: function", "onChange: function"):
         assert bit in q, bit
@@ -162,11 +162,27 @@ def test_follow_kit_round_12_api_and_copies():
 
 def test_follow_card_registry_matches_the_published_scopes():
     """A site listed in QK.FOLLOW_CARDS must write cards (its builder calls oddsmarkets/common/follow.py), so Home
-    never fetches a card that does not exist; the Bullpen's builder writes the scopes listed."""
+    never fetches a card that does not exist: every site's build calls its follow_build for exactly the scopes listed
+    (1 Nov 2026: all eight sites publish cards)."""
     import re
     q = (design_kit.DESIGN / "quant.js").read_text(encoding="utf-8")
-    reg = re.search(r"QK\.FOLLOW_CARDS = \{(.*?)\};", q).group(1)
+    reg = re.search(r"QK\.FOLLOW_CARDS = \{(.*?)\};", q, re.S).group(1)
     sites = dict((m.group(1), re.findall(r"'([a-z]+)'", m.group(2))) for m in re.finditer(r"(\w+): \[([^\]]*)\]", reg))
-    assert sites == {"bullpen": ["mlb", "aaa"]}
-    src = (ROOT / "scripts" / "build_bullpen.py").read_text(encoding="utf-8")
-    assert 'for lvl in ("mlb", "aaa"):' in src and "FLB.build(data, lvl" in src
+    assert sites == {"bullpen": ["mlb", "aaa"], "site": ["club"], "rink": ["team"], "gridiron": ["team"], "hardwood": ["nba", "wnba"],
+                     "campus": ["cfb", "mbb", "wbb", "mch", "wch"], "ace": ["atp", "wta"], "paddock": ["driver", "team"]}
+    assert set(sites) == set(design_kit.SITE_SPORT)
+    src = lambda f: (ROOT / "scripts" / f).read_text(encoding="utf-8")
+    pkg = lambda f: (ROOT / "oddsmarkets" / f).read_text(encoding="utf-8")
+    b = src("build_bullpen.py")
+    assert 'for lvl in ("mlb", "aaa"):' in b and "FLB.build(data, lvl" in b
+    assert "football_follow.build(DATA_DIR)" in src("build_site_all.py")
+    assert 'SITE, SPORT, SCOPE = "site", "football", "club"' in pkg("football/analytics/follow_build.py")
+    for f, mod in (("build_rink.py", "nhl"), ("build_gridiron.py", "nfl")):
+        assert f"from oddsmarkets.{mod}.analytics import follow_build as FLB" in src(f) and 'data / "follow" / "team"' in src(f)
+    h = src("build_hardwood.py")
+    assert 'for lg in ("nba", "wnba"):' in h and "FLB.build(data, lg" in h
+    c = src("build_campus.py")
+    assert 'LEVELS = ("cfb", "mbb", "wbb", "mch", "wch")' in c and "FLB.build(data, L)" in c
+    a = src("build_ace.py")
+    assert "FLB.build(data, t," in a and 'TOURS = ("atp", "wta")' in pkg("tennis/analytics/__init__.py")
+    assert '-> {"driver": summary, "team": summary}' in pkg("f1/analytics/follow_build.py") and "FLB.build(data)" in src("build_paddock.py")

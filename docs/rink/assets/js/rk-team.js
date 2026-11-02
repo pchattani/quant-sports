@@ -258,7 +258,9 @@ function render(el, params, state) {
     const TS = U.teamSet(tj, RK.ok(sj) ? sj : null);
     const tr = TS.by[abbr] || { p: {}, v: {} };
     const crumb = '<nav class="rk-crumb" aria-label="Breadcrumb"><a href="#/">Hockey</a><span aria-hidden="true">›</span><a href="' + esc(RK.href('teams', S)) + '">Teams</a><span aria-hidden="true">›</span>' + esc(RK.teamName(abbr)) + '</nav>';
-    el.innerHTML = crumb + header(abbr, S, x, row, sim, tr) + '<div style="margin-top:var(--sp-6)"></div>' + U.tabsHTML(tabs, view) + '<div id="tp-body"></div>';
+    /* My Teams: follow the club; it then leads Home and this site's overview */
+    const follow = QK.followButton ? '<div class="rk-flrow" style="display:flex;justify-content:flex-end;margin-top:var(--sp-4)">' + QK.followButton(U.followItem(abbr)) + '</div>' : '';
+    el.innerHTML = crumb + header(abbr, S, x, row, sim, tr) + follow + '<div style="margin-top:var(--sp-6)"></div>' + U.tabsHTML(tabs, view) + '<div id="tp-body"></div>';
     const body = el.querySelector('#tp-body');
     if (view === 'detail') return U.legacy('team', body, params, state);
 

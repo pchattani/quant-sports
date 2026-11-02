@@ -101,7 +101,7 @@ function standingsTable(id, season, kind, compact, chipsOf) {
   var cols = [
     /* an entry excluded from the championship (Schumacher 1997, McLaren 2007) keeps its results, scores 0 and ranks last: EX */
     { key: 'pos', label: 'Pos', num: true, fmt: function (v, r) { return r.excluded ? '<span class="qk-badge" data-tip="Excluded from the championship: ' + esc(String(r.excluded)) + '" tabindex="0">EX</span>' : (isNum(v) ? String(v) : '—'); } },
-    { key: 'name', label: isD ? 'Driver' : 'Constructor', sticky: true, fmt: function (v, r) { return (isD ? PD.driverLink(r.id, { team: r.team }) : PD.teamLink(r.id)) + (!season.championship && r.pos === 1 ? ' <span class="qk-badge accent">Champion</span>' : r.clinched ? ' <span class="qk-badge accent">Clinched</span>' : ''); } }
+    { key: 'name', label: isD ? 'Driver' : 'Constructor', sticky: true, fmt: function (v, r) { return (isD ? PD.driverLink(r.id, { team: r.team }) : PD.teamLink(r.id)) + (PD.follow && season.year === PD.currentSeason() ? PD.follow.star(isD ? 'driver' : 'team', r.id) : '') + (!season.championship && r.pos === 1 ? ' <span class="qk-badge accent">Champion</span>' : r.clinched ? ' <span class="qk-badge accent">Clinched</span>' : ''); } }
   ];
   if (isD && !compact) cols.push({ key: 'team', label: 'Team', fmt: function (v) { return '<span class="qk-muted">' + esc(PD.teamName(v)) + '</span>'; } });
   /* counted points; the gross total beside them when dropped scores (before 1991) or an exclusion made them differ */

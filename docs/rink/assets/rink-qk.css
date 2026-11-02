@@ -463,3 +463,6 @@ body.qk { font-size: var(--fs-md); }
 .rk-br a.nb-game.nb-link { color: inherit; }
 .rk-br a.nb-game.nb-link:hover { border-top-color: var(--volt); }
 .rk-br .nb-link .nb-last { color: var(--signal); }
+/* My Teams: the follow card's player and game links keep the card's ink (the #app link rule above outranks the kit's) */
+.qk #app .qk-fc a:not([class]), .qk #app .qk-fc a:not([class]):visited { color: var(--ink-1); }
+.qk #app .qk-fc a:not([class]):hover { text-decoration: none; }

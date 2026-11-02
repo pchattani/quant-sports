@@ -18,7 +18,11 @@ EDGE_HIDE_LEVELS = ("q",)
 
 
 def players_index(td: an.TourData) -> dict:
-    """{pid: [name, short, country, latest_rank]} for every player with a tour-level match on disk."""
+    """{pid: [name, short, country, latest_rank, last_match, official]} for every player with a tour-level match on
+    disk. latest_rank is the current official rank (the store's rankings, rankings.json's `official`) where the player
+    has one, else the rank at the latest tour-level match; official is 1 for the former, 0 for the latter; last_match
+    is the date (YYYY-MM-DD) of the latest tour-level match. follow_build.select() and the Ace's follow stars
+    (overview.js flOk) read the two for "active": who gets a follow card."""
     seen: dict[str, tuple] = {}
     for y in td.years:
         for m in td.matches(y).values():
@@ -35,7 +39,7 @@ def players_index(td: an.TourData) -> dict:
     out = {}
     for p in sorted(seen):
         info = td.players.get(p) or {}
-        out[p] = [td.name(p), td.short(p), info.get("country"), rk.get(p, seen[p][1])]
+        out[p] = [td.name(p), td.short(p), info.get("country"), rk.get(p, seen[p][1]), seen[p][0][:10] or None, 1 if p in rk else 0]
     return {"ok": True, "tour": td.tour, "updated_at": an.now(), "players": out}
 
 

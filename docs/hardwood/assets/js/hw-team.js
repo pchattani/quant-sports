@@ -103,6 +103,8 @@ function render(el, params) {
     let h = '<nav class="hw-crumb" aria-label="Breadcrumb"><a href="' + esc(HW.href(L, 'teams', S)) + '">' + esc(HW.leagueName(L)) + ' teams</a><span aria-hidden="true">›</span>' + esc(name) + '</nav>' +
       QK.playerHeader({ name: name, split: false, kicker: U.kicker(L, S), face: HW.teamAbbr(L, tid), team: { name: [info.conference || s.conf, info.division].filter(Boolean).join(' · ') || HW.leagueName(L), abbr: HW.teamAbbr(L, tid), colour: HW.teamColourRaw(L, tid), alt: HW.teamAlt(L, tid) },
         meta: [isNum(r.off) ? ['Offence', U.f(r.off, 1) + ' per 100'] : null, isNum(r.def) ? ['Defence', U.f(r.def, 1) + ' allowed'] : null, isNum(r.pace) ? ['Pace', U.f(r.pace, 1)] : null], strip: [stats[0]].concat(tiles.length ? tiles.filter(t => t.label !== 'Offence · defence') : stats.slice(1)).slice(0, 5) });
+    /* round 12 (My Teams): follow the team; it then leads Home and this site's overview */
+    if (QK.followButton) h += '<div class="hw-flex" style="justify-content:flex-end;margin-top:var(--sp-4)">' + QK.followButton(U.followItem(L, tid)) + '</div>';
     const base = HW.teamHref(L, tid, S);
     h += '<div style="margin-top:var(--sp-4)"></div>' + U.tabsHTML([{ key: 'overview', label: 'Overview', href: base }, { key: 'detail', label: 'Shots, lineups and the full catalogue', href: base + (base.indexOf('?') >= 0 ? '&' : '?') + 'tab=detail' }], tab);
     if (tab === 'detail') {

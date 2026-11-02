@@ -202,7 +202,7 @@ function power() {
   const row = t => {
     const i = tinfo(t), o = T[t], r = ROWS[t] || {};
     return { rank: rk[t], name: i.name, abbr: i.abbr, colour: i.colour, href: thref(t), sub: rec(t) + (r.streak ? ' · ' + r.streak : ''), value: o.rating, text: U.signed(o.rating, 2),
-      parts: o.parts, cells: [{ label: 'Points', text: isNum(r.pts) ? String(r.pts) : '—' }, { label: 'Projected', text: isNum(o.mean_pts) ? String(Math.round(o.mean_pts)) : '—' },
+      parts: o.parts, follow: U.followItem(t), cells: [{ label: 'Points', text: isNum(r.pts) ? String(r.pts) : '—' }, { label: 'Projected', text: isNum(o.mean_pts) ? String(Math.round(o.mean_pts)) : '—' },
         { label: 'Last 10', text: Array.isArray(r.l10) ? r.l10.join('-') : (r.l10 || '—') }],
       chances: sim ? [{ label: 'Playoffs', p: o.p_playoffs, text: o.p_playoffs === 1 ? 'In' : o.p_playoffs === 0 ? 'Out' : '' }].concat(o.p_playoffs === 0 ? [] : [{ label: 'Cup', p: o.p_cup }]) : [] };
   };

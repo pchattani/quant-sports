@@ -165,6 +165,7 @@ function power() {
     return { rank: rk[t], name: i.name, abbr: i.abbr, colour: i.colour, href: thref(t), sub: rec(t) + (stRow(t).streak ? ' · ' + stRow(t).streak : ''), value: rating(t), text: U().signed(rating(t), 1),
       parts: { off: off, def: def },
       cells: [{ label: 'Raw net', text: isNum(v(t, 'net')) ? U().signed(v(t, 'net'), 1) : '—' }, { label: open ? 'Proj W' : 'Pyth W', text: open && isNum(s.exp_w) ? U().f(s.exp_w, 1) : (isNum(v(t, 'pyth_wins')) ? U().f(v(t, 'pyth_wins'), 1) : '—') }],
+      follow: HW.ui.followItem(ST.L, t),
       form: form(t), chances: open ? [{ label: 'Playoffs', p: s.p_playoffs }, { label: 'Title', p: s.p_title }] : [] };
   };
   let groups;

@@ -1303,3 +1303,15 @@ return {
   devigAm: devigAm, lineLean: lineLean, gapPts: gapPts, ptsEdge: ptsEdge, pctBars: pctBars, gradePill: gradePill, heatTable: heatTable, gameCard: gameCard, qkGame: qkGame
 };
 })();
+/* My Teams: a team as a follow item (QK.follow: 'gridiron:team:<ABBR>', the route, the colours), its star toggle,
+   and every team as picker rows (index.json teams) */
+GI.followItem = function (t) {
+  const ab = GI.teamAbbr(t), x = ((GI.index() || {}).teams || {})[ab] || {};
+  return { k: 'gridiron:team:' + ab, name: x.name || GI.teamName(ab), abbr: ab, colour: x.colour || '', alt: x.alt || '', href: '#/team/' + encodeURIComponent(ab) };
+};
+GI.followStar = function (t, cls) { return window.QK && QK.followButton ? QK.followButton(GI.followItem(t), { compact: true, cls: cls || 'qk-fl-mini' }) : ''; };
+GI.followRows = function () {
+  const tm = (GI.index() || {}).teams || {};
+  return Object.keys(tm).filter(t => tm[t] && tm[t].name).map(t => ({ sport: 'nfl', t: tm[t].name, s: 'NFL' + (tm[t].division ? ' · ' + tm[t].division : ''), k: 'gridiron:team:' + t,
+    href: '#/team/' + t, abbr: t, colour: tm[t].colour, alt: tm[t].alt }));
+};

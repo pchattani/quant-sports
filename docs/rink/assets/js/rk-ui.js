@@ -56,6 +56,18 @@ U.tab = (params, keys, dflt) => {
 
 /* ── teams and players ─────────────────────────────────────────────────── */
 U.team = abbr => ({ name: RK.teamName(abbr), abbr: RK.teamAbbr(abbr), colour: RK.teamColourRaw(abbr), href: RK.teamHref(abbr) });
+/* My Teams: a club as a follow item (QK.follow: 'rink:team:<ABBR>', the route, the colours), its star toggle, and
+   every club as picker rows (index.json teams) */
+U.followItem = abbr => {
+  const t = RK.teamAbbr(abbr), x = (RK.index().teams || {})[t] || {};
+  return { k: 'rink:team:' + t, name: x.name || RK.teamName(t), abbr: t, colour: x.colour || '', alt: x.alt || '', href: '#/team/' + encodeURIComponent(t) };
+};
+U.followStar = (abbr, cls) => (QK.followButton ? QK.followButton(U.followItem(abbr), { compact: true, cls: cls || 'qk-fl-mini' }) : '');
+U.followRows = () => {
+  const tm = (RK.index() || {}).teams || {};
+  return Object.keys(tm).filter(t => tm[t] && tm[t].name).map(t => ({ sport: 'hockey', t: tm[t].name, s: 'NHL' + (tm[t].division ? ' · ' + tm[t].division : ''), k: 'rink:team:' + t,
+    href: '#/team/' + t, abbr: t, colour: tm[t].colour, alt: tm[t].alt }));
+};
 U.tcol = abbr => {
   const c = RK.teamColourRaw(abbr);
   return QK.color.parse(c) ? QK.color.team(c) : QK.cssVar('--c-other');

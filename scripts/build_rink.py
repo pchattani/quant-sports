@@ -836,6 +836,13 @@ def main(argv: list[str] | None = None) -> int:
         b.step("write index.json", lambda: b.write("index.json", idx_payload))
     else:
         logger.warning("index.json kept: the current season %s was not built this run", current)
+    # My Teams: one small follow card per club (data/follow/team/<ABBR>.json; oddsmarkets/common/follow.py), from the
+    # payloads on disk; Home and the overview read only these
+    from oddsmarkets.nhl.analytics import follow_build as FLB
+    fl = b.step("follow cards", lambda: FLB.build(data, _digest_now(today)), None)
+    if fl:
+        b.written.extend(data / "follow" / "team" / f"{i}.json" for i in fl["ids"])
+        logger.info("follow cards: %d, %.0f KB, largest %d bytes", fl["n"], fl["bytes"] / 1024, fl["max"])
     total = sum(p.stat().st_size for p in set(b.written) if p.exists())
     logger.info("wrote %d files (%.1f MB) in %.1f s; %d step errors", len(set(b.written)), total / 1e6, time.perf_counter() - t_start,
                 len(b.errors))

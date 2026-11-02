@@ -68,7 +68,7 @@ function standingsTable(node, L, S, rows, sim, fmt, league, lo) {
       home_w: (r.home || [])[0], away_w: (r.away || [])[0], l10_w: (r.l10 || [])[0], nm: HW.teamShort(L, r.team) });
   });
   const cols = [
-    { key: 'seedN', label: '#', num: true, fmt: (v, r) => (lo ? QKL.toggle(String(r.team), HW.teamName(L, r.team)) : '') + v },
+    { key: 'seedN', label: '#', num: true, fmt: (v, r) => (lo ? QKL.toggle(String(r.team), HW.teamName(L, r.team)) : '') + v + U.followStar(L, r.team) },
     { key: 'nm', label: 'Team', type: 'entity', mark: r => U.team(L, r.team), href: r => HW.teamHref(L, r.team, S) },
     { key: 'w', label: 'W-L', num: true, fmt: (v, r) => HW.record(r.w, r.l) },
     { key: 'pct', label: 'Pct', num: true, fmt: v => (isNum(v) ? HW.fmtVal(v, '3') : '—') },

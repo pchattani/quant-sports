@@ -122,6 +122,8 @@ CC.route('team', function (el, p) {
       team: t ? { name: '', abbr: t.abbr, colour: t.colour, alt: CC.talt(L, tid) || undefined } : null,
       meta: [['Record', recS(rec)], isNum(rec.conf_w) ? ['Conference', recS({ w: rec.conf_w, l: rec.conf_l, t: rec.conf_t }) + (hk && isNum(rec.conf_pts) ? ' · ' + rec.conf_pts + ' pts' : '')] : null, rec.streak ? ['Streak', rec.streak] : null, isNum(R.games) ? ['Games rated', String(R.games)] : null],
       short: null }) + '%STRIP_HTML%' + (shortTxt.trim() ? '<div class="qk-ph-short">' + QK.shortVersion(shortTxt.trim()) + '</div>' : '');
+    /* round 12 (My Teams): follow the team; it then leads Home and this site's overview */
+    if (QK.followButton) html += '<div style="display:flex;justify-content:flex-end;gap:var(--sp-3);margin-top:var(--sp-4)">' + QK.followButton(CC.followItem(L, tid)) + '</div>';
     if (!d) html += '<p class="cc-note">The full team page has not been built for this season; ratings come from the season file.</p>';
     var dm = ((cat && cat.metrics) || []).filter(function (m0) { return m0.key === 'def'; })[0];
     var defLow = dm ? !!dm.lower : !fb;

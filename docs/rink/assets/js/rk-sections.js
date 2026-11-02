@@ -53,7 +53,7 @@ function stBoard(node, g, pc, lo) {
   const rows = g.rows.map((r, i) => Object.assign({}, r, { pos: g.label ? g.label(i) : String(i + 1), cut: g.cut !== undefined && i === g.cut, name: RK.teamShort(r.team),
     l10s: Array.isArray(r.l10) ? r.l10.join('-') : (r.l10 || ''), xp: pc.xgf[r.team], rp: pc.rating[r.team] }));
   QK.leaderboard(node, { dense: true, rowClass: r => (r.cut ? 'rk-cut' : ''), rowHref: r => RK.teamHref(r.team), columns: [
-    { key: 'pos', label: '#', sort: false, fmt: (v, r) => (lo ? QKL.toggle(r.team, RK.teamName(r.team)) : '') + '<span class="qk-muted">' + esc(v) + '</span>' },
+    { key: 'pos', label: '#', sort: false, fmt: (v, r) => (lo ? QKL.toggle(r.team, RK.teamName(r.team)) : '') + '<span class="qk-muted">' + esc(v) + '</span>' + U.followStar(r.team) },
     { key: 'name', label: 'Club', type: 'entity', mark: r => U.team(r.team), href: r => RK.teamHref(r.team), sub: 'clinch' },
     { key: 'gp', label: 'GP', num: true }, { key: 'w', label: 'W', num: true }, { key: 'l', label: 'L', num: true }, { key: 'otl', label: 'OTL', num: true },
     { key: 'pts', label: 'PTS', num: true, fmt: v => '<b>' + v + '</b>' }, { key: 'p_pct', label: 'P%', num: true, fmt: v => RK.fmtVal(v, '3') },

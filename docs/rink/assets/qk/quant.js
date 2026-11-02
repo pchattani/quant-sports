@@ -2691,7 +2691,8 @@ QK.within = {
 var FOLLOW_KEY = 'qk-follow-v1', FOLLOW_MAX = 30;
 var FOLLOW_K = /^[a-z]+:[a-z0-9_]+:[A-Za-z0-9_.\-]+$/;
 /* the sites and scopes that publish follow cards (docs/<site>/data/follow/<scope>/<id>.json) */
-QK.FOLLOW_CARDS = { bullpen: ['mlb', 'aaa'] };
+QK.FOLLOW_CARDS = { bullpen: ['mlb', 'aaa'], site: ['club'], rink: ['team'], gridiron: ['team'], hardwood: ['nba', 'wnba'],
+  campus: ['cfb', 'mbb', 'wbb', 'mch', 'wch'], ace: ['atp', 'wta'], paddock: ['driver', 'team'] };
 /* what each scope is called, for chips, notes and the picker */
 QK.FOLLOW_SCOPES = { mlb: 'MLB', aaa: 'Triple-A', nba: 'NBA', wnba: 'WNBA', club: 'Football', team: 'Team', cfb: 'College football',
   mbb: 'Men’s college basketball', wbb: 'Women’s college basketball', mch: 'Men’s college hockey', wch: 'Women’s college hockey',
@@ -2877,10 +2878,12 @@ QK.follow = {
     var op = n.opp || {}, them = { name: op.name, abbr: op.abbr, colour: op.colour };
     var pd = isNum(n.p_draw) ? n.p_draw : null, pu = isNum(n.p) ? n.p : null;
     var po = pu === null ? null : Math.max(0, 1 - pu - (pd || 0));
-    var mu = isNum(n.mkt) ? n.mkt : null;
+    /* the market: n.mkt is our side's chance; with a draw (football) 1 - mkt is not the other side's, so only a
+       per-side value (n.mkt_home, the home side's) is shown, else none */
+    var mu = isNum(n.mkt) ? n.mkt : null, mh = pd !== null ? (isNum(n.mkt_home) ? n.mkt_home : null) : (mu === null ? null : (n.home ? mu : 1 - mu));
     return { sport: card.sport || p.sport, league: n.comp || T.league || '', id: n.id, start: n.start, status: n.status || 'pre', tba: !!n.tba,
       home: n.home ? us : them, away: n.home ? them : us, p_home: n.home ? pu : po, p_away: n.home ? po : pu, p_draw: pd,
-      market_home: mu === null ? null : (n.home ? mu : 1 - mu), href: n.href ? QK.follow.siteUrl(card.k, n.href) : null };
+      market_home: mh, href: n.href ? QK.follow.siteUrl(card.k, n.href) : null };
   }
 };
 /* another tab changed the list */
@@ -2925,13 +2928,15 @@ function bindFollowButtons() {
 bindFollowButtons();
 
 /* ─────────────────────────────────────── the picker */
-/* QK.followPicker({ sport: 'baseball' (open on that sport), rows: [{ sport, t, s, href, k?, abbr?, colour? }] |
- * load: fn -> Promise<rows> (default Home's data/search.json), title, onClose }). Rows that do not name a team,
- * tennis player or F1 driver/constructor are left out. Before anything is typed: sport -> league -> teams. */
+/* QK.followPicker({ sport: 'baseball' (open on that sport), rows: [{ sport, t, s, href, k?, abbr?, colour?, go? }] |
+ * load: fn -> Promise<rows> (default Home's data/search.json; its optional 'go' field), title, onClose }). Rows that do
+ * not name a team, tennis player or F1 driver/constructor are left out. Before anything is typed: sport -> league ->
+ * teams. go (group order, default 50): a sport's groups sort by their lowest go, then by size, so leagues can lead cups. */
 var fpRows = null;
 function fpLoadDefault() {
   return QK.fetchJSON(QK.homeUrl() + 'data/search.json').then(function (j) {
-    return (j.rows || []).map(function (r) { return { sport: r[0], t: r[1], s: r[2], href: r[3] }; });
+    var f = j.fields || [], gi = f.indexOf('go');
+    return (j.rows || []).map(function (r) { var x = { sport: r[0], t: r[1], s: r[2], href: r[3] }; if (gi >= 0 && isNum(r[gi])) x.go = r[gi]; return x; });
   });
 }
 function fpGroup(r) {
@@ -2995,10 +3000,15 @@ QK.followPicker = function (o) {
     }
     var mine = all.filter(function (r) { return r.sport === st.sport; });
     if (!st.group) {
-      var g = {}, order = [];
-      mine.forEach(function (r) { var k = fpGroup(r); if (!g[k]) { g[k] = 0; order.push(k); } g[k]++; });
+      var g = {}, go = {}, order = [];
+      mine.forEach(function (r) {
+        var k = fpGroup(r), v = isNum(r.go) ? r.go : 50;
+        if (!g[k]) { g[k] = 0; go[k] = v; order.push(k); }
+        g[k]++;
+        if (v < go[k]) go[k] = v;
+      });
       if (order.length === 1) { st.group = order[0]; draw(); return; }
-      order.sort(function (a, b) { return g[b] - g[a] || a.localeCompare(b); });
+      order.sort(function (a, b) { return go[a] - go[b] || g[b] - g[a] || a.localeCompare(b); });
       body.innerHTML = crumbs() + '<div class="qk-fp-groups">' + order.map(function (k) { return '<button type="button" data-group="' + esc(k) + '"><b>' + esc(k) + '</b><small>' + g[k] + '</small></button>'; }).join('') + '</div>';
       return;
     }
@@ -3054,7 +3064,7 @@ QK.followPicker = function (o) {
 var FACT_KICKER = { champion: 'Champions', franchise: 'Franchise history', streak: 'On a run', form_xp: 'Form', rating_move: 'Our ratings',
   vs_last: 'On last season', split: 'Home and away', best_start: 'Best start', pctl: 'Against the league', best_record: 'Best record',
   sos: 'Schedule', luck: 'Luck', swing: 'Big swing', clinch: 'The race', big_game: 'Big game', rivalry: 'Rivalry',
-  player_rank: 'Star player', player_run: 'Hot streak', call: 'Our call', rating: 'Our ratings' };
+  player_rank: 'Star player', player_run: 'Hot streak', call: 'Our call', rating: 'Our ratings', teammate: 'Team-mate' };
 QK.FACT_KICKER = FACT_KICKER;
 function fcWhen(n) {
   if (!n || !n.start) return '';
@@ -3141,6 +3151,7 @@ QK.followChip = function (item, o) {
  *   picker: QK.followPicker options (sport, rows | load), suggest: [items] (the empty state's suggestions, Home),
  *   full: true (a sport page: the full card), week: true (the "Your week" strip), feed: true (the facts feed),
  *   live: fn(game) -> a fresher copy of a game (Home's live scores), board: fn(cards) -> HTML (a sport page's mini board),
+ *   noun: 'team' (what one follow is called in the other-league lines: 'player', 'driver or team'; nouns: its plural),
  *   kicker, title }) -> { render() }. Renders now and again whenever the list changes (this tab or another). */
 QK.fetchCard = function (k) {
   if (!QK.follow.hasCards(k)) return Promise.resolve(null);
@@ -3151,6 +3162,10 @@ QK.followSection = function (el, o) {
   o = o || {};
   if (!el) return null;
   var gen = 0;
+  /* what a follow is called in the "You follow 2 teams in ..." lines: o.noun ('team', 'player', 'driver or team'),
+     o.nouns its plural (default: an s on each word around 'or' / 'and': 'drivers or teams') */
+  var one = o.noun || 'team', many = o.nouns || one.replace(/(\w+)(?= or | and |$)/g, '$1s');
+  function noun(n) { return n === 1 ? one : many; }
   function mine() { return o.site ? QK.follow.forSite(o.site) : fRead(); }
   function openPicker() { QK.followPicker(Object.assign({}, o.picker || {}, { onClose: function () { render(); } })); }
   function empty() {
@@ -3199,7 +3214,7 @@ QK.followSection = function (el, o) {
     var all = mine(), list = o.scope ? all.filter(function (x) { return x.k.split(':')[1] === o.scope; }) : all;
     var other = o.scope ? all.filter(function (x) { return x.k.split(':')[1] !== o.scope; }) : [];
     if (!list.length) {
-      var note = other.length && o.scopeLabel ? '<p class="qk-fl-other">You follow ' + other.length + ' ' + (other.length === 1 ? 'team' : 'teams') + ' in ' + other.map(function (x) { return x.k.split(':')[1]; }).filter(function (v, i, a) { return a.indexOf(v) === i; }).map(function (s) {
+      var note = other.length && o.scopeLabel ? '<p class="qk-fl-other">You follow ' + other.length + ' ' + noun(other.length) + ' in ' + other.map(function (x) { return x.k.split(':')[1]; }).filter(function (v, i, a) { return a.indexOf(v) === i; }).map(function (s) {
         return o.scopeHref ? '<a class="qk-link" href="' + esc(o.scopeHref(s)) + '">' + esc(o.scopeLabel(s)) + '</a>' : esc(o.scopeLabel(s));
       }).join(', ') + '.</p>' : '';
       el.innerHTML = empty() + note;
@@ -3213,7 +3228,7 @@ QK.followSection = function (el, o) {
     }).join('') + '</div>' +
       (list.length > withCards.length ? '<div class="qk-fl-chips">' + list.filter(function (x) { return !QK.follow.hasCards(x.k); }).map(function (x) { return QK.followChip(x); }).join('') + '</div>' : '') +
       '<div class="qk-fl-after"></div>' +
-      (other.length && o.scopeLabel ? '<p class="qk-fl-other">You also follow ' + other.length + ' ' + (other.length === 1 ? 'team' : 'teams') + ' in ' + other.map(function (x) { return x.k.split(':')[1]; }).filter(function (v, i, a) { return a.indexOf(v) === i; }).map(function (s) {
+      (other.length && o.scopeLabel ? '<p class="qk-fl-other">You also follow ' + other.length + ' ' + noun(other.length) + ' in ' + other.map(function (x) { return x.k.split(':')[1]; }).filter(function (v, i, a) { return a.indexOf(v) === i; }).map(function (s) {
         return o.scopeHref ? '<a class="qk-link" href="' + esc(o.scopeHref(s)) + '">' + esc(o.scopeLabel(s)) + '</a>' : esc(o.scopeLabel(s));
       }).join(', ') + '.</p>' : '');
     if (!withCards.length) { var c0 = $('.qk-fl-cards', el); if (c0) c0.parentNode.removeChild(c0); return; }

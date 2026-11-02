@@ -134,6 +134,29 @@ CC.href = function (L, sec, id, S, query) {
 };
 CC.teamHref = function (L, tid, S) { return CC.href(L, 'team', tid, S); };
 CC.playerHref = function (L, pid, S) { return CC.href(L, 'player', pid, S); };
+/* round 12 (My Teams): a team as a follow item (QK.follow: 'campus:<L>:<id>', the route, the colours), its star
+ * toggle, and every team of the five levels as picker rows (index.json levels.<L>.teams), grouped by level */
+CC.FOLLOW_LABEL = { cfb: 'College football', mbb: 'Men’s basketball', wbb: 'Women’s basketball', mch: 'Men’s hockey', wch: 'Women’s hockey' };
+/* the picker's group order (QK.followPicker's go): the levels in this order, whatever their team counts */
+CC.FOLLOW_GO = { cfb: 0, mbb: 1, wbb: 2, mch: 3, wch: 4 };
+CC.followItem = function (L, tid) {
+  return { k: 'campus:' + L + ':' + tid, name: CC.tname(L, tid), abbr: CC.tabbr(L, tid), colour: CC.traw(L, tid) || '', alt: CC.talt(L, tid) || '', href: '#/' + L + '/team/' + encodeURIComponent(tid) };
+};
+CC.followStar = function (L, tid, cls) { return QK.followButton ? QK.followButton(CC.followItem(L, tid), { compact: true, cls: cls || 'qk-fl-mini' }) : ''; };
+CC.followRows = function () {
+  var out = [];
+  CC.LEVELS.forEach(function (L) {
+    var teams = CC.info(L).teams || {};
+    Object.keys(teams).forEach(function (t) {
+      var x = teams[t] || {};
+      if (!x.name) return;
+      var c = x.conference === 'independent' ? 'Independent' : x.conference ? CC.cname(L, x.conference) : '';
+      out.push({ sport: 'college', t: x.name, s: CC.FOLLOW_LABEL[L] + (c ? ' · ' + c : ''), k: 'campus:' + L + ':' + t, href: '#/' + L + '/team/' + t,
+        abbr: x.abbr, colour: x.colour, alt: x.alt || x.alt_colour, go: CC.FOLLOW_GO[L] });
+    });
+  });
+  return out;
+};
 CC.gameHref = function (L, gid, S) { return CC.href(L, 'game', gid, S); };
 /* the Scouting Room (#/<L>/scout) and the full compare page (#/<L>/compare?p=<pid>,<pid>[,<pid>]) */
 CC.scoutHref = function (L, S, query) { return CC.href(L, 'scout', null, S, query); };

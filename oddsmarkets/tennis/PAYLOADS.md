@@ -19,7 +19,7 @@ MATCH_CARD = `{"id","event","round","date","status","p1","p2","winner","sets","l
 `data/glossary.json` (as in Hardwood). `data/<T>/calibration.json` (backtest; committed). `data/<T>/history.json`
 `{"events": {tid: {"name","level","surface","champions": [[year, pid, runner_up]]}}}`.
 `data/<T>/favourites.json` (round 9; the Draws calendar cards and a past season's recap) `{"w_surf", "events": {event_id: [pid, blended Elo, entrants rated]}}`: every tour-level event's top-rated main-draw entrant going in, by the surface-blended Elo before their first match of the event (`events.favourites`).
-`data/<T>/players_index.json` `{pid: [name, short, country, latest_rank]}` (search; all players with ≥1 tour match since 2000/2007).
+`data/<T>/players_index.json` `{pid: [name, short, country, latest_rank, last_match, official]}` (search; all players with ≥1 tour match since 2000/2007; last_match = the date of the latest tour-level match, official = 1 when latest_rank is the current official rank; the follow-card rule reads both).
 
 ## Per tour
 - `data/<T>/rankings.json`: `{"date","official": [[rank,pid,points,move]], "elo": [[rank,pid,elo,surface_elos]], "race": [[pid,points]],
@@ -93,7 +93,7 @@ k·2^(r+1) … (k+1)·2^(r+1)−1, 0-based).
 **index.json** tour entry adds `"names": {pid: short}`; `race_top` rows are `[pid, p_finals, p_no1, race_points]`;
 `events_now` items add `start`, `end`; `favourite` is `[pid, p_title]` | null.
 
-**Wrapped files.** `players_index.json` = `{"ok","tour","updated_at","players": {pid: [name, short, country, latest_rank]}}`;
+**Wrapped files.** `players_index.json` = `{"ok","tour","updated_at","players": {pid: [name, short, country, latest_rank, last_match, official]}}`;
 `<year>/events.json` = `{"ok","tour","year","updated_at","events": {event_id: {name, tid, level, surface, indoor, start, end,
 status, champion, runner_up, draw_size, city, country, n_matches, page}}}`; `<year>/schedule.json` = `{..., "matches": [...]}`.
 

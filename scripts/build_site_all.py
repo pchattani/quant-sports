@@ -2756,6 +2756,12 @@ def main() -> int:
         int(f.stem) for f in CRESTS_DIR.glob("*.png") if f.stem.isdigit()) if crests_enabled() else []}))
     ordered = [prev[s] for s in list(LEAGUES) + [LIGA_ARGENTINA_SLUG] + list(CUPS) if s in prev]
     _write(DATA_DIR, "competitions.json", {"competitions": ordered, "updated_at": _now()})
+    # My Teams: one follow card per club and national team with a current season (data/follow/club/<tid>.json), read
+    # from the payloads just written (analytics/follow_build.py)
+    from oddsmarkets.football.analytics import follow_build as football_follow
+    fl = _step("follow cards", lambda: football_follow.build(DATA_DIR))
+    if fl:
+        logger.info("follow cards: %d clubs, %d KB, the largest %d bytes", fl["n"], fl["bytes"] // 1024, fl["max"])
 
     n_built = sum(1 for c in competitions if c.get("ok"))
     logger.info("Built %d/%d competitions", n_built, len(competitions))

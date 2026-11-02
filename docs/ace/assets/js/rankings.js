@@ -26,7 +26,7 @@ function official(T, rk, eloRank, raceRank, race) {
     const fq = ((race || {}).finals_qual || {})[pid];
     return { _href: TA.playerHref(T, pid), cells: [
       { v: r[0], html: '<b>' + r[0] + '</b>' }, { v: r[3], html: moveHTML(r[3]), cls: 'hide-sm' },
-      { v: TA.playerName(T, pid), html: TA.playerLink(T, pid, { country: true }) },
+      { v: TA.playerName(T, pid), html: TA.playerLink(T, pid, { country: true }) + (TA.follow ? TA.follow.star(T, pid) : '') },
       { v: r[2], html: TA.num(r[2], 0) },
       { v: er, html: TA.isNum(er) ? String(er) : '—' },
       { v: gap, html: TA.isNum(gap) ? '<span class="rank-gap ' + (gap > 0 ? 'edge-pos' : gap < 0 ? 'edge-neg' : '') + '" title="' + (gap > 0 ? 'Elo ranks this player higher than the official ranking' : gap < 0 ? 'The official ranking is ahead of Elo' : '') + '">' + TA.signed(gap, 0) + '</span>' : '—', cls: 'hide-sm' },

@@ -63,7 +63,7 @@ function powerBoard(rows, o) {
   var list = ok.map(function (r, i) {
     var att = r.xf - mf, def = ma - r.xa, nm = (r.tid && FB.clubName(r.tid)) || r.name;
     return { rank: r.rank || i + 1, name: nm, abbr: FB.clubCode(nm), colour: r.tid ? FB.clubColour(r.tid) : null, href: r.tid ? FB.href.club(r.tid) : null, sub: r.sub || '',
-      value: att + def, text: signed(att + def, 2), parts: { att: att, def: def }, cells: r.cells || [], form: r.form || '' };
+      value: att + def, text: signed(att + def, 2), parts: { att: att, def: def }, cells: r.cells || [], form: r.form || '', follow: r.tid ? FB.followItem(r.tid) : null };
   });
   return QK.powerBars(list, { valueLabel: 'xG margin', unit: 'goals a match against the average side', formLabel: 'Form', formN: 6,
     parts: [{ key: 'att', label: 'Attack', color: 'var(--c-2)' }, { key: 'def', label: 'Defence', color: 'var(--c-3)' }] });
@@ -389,6 +389,8 @@ function hero(C) {
   if (doc.national) meta.push('<span>National team</span>');
   if (home) meta.push('<span>' + FB.compLink(home.slug) + '</span>');
   if (doc.country && !doc.national) meta.push('<span>' + esc(doc.country) + '</span>');
+  /* round 12 (My Teams): follow the club; it then leads Home and this site's overview */
+  if (QK.followButton) meta.push(QK.followButton(FB.followItem(doc.id), { cls: 'fb-cl-follow' }));
   if (nmv) meta.push('<span>Squad value <b>' + FB.money(mv) + '</b></span>');
   if (ages.length) meta.push('<span>Average age <b>' + num(ages.reduce(function (a, b) { return a + b; }, 0) / ages.length, 1) + '</b></span>');
   var live = Array.from(new Set(C.live.map(function (s) { return s.comp; })));

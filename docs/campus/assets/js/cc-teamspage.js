@@ -202,7 +202,7 @@ function power() {
     var mv = isNum(prevRk[t]) ? prevRk[t] - rk[t] : null;
     var po = fb() ? s0.p_cfp : s0.p_ncaa;
     return { rank: rk[t], name: i.name, abbr: i.abbr, colour: i.colour, href: thref(t), sub: rec(t) + ' · ' + CC.cname(ST.L, i.conf) + (AP[t] ? ' · AP No. ' + AP[t] : ''),
-      value: rating(t), text: CC.signed(rating(t), hk() ? 2 : 1), parts: parts,
+      value: rating(t), text: CC.signed(rating(t), hk() ? 2 : 1), parts: parts, follow: CC.followItem(ST.L, t),
       cells: [{ label: 'Since last week', html: mv === null ? '<span class="qk-muted">—</span>' : mv === 0 ? '<span class="qk-muted">=</span>' : '<span class="cc-mv ' + (mv > 0 ? 'pos' : 'neg') + '">' + (mv > 0 ? '▲' : '▼') + Math.abs(mv) + '</span>' },
         { label: 'Schedule', text: isNum(x.sos_rank) ? QK.ordinal(x.sos_rank) + ' hardest' : '—' }],
       chances: cur ? [{ label: fb() ? 'Playoff' : 'NCAA field', p: po }, { label: 'Title', p: s0.p_title }].filter(function (c) { return isNum(c.p) && c.p > 0; }) : [] };

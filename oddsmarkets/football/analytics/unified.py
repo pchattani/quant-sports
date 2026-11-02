@@ -836,8 +836,11 @@ class Unified:
             ctry = m.get(f"{side}_country")
             if ctry:
                 club["countries"][ctry] = club["countries"].get(ctry, 0) + 1
-            if comp["scope"] == "international":
-                club["national"] = True
+            # A national team is a side that plays mostly international-scope matches: a club that once met a national
+            # team in a friendly (Qatar v Fiorentina, 2022; Mexico v Valencia, 2024) stays a club.
+            sn = club.setdefault("_scope_n", [0, 0])
+            sn[1 if comp["scope"] == "international" else 0] += 1
+            club["national"] = sn[1] > sn[0]
             row = {"id": str(gid), "comp": slug, "sid": sid, "date": m.get("date"), "home": 1 if side == "home" else 0,
                    "opp_tid": m.get(f"{other}_id"), "opp": m.get(other), "status": _status(m),
                    "round": m.get("round"), "stage": m.get("stage")}

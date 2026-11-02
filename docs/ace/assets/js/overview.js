@@ -131,6 +131,93 @@ function weekTiles(T, dig, race, feat, yeFav) {
   return out;
 }
 
+/* ── round 12, My Teams: the players this visitor follows, above everything else (QK.followSection; the cards are
+   data/follow/<T>/<pid>.json from oddsmarkets/tennis/analytics/follow_build.py: every active player ranked 500 or
+   better, plus anyone playing this week). The tour on screen only; a line names the other tour's follows.
+   Below the cards: "Your players v the tour", each followed player in our Elo top 200 with the players either side. */
+const FL_ID = /^[A-Za-z0-9]+$/;
+function flWeek(T) {
+  const info = TA.tourInfo(T) || {}, out = {};
+  ['today', 'upcoming', 'live'].forEach(k => (info[k] || []).forEach(c => { [c.p1, c.p2].forEach(p => { if (p) out[String(p)] = 1; }); }));
+  return out;
+}
+/* a player as a follow item ('ace:<T>:<pid>', the site route, the country as the mark) */
+function flItem(T, pid) {
+  const x = TA.NAMES[T][String(pid)] || {};
+  return { k: 'ace:' + T + ':' + pid, name: x.name || TA.playerName(T, pid), abbr: String(x.country || '').slice(0, 3), href: '#/' + T + '/player/' + encodeURIComponent(pid) };
+}
+/* the players with a card: the builder's rule (follow_build.select): ranked 500 or better and active (the rank is the
+   current official one, players_index's flag, or a tour-level match in the last 52 weeks), or a match this week */
+function flActive(x) {
+  if (!x || !isNum(x.rank) || x.rank > 500) return false;
+  if (x.off) return true;
+  if (x.last === undefined) return true;                 // a players_index from before the last-match column
+  const t = x.last ? Date.parse(String(x.last).slice(0, 10) + 'T00:00:00Z') : NaN;
+  return isFinite(t) && QK.now() - t < 366 * 864e5;            // within 365 days, by date, as the builder counts
+}
+function flOk(T, pid) {
+  if (!FL_ID.test(String(pid || ''))) return false;
+  return flActive(TA.NAMES[T][String(pid)]) || !!flWeek(T)[String(pid)];
+}
+function flRows() {
+  return Promise.all(['atp', 'wta'].map(t => TA.ensureTour(t))).then(() => {
+    const out = [];
+    ['atp', 'wta'].forEach(t => {
+      const wk = flWeek(t);
+      Object.keys(TA.NAMES[t]).forEach(pid => {
+        const x = TA.NAMES[t][pid] || {};
+        if (!x.name || !FL_ID.test(pid) || !(flActive(x) || wk[pid])) return;
+        out.push({ sport: 'tennis', t: x.name, s: (t === 'wta' ? 'WTA' : 'ATP') + (x.country ? ' · ' + x.country : '') + (isNum(x.rank) ? ' · No. ' + x.rank : ''),
+          k: 'ace:' + t + ':' + pid, href: '#/' + t + '/player/' + pid, abbr: String(x.country || '').slice(0, 3), order: isNum(x.rank) ? x.rank : 9999 });
+      });
+    });
+    return out.sort((a, b) => a.order - b.order);
+  });
+}
+TA.follow = {
+  item: flItem, ok: flOk, rows: flRows,
+  /* the header button (a player page) and the table star; nothing for a player without a card */
+  button: (T, pid) => (QK.followButton && flOk(T, pid) ? QK.followButton(flItem(T, pid)) : ''),
+  star: (T, pid, cls) => (QK.followButton && flOk(T, pid) ? QK.followButton(flItem(T, pid), { compact: true, cls: cls || 'qk-fl-mini' }) : '')
+};
+const FOLLOW_SLOT = '<section class="qk-section ta-ov-follow" id="ov-follow" aria-label="Your players"></section>';
+function followFill(host, T, rk) {
+  if (!host || !QK.followSection) return;
+  QK.followSection(host, { site: 'ace', scope: T, full: true, feed: false, title: 'Your players', noun: 'player',
+    sub: 'The players you follow, first: the next match with our chance, form, the ranking and our Elo, serve and return strengths and weaknesses, and the facts that stand out.',
+    scopeLabel: s => (s === 'wta' ? 'WTA' : 'ATP'), scopeHref: s => '#/' + s,
+    picker: { sport: 'tennis', title: 'Pick your players', load: flRows },
+    board: cards => followBoard(cards, T, rk) });
+}
+/* "Your players v the tour": each followed player in our Elo top 200 (rankings.json elo) with the players either side */
+function followBoard(cards, T, rk) {
+  if (!QK.powerBars || !rk || !Array.isArray(rk.elo)) return '';
+  const rr = rk.elo.filter(r => Array.isArray(r) && isNum(r[2]));
+  if (rr.length < 3) return '';
+  const avg = rr.reduce((a, r) => a + r[2], 0) / rr.length;
+  const mine = {};
+  cards.forEach(c => { const p = String(c.k || '').split(':'); if (p[1] === T) mine[p[2]] = 1; });
+  const keep = {};
+  rr.forEach((r, i) => { if (mine[String(r[1])]) [i - 1, i, i + 1].forEach(j => { if (j >= 0 && j < rr.length) keep[j] = 1; }); });
+  const idx = Object.keys(keep).map(Number).sort((a, b) => a - b);
+  if (!idx.length) return '';
+  const groups = [];
+  idx.forEach((i, n) => { if (!n || i !== idx[n - 1] + 1) groups.push({ label: '', rows: [] }); groups[groups.length - 1].rows.push(i); });
+  const row = i => {
+    const r = rr[i], pid = String(r[1]), rank = TA.playerRank(T, pid);
+    return { rank: r[0], name: TA.playerName(T, pid), abbr: String((TA.NAMES[T][pid] || {}).country || '').slice(0, 3), href: TA.playerHref(T, pid),
+      sub: (isNum(rank) ? 'No. ' + rank + ' in the ranking' : 'Unranked') + (mine[pid] ? ' · you follow' : ''), value: r[2] - avg, text: TA.num(r[2], 0),
+      parts: { v: r[2] - avg }, follow: flOk(T, pid) ? flItem(T, pid) : null, pid: pid };
+  };
+  groups.forEach(g => {
+    g.rows = g.rows.map(row);
+    if (groups.length > 1) g.label = 'Around ' + g.rows.filter(x => mine[x.pid]).map(x => TA.playerSurname(T, x.pid)).join(', ');
+  });
+  return '<div class="ta-ov-flboard"><div class="qk-fc-k">Your players v the tour</div><div class="qk-card"><div class="qk-card-body">' +
+    QK.powerBars(null, { groups: groups, valueLabel: 'Our Elo', unit: 'points against the top-200 average', parts: [{ key: 'v', label: 'Elo against the top-200 average', color: 'var(--c-1)' }] }) +
+    '<p class="qk-caption">Each player you follow in our Elo top ' + rr.length + ', with the players either side. <a class="qk-link" href="' + TA.href(T, 'elo') + '">Every Elo rating →</a></p></div></div></div>';
+}
+
 function champions(T, Y) {
   const ev = TA.EVENTS[T][String(Y)] || {};
   const ids = Object.keys(ev).filter(id => ['slam', 'finals', 'm1000'].indexOf(ev[id].level) >= 0 && ev[id].champion)
@@ -264,11 +351,12 @@ function render(el, params) {
   const isCurrent = Y === TA.currentYear(T);
   const evNow = isCurrent ? (info.events_now || []) : [];
   el.innerHTML = QK.skeleton('card', 3);
-  return TA.loadAll([TA.tpath('race.json', T)].concat(evNow.map(e => TA.eventPath(T, e.event)))).then(arr => {
+  return TA.loadAll([TA.tpath('race.json', T), TA.tpath('rankings.json', T)].concat(evNow.map(e => TA.eventPath(T, e.event)))).then(arr => {
     if (!el.isConnected) return;
     const race = isCurrent && TA.ok(arr[0]) ? arr[0] : null;
     const evs = {};
-    evNow.forEach((e, i) => { if (TA.ok(arr[1 + i])) evs[e.event] = arr[1 + i]; });
+    const rkj = TA.ok(arr[1]) ? arr[1] : null;
+    evNow.forEach((e, i) => { if (TA.ok(arr[2 + i])) evs[e.event] = arr[2 + i]; });
     const live = isCurrent ? TA.fresh(info.live) : [], today = isCurrent ? TA.fresh(info.today) : [];
     const upcoming = isCurrent ? TA.fresh(info.upcoming) : [], recent = isCurrent ? (info.recent || []) : [];
     const elo1 = ((info.elo_top || {}).all || [])[0];
@@ -314,6 +402,7 @@ function render(el, params) {
           : 'The ' + Y + ' season: the champions, the rankings and the ratings as they finished.',
         links: [{ label: evNow.length ? 'Draws' : 'Tournaments', sub: evNow.length ? (evNow[0].name || TA.eventName(T, evNow[0].event)) : 'The calendar and every draw', href: evNow.length ? TA.eventHref(T, evNow[0].event) : TA.href(T, 'calendar', Y) },
           { label: 'Rankings', sub: 'And the race to the Finals', href: TA.href(T, 'rankings', Y) }, { label: 'Scouting Room', sub: 'Every player, every metric', href: TA.href(T, 'scout', Y) }] });
+    if (isCurrent) html += FOLLOW_SLOT;
     if (isCurrent) {
       const wt = weekTiles(T, dig, race, feat, yeFav);
       html += '<section class="qk-section ql-week">' + QK.sectionHead({ kicker: 'This week in ' + tourW + ' tennis', title: wt.length >= 3 ? 'The week in ' + WORDS[wt.length].toLowerCase() + ' lines' : 'The week so far', sub: stageLine(T, dig.stage) }) +
@@ -423,6 +512,7 @@ function render(el, params) {
     ].map(x => '<a class="qk-card is-link ov-x" href="' + x[0] + '"><b>' + esc(x[1]) + '</b><span>' + esc(x[2]) + '</span></a>').join('') + '</div></section>';
 
     el.innerHTML = html;
+    if (isCurrent) followFill(el.querySelector('#ov-follow'), T, rkj);
     if (!isCurrent && TA.past && TA.past.recap) TA.past.recap(el.querySelector('#ov-recap'), T, Y);
 
     if (isCurrent) TA.load(TA.tpath('value.json', T)).then(vj => { if (el.isConnected && TA.ok(vj)) fanStories(el, T, vj); });

@@ -97,7 +97,7 @@ function drawTable(T, E) {
     const spec = ['hard', 'clay', 'grass'].filter(x => k.isNum(c[x])).sort((a, b) => c[b] - c[a])[0];
     const gap = spec && k.isNum(c.all) ? c[spec] - c.all : null;
     return { _href: k.playerHref(T, id), cells: [
-      { v: i + 1, cls: 'pos-cell' }, { v: k.name(T, id), html: k.playerLink(T, id) }, { v: k.country(T, id), html: k.ctry(k.country(T, id)) },
+      { v: i + 1, cls: 'pos-cell' }, { v: k.name(T, id), html: k.playerLink(T, id) + (TA.follow ? TA.follow.star(T, id) : '') }, { v: k.country(T, id), html: k.ctry(k.country(T, id)) },
       cell(id, 'all'), cell(id, 'hard'), cell(id, 'clay'), cell(id, 'grass'),
       { v: spec || '', html: spec ? k.surfChip(spec) + ' <span class="muted-inline">' + k.signed(gap, 0) + '</span>' : '—' },
       { v: c.n, html: k.int(c.n), align: 'right' }, { v: k.isNum(c.rank) ? c.rank : 9999, html: k.isNum(c.rank) ? String(c.rank) : '—', align: 'right' },
@@ -129,7 +129,7 @@ function drawPeaks(T, E) {
   host.innerHTML = k.table([{ label: '#', sortable: false }, { label: 'Player' }, { label: 'Peak', align: 'right' }, { label: 'Date', align: 'right' }, { label: 'Now', align: 'right' }, { label: 'Off the peak', align: 'right' }],
     list.map((r, i) => {
       const now = (cur[r[0]] || {})[s];
-      return { _href: k.playerHref(T, r[0]), cells: [{ v: i + 1, cls: 'pos-cell' }, { v: k.name(T, r[0]), html: k.playerLink(T, r[0]) + ' ' + k.ctry(k.country(T, r[0])) },
+      return { _href: k.playerHref(T, r[0]), cells: [{ v: i + 1, cls: 'pos-cell' }, { v: k.name(T, r[0]), html: k.playerLink(T, r[0]) + ' ' + k.ctry(k.country(T, r[0])) + (TA.follow ? TA.follow.star(T, r[0]) : '') },
         { v: r[1], html: '<strong>' + k.num(r[1], 0) + '</strong>' }, { v: r[2], html: k.esc(k.fmtDate(r[2], { weekday: false })) },
         { v: now, html: k.isNum(now) ? k.num(now, 0) : '<span class="muted-inline">inactive</span>' }, { v: k.isNum(now) ? now - r[1] : null, html: k.isNum(now) ? k.signed(now - r[1], 0) : '—' }] };
     }), { compact: true });
