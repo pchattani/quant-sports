@@ -232,7 +232,8 @@ def build(data: Path, now: datetime | None = None, out_dir: Path | None = None) 
             out.append({"kind": "champion", "score": 100, "text": f"{y} {what} champion{'s' if plural else ''}."})
             return
         if c.get("clinched"):
-            out.append({"kind": "clinch", "score": 96, "text": f"{who} {has} clinched the {y} {what} title{f" with {left} race{'s' if left != 1 else ''} left" if left else ''}."})
+            tail = f" with {left} race{'s' if left != 1 else ''} left" if left else ""
+            out.append({"kind": "clinch", "score": 96, "text": f"{who} {has} clinched the {y} {what} title{tail}."})
         elif p is not None and p >= 0.9995:
             mg = _num(c.get("magic"))
             out.append({"kind": "clinch", "score": 90,

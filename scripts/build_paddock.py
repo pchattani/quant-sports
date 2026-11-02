@@ -491,8 +491,10 @@ def main(argv: list[str] | None = None) -> int:
 
     # My Teams: one small follow card per driver and constructor (data/follow/driver|team/<id>.json;
     # oddsmarkets/common/follow.py), from the payloads this run has just written; Home and the overview read only these
-    from oddsmarkets.f1.analytics import follow_build as FLB
-    fl = b.step("follow cards", lambda: FLB.build(data), None)
+    def follow_cards():
+        from oddsmarkets.f1.analytics import follow_build as FLB
+        return FLB.build(data)
+    fl = b.step("follow cards", follow_cards, None)
     for scope, s_ in (fl or {}).items():
         b.written.extend(data / "follow" / scope / f"{i}.json" for i in s_["ids"])
         logger.info("follow cards %s: %d, %.0f KB, largest %d bytes", scope, s_["n"], s_["bytes"] / 1024, s_["max"])
