@@ -220,6 +220,16 @@ def guard_hardwood(ctx: dict) -> list[str]:
     return problems
 
 
+def guard_scrum(ctx: dict) -> list[str]:
+    """The Quant Scrum: every men's season store from 1995 (the ratings, the rankings rebuild and the records walk the
+    whole history) and the forecast log. The stores are in the Actions cache; a cold runner seeds them from seed-scrum
+    (scripts/push_seed.py --site scrum)."""
+    stores = ROOT / "data/rugby/stores"
+    year = ctx["today"].year
+    missing = [y for y in range(1995, year + 1) if not (stores / "men" / f"{y}.json.gz").exists()]
+    return [f"men's stores missing for {len(missing)} years ({missing[0]}..{missing[-1]})"] if missing else []
+
+
 def guard_campus(ctx: dict) -> list[str]:
     """Every season's store per level (the walk-forward backtests, the selection / committee-proxy fits and the
     history pages read them all), every football season's plays (the EP model and the EPA ratings) and the current
@@ -399,7 +409,7 @@ def _seed_from_branch(branch: str) -> int:
 SEEDS = {"gridiron": seed_gridiron, "rink": seed_branch("rink", guard_rink),
          "hardwood": seed_branch("hardwood", guard_hardwood), "bullpen": seed_branch("bullpen", guard_bullpen),
          "ace": seed_branch("ace", guard_ace), "paddock": seed_branch("paddock", guard_paddock),
-         "campus": seed_branch("campus", guard_campus)}
+         "campus": seed_branch("campus", guard_campus), "scrum": seed_branch("scrum", guard_scrum)}
 
 
 def cmd_seed(site: str) -> int:
@@ -490,6 +500,7 @@ LOGS = {
     "gridiron": ("data/chance_log.json", "data/race_log.json"),
     "rink": ("data/chance_log.json", "data/race_log.json"),
     "campus": ("data/*/chance_log.json", "data/*/race_log.json"),
+    "scrum": (),              # the forecast log lives in the stores (data/rugby/stores/forecast_log_<scope>.json, cached)
 }
 
 
@@ -600,6 +611,9 @@ SITES = {
     # The Quant Campus (college): built, not launched; the workflow runs only by hand until the user approves it
     "campus": {"docs": "campus", "repo": "the-quant-campus", "prune": prune_campus, "excluded": (),
                "guard": chain(guard_campus, guard_payload_floor("campus", 3000))},
+    # The Quant Scrum (international rugby union, Nov 2026): built, not launched until its Pages repo exists
+    "scrum": {"docs": "scrum", "repo": "the-quant-scrum", "prune": None, "excluded": (),
+              "guard": chain(guard_scrum, guard_payload_floor("scrum", 3000))},
 }
 
 

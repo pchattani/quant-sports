@@ -45,6 +45,7 @@ SITE_SPORT = {
     "gridiron": "nfl",
     "rink": "hockey",
     "campus": "college",
+    "scrum": "rugby",
 }
 
 
@@ -90,6 +91,7 @@ SHORT_UNIT = {
     "yds/dropback": "yds/dropback", "yds/carry": "yds/carry", "pts": "pts", "yds/punt": "yds/punt", "poss/40": "/40",
     "wins/game": "wins/game", "per set": "/set", "% of lap": "% of lap", "places": "places", "km/h": "km/h", "ms": "ms",
     "s/lap": "s/lap", "per race": "/race", "s": "s",
+    "per 80": "/80", "points per 80": "/80", "metres per carry": "m/carry", "per test": "/test",
 }
 
 

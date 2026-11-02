@@ -143,7 +143,7 @@ function pickFeature() {
   if (F.week && stillOn(m[F.week.key])) return { g: m[F.week.key], r: F.week, kind: 'week', rest: [] };
   return null;
 }
-var SPORT_LEAGUE = { nfl: 'the NFL', basketball: null, baseball: 'MLB', hockey: 'the NHL', f1: 'Formula 1', tennis: null, college: null, football: null };
+var SPORT_LEAGUE = { nfl: 'the NFL', basketball: null, baseball: 'MLB', hockey: 'the NHL', f1: 'Formula 1', tennis: null, college: null, football: null, rugby: null };
 function compName(g) {
   if (g.sport === 'tennis') return String(g.league || 'the tour').split(' · ').slice(-1)[0];
   if (g.sport === 'basketball' || g.sport === 'college') return g.league === 'CFB' ? 'college football' : g.league === 'MBB' ? 'men’s college basketball' : g.league === 'WBB' ? 'women’s college basketball' : 'the ' + g.league;
@@ -211,7 +211,7 @@ function raceFallback() {
 }
 
 /* ───────────────────────────── today: the week's top lines (oddsmarkets/common/digest.py) */
-var SPORT_SHORT = { nfl: 'NFL', hockey: 'NHL', baseball: 'MLB', basketball: 'NBA/WNBA', tennis: 'tennis', college: 'college', football: 'football', f1: 'F1' };
+var SPORT_SHORT = { nfl: 'NFL', hockey: 'NHL', baseball: 'MLB', basketball: 'NBA/WNBA', tennis: 'tennis', college: 'college', football: 'football', f1: 'F1', rugby: 'rugby' };
 function tl(kicker, num, head, text, href, sport) {
   var sp = sportOf(sport);
   return '<' + (href ? 'a href="' + esc(href) + '"' : 'div') + ' class="hm-tl" style="--sa:' + (sp.accent || 'var(--accent)') + '"><div class="hm-tl-k">' + esc(kicker) + '</div>' +
@@ -272,7 +272,7 @@ function ymd(s) { var m = /^(\d{4})-(\d\d)-(\d\d)$/.exec(String(s || '')); retur
 function surname(n) { var p = String(n || '').split(' '); return p.length > 1 ? p.slice(1).join(' ') : n; }
 
 /* ───────────────────────────── around the sports: one line each (stage, the next big game, who's hot) */
-var HOT_OF = { football: ['football'], f1: ['f1'], basketball: [], tennis: ['tennis_atp', 'tennis_wta'], baseball: ['baseball'], nfl: ['nfl'], hockey: ['hockey'], college: [] };
+var HOT_OF = { football: ['football'], f1: ['f1'], basketball: [], tennis: ['tennis_atp', 'tennis_wta'], baseball: ['baseball'], nfl: ['nfl'], hockey: ['hockey'], college: [], rugby: [] };
 function renderAround() {
   var by = {}; D.sports.forEach(function (s) { by[s.key] = s; });
   var lm = liveMap(), L = D.leaders || {};
@@ -423,10 +423,10 @@ function question(id, title) {
   return 'Who wins the ' + String(title || 'title').replace(/^College football national title$/i, 'college football title') + '?';
 }
 function raceLabel(id, title) {
-  var L = { hockey: 'NHL', nfl: 'NFL', baseball: 'MLB', f1: 'F1', college: 'CFB', college_mbb: 'MBB', college_wbb: 'WBB', college_mch: 'MCH', college_wch: 'WCH' };
+  var L = { hockey: 'NHL', nfl: 'NFL', baseball: 'MLB', f1: 'F1', college: 'CFB', college_mbb: 'MBB', college_wbb: 'WBB', college_mch: 'MCH', college_wch: 'WCH', rugby_six: 'Six Nations', rugby_rwc: 'Rugby World Cup', rugby_trc: 'Rugby Championship' };
   return L[id] || String(title || id).replace(/ title$/i, '');
 }
-var RACE_ORDER = ['hockey', 'basketball_2', 'basketball', 'nfl', 'baseball', 'f1', 'college', 'college_mbb', 'college_wbb', 'college_mch', 'college_wch'];
+var RACE_ORDER = ['hockey', 'basketball_2', 'basketball', 'nfl', 'baseball', 'f1', 'college', 'college_mbb', 'college_wbb', 'college_mch', 'college_wch', 'rugby', 'rugby_six', 'rugby_rwc', 'rugby_trc'];
 function renderRaces() {
   var F = D.futures || {}, ft = (D.charts || {}).football_titles || [];
   /* the race already leading the page (the fallback hero) is not shown twice */
@@ -563,10 +563,13 @@ function pack(cards) {
 }
 
 /* ───────────────────────────── how it works */
-var METHOD = { football: '#/model/methodology', college: '#/model' };
+var METHOD = { football: '#/model/methodology', college: '#/model', rugby: '#/men/model' };
 /* each site's "How we're doing" (the Model page tab with our record and calibration, round 6) */
-var DOING = { football: '#/model/calibration', f1: '#/model', basketball: '#/nba/model?tab=calibration', tennis: '#/atp/calibration', baseball: '#/calibration', nfl: '#/calibration', hockey: '#/model?tab=calibration', college: '#/cfb/model?tab=calibration' };
+var DOING = { football: '#/model/calibration', f1: '#/model', basketball: '#/nba/model?tab=calibration', tennis: '#/atp/calibration', baseball: '#/calibration', nfl: '#/calibration', hockey: '#/model?tab=calibration', college: '#/cfb/model?tab=calibration', rugby: '#/men/model?tab=doing' };
 function renderHow() {
+  /* the intro counts the sports the switcher shows (a site not launched yet is left out: QK.SPORTS) */
+  var ih = $('#intro-h');
+  if (ih && NUMS[QK.SPORTS.length]) ih.textContent = 'Every game, player and title race in ' + NUMS[QK.SPORTS.length] + ' sports, by the numbers.';
   $('#how').innerHTML = QK.sectionHead({ kicker: 'How it works', title: 'Where the numbers come from', sub: 'Each sport has its own models, built from public data and checked on seasons they never saw.' }) +
     QK.newHere({ items: [QK.NEW_HERE[0], QK.NEW_HERE[1], 'A <b>season simulation</b> plays out the rest of the schedule thousands of times with our game forecasts, so every team gets a chance of the title and the playoffs.'] }) +
     '<div class="hm-method">' + QK.SPORTS.map(function (q) { return '<a href="' + esc(QK.sportUrl(q.key) + (METHOD[q.key] || '#/methodology')) + '" style="--sa:' + q.accent + '"><span aria-hidden="true">' + QK.ICON[q.key] + '</span>' + esc(q.label) + ': how the model works</a>'; }).join('') + '</div>' +
@@ -587,6 +590,8 @@ var ADAPT = {
   nfl: ['index.json', function (j) { return [].concat(j.live || [], j.games || [], j.recent || []).map(function (g) { return { id: g.game_id, status: g.status, hs: g.hs, as: g.as, period: g.qtr, clock: g.clock, wp_home: g.wp_home }; }); }],
   hockey: ['index.json', function (j) { return [].concat(j.live || [], j.today || [], j.recent || [], j.upcoming || []).map(function (g) { return { id: g.game_id, status: g.status, hs: g.hs, as: g.as, period: g.period, clock: g.clock, wp_home: g.wp_home }; }); }],
   college: ['index.json', function (j) { var out = []; Object.keys(j.levels || {}).forEach(function (L) { var l = j.levels[L] || {}; ['today', 'next_games', 'last_games'].forEach(function (k) { (l[k] || []).forEach(function (g) { out.push({ id: g.id, status: g.status, hs: g.hs, as: g.as, period: g.period, clock: g.clock }); }); }); }); return out; }],
+  /* rugby (The Quant Scrum): the men's fixtures payload carries the live and upcoming tests */
+  rugby: ['men/fixtures.json', function (j) { return [].concat(j.live || [], j.upcoming || [], j.results || []).map(function (g) { return { id: g.id, status: g.status, hs: g.hs, as: g.as }; }); }],
   tennis: ['index.json', function (j) { var out = []; Object.keys(j.tours || {}).forEach(function (T) { var t = j.tours[T]; [].concat(t.live || [], t.today || [], t.recent || []).forEach(function (m) { var s = m.sets || [], a = 0, b = 0; s.forEach(function (x) { if (isNum(x[0]) && isNum(x[1])) { if (x[0] > x[1]) a++; else if (x[1] > x[0]) b++; } }); out.push({ id: m.id, status: m.status, hs: s.length ? a : null, as: s.length ? b : null }); }); }); return out; }]
 };
 function needsLive(sport) {

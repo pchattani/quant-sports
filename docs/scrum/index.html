@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en-GB" data-sport="rugby" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Quant Scrum</title>
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#000000">
+<meta property="og:site_name" content="The Quant Scrum">
+<meta property="og:title" content="The Quant Scrum">
+<meta property="og:description" content="International rugby union by the numbers: our win, draw and margin forecast for every test, team ratings, our rebuild of the World Rugby rankings, Six Nations, Nations Championship and World Cup chances from simulated tournaments, team profiles, and player percentiles and value by position.">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
+<meta name="description" content="International rugby union by the numbers: our win, draw and margin forecast for every test, team ratings, our rebuild of the World Rugby rankings, Six Nations, Nations Championship and World Cup chances from simulated tournaments, team profiles, and player percentiles and value by position.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23000000'/%3E%3Cpath d='M11 6h14l-6 20H5z' fill='%23d4ff3a'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&family=Bebas+Neue&display=swap">
+<link rel="stylesheet" href="assets/qk/tokens.css">
+<link rel="stylesheet" href="assets/qk/quant.css">
+<link rel="stylesheet" href="assets/scrum.css">
+</head>
+<body class="qk">
+<div id="qk-shell"></div>
+<main id="main" class="qk-page sc-main">
+  <div id="app"><div role="status" aria-label="Loading" class="sc-boot"><div class="qk-skel line short"></div><div class="qk-skel block"></div></div></div>
+  <div class="sc-meta" id="meta-line" aria-live="polite"></div>
+</main>
+
+<template id="disclaimer-template">
+  <div class="qk-card sc-prose legal qk-legal">
+    <h3>Disclaimer &amp; terms of use</h3>
+    <p class="qk-muted">Last updated 2 November 2026</p>
+    <p>The Quant Scrum is an independent, non-commercial hobby project that applies statistical models to publicly
+    available international rugby union data. By using this site you agree to the terms below. If you do not agree,
+    please do not use the site.</p>
+
+    <h4>1. Not betting, financial or professional advice</h4>
+    <p>Everything on this site &mdash; match, tournament and title probabilities, projected margins and totals,
+    ratings, our rebuild of the World Rugby rankings, player value and percentiles, and commentary &mdash; is provided
+    for <strong>information, education and entertainment only</strong>. None of it is betting, gambling, financial,
+    investment or any other professional advice, and none of it is a recommendation to place any wager or trade. Model
+    probabilities carry no margin; they are not offers of any kind, and no bets can be placed here. The site does not
+    accept bets, take payments or link to bookmakers for commercial gain.</p>
+
+    <h4>2. Gambling responsibly</h4>
+    <p>If you choose to gamble elsewhere, you do so entirely at your own risk and responsibility. Only gamble where it is
+    legal for you to do so and if you are of legal age in your jurisdiction (18+ or 21+ in many places). Never stake
+    more than you can afford to lose. If gambling is causing you harm, free and confidential help is available:
+    <a href="https://www.begambleaware.org" target="_blank" rel="noopener">BeGambleAware</a> (United Kingdom),
+    <a href="https://www.gamblinghelponline.org.au" target="_blank" rel="noopener">Gambling Help Online</a> (Australia),
+    <a href="https://www.connexontario.ca" target="_blank" rel="noopener">ConnexOntario</a> (Canada, 1-866-531-2600),
+    <a href="https://www.ncpgambling.org" target="_blank" rel="noopener">1-800-GAMBLER</a> (United States),
+    or <a href="https://www.gamblingtherapy.org" target="_blank" rel="noopener">Gambling Therapy</a> (worldwide).</p>
+
+    <h4>3. Models are estimates and can be wrong</h4>
+    <p>Model outputs are statistical estimates built on assumptions and incomplete data. Rugby is full of things no
+    model sees coming &mdash; selection, injuries, cards, weather, travel and plain variance &mdash; and the forecasts
+    here are frequently wrong, sometimes by a wide margin. Our World Rugby rankings are our own rebuild from results
+    with the published formula, not the official table, and can differ from it. Tournament formats, fixtures and
+    tie-breakers are taken from public sources and may contain errors. Scores, line-ups and statistics may be delayed,
+    incomplete, provisional, mislabelled or out of date; tests missing from our source are missing here too, so counts
+    of tests are not official caps. The site and all content are provided <strong>&ldquo;as is&rdquo; and &ldquo;as
+    available&rdquo;, without warranties of any kind</strong>, express or implied, including accuracy, completeness,
+    timeliness, fitness for a particular purpose and non-infringement.</p>
+
+    <h4>4. Limitation of liability</h4>
+    <p>To the fullest extent permitted by law, the author accepts no liability for any loss or damage of any kind
+    &mdash; including financial loss, lost winnings, or losses from wagers, trades or other decisions &mdash; arising from
+    use of, reliance on, or inability to use this site or its content. You are solely responsible for your own
+    decisions.</p>
+
+    <h4>5. No affiliation; trademarks</h4>
+    <p>This site is unofficial and is not affiliated with, endorsed by, sponsored by or connected to World Rugby, Six
+    Nations Rugby, SANZAAR, the Nations Championship, the Rugby World Cup, any national union, team or player, ESPN, any
+    other data provider, betting operator or prediction market. Competition, union and team names and related marks are
+    trade marks of their respective owners. No league, union, competition or sponsor logos are used. Team and player
+    names appear only to identify the competitors and matches discussed and to report factual sporting statistics; team
+    colours are used only to tell teams apart.</p>
+
+    <h4>6. Data sources</h4>
+    <p>Fixtures, results, line-ups, key moments, and team and player match statistics come from ESPN&rsquo;s public site
+    data, credited with thanks. Published World Rugby ranking points used to check our rebuild, tournament formats and
+    fixtures not yet in that feed come from Wikipedia (CC BY-SA 4.0). World Rugby&rsquo;s own websites and data feeds are
+    not used: their terms limit the content to personal, non-commercial use. Statistics shown here are derived and
+    transformed and may differ from official statistics.</p>
+
+    <h4>7. Rights holders and corrections</h4>
+    <p>If you own rights in any material on this site and object to its use, or you spot an error, contact the author
+    through <a href="https://github.com/pchattani" target="_blank" rel="noopener">GitHub (@pchattani)</a>. Material will
+    be reviewed promptly and removed or corrected where appropriate.</p>
+
+    <h4>8. Privacy</h4>
+    <p>The site sets no cookies, runs no analytics or advertising, and collects no personal data. Your browser remembers
+    only that you dismissed the first-visit notice, the side of the game you last viewed (men&rsquo;s or women&rsquo;s
+    tests) and the teams you follow, locally on your device. The page loads its fonts from Google Fonts and its charting
+    library from a content delivery network (cdn.jsdelivr.net), which receive your IP address when your browser makes the
+    request, like any web server. The site itself is hosted on GitHub Pages, whose own privacy terms apply to its server
+    logs.</p>
+
+    <h4>9. Changes</h4>
+    <p>These terms may change at any time; the date above shows the latest version. Continued use of the site after a
+    change means you accept the updated terms. Nothing in these terms limits any rights you have that cannot be limited
+    under the law that applies to you.</p>
+  </div>
+</template>
+
+<div class="sc-legal">
+  <div class="sc-legal-in">
+    <p>Fixtures, results, line-ups and match statistics from ESPN&rsquo;s public site data. Published ranking points used to check our rankings rebuild, and tournament formats, from Wikipedia (CC BY-SA 4.0). World Rugby&rsquo;s own feeds are not used.</p>
+    <p>For information and entertainment only &mdash; not betting, financial or professional advice. Probabilities are model estimates and can be wrong; no bets are offered. Unofficial: not affiliated with or endorsed by World Rugby, any competition, union, team, player, ESPN or bookmaker; no logos are used and names belong to their owners. 18+. Gamble responsibly. <a href="#/disclaimer">Disclaimer &amp; terms</a></p>
+  </div>
+</div>
+<div id="qk-footer"></div>
+
+<div id="first-visit-notice" class="sc-fv" role="region" aria-label="Notice" hidden>
+  <div class="sc-fv-in">
+    <span><strong>For information and entertainment only.</strong> Match and tournament probabilities are model
+    estimates, not betting or financial advice. Unofficial: not affiliated with World Rugby, any competition, union, ESPN
+    or bookmaker; no logos are used. 18+ where gambling is discussed.
+    <a href="#/disclaimer">Read the disclaimer &amp; terms</a>.</span>
+    <button type="button" id="fv-dismiss" class="qk-btn primary">I understand</button>
+  </div>
+</div>
+<script>
+(function () {
+  var KEY = 'qs-notice-v1', el = document.getElementById('first-visit-notice');
+  var seen = false;
+  try { seen = window.localStorage.getItem(KEY) === '1'; } catch (e) { seen = false; }
+  if (!seen) el.hidden = false;
+  document.getElementById('fv-dismiss').addEventListener('click', function () {
+    el.hidden = true;
+    try { window.localStorage.setItem(KEY, '1'); } catch (e) { /* private mode: shown again next visit */ }
+  });
+})();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js" defer></script>
+<script src="assets/qk/quant.js" defer></script>
+<script src="assets/qk/quant-charts.js" defer></script>
+<script src="assets/qk/scout.js" defer></script>
+<script src="assets/js/sc-core.js" defer></script>
+<script src="assets/js/sc-overview.js" defer></script>
+<script src="assets/js/sc-matches.js" defer></script>
+<script src="assets/js/sc-standings.js" defer></script>
+<script src="assets/js/sc-rankings.js" defer></script>
+<script src="assets/js/sc-teams.js" defer></script>
+<script src="assets/js/sc-players.js" defer></script>
+<script src="assets/js/sc-model.js" defer></script>
+</body>
+</html>

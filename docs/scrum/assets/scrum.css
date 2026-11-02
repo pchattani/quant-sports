@@ -1,0 +1,139 @@
+/* The Quant Scrum — site layout on The Quant design kit v4 (tokens.css, quant.css). Colours come from tokens only;
+ * every rule here is layout or a site component. Checked at 375 px: nothing widens the page; wide tables scroll
+ * inside their card. Bebas Neue has one weight: display text stays at 400. */
+
+body.qk { font-size: var(--fs-md); }
+.sc-main { min-height: 62vh; padding-top: var(--sp-5); }
+#app, .sc-page { min-width: 0; }
+.qk a { color: inherit; }
+.sc-page a:not([class]) { color: var(--signal); }
+.sc-page a:not([class]):hover { text-decoration: underline; text-underline-offset: 3px; }
+.sc-boot { display: grid; gap: 12px; }
+.sc-meta { margin-top: var(--sp-8); color: var(--ink-3); font-size: var(--fs-xs); }
+.sc-meta:empty { display: none; }
+
+/* heads, tabs, notes */
+.sc-sh { margin-bottom: var(--sp-4); }
+.sc-tabs { margin-bottom: var(--sp-5); }
+.sc-tabs a.qk-tab { display: inline-flex; align-items: center; }
+.sc-note { color: var(--ink-3); font-size: var(--fs-xs); margin: var(--sp-2) 0 var(--sp-3); max-width: 900px; }
+.sc-note b { color: var(--ink-2); }
+.sc-link { color: var(--signal) !important; font-weight: 600; font-size: var(--fs-xs); white-space: nowrap; }
+.sc-crumb { color: var(--ink-3); font: 600 var(--fs-xs)/1.4 var(--font-cond); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: var(--sp-3); }
+.sc-crumb a { color: var(--signal); }
+.sc-pad { padding: 0 var(--sp-3) var(--sp-3); }
+.pos { color: var(--up); }
+.neg { color: var(--down); }
+.sc-ours { color: var(--signal); font-weight: 700; }
+.sc-yes { color: var(--up); font-weight: 600; }
+.sc-no { color: var(--live); font-weight: 600; }
+.sc-capt { display: inline-grid; place-items: center; width: 16px; height: 16px; background: var(--volt); color: var(--volt-ink); font: 800 10px var(--font-cond); vertical-align: middle; }
+
+/* layout */
+.sc-sec { margin-bottom: var(--sp-6); }
+.sc-card, .sc-page > .qk-card { margin-bottom: var(--sp-4); }
+.sc-gap { margin-bottom: var(--sp-4); align-items: start; }
+.sc-gap > * { min-width: 0; }
+.qk-g2 > div > .sc-card + .sc-card, .qk-g75 > div > .sc-card + .sc-card { margin-top: var(--sp-4); }
+.qk-g2 > .sc-card, .qk-g75 > div > .sc-card { margin-bottom: 0; }
+.qk-g2, .qk-g75 { margin-bottom: var(--sp-4); }
+.sc-toolbar { display: flex; gap: var(--sp-3); flex-wrap: wrap; align-items: center; margin-bottom: var(--sp-3); }
+.sc-lab-sel { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-xs); color: var(--ink-3); font-weight: 600; }
+.sc-filters { margin-bottom: var(--sp-4); }
+.sc-ctx { display: flex; gap: 8px; align-items: center; min-width: 0; }
+
+/* games */
+.sc-watch { margin-bottom: var(--sp-4); }
+.sc-day { font: 700 var(--fs-xs)/1.2 var(--font-cond); text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); margin: var(--sp-5) 0 var(--sp-3); }
+.sc-day:first-child { margin-top: 0; }
+.sc-day b { color: var(--ink-1); }
+.sc-results-strip { display: grid; gap: var(--sp-3); grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); margin-top: var(--sp-4); }
+.sc-score { font: 600 var(--fs-sm) var(--font-num); white-space: nowrap; }
+.sc-res { display: inline-grid; place-items: center; width: 20px; height: 20px; font: 800 11px var(--font-cond); color: #000; background: var(--slate); }
+.sc-res.W { background: var(--up); }
+.sc-res.L { background: var(--live); color: #fff; }
+.sc-res.D { background: var(--ink-3); }
+.sc-formbig { margin-bottom: var(--sp-3); }
+
+/* entities and lists */
+.sc-ent { display: inline-flex; align-items: center; gap: 8px; min-width: 0; max-width: 100%; vertical-align: middle; }
+.sc-ent .nm { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sc-ent .sb { color: var(--ink-3); font-size: var(--fs-xs); white-space: nowrap; }
+.sc-ent:hover .nm { color: var(--signal); }
+.qk-table td .sc-ent .nm { max-width: 180px; }
+.sc-list { list-style: none; margin: 0; padding: 0; }
+.sc-list li { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line-1); min-width: 0; flex-wrap: wrap; }
+.sc-list li:last-child { border-bottom: 0; }
+.sc-list .s { color: var(--ink-3); font-size: var(--fs-xs); }
+.sc-list .v { margin-left: auto; font: 600 var(--fs-sm) var(--font-num); white-space: nowrap; }
+.sc-list a.v:hover { color: var(--signal); }
+
+/* standings */
+.sc-views { display: flex; gap: 0; margin-bottom: var(--sp-4); flex-wrap: wrap; }
+.sc-views .sc-view { padding: 6px 14px; border: 1px solid var(--line-2); color: var(--ink-2); font: 700 var(--fs-xs)/1.4 var(--font-cond); text-transform: uppercase; letter-spacing: 0.06em; }
+.sc-views .sc-view[aria-pressed="true"] { background: var(--volt); color: var(--volt-ink); border-color: var(--volt); }
+.sc-views .sc-view + .sc-view { margin-left: -1px; }
+.sc-races { display: grid; gap: var(--sp-5); grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); }
+.sc-race { min-width: 0; }
+.sc-pools { display: grid; gap: var(--sp-4); grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
+.sc-pools .sc-card { margin-bottom: 0; }
+.sc-bracket { display: grid; gap: var(--sp-5); grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); }
+.sc-bracket h3 { font-family: var(--font-display); font-weight: 400; font-size: 1.4rem; letter-spacing: 0.02em; margin: 0 0 var(--sp-2); }
+.sc-bracket ol, .sc-finals { list-style: none; margin: 0 0 var(--sp-4); padding: 0; }
+.sc-bracket li, .sc-finals li { padding: 10px 12px; margin-bottom: 2px; background: var(--block-2); color: var(--block-ink-2); }
+.sc-bracket .hd, .sc-finals .hd { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.sc-bracket .k, .sc-finals .k { font: 700 var(--fs-2xs)/1.2 var(--font-cond); text-transform: uppercase; letter-spacing: 0.08em; color: var(--volt); }
+.sc-bracket .d, .sc-finals .d { font-size: var(--fs-2xs); color: var(--block-ink-3); }
+.sc-bracket .row, .sc-finals .row { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 10px; align-items: center; }
+.sc-bracket .s, .sc-finals .s { min-width: 0; display: flex; flex-direction: column; }
+.sc-bracket .s.r, .sc-finals .s.r { text-align: right; }
+.sc-bracket b, .sc-finals b { color: var(--ink-1); font: 700 var(--fs-sm)/1.2 var(--font-cond); text-transform: uppercase; overflow-wrap: anywhere; }
+.sc-bracket small, .sc-finals small { color: var(--block-ink-3); font-size: var(--fs-2xs); }
+.sc-bracket .v, .sc-finals .v { color: var(--volt); font: 400 1.3rem var(--font-display); }
+
+/* rankings */
+.sc-wis { display: grid; gap: var(--sp-4); grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr)); }
+.sc-wis .sc-wi { margin: 0; }
+.sc-witab td:first-child { white-space: nowrap; }
+
+/* teams and players */
+.sc-sws { display: grid; gap: var(--sp-4); grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); }
+.sc-leaders { display: grid; gap: var(--sp-4); grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
+.sc-hero-star { margin-left: 4px; }
+
+/* match */
+.sc-events { list-style: none; margin: 0; padding: 0; max-height: 520px; overflow: auto; }
+.sc-events li { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--line-1); flex-wrap: wrap; min-width: 0; }
+.sc-events .mn { width: 34px; color: var(--ink-3); font-size: var(--fs-xs); }
+.sc-events .w { font: 700 var(--fs-2xs)/1.2 var(--font-cond); text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-2); min-width: 86px; }
+.sc-events .ev-try .w { color: var(--volt); }
+.sc-events .ev-yc .w { color: #ffd23f; }
+.sc-events .ev-rc .w { color: var(--live); }
+.sc-events .sc { margin-left: auto; font-weight: 600; }
+.sc-pairs { color: var(--ink-2); font-size: var(--fs-sm); padding-left: 18px; margin: var(--sp-3) 0; }
+.sc-pairs li { margin-bottom: 6px; }
+
+/* prose, glossary */
+.sc-prose { max-width: 860px; }
+.sc-prose h2 { font-family: var(--font-display); font-weight: 400; font-size: 1.8rem; letter-spacing: 0.02em; margin: var(--sp-5) 0 var(--sp-2); }
+.sc-prose h2:first-child { margin-top: 0; }
+.sc-prose h3 { font-family: var(--font-display); font-weight: 400; font-size: 1.6rem; }
+.sc-prose h4 { font: 700 var(--fs-sm)/1.3 var(--font-cond); text-transform: uppercase; letter-spacing: 0.05em; margin: var(--sp-4) 0 var(--sp-1); }
+.sc-prose p { color: var(--ink-2); line-height: 1.6; }
+.sc-prose.legal { padding: var(--sp-4); }
+.sc-gloss { max-width: 900px; }
+.sc-gloss dt { font: 700 var(--fs-sm)/1.3 var(--font-cond); text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-1); margin-top: var(--sp-4); }
+.sc-gloss dd { margin: 4px 0 0; color: var(--ink-2); line-height: 1.55; }
+
+/* the legal strip, the first-visit notice */
+.sc-legal { margin-top: var(--sp-8); border-top: 1px solid var(--line-1); }
+.sc-legal-in { max-width: var(--page-w, 1320px); margin: 0 auto; padding: var(--sp-4) var(--gutter); color: var(--ink-3); font-size: var(--fs-2xs); }
+.sc-legal-in a { color: var(--signal); }
+.sc-fv { position: fixed; left: 0; right: 0; bottom: 0; z-index: var(--z-bar, 50); background: var(--block); border-top: 4px solid var(--volt); }
+.sc-fv-in { max-width: 1320px; margin: 0 auto; padding: 12px var(--gutter); display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; color: var(--block-ink-2); font-size: var(--fs-xs); }
+.sc-fv-in a { color: var(--volt); }
+
+@media (max-width: 640px) {
+  .sc-bracket li, .sc-finals li { padding: 8px; }
+  .sc-events .w { min-width: 0; }
+}

@@ -585,6 +585,83 @@ The format is in `LigaConfig` (`liga/config.py`, 2026): 30 clubs in zones A and 
 - **Stakes** (as the leagues, section 8.2): the next zone-phase fixtures within seven days (at most 15) split the same seasons by result; metrics the top of the Tabla Anual, Libertadores, Sudamericana, relegation (either route) and a playoff place (`probs.json` `stakes`).
 - **Outputs:** `p_zone_position`, `p_top8`, `p_reach`, `p_title`, `p_anual_*`, `p_libertadores`, `p_sudamericana`, `p_relegation_{promedio,anual,any}`, and promedio quantiles. These go to `zones.json`, `bracket.json`, `anual.json` (the Tabla Anual as it stands: the finished Apertura plus the Clausura so far, with the projections), `relegation.json`, `probs.json` (with the leagues' `bands` and `stakes`), `table.json` (the Tabla Anual in the leagues' shape for the Race tab: bands Libertadores = top 3, the places that guarantee it whatever the champions do; Libertadores or Sudamericana = top 9; relegation = last, with the either-route chance) and `history.json` (with the daily race log), under `docs/site/data/liga-argentina/` (and `docs/liga/data/` when the old standalone build runs).
 
+### 8.5 Torneo simulator: `oddsmarkets/football/competitions/league/torneo.py` (2 November 2026)
+
+Colombia, Uruguay and Peru play a calendar year as several tournaments and an aggregate table. The format is data:
+`LeagueConfig.torneo` (`TorneoFormat`) lists the stages (`StageFormat`) and how each is won, how the season champion is
+decided, the aggregate table's matches, the continental allocation and relegation. Every rule is cited in
+`league/config.py` (the DIMAYOR and Liga 1 regulations of 2026, the ANFP bases for Chile; for Uruguay no AUF
+reglamento was found and the season articles, RSSSF and the press are the source, the unconfirmed points marked).
+
+| League | Stages | Season champion | Aggregate | Relegation | Continental places |
+|---|---|---|---|---|---|
+| Colombia | Apertura: round robin, then top 8 in two-legged QF/SF/final (1st and 2nd in opposite halves, the rest drawn). Finalización: round robin, then two groups of four headed by 1st and 2nd (3rd-8th drawn), home and away, a group tie on points to the club that heads it, the winners in a two-legged final | none: two champions a year | reclasificación, every match including playoffs | promedio over 2024-I to 2026-II round robins, bottom 2 | Lib: both champions then the best two others of the reclasificación (a double champion's place passes down; relegated clubs take none). Sud: the Copa BetPlay champion (drawn from that cup's simulation; passed down when already in), then the reclasificación |
+| Uruguay | Apertura and Clausura: round robin, first wins. Intermedio: groups A (Apertura 1, 4, 5, 8, 9, 12, 13, 16) and B, single round robins, one-match final | semi-final of the Apertura and Clausura winners (one match), its winner v the Tabla Anual leader over two legs; a double stage winner, or the Anual leader winning the semi, is champion outright | Tabla Anual: the three stages' round robins | promedio over 2025 and 2026 (every Anual match), bottom 3 | Lib: champion, runner-up (the final's loser, else the best other Anual club), then the Anual (Uruguay 4, the Copa AUF Uruguay champion, is not in our data). Sud: the next four of the Anual |
+| Peru | Apertura and Clausura: round robin, first wins | the stage winners in the Acumulada top 8 and the Acumulada 1st and 2nd: two-legged semis (best v worst, 2nd v 3rd of them) and final; a stage winner in the top two goes straight to the final; with a winner outside the top 8 the best of the other three does; a double stage winner is champion and 3rd v 4th then its winner v 2nd decide the runner-up | Tabla Acumulada | bottom 2 of the Acumulada | Lib: final places 1-4 (3rd and 4th: the losing semi-finalists by the Acumulada); Sud: places 5-8 |
+
+**Inputs.** The store's current season, by stage (`torneo` on each match, §4.4 of DATA_PIPELINE.md). Postponed copies of
+a listed fixture and cancelled fixtures are dropped; a stage's leftover round-robin fixtures are dropped once its
+playoffs or a later stage have begun (Colombia's Apertura 2026 left three). Pairings Sofascore has not listed yet (it
+publishes the last rounds late: Uruguay's Clausura on 2 Nov lacked 18) are simulated at the ground of the club that was
+away in the pair's earlier meeting. A stage with no fixtures yet (January, before the Clausura is published) mirrors the
+Apertura's. Sanctions and unlisted results come from the config. The promedio history is the store's earlier seasons:
+a club counts a season only while it has been in the top flight every season since, so a club promoted in the window
+averages over its own seasons (Jaguares: 2026 only). On 2 Nov 2026 our promedios equal the published ones (Chicó
+0.8947, Jaguares 0.8857; Progreso 1.028, Danubio 1.042), as do the Peruvian Acumulada (Alianza 65, UTC 13) and the Tabla
+Anual (Peñarol 65).
+
+**Process**, vectorised over simulations: every stage's remaining fixtures (fixed pairs, `ScoreSampler`), each stage
+table ranked by the league's tiebreak (points, goal difference, goals), each stage's champion by its phase, playoff
+legs between clubs that vary per simulation sampled with `PairSampler`. A leg already played is forced by its round and
+its two clubs; a level tie already decided takes its real winner. Two-legged ties: points over the legs, then aggregate
+goal difference, then penalties as a coin (Colombia, Peru: no extra time); Uruguay's ties, whose rule is not in the
+sources, go to extra time tilted to the stronger side, then penalties. Then the season champion, the berths and
+relegation, inside each simulation.
+
+**Not followed:** a tie on points for first place settled by a play-off match (Uruguay, Chile) is ranked on goal
+difference; fair play and the away-goals and fewest-conceded criteria; the cascades when a club wins a CONMEBOL title;
+which of Colombia's quarter-final brackets the drawn clubs land in once the ties exist (the store's order is used).
+
+**Outputs** (`torneo_payloads.py`): `table.json` (the current stage in the leagues' shape plus every stage under
+`stages`), `anual.json` and `relegation.json` (Argentina's shapes; `relegation.json` `rules.by` is "promedio" or
+"aggregate"), `bracket.json` (the current stage's playoffs in Colombia, the season playoffs in Uruguay and Peru),
+`probs.json` (`p_title`, `p_stage`, `p_playoffs`, `p_anual`, `p_libertadores`, `p_sudamericana`, `p_relegation`) and
+`history.json` (title, anual, Libertadores and relegation series). Chile is a plain league (8.2) with its sanctions.
+
+**Match models (2 Nov 2026).** `scripts/tune_league_models.py` over all 16 leagues (the pooled fit on every one of
+them, as the build fits it), walk-forward on six day-boundary folds of each store (Colombia 2024-2026, the others
+2025-2026); only the four new entries were taken into `model_params.json`. Log-loss on the pooled fit's test window
+(lower is better; uniform 1.0986):
+
+| League | n | home-only prior | default | global | per-league | pooled | chosen |
+|---|---|---|---|---|---|---|---|
+| Colombia | 472 | 1.0581 | 1.0169 | 1.0202 | **1.0123** | 1.0191 | per-league |
+| Uruguay | 334 | 1.0879 | 1.0873 | **1.0773** | 1.0768 | 1.0930 | global (per-league within the 0.002 margin) |
+| Chile | 247 | 1.0558 | 1.0441 | 1.0455 | **1.0382** | 1.0403 | per-league |
+| Peru | 356 | 1.0221 | 0.9781 | 0.9948 | **0.9700** | 0.9764 | per-league |
+
+The pooled fit loses in all four: between the South American blocks it has only the Libertadores and Sudamericana as
+bridges, and these clubs play few of those matches. Every choice beats the home-advantage prior.
+
+Calibration of the chosen model on its own walk-forward forecasts (every outcome's probability pooled; slope 1 is
+calibrated, below 1 over-confident):
+
+| League | n | log-loss | Brier | ECE | slope | mean forecast H/D/A | observed H/D/A |
+|---|---|---|---|---|---|---|---|
+| Colombia | 1,049 | 1.0208 | 0.6124 | 0.008 | 1.06 | .444/.283/.272 | .464/.289/.247 |
+| Uruguay | 375 | 1.0614 | 0.6379 | 0.024 | 0.79 | .419/.276/.305 | .419/.256/.325 |
+| Chile | 247 | 1.0382 | 0.6250 | 0.035 | 0.78 | .489/.226/.285 | .470/.215/.316 |
+| Peru | 413 | 0.9830 | 0.5839 | 0.022 | 0.91 | .520/.218/.261 | .511/.232/.257 |
+
+Colombia is well calibrated; Uruguay and Chile are over-confident on few matches (a slope near 0.8), which more seasons
+in the store (the archive's past results) should test before any shrinkage is fitted.
+
+**Tests:** `tests/test_torneo_leagues.py`: golden runs under a model in which the stronger club always wins 1-0 (every
+stage, playoff, berth and relegation known: Colombia's cuadrangulares, knockout, berths, Copa BetPlay place and promedio;
+Uruguay's semi-final and outright champions; Peru's double winner and bye), invariants under a fair model (four
+Libertadores and four Sudamericana places, the relegation count, one champion), the store reading (unlisted pairs and
+results, sanctions, dead fixtures), the payload shapes, and the fetcher's stage labels.
+
 ### 8.4 Cup simulator: `oddsmarkets/football/competitions/cup/simulator.py`
 
 The league or group phase is simulated as in 8.2 with (pts, gd, gf, lots). Brackets are resolved from `A1` (single leg), neutral single leg, and `A2 = two_leg_advance_matrix` (etw 0.5). Decided ties are forced by pair on aggregate, falling back to `agg_winner` or `winner` for a level aggregate. Draws already in the store (`known_pairs`) fix the pairings. Undrawn rounds are drawn at random per simulation.
@@ -1400,3 +1477,10 @@ September as a diagnostic of the model, not as opportunities.
 12. **Cup Elo is flat** (unseeded, never updated), so cup `strength.json` Elo columns read 1500 and unknown-club fallbacks are a pure home-advantage prior.
 13. **The Belgian split is always simulated from scratch** off the regular-season table. **Points quantiles** use 2,000 simulations, not the full run.
 14. **Player value is a box score plus a rating** (section 11b). What Sofascore does not count (positioning, pressing without a tackle, off-ball runs) is invisible, so defenders and goalkeepers are measured less well than attackers; blocks, clearances and errors carry no predictive weight. Cross-league comparison rests on the pooled offsets (weak across continents, approximate for Argentina), and a transfer moves a player between leagues by those offsets alone. The fair fee (11c) is fitted on Sofascore's published fees, a third of which have a value at the time in our data; budgets do not know wages or owners' money; fantasy prices are our own proxy (no official FPL data) and the bonus is a rating stand-in. The windows are typical dates.
+
+## 15. The Quant Scrum (international rugby union, 2 Nov 2026)
+
+The rugby site's models (a margin rating with home advantage, Glicko-style uncertainty, travel and rest tested; a
+normal margin model for win, draw and loss; the World Rugby rankings rebuilt with the published points exchange; the
+Six Nations, Nations Championship and 2027 World Cup simulators; Scrum value for players) are written up in
+`docs/scrum/MODELS.md`, with the walk-forward ladder against our World Rugby rebuild on the sealed 2019-2026 tests.

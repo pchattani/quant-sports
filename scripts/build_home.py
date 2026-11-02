@@ -11,6 +11,7 @@ normalised file written here from the sport sites' already-built data trees:
     docs/gridiron/data  NFL        (index.json, <season>/season.json, players_index.json)
     docs/rink/data      NHL        (index.json, <season>/season.json, players_index.json)
     docs/campus/data    college    (index.json, search.json)
+    docs/scrum/data     rugby      (index.json, search.json, men/overview.json)
 
 Nothing is fetched from the network. Every sport is optional: a missing or broken tree is
 logged and skipped, so the home page still builds with the sports that are present.
@@ -98,6 +99,9 @@ SPORTS = [
 # Built but not launched (no public Pages site yet): only with --with-pending or once listed in LAUNCHED.
 PENDING = [
     ("college", "campus", "campus", "College", "The Quant Campus"),
+    # The Quant Scrum (international rugby union, built 2 Nov 2026): add "rugby" to LAUNCHED once
+    # pchattani/the-quant-scrum serves Pages (and drop `pending: true` in docs/_design/quant.js)
+    ("rugby", "scrum", "scrum", "Rugby", "The Quant Scrum"),
 ]
 LAUNCHED: set[str] = {"college"}   # The Quant Campus, launched 21 Oct 2026
 STALE_HOURS = 6   # a sport whose input is older than this is flagged stale in home.json
@@ -1244,6 +1248,76 @@ def build_college(ctx: Ctx, base: str, out: dict):
             "stage": " · ".join(stages) or " · ".join(status), "updated_at": idx.get("updated_at")}
 
 
+# ───────────────────────────────────────────────────────────── rugby
+RUGBY_COMP = {"six": "Six Nations", "trc": "Rugby Championship", "nc": "Nations Championship", "rwc": "Rugby World Cup",
+              "test": "Test", "lions": "Lions tour", "tri20": "Tri Nations", "wrwc": "Women's Rugby World Cup"}
+RUGBY_TITLE = {"nc": "Nations Championship", "six": "Six Nations", "rwc": "Rugby World Cup", "trc": "Rugby Championship"}
+
+
+def build_rugby(ctx: Ctx, base: str, out: dict):
+    """The Quant Scrum: docs/scrum/data/index.json, men/overview.json (oddsmarkets/rugby/pages.py) and search.json.
+    Games are the men's upcoming tests (our home, draw and away chances; no market) and the last week's results with
+    our pre-match call; futures are the title races the site simulates; champions the titles decided this year."""
+    d = DOCS / "scrum" / "data"
+    idx = load(d / "index.json")
+    if not idx or not (idx.get("scopes") or {}).get("men", {}).get("ok"):
+        raise RuntimeError("index.json missing")
+    ov = load(d / "men" / "overview.json") or {}
+    teams = idx["scopes"]["men"].get("teams") or {}
+
+    def tm(tid):
+        t = teams.get(str(tid)) or {}
+        return team(t.get("name") or str(tid), t.get("abbr"), t.get("colour"), href=base + "#/men/team/" + str(tid),
+                    alt=t.get("alt"))
+    games, seen = [], set()
+    rows = list(ov.get("upcoming") or []) + list((ov.get("digest") or {}).get("results") or [])
+    for c in rows:
+        if c.get("id") in seen:
+            continue
+        seen.add(c.get("id"))
+        p = c.get("p") or [None, None, None]
+        comp = c.get("comp") or "test"
+        x = game("rugby", RUGBY_COMP.get(comp, "Test"), c["id"], c.get("date"), c.get("status"), tm(c["home"]), tm(c["away"]),
+                 c.get("hs"), c.get("as"), p_home=r4(p[0]), p_draw=r4(p[1]), p_away=r4(p[2]),
+                 href=base + "#/men/match/" + str(c["id"]))
+        note = str(c.get("note") or "")
+        x["sig"] = {"comp": comp, "stage": "semi" if re.search("semi", note, re.I) else ("final" if re.search("final", note, re.I) else None)}
+        games.append(x)
+    out["games"].extend(pick_games(ctx, games, 4, 6))
+    out["pool"].extend(games)
+    kpis, stages = [], []
+    for r in ov.get("races") or []:
+        rs = [x for x in r.get("rows") or [] if x.get("p")][:8]
+        if not rs:
+            continue
+        by = {t.get("name"): k for k, t in teams.items()}
+        key = "rugby" if not out["futures"].get("rugby") else "rugby_" + r["comp"]
+        out["futures"][key] = {"title": f"{RUGBY_TITLE.get(r['comp'], r['comp'])} {r.get('season') or ''}".strip(), "rows": [
+            {"name": x["team"], "abbr": (teams.get(by.get(x["team"])) or {}).get("abbr"), "p": r4(x["p"]),
+             "colour": (teams.get(by.get(x["team"])) or {}).get("colour"),
+             "href": base + "#/men/team/" + str(by.get(x["team"])) if by.get(x["team"]) else base + "#/men/standings"} for x in rs]}
+        if not kpis:
+            kpis.append({"label": RUGBY_TITLE.get(r["comp"], r["comp"]) + " fav", "value": rs[0]["team"], "sub": f"{(rs[0]['p'] or 0) * 100:.0f}% title"})
+        stages.append(RUGBY_TITLE.get(r["comp"], r["comp"]))
+    pw = (ov.get("power") or [])[:1]
+    if pw:
+        t0 = teams.get(str(pw[0]["id"])) or {}
+        kpis.append({"label": "Top rated", "value": t0.get("name") or pw[0]["id"], "sub": f"+{pw[0]['rating']:.1f} rating"})
+    for c in ov.get("champions") or []:
+        t = tm(c["team"]) if c.get("team") else None
+        if t and c.get("decided") and parse_ts(c["decided"]) and (ctx.now - parse_ts(c["decided"])).days <= 365:
+            champion(out, "rugby", "Men's tests", f"{c.get('season')} {RUGBY_TITLE.get(c.get('comp'), c.get('comp'))}", t,
+                     tm(c["opp"]) if c.get("opp") else None, c["decided"], score=c.get("score"), how=c.get("how"))
+    srch = load(d / "search.json") or []
+    rows = [r for r in (srch if isinstance(srch, list) else []) if r.get("t") and r.get("href")]
+    players = sorted((r for r in rows if "/player/" in r["href"] and r["href"].startswith("#/men/")), key=lambda r: -(r.get("w") or 0))
+    for r in [r for r in rows if "/team/" in r["href"]] + players[:SEARCH_TOP_PLAYERS]:
+        out["search"].append(["rugby", r["t"], r.get("s") or "", base + r["href"]])
+    status = "Men's tests" + (" · " + stages[0] if stages else "")
+    return {"phase": status, "status": status, "kpis": kpis[:3], "stage": " · ".join(stages[:2]) or status,
+            "updated_at": idx.get("updated_at")}
+
+
 def pct_text(p):
     """0.9999 -> '>99.9%', 0.0004 -> '<0.1%', else one decimal under 10% and whole numbers above."""
     if p is None:
@@ -1429,7 +1503,7 @@ def calibration_summary(docs: Path = DOCS):
 # rebuilt as of the day before with ratings that exclude the game): MLB, NFL, NHL frozen; NBA/WNBA, tennis and college
 # computed as of the day before. Football drops its forecast once a match is finished, so it has no pre-game chance
 # to count and is left out of "Our record this week" (the page says so).
-RECORD_SPORTS = ("nfl", "hockey", "baseball", "basketball", "tennis", "college")
+RECORD_SPORTS = ("nfl", "hockey", "baseball", "basketball", "tennis", "college", "rugby")
 
 
 def _matchup(g):
@@ -1510,7 +1584,8 @@ def top_of_page(now, games, pool, series, sports):
 
 
 BUILDERS = {"football": build_football, "f1": build_f1, "basketball": build_basketball, "tennis": build_tennis,
-            "baseball": build_baseball, "nfl": build_nfl, "hockey": build_hockey, "college": build_college}
+            "baseball": build_baseball, "nfl": build_nfl, "hockey": build_hockey, "college": build_college,
+            "rugby": build_rugby}
 
 
 SEARCH_TOP_PLAYERS = 40      # players per site (per level on Campus) in the hub's search
@@ -1577,6 +1652,7 @@ SEARCH_GO_SUB = {
 SEARCH_GO_COUNTRY = {"ENG": 0, "ESP": 1, "ITA": 2, "DEU": 3, "FRA": 4,
                      "BRA": 5, "ARG": 6, "COL": 7, "URY": 8, "CHL": 9, "PER": 10}
 SEARCH_GO_LEVEL = {"cfb": 0, "mbb": 1, "wbb": 2, "mch": 3, "wch": 4}       # college: the Campus's own level order
+SEARCH_GO_RUGBY = {"Men's national team": 0, "Women's national team": 1}   # rugby: men's sides, then women's
 
 
 def search_go(row: list) -> int | None:
@@ -1589,6 +1665,8 @@ def search_go(row: list) -> int | None:
     if sport == "college":
         m = re.search(r"#/([a-z]+)/", href)
         return SEARCH_GO_LEVEL.get(m.group(1)) if m else None
+    if sport == "rugby":
+        return SEARCH_GO_RUGBY.get(head)
     for k, v in (SEARCH_GO_SUB.get(sport) or {}).items():
         if head == k:
             return v

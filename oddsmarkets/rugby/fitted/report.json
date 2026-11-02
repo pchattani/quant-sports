@@ -1,0 +1,1046 @@
+{
+ "scope": "men",
+ "n": 1890,
+ "dev": [
+  2004,
+  2018
+ ],
+ "test": [
+  2019,
+  2026
+ ],
+ "rungs": {
+  "wr": {
+   "dev": {
+    "n": 707,
+    "logloss": 0.58189,
+    "brier": 0.34945,
+    "mae_margin": null
+   },
+   "test": {
+    "n": 825,
+    "logloss": 0.58363,
+    "brier": 0.36735,
+    "mae_margin": null
+   },
+   "cal_test": {
+    "bins": [
+     {
+      "lo": 0.0,
+      "hi": 0.1,
+      "n": 25,
+      "mean_p": 0.0676,
+      "freq": 0.04
+     },
+     {
+      "lo": 0.1,
+      "hi": 0.2,
+      "n": 35,
+      "mean_p": 0.1507,
+      "freq": 0.1429
+     },
+     {
+      "lo": 0.2,
+      "hi": 0.3,
+      "n": 56,
+      "mean_p": 0.2501,
+      "freq": 0.1964
+     },
+     {
+      "lo": 0.3,
+      "hi": 0.4,
+      "n": 50,
+      "mean_p": 0.3486,
+      "freq": 0.32
+     },
+     {
+      "lo": 0.4,
+      "hi": 0.5,
+      "n": 57,
+      "mean_p": 0.449,
+      "freq": 0.4912
+     },
+     {
+      "lo": 0.5,
+      "hi": 0.6,
+      "n": 97,
+      "mean_p": 0.5556,
+      "freq": 0.5464
+     },
+     {
+      "lo": 0.6,
+      "hi": 0.7,
+      "n": 144,
+      "mean_p": 0.6497,
+      "freq": 0.5833
+     },
+     {
+      "lo": 0.7,
+      "hi": 0.8,
+      "n": 107,
+      "mean_p": 0.7504,
+      "freq": 0.6168
+     },
+     {
+      "lo": 0.8,
+      "hi": 0.9,
+      "n": 127,
+      "mean_p": 0.8475,
+      "freq": 0.8504
+     },
+     {
+      "lo": 0.9,
+      "hi": 1.0,
+      "n": 127,
+      "mean_p": 0.9357,
+      "freq": 0.9449
+     }
+    ],
+    "ece": 0.0413,
+    "n": 825
+   },
+   "fit": {
+    "a": 0.04998465064396485,
+    "b": 0.1845126625005071,
+    "draw": 0.021216407355021217
+   }
+  },
+  "elo": {
+   "params": {
+    "H": 5.0,
+    "k": 0.15,
+    "k_new": 0.5,
+    "n_new": 8,
+    "cap": 40.0,
+    "revert": 0.15,
+    "c_km": 0.0,
+    "c_tz": 0.0,
+    "c_rest": 0.0,
+    "s0": 12.0,
+    "s1": 0.12,
+    "s_tier": 0.0,
+    "wr3": false,
+    "s_n": 0.0,
+    "mu0": 42.0,
+    "k_mu": 0.01,
+    "split": false
+   },
+   "dev": {
+    "n": 711,
+    "logloss": 0.5558,
+    "brier": 0.33127,
+    "mae_margin": 12.026
+   },
+   "test": {
+    "n": 838,
+    "logloss": 0.63256,
+    "brier": 0.38261,
+    "mae_margin": 16.306
+   },
+   "cal_test": {
+    "bins": [
+     {
+      "lo": 0.0,
+      "hi": 0.1,
+      "n": 70,
+      "mean_p": 0.0448,
+      "freq": 0.1714
+     },
+     {
+      "lo": 0.1,
+      "hi": 0.2,
+      "n": 59,
+      "mean_p": 0.1476,
+      "freq": 0.1695
+     },
+     {
+      "lo": 0.2,
+      "hi": 0.3,
+      "n": 57,
+      "mean_p": 0.2577,
+      "freq": 0.4561
+     },
+     {
+      "lo": 0.3,
+      "hi": 0.4,
+      "n": 56,
+      "mean_p": 0.3484,
+      "freq": 0.3393
+     },
+     {
+      "lo": 0.4,
+      "hi": 0.5,
+      "n": 55,
+      "mean_p": 0.4554,
+      "freq": 0.4727
+     },
+     {
+      "lo": 0.5,
+      "hi": 0.6,
+      "n": 65,
+      "mean_p": 0.5534,
+      "freq": 0.5231
+     },
+     {
+      "lo": 0.6,
+      "hi": 0.7,
+      "n": 93,
+      "mean_p": 0.6518,
+      "freq": 0.6667
+     },
+     {
+      "lo": 0.7,
+      "hi": 0.8,
+      "n": 78,
+      "mean_p": 0.7498,
+      "freq": 0.641
+     },
+     {
+      "lo": 0.8,
+      "hi": 0.9,
+      "n": 122,
+      "mean_p": 0.8534,
+      "freq": 0.8197
+     },
+     {
+      "lo": 0.9,
+      "hi": 1.0,
+      "n": 183,
+      "mean_p": 0.9534,
+      "freq": 0.8852
+     }
+    ],
+    "ece": 0.0613,
+    "n": 838
+   }
+  },
+  "unc": {
+   "params": {
+    "H": 5.0,
+    "k": 0.15,
+    "k_new": 0.7,
+    "n_new": 8,
+    "cap": 40.0,
+    "revert": 0.15,
+    "c_km": 0.0,
+    "c_tz": 0.0,
+    "c_rest": 0.0,
+    "s0": 12.0,
+    "s1": 0.12,
+    "s_tier": 0.0,
+    "wr3": false,
+    "s_n": 20.0,
+    "mu0": 42.0,
+    "k_mu": 0.01,
+    "split": false
+   },
+   "dev": {
+    "n": 711,
+    "logloss": 0.55371,
+    "brier": 0.33031,
+    "mae_margin": 12.067
+   },
+   "test": {
+    "n": 838,
+    "logloss": 0.61709,
+    "brier": 0.3797,
+    "mae_margin": 16.665
+   },
+   "cal_test": {
+    "bins": [
+     {
+      "lo": 0.0,
+      "hi": 0.1,
+      "n": 61,
+      "mean_p": 0.0425,
+      "freq": 0.1311
+     },
+     {
+      "lo": 0.1,
+      "hi": 0.2,
+      "n": 60,
+      "mean_p": 0.1457,
+      "freq": 0.2167
+     },
+     {
+      "lo": 0.2,
+      "hi": 0.3,
+      "n": 57,
+      "mean_p": 0.2542,
+      "freq": 0.4211
+     },
+     {
+      "lo": 0.3,
+      "hi": 0.4,
+      "n": 65,
+      "mean_p": 0.3554,
+      "freq": 0.3538
+     },
+     {
+      "lo": 0.4,
+      "hi": 0.5,
+      "n": 58,
+      "mean_p": 0.4541,
+      "freq": 0.5345
+     },
+     {
+      "lo": 0.5,
+      "hi": 0.6,
+      "n": 88,
+      "mean_p": 0.5509,
+      "freq": 0.5455
+     },
+     {
+      "lo": 0.6,
+      "hi": 0.7,
+      "n": 80,
+      "mean_p": 0.6509,
+      "freq": 0.6125
+     },
+     {
+      "lo": 0.7,
+      "hi": 0.8,
+      "n": 87,
+      "mean_p": 0.7432,
+      "freq": 0.6782
+     },
+     {
+      "lo": 0.8,
+      "hi": 0.9,
+      "n": 115,
+      "mean_p": 0.8531,
+      "freq": 0.8261
+     },
+     {
+      "lo": 0.9,
+      "hi": 1.0,
+      "n": 167,
+      "mean_p": 0.954,
+      "freq": 0.9042
+     }
+    ],
+    "ece": 0.0532,
+    "n": 838
+   }
+  },
+  "ctx": {
+   "params": {
+    "H": 5.0,
+    "k": 0.15,
+    "k_new": 0.7,
+    "n_new": 8,
+    "cap": 40.0,
+    "revert": 0.15,
+    "c_km": 0.0,
+    "c_tz": 0.0,
+    "c_rest": 0.0,
+    "s0": 12.0,
+    "s1": 0.12,
+    "s_tier": 0.0,
+    "wr3": false,
+    "s_n": 20.0,
+    "mu0": 42.0,
+    "k_mu": 0.01,
+    "split": false
+   },
+   "dev": {
+    "n": 711,
+    "logloss": 0.55371,
+    "brier": 0.33031,
+    "mae_margin": 12.067
+   },
+   "test": {
+    "n": 838,
+    "logloss": 0.61709,
+    "brier": 0.3797,
+    "mae_margin": 16.665
+   },
+   "cal_test": {
+    "bins": [
+     {
+      "lo": 0.0,
+      "hi": 0.1,
+      "n": 61,
+      "mean_p": 0.0425,
+      "freq": 0.1311
+     },
+     {
+      "lo": 0.1,
+      "hi": 0.2,
+      "n": 60,
+      "mean_p": 0.1457,
+      "freq": 0.2167
+     },
+     {
+      "lo": 0.2,
+      "hi": 0.3,
+      "n": 57,
+      "mean_p": 0.2542,
+      "freq": 0.4211
+     },
+     {
+      "lo": 0.3,
+      "hi": 0.4,
+      "n": 65,
+      "mean_p": 0.3554,
+      "freq": 0.3538
+     },
+     {
+      "lo": 0.4,
+      "hi": 0.5,
+      "n": 58,
+      "mean_p": 0.4541,
+      "freq": 0.5345
+     },
+     {
+      "lo": 0.5,
+      "hi": 0.6,
+      "n": 88,
+      "mean_p": 0.5509,
+      "freq": 0.5455
+     },
+     {
+      "lo": 0.6,
+      "hi": 0.7,
+      "n": 80,
+      "mean_p": 0.6509,
+      "freq": 0.6125
+     },
+     {
+      "lo": 0.7,
+      "hi": 0.8,
+      "n": 87,
+      "mean_p": 0.7432,
+      "freq": 0.6782
+     },
+     {
+      "lo": 0.8,
+      "hi": 0.9,
+      "n": 115,
+      "mean_p": 0.8531,
+      "freq": 0.8261
+     },
+     {
+      "lo": 0.9,
+      "hi": 1.0,
+      "n": 167,
+      "mean_p": 0.954,
+      "freq": 0.9042
+     }
+    ],
+    "ece": 0.0532,
+    "n": 838
+   }
+  },
+  "split": {
+   "params": {
+    "H": 5.0,
+    "k": 0.15,
+    "k_new": 0.7,
+    "n_new": 8,
+    "cap": 40.0,
+    "revert": 0.15,
+    "c_km": 0.0,
+    "c_tz": 0.0,
+    "c_rest": 0.0,
+    "s0": 11.0,
+    "s1": 0.12,
+    "s_tier": 0.0,
+    "wr3": false,
+    "s_n": 20.0,
+    "mu0": 42.0,
+    "k_mu": 0.01,
+    "split": true
+   },
+   "dev": {
+    "n": 711,
+    "logloss": 0.55349,
+    "brier": 0.3304,
+    "mae_margin": 12.074
+   },
+   "test": {
+    "n": 838,
+    "logloss": 0.63735,
+    "brier": 0.38378,
+    "mae_margin": 16.846
+   },
+   "cal_test": {
+    "bins": [
+     {
+      "lo": 0.0,
+      "hi": 0.1,
+      "n": 77,
+      "mean_p": 0.0443,
+      "freq": 0.1948
+     },
+     {
+      "lo": 0.1,
+      "hi": 0.2,
+      "n": 52,
+      "mean_p": 0.1421,
+      "freq": 0.1538
+     },
+     {
+      "lo": 0.2,
+      "hi": 0.3,
+      "n": 58,
+      "mean_p": 0.2492,
+      "freq": 0.4655
+     },
+     {
+      "lo": 0.3,
+      "hi": 0.4,
+      "n": 65,
+      "mean_p": 0.3479,
+      "freq": 0.3385
+     },
+     {
+      "lo": 0.4,
+      "hi": 0.5,
+      "n": 55,
+      "mean_p": 0.4545,
+      "freq": 0.4364
+     },
+     {
+      "lo": 0.5,
+      "hi": 0.6,
+      "n": 78,
+      "mean_p": 0.554,
+      "freq": 0.6154
+     },
+     {
+      "lo": 0.6,
+      "hi": 0.7,
+      "n": 76,
+      "mean_p": 0.6518,
+      "freq": 0.6184
+     },
+     {
+      "lo": 0.7,
+      "hi": 0.8,
+      "n": 91,
+      "mean_p": 0.7519,
+      "freq": 0.6703
+     },
+     {
+      "lo": 0.8,
+      "hi": 0.9,
+      "n": 98,
+      "mean_p": 0.8592,
+      "freq": 0.8265
+     },
+     {
+      "lo": 0.9,
+      "hi": 1.0,
+      "n": 188,
+      "mean_p": 0.9581,
+      "freq": 0.8936
+     }
+    ],
+    "ece": 0.0673,
+    "n": 838
+   }
+  },
+  "hybrid": {
+   "params": {
+    "H": 5.0,
+    "k": 0.15,
+    "k_new": 0.7,
+    "n_new": 8,
+    "cap": 40.0,
+    "revert": 0.15,
+    "c_km": 0.0,
+    "c_tz": 0.0,
+    "c_rest": 0.0,
+    "s0": 12.0,
+    "s1": 0.12,
+    "s_tier": 0.0,
+    "wr3": true,
+    "s_n": 20.0,
+    "mu0": 42.0,
+    "k_mu": 0.01,
+    "split": false
+   },
+   "dev": {
+    "n": 711,
+    "logloss": 0.55062,
+    "brier": 0.32811,
+    "mae_margin": 12.067
+   },
+   "test": {
+    "n": 838,
+    "logloss": 0.58214,
+    "brier": 0.36553,
+    "mae_margin": 16.665
+   },
+   "cal_test": {
+    "bins": [
+     {
+      "lo": 0.0,
+      "hi": 0.1,
+      "n": 39,
+      "mean_p": 0.0526,
+      "freq": 0.0256
+     },
+     {
+      "lo": 0.1,
+      "hi": 0.2,
+      "n": 50,
+      "mean_p": 0.1464,
+      "freq": 0.14
+     },
+     {
+      "lo": 0.2,
+      "hi": 0.3,
+      "n": 53,
+      "mean_p": 0.2583,
+      "freq": 0.3774
+     },
+     {
+      "lo": 0.3,
+      "hi": 0.4,
+      "n": 57,
+      "mean_p": 0.3552,
+      "freq": 0.4035
+     },
+     {
+      "lo": 0.4,
+      "hi": 0.5,
+      "n": 56,
+      "mean_p": 0.4513,
+      "freq": 0.4286
+     },
+     {
+      "lo": 0.5,
+      "hi": 0.6,
+      "n": 97,
+      "mean_p": 0.5549,
+      "freq": 0.4948
+     },
+     {
+      "lo": 0.6,
+      "hi": 0.7,
+      "n": 131,
+      "mean_p": 0.6486,
+      "freq": 0.6412
+     },
+     {
+      "lo": 0.7,
+      "hi": 0.8,
+      "n": 99,
+      "mean_p": 0.7418,
+      "freq": 0.6364
+     },
+     {
+      "lo": 0.8,
+      "hi": 0.9,
+      "n": 114,
+      "mean_p": 0.8534,
+      "freq": 0.8509
+     },
+     {
+      "lo": 0.9,
+      "hi": 1.0,
+      "n": 142,
+      "mean_p": 0.9516,
+      "freq": 0.9437
+     }
+    ],
+    "ece": 0.0362,
+    "n": 838
+   },
+   "post_hoc": true
+  }
+ },
+ "paired": {
+  "elo_vs_wr": {
+   "n": 825,
+   "diff": 0.0488,
+   "lo": 0.01094,
+   "hi": 0.08666,
+   "better": false
+  },
+  "unc_vs_elo": {
+   "n": 838,
+   "diff": -0.01547,
+   "lo": -0.02582,
+   "hi": -0.00513,
+   "better": true
+  },
+  "ctx_vs_unc": {
+   "n": 838,
+   "diff": 0.0,
+   "lo": 0.0,
+   "hi": 0.0,
+   "better": false
+  },
+  "split_vs_best": {
+   "n": 838,
+   "diff": 0.02027,
+   "lo": 0.0066,
+   "hi": 0.03393,
+   "better": false,
+   "against": "unc"
+  },
+  "hybrid_vs_best": {
+   "n": 838,
+   "diff": -0.03495,
+   "lo": -0.063,
+   "hi": -0.00689,
+   "better": true,
+   "against": "unc",
+   "post_hoc": true
+  },
+  "hybrid_vs_wr": {
+   "n": 825,
+   "diff": -0.00152,
+   "lo": -0.02032,
+   "hi": 0.01728,
+   "better": false,
+   "post_hoc": true
+  }
+ },
+ "sealed_choice": "unc",
+ "chosen": "hybrid",
+ "total": {
+  "sd_test": 18.118,
+  "sd_dev": 16.948,
+  "mae_test": 13.796,
+  "mae_test_baseline": 13.328
+ },
+ "tries": {
+  "fit": {
+   "t0": -0.9855,
+   "t1": 0.1455,
+   "c0": -1.0254,
+   "c1": 0.1463,
+   "mean": 2.2982,
+   "n": 758
+  },
+  "test": {
+   "n": 554,
+   "diff": -0.19271,
+   "lo": -0.44534,
+   "hi": 0.05993,
+   "better": false
+  }
+ },
+ "value": {
+  "ok": true,
+  "n": 379,
+  "n_test": 277,
+  "weights": {
+   "m": 0.05009,
+   "cb": 0.85552,
+   "db": 0.15216,
+   "off": -0.11014,
+   "tk": 0.09213,
+   "mt": -0.2394,
+   "toc": -1.17213,
+   "pc": -0.67771,
+   "yc": -0.94187,
+   "rc": -4.29305,
+   "lo": 0.29122
+  },
+  "r2_dev": 0.6879,
+  "r2_test": 0.6989,
+  "lambda": 50.0
+ },
+ "replica": {
+  "sep2026": {
+   "date": "2026-09-28",
+   "n": 30,
+   "of": 30,
+   "mae": 3.532,
+   "mae_top10": 4.621,
+   "bias": -2.588,
+   "mae_after_level": 2.597,
+   "spearman": 0.9457,
+   "rows": [
+    {
+     "team": "South Africa",
+     "published": 93.09,
+     "ours": 89.05
+    },
+    {
+     "team": "New Zealand",
+     "published": 91.15,
+     "ours": 87.11
+    },
+    {
+     "team": "Ireland",
+     "published": 88.08,
+     "ours": 83.78
+    },
+    {
+     "team": "France",
+     "published": 87.43,
+     "ours": 83.06
+    },
+    {
+     "team": "England",
+     "published": 85.68,
+     "ours": 81.18
+    },
+    {
+     "team": "Australia",
+     "published": 85.55,
+     "ours": 80.71
+    },
+    {
+     "team": "Scotland",
+     "published": 84.78,
+     "ours": 80.59
+    },
+    {
+     "team": "Argentina",
+     "published": 82.24,
+     "ours": 77.72
+    },
+    {
+     "team": "Japan",
+     "published": 77.28,
+     "ours": 69.66
+    },
+    {
+     "team": "Fiji",
+     "published": 76.81,
+     "ours": 73.04
+    },
+    {
+     "team": "Wales",
+     "published": 76.38,
+     "ours": 71.49
+    },
+    {
+     "team": "Italy",
+     "published": 76.3,
+     "ours": 71.63
+    },
+    {
+     "team": "Georgia",
+     "published": 73.94,
+     "ours": 67.0
+    },
+    {
+     "team": "Portugal",
+     "published": 69.39,
+     "ours": 65.49
+    },
+    {
+     "team": "United States",
+     "published": 67.58,
+     "ours": 66.07
+    },
+    {
+     "team": "Chile",
+     "published": 66.94,
+     "ours": 66.45
+    },
+    {
+     "team": "Spain",
+     "published": 66.83,
+     "ours": 64.91
+    },
+    {
+     "team": "Uruguay",
+     "published": 65.75,
+     "ours": 67.66
+    },
+    {
+     "team": "Tonga",
+     "published": 65.14,
+     "ours": 63.14
+    },
+    {
+     "team": "Samoa",
+     "published": 64.73,
+     "ours": 67.37
+    },
+    {
+     "team": "Romania",
+     "published": 62.45,
+     "ours": 59.27
+    },
+    {
+     "team": "Canada",
+     "published": 62.29,
+     "ours": 55.43
+    },
+    {
+     "team": "Belgium",
+     "published": 61.03,
+     "ours": 54.73
+    },
+    {
+     "team": "Hong Kong",
+     "published": 60.74,
+     "ours": 60.1
+    },
+    {
+     "team": "Zimbabwe",
+     "published": 57.68,
+     "ours": 59.07
+    },
+    {
+     "team": "Namibia",
+     "published": 56.96,
+     "ours": 58.45
+    },
+    {
+     "team": "Netherlands",
+     "published": 56.44,
+     "ours": 54.17
+    },
+    {
+     "team": "Switzerland",
+     "published": 55.47,
+     "ours": 57.34
+    },
+    {
+     "team": "Czech Republic",
+     "published": 54.78,
+     "ours": 55.53
+    },
+    {
+     "team": "Poland",
+     "published": 54.54,
+     "ours": 58.64
+    }
+   ],
+   "missing": [],
+   "same_rank": 10,
+   "within_one": 14
+  },
+  "dec2025": {
+   "date": "2025-12-01",
+   "n": 24,
+   "spearman": 0.9739,
+   "same_rank": 12,
+   "within_one": 19,
+   "rows": [
+    {
+     "team": "South Africa",
+     "published_rank": 1,
+     "our_rank": 1
+    },
+    {
+     "team": "New Zealand",
+     "published_rank": 2,
+     "our_rank": 2
+    },
+    {
+     "team": "England",
+     "published_rank": 3,
+     "our_rank": 3
+    },
+    {
+     "team": "Ireland",
+     "published_rank": 4,
+     "our_rank": 4
+    },
+    {
+     "team": "France",
+     "published_rank": 5,
+     "our_rank": 5
+    },
+    {
+     "team": "Argentina",
+     "published_rank": 6,
+     "our_rank": 6
+    },
+    {
+     "team": "Australia",
+     "published_rank": 7,
+     "our_rank": 7
+    },
+    {
+     "team": "Fiji",
+     "published_rank": 8,
+     "our_rank": 9
+    },
+    {
+     "team": "Scotland",
+     "published_rank": 9,
+     "our_rank": 8
+    },
+    {
+     "team": "Italy",
+     "published_rank": 10,
+     "our_rank": 10
+    },
+    {
+     "team": "Wales",
+     "published_rank": 11,
+     "our_rank": 11
+    },
+    {
+     "team": "Japan",
+     "published_rank": 12,
+     "our_rank": 12
+    },
+    {
+     "team": "Georgia",
+     "published_rank": 13,
+     "our_rank": 15
+    },
+    {
+     "team": "Uruguay",
+     "published_rank": 14,
+     "our_rank": 13
+    },
+    {
+     "team": "Spain",
+     "published_rank": 15,
+     "our_rank": 19
+    },
+    {
+     "team": "United States",
+     "published_rank": 16,
+     "our_rank": 17
+    },
+    {
+     "team": "Chile",
+     "published_rank": 17,
+     "our_rank": 16
+    },
+    {
+     "team": "Tonga",
+     "published_rank": 18,
+     "our_rank": 20
+    },
+    {
+     "team": "Samoa",
+     "published_rank": 19,
+     "our_rank": 14
+    },
+    {
+     "team": "Portugal",
+     "published_rank": 20,
+     "our_rank": 18
+    },
+    {
+     "team": "Romania",
+     "published_rank": 22,
+     "our_rank": 22
+    },
+    {
+     "team": "Hong Kong",
+     "published_rank": 23,
+     "our_rank": 21
+    },
+    {
+     "team": "Zimbabwe",
+     "published_rank": 24,
+     "our_rank": 23
+    },
+    {
+     "team": "Canada",
+     "published_rank": 25,
+     "our_rank": 24
+    }
+   ]
+  }
+ },
+ "seconds": 6.5
+}

@@ -1,10 +1,12 @@
 # Data sources, credits and terms
 
 The sites built from this repository (The Quant Sports and its sites The Quant Footballer, Paddock, Hardwood, Ace,
-Bullpen, Gridiron, Rink and Campus) are non-commercial. They publish model outputs and compact facts derived from the sources below, credit each
+Bullpen, Gridiron, Rink, Campus and Scrum) are non-commercial. They publish model outputs and compact facts derived from the sources below, credit each
 source on the site, and do not re-host raw feeds. The rule throughout: a source whose terms forbid reuse or
 redistribution is not used (Nippon Professional Baseball's npb.jp, Basketball-Reference, Pro Football
-Reference, Spotrac, HoopsHype and OverTheCap contracts are left out for that reason).
+Reference, Spotrac, HoopsHype and OverTheCap contracts are left out for that reason; World Rugby's
+own websites and data feeds are left out of The Quant Scrum because their terms limit the content to personal,
+non-commercial use).
 
 | Source | Used for | Terms / licence | What is in this repository |
 |---|---|---|---|
@@ -13,6 +15,9 @@ Reference, Spotrac, HoopsHype and OverTheCap contracts are left out for that rea
 | **Jolpica F1** (Ergast successor) | Formula 1 results, qualifying, laps and pit stops | free API; Formula 1 timing data belongs to Formula One Management | Paddock season stores (`docs/paddock/data/`) |
 | **OpenF1** (openf1.org) | sessions, stints, race control, telemetry | unofficial, from F1 live timing; non-commercial | session records and telemetry **summaries**; raw telemetry is never committed |
 | **ESPN** public JSON | NBA/WNBA and college (FBS football, D-I basketball) scores, box scores, play-by-play, polls and closing lines; college hockey (men's and women's D-I) schedules, scores and the USCHO poll; tennis; MLB/NFL/NHL odds and scores | no published API terms; used non-commercially, credited | compact season stores and derived tables; raw responses are not published |
+| **ESPN** public JSON (rugby) | The Quant Scrum: international rugby union fixtures, results, matchday 23s, key moments (tries, kicks, cards, substitutions) and team and player match statistics, men's tests from 1995 and the women's World Cup | no published API terms; used non-commercially, credited on every page's footer and the Terms page | compact season stores (private) and derived payloads; raw responses are not published |
+| **Wikipedia** (English; Wikipedia contributors) for rugby | The Quant Scrum: the published World Rugby ranking points of 28 September 2026 (the "World Rugby Rankings" article) and ranking positions of 1 December 2025 (the "2027 Rugby World Cup" article) that anchor and check our rankings rebuild; the formats and fixtures of the 2026 Nations Championship, the 2027 Six Nations and the 2027 Rugby World Cup | **CC BY-SA 4.0** | the anchor values and formats in `oddsmarkets/rugby/validate.py` and `comps.py`, shared alike, credited on the site |
+| **World Rugby** (world.rugby, its rankings API) | **not used** | its terms limit the content to "own personal non-commercial use", explicitly: the official rankings are rebuilt from results with the published points-exchange formula instead | nothing |
 | **College Hockey News** (collegehockeynews.com) | college hockey (men's and women's D-I) box scores, player and team statistics, rosters, shot attempts and its own expected goals, for The Quant Campus | no published terms page found; robots.txt obeyed (box scores dated 2024 and earlier are excluded by it and are not fetched); fetched politely from one PC (one request at a time, 3 s apart); used with the site owner's approval (30 Oct 2026) on the understanding that it may be taken down; credit: *College Hockey News* on every hockey page | **derived facts and model output only, no raw re-hosting.** Raw pages and the parsed stores live in a private repository; everything from it sits behind one source module and switch (`oddsmarkets/college/sources/chn.py`, `CHN_ENABLED`), so it can be removed cleanly |
 | **USCHO** (uscho.com) | the USCHO Division I men's and women's polls: every week of the current season and each past season's final poll, for The Quant Campus college hockey | no terms found for reuse; robots.txt allows crawling; fetched politely from one PC; used under the site owner's rule for sources with unclear terms (30 Oct 2026), taken down on request; credit: *USCHO* | the poll ranks only, mapped to our team ids; raw pages are private; behind `oddsmarkets/college/sources/uscho.py` and `USCHO_ENABLED` |
 | **WTA** stats API | WTA draws, matches and match statistics | terms unstated | compact stores only |

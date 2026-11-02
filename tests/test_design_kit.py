@@ -169,7 +169,8 @@ def test_follow_card_registry_matches_the_published_scopes():
     reg = re.search(r"QK\.FOLLOW_CARDS = \{(.*?)\};", q, re.S).group(1)
     sites = dict((m.group(1), re.findall(r"'([a-z]+)'", m.group(2))) for m in re.finditer(r"(\w+): \[([^\]]*)\]", reg))
     assert sites == {"bullpen": ["mlb", "aaa"], "site": ["club"], "rink": ["team"], "gridiron": ["team"], "hardwood": ["nba", "wnba"],
-                     "campus": ["cfb", "mbb", "wbb", "mch", "wch"], "ace": ["atp", "wta"], "paddock": ["driver", "team"]}
+                     "campus": ["cfb", "mbb", "wbb", "mch", "wch"], "ace": ["atp", "wta"], "paddock": ["driver", "team"],
+                     "scrum": ["men", "women"]}
     assert set(sites) == set(design_kit.SITE_SPORT)
     src = lambda f: (ROOT / "scripts" / f).read_text(encoding="utf-8")
     pkg = lambda f: (ROOT / "oddsmarkets" / f).read_text(encoding="utf-8")
@@ -186,3 +187,5 @@ def test_follow_card_registry_matches_the_published_scopes():
     a = src("build_ace.py")
     assert "FLB.build(data, t," in a and 'TOURS = ("atp", "wta")' in pkg("tennis/analytics/__init__.py")
     assert '-> {"driver": summary, "team": summary}' in pkg("f1/analytics/follow_build.py") and "FLB.build(data)" in src("build_paddock.py")
+    sc = src("build_scrum.py")
+    assert 'ap.add_argument("--scopes", default="men,women")' in sc and "follow_build.build(res, data)" in sc

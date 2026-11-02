@@ -422,8 +422,10 @@ What is known, from operating history (`HANDOFF.md`, fetcher docstrings):
 
 ## 4. Competition registry
 
-There are 69 competitions: 12 plain leagues (`LEAGUES`), 56 cups and
-national-team competitions (`CUPS`), and the Argentine Liga Profesional, which
+There are 81 competitions: 16 leagues (`LEAGUES`: 13 single tables or
+conference/playoff/split formats, and since 2 November 2026 Colombia, Uruguay and
+Peru, whose seasons are several tournaments and an aggregate table, §4.4), 64 cups
+and national-team competitions (`CUPS`), and the Argentine Liga Profesional, which
 has its own package.
 
 ### 4.1 `oddsmarkets/football/competitions/league/config.py`: `LeagueConfig`
@@ -566,6 +568,49 @@ not listed yet: Euro 2024, Copa América 2024, Euro qualifiers 2024, Gold Cup
 2025, AFCON 2025, Coupe de France 25/26, Supercoppa Italiana 2025 and Saudi
 Super Cup 2025. These show as `status: last_edition` in the unified payloads.
 
+### 4.4 Colombia, Uruguay, Chile and Peru (2 November 2026)
+
+Four leagues and seven national and super cups, each with a pinned Sofascore id (found by search on 2 Nov 2026; a
+"Copa de la Liga" exists in Chile, Peru and Argentina, so none is resolved by search).
+
+| Competition | Slug | Sofascore id | Kind | Notes |
+|---|---|---|---|---|
+| Liga BetPlay DIMAYOR (Colombia) | `primera-a-colombia` | 11539 (+ alt 11536) | torneo | 2026 is one season ("Liga DIMAYOR 2026") under 11539 with both halves; until 2025 the Finalización was its own tournament, 11536 |
+| Liga AUF Uruguaya | `primera-division-uruguay` | 278 | torneo | Apertura, Intermedio (two groups) and Clausura in one season |
+| Liga de Primera (Chile) | `liga-de-primera` | 11653 | league | a double round robin; tiebreak points, goal difference, wins, goals |
+| Liga 1 (Peru) | `liga-1-peru` | 406 | torneo | Apertura and Clausura in one season |
+| Copa BetPlay (Colombia) | `copa-colombia` | 1335 | knockout | its champion takes Sudamericana Colombia 1 (drawn in the Colombian simulation) |
+| Superliga BetPlay | `superliga-colombia` | 10756 | super | two legs |
+| Supercopa Uruguaya | `supercopa-uruguaya` | 11705 | super | one match |
+| Copa Chile | `copa-chile` | 1221 | knockout | groups listed as qualifying |
+| Copa de la Liga (Chile) | `copa-de-la-liga-chile` | 32734 | knockout | new in 2026; its final (Coquimbo v O'Higgins) was suspended twice and has no date |
+| Supercopa de Chile | `supercopa-de-chile` | 1309 | super | four clubs since 2026 |
+| Copa de la Liga (Peru) | `copa-de-la-liga-peru` | 35067 | knockout | new in 2026; final 15 Nov 2026 |
+
+Not added: the **Copa AUF Uruguay** (Sofascore's search finds no tournament for "Copa AUF Uruguay" or "Copa AUF"; a
+third search, "Copa Uruguay", met the 2 Nov challenge and is still to try), so Uruguay 4 in the Libertadores, its prize, is given to the Tabla Anual in the
+simulation; and **no Peruvian super cup**: none was played in 2025 or 2026, a new one (the Liga 1 champion against the
+Copa de la Liga champion) starts in 2027.
+
+- **Registries.** `teams.py` has a registry per league and `COUNTRY_REGISTRY` maps COL, URY/URU, CHL/CHI and PER to
+  them; the canonical name is Sofascore's own spelling, the one the Libertadores and Sudamericana stores already used,
+  so adding the leagues renamed nothing. `cup/config.py` `COUNTRY_LEAGUE` maps the same codes, so these clubs' cup
+  matches join the pooled fit under their league's prefix (§6 of MODELS.md): their Libertadores and Sudamericana
+  ratings now come from their full domestic seasons.
+- **Stages in the store.** For a torneo league the fetcher passes `torneo_labels=True` to `event_record`, which adds
+  `torneo` ("apertura", "clausura" for a Clausura or Finalización, "intermedio") from Sofascore's tournament label and
+  files Colombia's cuadrangulares ("..., Championship, Group A"; before 2025 "..., Apertura, Group A") as playoff
+  matches with their group. The season playoffs (Uruguay's semi-final and final, Peru's playoffs) carry no `torneo`.
+- **Sanctions and unlisted results.** Sofascore's match list carries no point deductions and lacks a few results its
+  own standings count (matches awarded after being called off, a handful never listed). Discovery now records each
+  table's points and matches (`standings_points`, `standings_at` in `seasons.json`) for these leagues;
+  `LeagueConfig.point_adjustments` and `unlisted_results` hold what the comparison found on 2 Nov 2026 (Peru: UTC −5 in
+  each stage, Sport Boys −4, ADT −1 and FC Cajamarca −2 on the Acumulada, one unlisted Clausura draw; Chile: two La
+  Calera matches awarded to Everton and Cobresal; Uruguay: four unlisted Apertura results, the Intermedio match Peñarol
+  v Liverpool awarded to Liverpool, two unlisted Clausura results, Peñarol −1 in the Clausura; Colombia: three
+  unlisted Apertura results). With them our tables equal Sofascore's. An unlisted result is skipped once Sofascore
+  lists the match. Re-check after each discovery (RUNBOOK §7).
+
 ### 4.3 `oddsmarkets/football/competitions/liga/config.py`: Argentina
 
 - `SOFASCORE_TOURNAMENT_ID = 155`. `SOFASCORE_COPA_LIGA_TOURNAMENT_ID = 13475`
@@ -617,6 +662,7 @@ both.
 | `KEEP_SEASONS = 2` | Newest season plus one of history. |
 | `resolve_id(cfg)` | `cfg.sofascore_id` if non-zero. Otherwise `search_tournament(cfg.search, cfg.country_hint)`; logs the resolved id, name and category, or an error and `None`. |
 | `list_seasons` | `/unique-tournament/{tid}/seasons`, newest first. |
+| `discover_league(cfg)` (torneo leagues relegating on a promedio) | Every season of the promedio window, from both tournaments where the halves were filed apart (Colombia 2024-2026 under 11539 and 11536), the ones before the previous year marked `"detail": false`; then as below, plus `standings_points` per table (§4.4). |
 | `discover_league(cfg)` | Seasons, then standings of the current season (overall block → `teams`, conference blocks → `conferences`, `promotion` texts → `bands_seen`), then standings of the previous season → `previous_rank` (seeds Elo). For Liga MX with `alt_sofascore_id`, the current season is the newer of the two tournaments' newest seasons. Team names are canonicalised through the league registry. |
 | `discover_cup(cfg)` | Seasons. For `fixed`, `knockout` and `international` kinds it stops there (no standings call). `groups` reads group blocks into `conferences` keyed by the last letter of the block name. Other kinds take the largest block as `teams`. Cup team names stay **raw** Sofascore spellings. |
 
@@ -668,6 +714,17 @@ Output: `oddsmarkets/football/competitions/liga/data/seasons.json` with
 One process serves every entry in `COMPETITIONS = {**LEAGUES, **CUPS}`. The
 season-events endpoint is format-agnostic: MLS has no rounds at all, and the
 same code handles it. Stores are written to `docs/site/data/<slug>/store.json`.
+
+Since 2 November 2026:
+- **A finished past season is refetched weekly, not hourly** (`complete_past_season`): a season other than the
+  current one whose stored matches have nothing left to kick off, refreshed within `PAST_SEASON_REFRESH_DAYS = 7`
+  (`meta.seasons_refreshed` holds each season's stamp). Colombia's store keeps five seasons for its promedio window and
+  would otherwise pay a dozen fixture pages an hour for lists that cannot change; every other store saves its previous
+  season's pages too.
+- **Seasons kept for their results only.** A `seasons.json` season with `"detail": false` (the older seasons of a
+  promedio window: Colombia's 2024 halves) gets no per-match detail.
+- **`--detail-only`** skips the fixture lists (the hourly task keeps them fresh) and spends the budget on detail: the
+  form a detail backfill between hourly runs takes (RUNBOOK §5a).
 
 **Startup**
 

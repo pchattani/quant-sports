@@ -82,6 +82,8 @@ TIERS: dict[str, dict[str, float]] = {
     "hockey": {"NHL": 34, "*": 14},
     "f1": {"*": 42},                              # a Grand Prix
     "college": {"CFB": 30, "MBB": 20, "WBB": 16, "*": 14},
+    # rugby (The Quant Scrum, men's tests): a World Cup and the Lions lead, then the championships, then other tests
+    "rugby": {"rwc": 50, "lions": 44, "six": 42, "nc": 40, "trc": 38, "tri20": 30, "wrwc": 34, "test": 24, "*": 20},
     "tennis": {"slam": 44, "finals": 38, "m1000": 28, "500": 18, "250": 10, "other": 6, "challenger": 4,
                "itf": 2, "*": 10},
     "football": {

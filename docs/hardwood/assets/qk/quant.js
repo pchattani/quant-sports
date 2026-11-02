@@ -64,7 +64,7 @@
 'use strict';
 
 var QK = root.QK || {};
-QK.version = '4.3.0';
+QK.version = '4.3.1';   /* 4.3.1: rugby (The Quant Scrum) in the registry, sections, glossary and My Teams */
 
 /* ─────────────────────────────────────── helpers */
 function esc(s) {
@@ -290,6 +290,7 @@ var ICON = {
   nfl: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3.5 16.5C2 11 5.5 4.5 16.5 3.5 18 9 14.5 15.5 3.5 16.5z"/><path d="M7 13l6-6M8.5 9.5l2 2M10 8l2 2"/></svg>',
   hockey: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><ellipse cx="10" cy="8" rx="7" ry="3"/><path d="M3 8v4c0 1.7 3.1 3 7 3s7-1.3 7-3V8"/></svg>',
   college: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2.5v15"/><path d="M4 3.5l12.5 3.8L4 11.2z"/><path d="M7 6.2l4.5 1.3"/></svg>',
+  rugby: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><ellipse cx="10" cy="10" rx="8.2" ry="5" transform="rotate(-35 10 10)"/><path d="M6.4 13.6l7.2-7.2"/><path d="M8.2 10.4l1.4 1.4M9.8 8.8l1.4 1.4"/></svg>',
   empty: '<svg viewBox="0 0 36 36" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="5" y="8" width="26" height="20" rx="3"/><path d="M5 14h26M11 20h8M11 24h5"/></svg>',
   arrow: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>'
 };
@@ -312,7 +313,9 @@ QK.ALL_SPORTS = [
   { key: 'hockey',     label: 'Hockey',     site: 'The Quant Rink',       repo: 'the-quant-rink',       folder: 'rink',     leagues: 'NHL' },
   { key: 'f1',         label: 'F1',         site: 'The Quant Paddock',    repo: 'the-quant-paddock',    folder: 'paddock',  leagues: 'Formula 1 · 1950 to today' },
   { key: 'tennis',     label: 'Tennis',     site: 'The Quant Ace',        repo: 'the-quant-ace',        folder: 'ace',      leagues: 'ATP · WTA' },
-  { key: 'college',    label: 'College',    site: 'The Quant Campus',     repo: 'the-quant-campus',     folder: 'campus',   leagues: 'CFB · Men’s and women’s college basketball' }
+  { key: 'college',    label: 'College',    site: 'The Quant Campus',     repo: 'the-quant-campus',     folder: 'campus',   leagues: 'CFB · Men’s and women’s college basketball' },
+  /* The Quant Scrum (international rugby union, Nov 2026): pending until its Pages repo exists (QK.visible) */
+  { key: 'rugby',      label: 'Rugby',      site: 'The Quant Scrum',      repo: 'the-quant-scrum',      folder: 'scrum',    leagues: 'Men’s tests · Six Nations, Rugby Championship, World Cup', pending: true }
 ];
 QK.ALL_SPORTS.forEach(function (s) { s.url = PUB + s.repo + '/'; s.data = s.url + 'data/'; s.accent = 'var(--a-' + s.key + ')'; });
 QK.sport = function (key) { for (var i = 0; i < QK.ALL_SPORTS.length; i++) if (QK.ALL_SPORTS[i].key === key) return QK.ALL_SPORTS[i]; return null; };
@@ -348,7 +351,9 @@ var SECTION_LABELS = {
   f1: { fixtures: 'Races', teams: 'Constructors', players: 'Drivers' },
   tennis: { fixtures: 'Draws', standings: 'Rankings', teams: null },
   baseball: { fixtures: 'Games' }, basketball: { fixtures: 'Games' }, hockey: { fixtures: 'Games' }, nfl: { fixtures: 'Games' },
-  college: { fixtures: 'Games' }
+  college: { fixtures: 'Games' },
+  /* rugby: no transfers market or fantasy game; the Value slot carries the rankings (ours and World Rugby's) */
+  rugby: { value: 'Rankings', fantasy: null }
 };
 /* Round 8 (28 Oct 2026): the Scouting Room. Players and Lab merge into one section, "Scouting Room" (key 'scout',
  * #/scout), in the Players slot; the Lab section is hidden. A site switches with one line:
@@ -642,7 +647,12 @@ var GL_SPORT = {
     REB: 'Rebounds', OREB: 'Offensive rebounds', DREB: 'Defensive rebounds', AST: 'Assists', STL: 'Steals', BLK: 'Blocks', TO: 'Turnovers',
     MIN: 'Minutes', PTS: 'Points', FG: 'Field goals made-attempted', '3PT': 'Three-pointers made-attempted', FT: 'Free throws made-attempted',
     ATS: 'Against the spread: games where the model side covered the line', AP: 'AP poll rank', Ours: 'Our rank', Prev: 'Previous AP rank',
-    In: 'Chance of making the playoff', Bye: 'Chance of a first-round bye', Line: 'The market line', Opp: 'Opponent', Q: 'Quarter' }
+    In: 'Chance of making the playoff', Bye: 'Chance of a first-round bye', Line: 'The market line', Opp: 'Opponent', Q: 'Quarter' },
+  rugby: { P: 'Played', W: 'Won', D: 'Drawn', L: 'Lost', PF: 'Points for', PA: 'Points against', PD: 'Points difference', TF: 'Tries for',
+    TA: 'Tries against', TB: 'Try bonus points (four or more tries)', LB: 'Losing bonus points (lost by seven or fewer)', GS: 'Grand Slam bonus points',
+    Pts: 'Table points', Caps: 'Tests in our data (older and smaller tests are missing)', Min: 'Minutes played', Tk: 'Tackles', MT: 'Missed tackles',
+    CB: 'Clean breaks', DB: 'Defenders beaten', Off: 'Offloads', Car: 'Carries', M: 'Metres carried', TO: 'Turnovers conceded', Pen: 'Penalties conceded',
+    YC: 'Yellow cards', RC: 'Red cards', Rtg: 'Our rating: points better than an average test side', WR: 'World Rugby points (our replica)' }
 };
 QK.GLOSS = {
   lookup: function (label, sport) {
@@ -997,6 +1007,7 @@ QK.periodLabel = function (g) {
   if (g.sport === 'baseball') return 'Inn ' + p;
   if (g.sport === 'hockey') return p > 3 ? 'OT' : 'P' + p;
   if (g.sport === 'nfl' || g.sport === 'basketball') return p > 4 ? 'OT' : 'Q' + p;
+  if (g.sport === 'rugby') return p > 2 ? 'ET' : 'H' + p;
   return String(p);
 };
 QK.matchCard = function (g, opts) {
@@ -2357,7 +2368,7 @@ QK.howSure = function (el, o) {
  * everything else away "at" home and "game". The card: both sides with monogram, record and form, the
  * score once it starts (the score bug when live), our chance for the favourite as a big blue number with a
  * sentence, the team-colour bar, a plain-English note and the match-up factors. */
-var PREVIEW_WORDS = { football: { vs: 'v', noun: 'match', homeFirst: true }, tennis: { vs: 'v', noun: 'match' }, f1: { vs: 'v', noun: 'race' } };
+var PREVIEW_WORDS = { football: { vs: 'v', noun: 'match', homeFirst: true }, rugby: { vs: 'v', noun: 'test', homeFirst: true }, tennis: { vs: 'v', noun: 'match' }, f1: { vs: 'v', noun: 'race' } };
 /* v4 options: layout: 'hero' (default: the diagonal split hero, QK.splitHero) | 'bug' (the scoreboard bug,
  * QK.scorebugXL, for a "tonight" slot on a player or team page). The note becomes the explain strip under the hero;
  * the market (game detail only) a quiet black line under the hero's foot; the factors a card of Bebas numbers with
@@ -2674,7 +2685,7 @@ QK.within = {
  * https://pchattani.github.io/, so a team followed on the Rink shows on Home). No account, nothing leaves the
  * browser. A local preview (127.0.0.1) is its own origin and starts with no follows: that is expected.
  *
- *   key        '<site>:<scope>:<id>': the site folder (site, bullpen, hardwood, rink, gridiron, campus, ace, paddock),
+ *   key        '<site>:<scope>:<id>': the site folder (site, bullpen, hardwood, rink, gridiron, campus, ace, paddock, scrum),
  *              a scope inside it (mlb, aaa, nba, wnba, club, team, cfb, atp, driver ...) and the site's own id
  *   item       { k, name, abbr, colour, alt, href (the site route '#/mlb/team/158' or a full URL), added (YYYY-MM-DD) }
  *   QK.follow  list() has(k) add(item) remove(k) toggle(item) update(k, fields) forSite(site, scope) parse(k)
@@ -2692,11 +2703,11 @@ var FOLLOW_KEY = 'qk-follow-v1', FOLLOW_MAX = 30;
 var FOLLOW_K = /^[a-z]+:[a-z0-9_]+:[A-Za-z0-9_.\-]+$/;
 /* the sites and scopes that publish follow cards (docs/<site>/data/follow/<scope>/<id>.json) */
 QK.FOLLOW_CARDS = { bullpen: ['mlb', 'aaa'], site: ['club'], rink: ['team'], gridiron: ['team'], hardwood: ['nba', 'wnba'],
-  campus: ['cfb', 'mbb', 'wbb', 'mch', 'wch'], ace: ['atp', 'wta'], paddock: ['driver', 'team'] };
+  campus: ['cfb', 'mbb', 'wbb', 'mch', 'wch'], ace: ['atp', 'wta'], paddock: ['driver', 'team'], scrum: ['men', 'women'] };
 /* what each scope is called, for chips, notes and the picker */
 QK.FOLLOW_SCOPES = { mlb: 'MLB', aaa: 'Triple-A', nba: 'NBA', wnba: 'WNBA', club: 'Football', team: 'Team', cfb: 'College football',
   mbb: 'Men’s college basketball', wbb: 'Women’s college basketball', mch: 'Men’s college hockey', wch: 'Women’s college hockey',
-  atp: 'ATP', wta: 'WTA', driver: 'Driver' };
+  atp: 'ATP', wta: 'WTA', driver: 'Driver', men: 'Men’s rugby', women: 'Women’s rugby' };
 var followFns = [], followCache = {};
 function folderSport(folder) { for (var i = 0; i < QK.ALL_SPORTS.length; i++) if (QK.ALL_SPORTS[i].folder === folder) return QK.ALL_SPORTS[i]; return null; }
 function fClean(x) {
@@ -2737,7 +2748,8 @@ var FOLLOW_ROUTES = {
   campus: function (r) { var m = /^\/(cfb|mbb|wbb|mch|wch)\/team\/([A-Za-z0-9]+)/.exec(r); return m ? [m[1], m[2]] : null; },
   ace: function (r) { var m = /^\/(atp|wta)\/player\/([A-Za-z0-9]+)/.exec(r); return m ? [m[1], m[2]] : null; },
   paddock: function (r) { var m = /^\/(driver|team)\/([A-Za-z0-9_\-]+)/.exec(r); return m ? [m[1], m[2]] : null; },
-  site: function (r) { var m = /^\/club\/(\d+)/.exec(r); return m ? ['club', m[1]] : null; }
+  site: function (r) { var m = /^\/club\/(\d+)/.exec(r); return m ? ['club', m[1]] : null; },
+  scrum: function (r) { var m = /^\/(men|women)\/team\/([A-Za-z0-9]+)/.exec(r); return m ? [m[1], m[2]] : null; }
 };
 QK.follow = {
   KEY: FOLLOW_KEY, MAX: FOLLOW_MAX,

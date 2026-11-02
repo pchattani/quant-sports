@@ -1,0 +1,3509 @@
+{
+ "sport": "rugby",
+ "site": "scrum",
+ "schema_version": 1,
+ "generated": "2026-11-02",
+ "leagues": [
+  "men",
+  "women"
+ ],
+ "payloads": {
+  "players": "docs/scrum/data/<S>/players.json -> cols/rows (id, n, team, pos, grp, age, gp, min, q, <metric>, p_<metric>)",
+  "player_pages": "docs/scrum/data/<S>/players/<id>.json -> cur.v / cur.pc, seasons[].v / .pc",
+  "teams": "docs/scrum/data/<S>/teams.json -> teams[].m{id: [value, percentile]}"
+ },
+ "method": {
+  "seasons": "calendar years 2006 to now (player statistics); 160+ minutes a year to qualify",
+  "yoy": "Pearson r of per-80 rates in consecutive years, z-scored within year and group",
+  "split_half": "odd v even appearances within a year",
+  "m50": "mean half-sample minutes x (1 - r) / r",
+  "predictive": "r with next year's Scrum value per 80"
+ },
+ "groups": [
+  {
+   "id": "front_row",
+   "entity": "player",
+   "display": "Front row",
+   "peer_group": "position group front_row (P, H)",
+   "position_field": "grp",
+   "position_codes": [
+    "front_row"
+   ],
+   "minimum": {
+    "field": "min",
+    "value": 160.0,
+    "unit": "minutes",
+    "note": "minutes in the window (the last two years on the Board, a calendar year for a season row)"
+   },
+   "basis": "per 80 minutes, shrunk toward the group with 240 minutes of prior",
+   "metrics": [
+    {
+     "id": "val80",
+     "display": "Scrum value per 80",
+     "short": "Value",
+     "unit": "points per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "headline",
+     "order": 1,
+     "basis": "rate",
+     "family": "value",
+     "explanation": "Our player value: points added to the final margin per 80 minutes above a replacement-level player in the same position group, from what each carry, break, tackle, turnover and penalty is worth (a model fitted on 2004-2018 tests), plus goal kicking above an average kicker.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.331,
+      "n_pairs": 349,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "m50": null,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.33
+     }
+    },
+    {
+     "id": "tk",
+     "display": "Tackles per 80",
+     "short": "Tackles",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "headline",
+     "order": 2,
+     "basis": "rate",
+     "family": "defence",
+     "explanation": "Tackles made per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.289,
+      "n_pairs": 349,
+      "split_half_r": 0.474,
+      "split_half_r_sb": 0.643,
+      "m50": 170,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.131
+     }
+    },
+    {
+     "id": "tkpct",
+     "display": "Tackle success",
+     "short": "Tackle %",
+     "unit": "%",
+     "unit_short": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "family": "defence",
+     "explanation": "Tackle success: tackles made out of tackles attempted.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.206,
+      "n_pairs": 342,
+      "split_half_r": 0.138,
+      "split_half_r_sb": 0.243,
+      "m50": 954,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.114
+     }
+    },
+    {
+     "id": "car",
+     "display": "Carries per 80",
+     "short": "Carries",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "family": "carrying",
+     "explanation": "Carries (runs with the ball) per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.627,
+      "n_pairs": 349,
+      "split_half_r": 0.545,
+      "split_half_r_sb": 0.705,
+      "m50": 128,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.203
+     }
+    },
+    {
+     "id": "m",
+     "display": "Metres per 80",
+     "short": "Metres",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "headline",
+     "order": 5,
+     "basis": "rate",
+     "family": "carrying",
+     "explanation": "Metres gained with the ball in hand per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.573,
+      "n_pairs": 349,
+      "split_half_r": 0.475,
+      "split_half_r_sb": 0.644,
+      "m50": 169,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.297
+     }
+    },
+    {
+     "id": "rk",
+     "display": "Rucks won per 80",
+     "short": "Rucks",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "headline",
+     "order": 6,
+     "basis": "rate",
+     "family": "breakdown",
+     "explanation": "Rucks won per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.463,
+      "n_pairs": 349,
+      "split_half_r": 0.877,
+      "split_half_r_sb": 0.934,
+      "m50": 21,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.055
+     }
+    },
+    {
+     "id": "db",
+     "display": "Defenders beaten per 80",
+     "short": "Beaten",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "headline",
+     "order": 7,
+     "basis": "rate",
+     "family": "carrying",
+     "explanation": "Defenders beaten per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.478,
+      "n_pairs": 349,
+      "split_half_r": 0.394,
+      "split_half_r_sb": 0.565,
+      "m50": 236,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.253
+     }
+    },
+    {
+     "id": "pc",
+     "display": "Penalties conceded per 80",
+     "short": "Pens",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "lower",
+     "set": "headline",
+     "order": 8,
+     "basis": "rate",
+     "family": "discipline",
+     "explanation": "Penalties conceded per 80 minutes (fewer is better).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.328,
+      "n_pairs": 349,
+      "split_half_r": 0.165,
+      "split_half_r_sb": 0.283,
+      "m50": 776,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": -0.28
+     }
+    },
+    {
+     "id": "pts",
+     "display": "Points per 80",
+     "short": "Points",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 9,
+     "basis": "rate",
+     "family": "scoring",
+     "explanation": "Points scored per 80 minutes: tries, conversions, penalties and drop goals.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.247,
+      "n_pairs": 349,
+      "split_half_r": 0.234,
+      "split_half_r_sb": 0.379,
+      "m50": 503,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.222
+     }
+    },
+    {
+     "id": "tries",
+     "display": "Tries per 80",
+     "short": "Tries",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 10,
+     "basis": "rate",
+     "family": "scoring",
+     "explanation": "Tries per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.247,
+      "n_pairs": 349,
+      "split_half_r": 0.234,
+      "split_half_r_sb": 0.379,
+      "m50": 503,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.222
+     }
+    },
+    {
+     "id": "ta",
+     "display": "Try assists per 80",
+     "short": "Try ast",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 11,
+     "basis": "rate",
+     "family": "creating",
+     "explanation": "Try assists (the last pass or kick before a try) per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.055,
+      "n_pairs": 349,
+      "split_half_r": 0.037,
+      "split_half_r_sb": 0.071,
+      "m50": null,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.104
+     }
+    },
+    {
+     "id": "mpc",
+     "display": "Metres per carry",
+     "short": "m/carry",
+     "unit": "metres per carry",
+     "unit_short": "m/carry",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 12,
+     "basis": "rate",
+     "family": "carrying",
+     "explanation": "Metres per carry: how far a carry goes on average.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.404,
+      "n_pairs": 342,
+      "split_half_r": 0.377,
+      "split_half_r_sb": 0.548,
+      "m50": 253,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.169
+     }
+    },
+    {
+     "id": "cb",
+     "display": "Clean breaks per 80",
+     "short": "Breaks",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 13,
+     "basis": "rate",
+     "family": "carrying",
+     "explanation": "Clean breaks (carries through the defensive line) per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.333,
+      "n_pairs": 349,
+      "split_half_r": 0.274,
+      "split_half_r_sb": 0.431,
+      "m50": 405,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.244
+     }
+    },
+    {
+     "id": "off",
+     "display": "Offloads per 80",
+     "short": "Offloads",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 14,
+     "basis": "rate",
+     "family": "creating",
+     "explanation": "Offloads (passes out of a tackle) per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.384,
+      "n_pairs": 349,
+      "split_half_r": 0.293,
+      "split_half_r_sb": 0.453,
+      "m50": 370,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.274
+     }
+    },
+    {
+     "id": "pas",
+     "display": "Passes per 80",
+     "short": "Passes",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 15,
+     "basis": "rate",
+     "family": "creating",
+     "explanation": "Passes per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.52,
+      "n_pairs": 349,
+      "split_half_r": 0.539,
+      "split_half_r_sb": 0.7,
+      "m50": 131,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.175
+     }
+    },
+    {
+     "id": "mt",
+     "display": "Missed tackles per 80",
+     "short": "Missed",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 16,
+     "basis": "rate",
+     "family": "defence",
+     "explanation": "Missed tackles per 80 minutes (fewer is better).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.28,
+      "n_pairs": 349,
+      "split_half_r": 0.277,
+      "split_half_r_sb": 0.433,
+      "m50": 400,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": -0.062
+     }
+    },
+    {
+     "id": "toc",
+     "display": "Turnovers conceded per 80",
+     "short": "TO conc",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 17,
+     "basis": "rate",
+     "family": "discipline",
+     "explanation": "Turnovers conceded per 80 minutes (fewer is better).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.151,
+      "n_pairs": 349,
+      "split_half_r": 0.104,
+      "split_half_r_sb": 0.188,
+      "m50": 1326,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.196
+     }
+    },
+    {
+     "id": "kfh",
+     "display": "Kicks from hand per 80",
+     "short": "Kicks",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 18,
+     "basis": "rate",
+     "family": "kicking",
+     "explanation": "Kicks from hand per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.076,
+      "n_pairs": 349,
+      "split_half_r": -0.018,
+      "split_half_r_sb": -0.036,
+      "m50": null,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.15
+     }
+    },
+    {
+     "id": "kpct",
+     "display": "Goal-kicking success",
+     "short": "Goal %",
+     "unit": "%",
+     "unit_short": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 19,
+     "basis": "rate",
+     "family": "kicking",
+     "explanation": "Goal-kicking success: conversions and penalties kicked out of attempts.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": null,
+      "n_pairs": 0,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "m50": null,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": null
+     }
+    }
+   ],
+   "view": {
+    "why": "Props and hookers: the tackle count and its success, carries and rucks; the set piece itself is a team stat.",
+    "excel": [
+     "tk",
+     "tkpct",
+     "car"
+    ],
+    "value": [
+     "val80"
+    ],
+    "x": "tk",
+    "y": "tkpct",
+    "color": "val80"
+   }
+  },
+  {
+   "id": "lock",
+   "entity": "player",
+   "display": "Locks",
+   "peer_group": "position group lock (L)",
+   "position_field": "grp",
+   "position_codes": [
+    "lock"
+   ],
+   "minimum": {
+    "field": "min",
+    "value": 160.0,
+    "unit": "minutes",
+    "note": "minutes in the window (the last two years on the Board, a calendar year for a season row)"
+   },
+   "basis": "per 80 minutes, shrunk toward the group with 240 minutes of prior",
+   "metrics": [
+    {
+     "id": "val80",
+     "display": "Scrum value per 80",
+     "short": "Value",
+     "unit": "points per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "headline",
+     "order": 1,
+     "basis": "rate",
+     "family": "value",
+     "explanation": "Our player value: points added to the final margin per 80 minutes above a replacement-level player in the same position group, from what each carry, break, tackle, turnover and penalty is worth (a model fitted on 2004-2018 tests), plus goal kicking above an average kicker.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.132,
+      "n_pairs": 230,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "m50": null,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.145
+     }
+    },
+    {
+     "id": "tk",
+     "display": "Tackles per 80",
+     "short": "Tackles",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "headline",
+     "order": 2,
+     "basis": "rate",
+     "family": "defence",
+     "explanation": "Tackles made per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.345,
+      "n_pairs": 230,
+      "split_half_r": 0.47,
+      "split_half_r_sb": 0.639,
+      "m50": 198,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.11
+     }
+    },
+    {
+     "id": "tkpct",
+     "display": "Tackle success",
+     "short": "Tackle %",
+     "unit": "%",
+     "unit_short": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "family": "defence",
+     "explanation": "Tackle success: tackles made out of tackles attempted.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.211,
+      "n_pairs": 222,
+      "split_half_r": 0.256,
+      "split_half_r_sb": 0.408,
+      "m50": 510,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.038
+     }
+    },
+    {
+     "id": "car",
+     "display": "Carries per 80",
+     "short": "Carries",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "family": "carrying",
+     "explanation": "Carries (runs with the ball) per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.477,
+      "n_pairs": 230,
+      "split_half_r": 0.496,
+      "split_half_r_sb": 0.663,
+      "m50": 178,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.19
+     }
+    },
+    {
+     "id": "m",
+     "display": "Metres per 80",
+     "short": "Metres",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "headline",
+     "order": 5,
+     "basis": "rate",
+     "family": "carrying",
+     "explanation": "Metres gained with the ball in hand per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.473,
+      "n_pairs": 230,
+      "split_half_r": 0.396,
+      "split_half_r_sb": 0.568,
+      "m50": 267,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.213
+     }
+    },
+    {
+     "id": "rk",
+     "display": "Rucks won per 80",
+     "short": "Rucks",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "headline",
+     "order": 6,
+     "basis": "rate",
+     "family": "breakdown",
+     "explanation": "Rucks won per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.338,
+      "n_pairs": 230,
+      "split_half_r": 0.871,
+      "split_half_r_sb": 0.931,
+      "m50": 26,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.132
+     }
+    },
+    {
+     "id": "db",
+     "display": "Defenders beaten per 80",
+     "short": "Beaten",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "headline",
+     "order": 7,
+     "basis": "rate",
+     "family": "carrying",
+     "explanation": "Defenders beaten per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.264,
+      "n_pairs": 230,
+      "split_half_r": 0.259,
+      "split_half_r_sb": 0.412,
+      "m50": 501,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.204
+     }
+    },
+    {
+     "id": "pc",
+     "display": "Penalties conceded per 80",
+     "short": "Pens",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "lower",
+     "set": "headline",
+     "order": 8,
+     "basis": "rate",
+     "family": "discipline",
+     "explanation": "Penalties conceded per 80 minutes (fewer is better).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.15,
+      "n_pairs": 230,
+      "split_half_r": 0.052,
+      "split_half_r_sb": 0.099,
+      "m50": 3190,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": -0.02
+     }
+    },
+    {
+     "id": "pts",
+     "display": "Points per 80",
+     "short": "Points",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 9,
+     "basis": "rate",
+     "family": "scoring",
+     "explanation": "Points scored per 80 minutes: tries, conversions, penalties and drop goals.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.142,
+      "n_pairs": 230,
+      "split_half_r": 0.091,
+      "split_half_r_sb": 0.167,
+      "m50": 1746,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.014
+     }
+    },
+    {
+     "id": "tries",
+     "display": "Tries per 80",
+     "short": "Tries",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 10,
+     "basis": "rate",
+     "family": "scoring",
+     "explanation": "Tries per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.142,
+      "n_pairs": 230,
+      "split_half_r": 0.091,
+      "split_half_r_sb": 0.167,
+      "m50": 1746,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.014
+     }
+    },
+    {
+     "id": "ta",
+     "display": "Try assists per 80",
+     "short": "Try ast",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 11,
+     "basis": "rate",
+     "family": "creating",
+     "explanation": "Try assists (the last pass or kick before a try) per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.081,
+      "n_pairs": 230,
+      "split_half_r": 0.051,
+      "split_half_r_sb": 0.097,
+      "m50": 3252,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.083
+     }
+    },
+    {
+     "id": "mpc",
+     "display": "Metres per carry",
+     "short": "m/carry",
+     "unit": "metres per carry",
+     "unit_short": "m/carry",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 12,
+     "basis": "rate",
+     "family": "carrying",
+     "explanation": "Metres per carry: how far a carry goes on average.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.426,
+      "n_pairs": 222,
+      "split_half_r": 0.264,
+      "split_half_r_sb": 0.418,
+      "m50": 490,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.138
+     }
+    },
+    {
+     "id": "cb",
+     "display": "Clean breaks per 80",
+     "short": "Breaks",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 13,
+     "basis": "rate",
+     "family": "carrying",
+     "explanation": "Clean breaks (carries through the defensive line) per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.208,
+      "n_pairs": 230,
+      "split_half_r": 0.146,
+      "split_half_r_sb": 0.254,
+      "m50": 1028,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.062
+     }
+    },
+    {
+     "id": "off",
+     "display": "Offloads per 80",
+     "short": "Offloads",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 14,
+     "basis": "rate",
+     "family": "creating",
+     "explanation": "Offloads (passes out of a tackle) per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.127,
+      "n_pairs": 230,
+      "split_half_r": 0.392,
+      "split_half_r_sb": 0.563,
+      "m50": 272,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.136
+     }
+    },
+    {
+     "id": "pas",
+     "display": "Passes per 80",
+     "short": "Passes",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 15,
+     "basis": "rate",
+     "family": "creating",
+     "explanation": "Passes per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.397,
+      "n_pairs": 230,
+      "split_half_r": 0.621,
+      "split_half_r_sb": 0.766,
+      "m50": 107,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.141
+     }
+    },
+    {
+     "id": "mt",
+     "display": "Missed tackles per 80",
+     "short": "Missed",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 16,
+     "basis": "rate",
+     "family": "defence",
+     "explanation": "Missed tackles per 80 minutes (fewer is better).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.199,
+      "n_pairs": 230,
+      "split_half_r": 0.37,
+      "split_half_r_sb": 0.54,
+      "m50": 299,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.041
+     }
+    },
+    {
+     "id": "toc",
+     "display": "Turnovers conceded per 80",
+     "short": "TO conc",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 17,
+     "basis": "rate",
+     "family": "discipline",
+     "explanation": "Turnovers conceded per 80 minutes (fewer is better).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.113,
+      "n_pairs": 230,
+      "split_half_r": 0.025,
+      "split_half_r_sb": 0.048,
+      "m50": null,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.001
+     }
+    },
+    {
+     "id": "kfh",
+     "display": "Kicks from hand per 80",
+     "short": "Kicks",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 18,
+     "basis": "rate",
+     "family": "kicking",
+     "explanation": "Kicks from hand per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.214,
+      "n_pairs": 230,
+      "split_half_r": 0.221,
+      "split_half_r_sb": 0.361,
+      "m50": 620,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.047
+     }
+    },
+    {
+     "id": "kpct",
+     "display": "Goal-kicking success",
+     "short": "Goal %",
+     "unit": "%",
+     "unit_short": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 19,
+     "basis": "rate",
+     "family": "kicking",
+     "explanation": "Goal-kicking success: conversions and penalties kicked out of attempts.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": null,
+      "n_pairs": 0,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "m50": null,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": null
+     }
+    }
+   ],
+   "view": {
+    "why": "Locks: the tackle and carry work (lineout wins are a team stat in our source).",
+    "excel": [
+     "tk",
+     "tkpct",
+     "car"
+    ],
+    "value": [
+     "val80"
+    ],
+    "x": "tk",
+    "y": "tkpct",
+    "color": "val80"
+   }
+  },
+  {
+   "id": "back_row",
+   "entity": "player",
+   "display": "Back row",
+   "peer_group": "position group back_row (FL, N8)",
+   "position_field": "grp",
+   "position_codes": [
+    "back_row"
+   ],
+   "minimum": {
+    "field": "min",
+    "value": 160.0,
+    "unit": "minutes",
+    "note": "minutes in the window (the last two years on the Board, a calendar year for a season row)"
+   },
+   "basis": "per 80 minutes, shrunk toward the group with 240 minutes of prior",
+   "metrics": [
+    {
+     "id": "val80",
+     "display": "Scrum value per 80",
+     "short": "Value",
+     "unit": "points per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "headline",
+     "order": 1,
+     "basis": "rate",
+     "family": "value",
+     "explanation": "Our player value: points added to the final margin per 80 minutes above a replacement-level player in the same position group, from what each carry, break, tackle, turnover and penalty is worth (a model fitted on 2004-2018 tests), plus goal kicking above an average kicker.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.309,
+      "n_pairs": 322,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "m50": null,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.277
+     }
+    },
+    {
+     "id": "tk",
+     "display": "Tackles per 80",
+     "short": "Tackles",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "headline",
+     "order": 2,
+     "basis": "rate",
+     "family": "defence",
+     "explanation": "Tackles made per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.384,
+      "n_pairs": 322,
+      "split_half_r": 0.475,
+      "split_half_r_sb": 0.644,
+      "m50": 199,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": -0.011
+     }
+    },
+    {
+     "id": "car",
+     "display": "Carries per 80",
+     "short": "Carries",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "family": "carrying",
+     "explanation": "Carries (runs with the ball) per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.64,
+      "n_pairs": 322,
+      "split_half_r": 0.606,
+      "split_half_r_sb": 0.755,
+      "m50": 117,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.24
+     }
+    },
+    {
+     "id": "m",
+     "display": "Metres per 80",
+     "short": "Metres",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "family": "carrying",
+     "explanation": "Metres gained with the ball in hand per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.595,
+      "n_pairs": 322,
+      "split_half_r": 0.479,
+      "split_half_r_sb": 0.648,
+      "m50": 196,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.339
+     }
+    },
+    {
+     "id": "db",
+     "display": "Defenders beaten per 80",
+     "short": "Beaten",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "headline",
+     "order": 5,
+     "basis": "rate",
+     "family": "carrying",
+     "explanation": "Defenders beaten per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.532,
+      "n_pairs": 322,
+      "split_half_r": 0.472,
+      "split_half_r_sb": 0.641,
+      "m50": 202,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.291
+     }
+    },
+    {
+     "id": "tkpct",
+     "display": "Tackle success",
+     "short": "Tackle %",
+     "unit": "%",
+     "unit_short": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 6,
+     "basis": "rate",
+     "family": "defence",
+     "explanation": "Tackle success: tackles made out of tackles attempted.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.311,
+      "n_pairs": 312,
+      "split_half_r": 0.171,
+      "split_half_r_sb": 0.293,
+      "m50": 875,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.094
+     }
+    },
+    {
+     "id": "off",
+     "display": "Offloads per 80",
+     "short": "Offloads",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "headline",
+     "order": 7,
+     "basis": "rate",
+     "family": "creating",
+     "explanation": "Offloads (passes out of a tackle) per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.463,
+      "n_pairs": 322,
+      "split_half_r": 0.352,
+      "split_half_r_sb": 0.521,
+      "m50": 332,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.117
+     }
+    },
+    {
+     "id": "pc",
+     "display": "Penalties conceded per 80",
+     "short": "Pens",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "lower",
+     "set": "headline",
+     "order": 8,
+     "basis": "rate",
+     "family": "discipline",
+     "explanation": "Penalties conceded per 80 minutes (fewer is better).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.121,
+      "n_pairs": 322,
+      "split_half_r": 0.122,
+      "split_half_r_sb": 0.217,
+      "m50": 1300,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": -0.003
+     }
+    },
+    {
+     "id": "pts",
+     "display": "Points per 80",
+     "short": "Points",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 9,
+     "basis": "rate",
+     "family": "scoring",
+     "explanation": "Points scored per 80 minutes: tries, conversions, penalties and drop goals.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.223,
+      "n_pairs": 322,
+      "split_half_r": 0.03,
+      "split_half_r_sb": 0.058,
+      "m50": null,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.17
+     }
+    },
+    {
+     "id": "tries",
+     "display": "Tries per 80",
+     "short": "Tries",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 10,
+     "basis": "rate",
+     "family": "scoring",
+     "explanation": "Tries per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.223,
+      "n_pairs": 322,
+      "split_half_r": 0.03,
+      "split_half_r_sb": 0.059,
+      "m50": null,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.17
+     }
+    },
+    {
+     "id": "ta",
+     "display": "Try assists per 80",
+     "short": "Try ast",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 11,
+     "basis": "rate",
+     "family": "creating",
+     "explanation": "Try assists (the last pass or kick before a try) per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.171,
+      "n_pairs": 322,
+      "split_half_r": 0.055,
+      "split_half_r_sb": 0.104,
+      "m50": 3094,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.057
+     }
+    },
+    {
+     "id": "mpc",
+     "display": "Metres per carry",
+     "short": "m/carry",
+     "unit": "metres per carry",
+     "unit_short": "m/carry",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 12,
+     "basis": "rate",
+     "family": "carrying",
+     "explanation": "Metres per carry: how far a carry goes on average.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.446,
+      "n_pairs": 312,
+      "split_half_r": 0.353,
+      "split_half_r_sb": 0.522,
+      "m50": 332,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.214
+     }
+    },
+    {
+     "id": "cb",
+     "display": "Clean breaks per 80",
+     "short": "Breaks",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 13,
+     "basis": "rate",
+     "family": "carrying",
+     "explanation": "Clean breaks (carries through the defensive line) per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.253,
+      "n_pairs": 322,
+      "split_half_r": 0.164,
+      "split_half_r_sb": 0.281,
+      "m50": 922,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.157
+     }
+    },
+    {
+     "id": "pas",
+     "display": "Passes per 80",
+     "short": "Passes",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 14,
+     "basis": "rate",
+     "family": "creating",
+     "explanation": "Passes per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.629,
+      "n_pairs": 322,
+      "split_half_r": 0.563,
+      "split_half_r_sb": 0.721,
+      "m50": 140,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.075
+     }
+    },
+    {
+     "id": "mt",
+     "display": "Missed tackles per 80",
+     "short": "Missed",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 15,
+     "basis": "rate",
+     "family": "defence",
+     "explanation": "Missed tackles per 80 minutes (fewer is better).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.335,
+      "n_pairs": 322,
+      "split_half_r": 0.287,
+      "split_half_r_sb": 0.447,
+      "m50": 447,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": -0.11
+     }
+    },
+    {
+     "id": "rk",
+     "display": "Rucks won per 80",
+     "short": "Rucks",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 16,
+     "basis": "rate",
+     "family": "breakdown",
+     "explanation": "Rucks won per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.596,
+      "n_pairs": 322,
+      "split_half_r": 0.892,
+      "split_half_r_sb": 0.943,
+      "m50": 22,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.16
+     }
+    },
+    {
+     "id": "toc",
+     "display": "Turnovers conceded per 80",
+     "short": "TO conc",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 17,
+     "basis": "rate",
+     "family": "discipline",
+     "explanation": "Turnovers conceded per 80 minutes (fewer is better).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.15,
+      "n_pairs": 322,
+      "split_half_r": 0.113,
+      "split_half_r_sb": 0.204,
+      "m50": 1409,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.003
+     }
+    },
+    {
+     "id": "kfh",
+     "display": "Kicks from hand per 80",
+     "short": "Kicks",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 18,
+     "basis": "rate",
+     "family": "kicking",
+     "explanation": "Kicks from hand per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.25,
+      "n_pairs": 322,
+      "split_half_r": 0.167,
+      "split_half_r_sb": 0.286,
+      "m50": 901,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.053
+     }
+    },
+    {
+     "id": "kpct",
+     "display": "Goal-kicking success",
+     "short": "Goal %",
+     "unit": "%",
+     "unit_short": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 19,
+     "basis": "rate",
+     "family": "kicking",
+     "explanation": "Goal-kicking success: conversions and penalties kicked out of attempts.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": null,
+      "n_pairs": 0,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "m50": null,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": null
+     }
+    }
+   ],
+   "view": {
+    "why": "Flankers and number 8s: tackles, carries and the metres after contact.",
+    "excel": [
+     "tk",
+     "car",
+     "m"
+    ],
+    "value": [
+     "val80"
+    ],
+    "x": "tk",
+    "y": "car",
+    "color": "val80"
+   }
+  },
+  {
+   "id": "halves",
+   "entity": "player",
+   "display": "Half-backs",
+   "peer_group": "position group halves (SH, FH)",
+   "position_field": "grp",
+   "position_codes": [
+    "halves"
+   ],
+   "minimum": {
+    "field": "min",
+    "value": 160.0,
+    "unit": "minutes",
+    "note": "minutes in the window (the last two years on the Board, a calendar year for a season row)"
+   },
+   "basis": "per 80 minutes, shrunk toward the group with 240 minutes of prior",
+   "metrics": [
+    {
+     "id": "val80",
+     "display": "Scrum value per 80",
+     "short": "Value",
+     "unit": "points per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "headline",
+     "order": 1,
+     "basis": "rate",
+     "family": "value",
+     "explanation": "Our player value: points added to the final margin per 80 minutes above a replacement-level player in the same position group, from what each carry, break, tackle, turnover and penalty is worth (a model fitted on 2004-2018 tests), plus goal kicking above an average kicker.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.195,
+      "n_pairs": 200,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "m50": null,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.239
+     }
+    },
+    {
+     "id": "pts",
+     "display": "Points per 80",
+     "short": "Points",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "headline",
+     "order": 2,
+     "basis": "rate",
+     "family": "scoring",
+     "explanation": "Points scored per 80 minutes: tries, conversions, penalties and drop goals.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.72,
+      "n_pairs": 200,
+      "split_half_r": 0.707,
+      "split_half_r_sb": 0.828,
+      "m50": 69,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.308
+     }
+    },
+    {
+     "id": "pas",
+     "display": "Passes per 80",
+     "short": "Passes",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "family": "creating",
+     "explanation": "Passes per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.855,
+      "n_pairs": 200,
+      "split_half_r": 0.831,
+      "split_half_r_sb": 0.908,
+      "m50": 34,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": -0.235
+     }
+    },
+    {
+     "id": "kfh",
+     "display": "Kicks from hand per 80",
+     "short": "Kicks",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "family": "kicking",
+     "explanation": "Kicks from hand per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.438,
+      "n_pairs": 200,
+      "split_half_r": 0.569,
+      "split_half_r_sb": 0.725,
+      "m50": 126,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.044
+     }
+    },
+    {
+     "id": "kpct",
+     "display": "Goal-kicking success",
+     "short": "Goal %",
+     "unit": "%",
+     "unit_short": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 5,
+     "basis": "rate",
+     "family": "kicking",
+     "explanation": "Goal-kicking success: conversions and penalties kicked out of attempts.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": -0.075,
+      "n_pairs": 56,
+      "split_half_r": -0.027,
+      "split_half_r_sb": -0.056,
+      "m50": null,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.024
+     }
+    },
+    {
+     "id": "ta",
+     "display": "Try assists per 80",
+     "short": "Try ast",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "headline",
+     "order": 6,
+     "basis": "rate",
+     "family": "creating",
+     "explanation": "Try assists (the last pass or kick before a try) per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.168,
+      "n_pairs": 200,
+      "split_half_r": 0.051,
+      "split_half_r_sb": 0.098,
+      "m50": 3065,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.013
+     }
+    },
+    {
+     "id": "m",
+     "display": "Metres per 80",
+     "short": "Metres",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "headline",
+     "order": 7,
+     "basis": "rate",
+     "family": "carrying",
+     "explanation": "Metres gained with the ball in hand per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.366,
+      "n_pairs": 200,
+      "split_half_r": 0.434,
+      "split_half_r_sb": 0.606,
+      "m50": 217,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.144
+     }
+    },
+    {
+     "id": "tk",
+     "display": "Tackles per 80",
+     "short": "Tackles",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "headline",
+     "order": 8,
+     "basis": "rate",
+     "family": "defence",
+     "explanation": "Tackles made per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.389,
+      "n_pairs": 200,
+      "split_half_r": 0.458,
+      "split_half_r_sb": 0.628,
+      "m50": 197,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.156
+     }
+    },
+    {
+     "id": "tries",
+     "display": "Tries per 80",
+     "short": "Tries",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 9,
+     "basis": "rate",
+     "family": "scoring",
+     "explanation": "Tries per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.07,
+      "n_pairs": 200,
+      "split_half_r": 0.092,
+      "split_half_r_sb": 0.169,
+      "m50": 1637,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.055
+     }
+    },
+    {
+     "id": "car",
+     "display": "Carries per 80",
+     "short": "Carries",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 10,
+     "basis": "rate",
+     "family": "carrying",
+     "explanation": "Carries (runs with the ball) per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.386,
+      "n_pairs": 200,
+      "split_half_r": 0.526,
+      "split_half_r_sb": 0.69,
+      "m50": 150,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.151
+     }
+    },
+    {
+     "id": "mpc",
+     "display": "Metres per carry",
+     "short": "m/carry",
+     "unit": "metres per carry",
+     "unit_short": "m/carry",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 11,
+     "basis": "rate",
+     "family": "carrying",
+     "explanation": "Metres per carry: how far a carry goes on average.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.222,
+      "n_pairs": 193,
+      "split_half_r": 0.161,
+      "split_half_r_sb": 0.277,
+      "m50": 871,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.09
+     }
+    },
+    {
+     "id": "cb",
+     "display": "Clean breaks per 80",
+     "short": "Breaks",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 12,
+     "basis": "rate",
+     "family": "carrying",
+     "explanation": "Clean breaks (carries through the defensive line) per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.225,
+      "n_pairs": 200,
+      "split_half_r": 0.35,
+      "split_half_r_sb": 0.518,
+      "m50": 309,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.094
+     }
+    },
+    {
+     "id": "db",
+     "display": "Defenders beaten per 80",
+     "short": "Beaten",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 13,
+     "basis": "rate",
+     "family": "carrying",
+     "explanation": "Defenders beaten per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.402,
+      "n_pairs": 200,
+      "split_half_r": 0.466,
+      "split_half_r_sb": 0.635,
+      "m50": 191,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.167
+     }
+    },
+    {
+     "id": "off",
+     "display": "Offloads per 80",
+     "short": "Offloads",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 14,
+     "basis": "rate",
+     "family": "creating",
+     "explanation": "Offloads (passes out of a tackle) per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.247,
+      "n_pairs": 200,
+      "split_half_r": 0.253,
+      "split_half_r_sb": 0.404,
+      "m50": 490,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.052
+     }
+    },
+    {
+     "id": "tkpct",
+     "display": "Tackle success",
+     "short": "Tackle %",
+     "unit": "%",
+     "unit_short": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 15,
+     "basis": "rate",
+     "family": "defence",
+     "explanation": "Tackle success: tackles made out of tackles attempted.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.383,
+      "n_pairs": 193,
+      "split_half_r": 0.243,
+      "split_half_r_sb": 0.391,
+      "m50": 519,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.054
+     }
+    },
+    {
+     "id": "mt",
+     "display": "Missed tackles per 80",
+     "short": "Missed",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 16,
+     "basis": "rate",
+     "family": "defence",
+     "explanation": "Missed tackles per 80 minutes (fewer is better).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.174,
+      "n_pairs": 200,
+      "split_half_r": 0.268,
+      "split_half_r_sb": 0.423,
+      "m50": 454,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.091
+     }
+    },
+    {
+     "id": "rk",
+     "display": "Rucks won per 80",
+     "short": "Rucks",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 17,
+     "basis": "rate",
+     "family": "breakdown",
+     "explanation": "Rucks won per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.23,
+      "n_pairs": 200,
+      "split_half_r": 0.817,
+      "split_half_r_sb": 0.899,
+      "m50": 37,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.064
+     }
+    },
+    {
+     "id": "toc",
+     "display": "Turnovers conceded per 80",
+     "short": "TO conc",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 18,
+     "basis": "rate",
+     "family": "discipline",
+     "explanation": "Turnovers conceded per 80 minutes (fewer is better).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.179,
+      "n_pairs": 200,
+      "split_half_r": 0.268,
+      "split_half_r_sb": 0.422,
+      "m50": 455,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.086
+     }
+    },
+    {
+     "id": "pc",
+     "display": "Penalties conceded per 80",
+     "short": "Pens",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 19,
+     "basis": "rate",
+     "family": "discipline",
+     "explanation": "Penalties conceded per 80 minutes (fewer is better).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.225,
+      "n_pairs": 200,
+      "split_half_r": 0.157,
+      "split_half_r_sb": 0.272,
+      "m50": 892,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": -0.084
+     }
+    }
+   ],
+   "view": {
+    "why": "Scrum-halves and fly-halves: points (the goal kicker), passing, kicking and try assists.",
+    "excel": [
+     "pts",
+     "pas",
+     "kfh"
+    ],
+    "value": [
+     "val80"
+    ],
+    "x": "pts",
+    "y": "pas",
+    "color": "val80"
+   }
+  },
+  {
+   "id": "centres",
+   "entity": "player",
+   "display": "Centres",
+   "peer_group": "position group centres (C)",
+   "position_field": "grp",
+   "position_codes": [
+    "centres"
+   ],
+   "minimum": {
+    "field": "min",
+    "value": 160.0,
+    "unit": "minutes",
+    "note": "minutes in the window (the last two years on the Board, a calendar year for a season row)"
+   },
+   "basis": "per 80 minutes, shrunk toward the group with 240 minutes of prior",
+   "metrics": [
+    {
+     "id": "val80",
+     "display": "Scrum value per 80",
+     "short": "Value",
+     "unit": "points per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "headline",
+     "order": 1,
+     "basis": "rate",
+     "family": "value",
+     "explanation": "Our player value: points added to the final margin per 80 minutes above a replacement-level player in the same position group, from what each carry, break, tackle, turnover and penalty is worth (a model fitted on 2004-2018 tests), plus goal kicking above an average kicker.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.127,
+      "n_pairs": 229,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "m50": null,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.198
+     }
+    },
+    {
+     "id": "m",
+     "display": "Metres per 80",
+     "short": "Metres",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "headline",
+     "order": 2,
+     "basis": "rate",
+     "family": "carrying",
+     "explanation": "Metres gained with the ball in hand per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.36,
+      "n_pairs": 229,
+      "split_half_r": 0.338,
+      "split_half_r_sb": 0.505,
+      "m50": 369,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.181
+     }
+    },
+    {
+     "id": "cb",
+     "display": "Clean breaks per 80",
+     "short": "Breaks",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "family": "carrying",
+     "explanation": "Clean breaks (carries through the defensive line) per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.083,
+      "n_pairs": 229,
+      "split_half_r": 0.319,
+      "split_half_r_sb": 0.484,
+      "m50": 402,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.064
+     }
+    },
+    {
+     "id": "db",
+     "display": "Defenders beaten per 80",
+     "short": "Beaten",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "family": "carrying",
+     "explanation": "Defenders beaten per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.371,
+      "n_pairs": 229,
+      "split_half_r": 0.319,
+      "split_half_r_sb": 0.484,
+      "m50": 402,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.126
+     }
+    },
+    {
+     "id": "car",
+     "display": "Carries per 80",
+     "short": "Carries",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "headline",
+     "order": 5,
+     "basis": "rate",
+     "family": "carrying",
+     "explanation": "Carries (runs with the ball) per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.525,
+      "n_pairs": 229,
+      "split_half_r": 0.409,
+      "split_half_r_sb": 0.581,
+      "m50": 272,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.138
+     }
+    },
+    {
+     "id": "off",
+     "display": "Offloads per 80",
+     "short": "Offloads",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "headline",
+     "order": 6,
+     "basis": "rate",
+     "family": "creating",
+     "explanation": "Offloads (passes out of a tackle) per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.295,
+      "n_pairs": 229,
+      "split_half_r": 0.363,
+      "split_half_r_sb": 0.532,
+      "m50": 331,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.094
+     }
+    },
+    {
+     "id": "ta",
+     "display": "Try assists per 80",
+     "short": "Try ast",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "headline",
+     "order": 7,
+     "basis": "rate",
+     "family": "creating",
+     "explanation": "Try assists (the last pass or kick before a try) per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.047,
+      "n_pairs": 229,
+      "split_half_r": 0.151,
+      "split_half_r_sb": 0.262,
+      "m50": 1060,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.08
+     }
+    },
+    {
+     "id": "tk",
+     "display": "Tackles per 80",
+     "short": "Tackles",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "headline",
+     "order": 8,
+     "basis": "rate",
+     "family": "defence",
+     "explanation": "Tackles made per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.284,
+      "n_pairs": 229,
+      "split_half_r": 0.335,
+      "split_half_r_sb": 0.502,
+      "m50": 375,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.002
+     }
+    },
+    {
+     "id": "pts",
+     "display": "Points per 80",
+     "short": "Points",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 9,
+     "basis": "rate",
+     "family": "scoring",
+     "explanation": "Points scored per 80 minutes: tries, conversions, penalties and drop goals.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.672,
+      "n_pairs": 229,
+      "split_half_r": 0.552,
+      "split_half_r_sb": 0.712,
+      "m50": 153,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.104
+     }
+    },
+    {
+     "id": "tries",
+     "display": "Tries per 80",
+     "short": "Tries",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 10,
+     "basis": "rate",
+     "family": "scoring",
+     "explanation": "Tries per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.176,
+      "n_pairs": 229,
+      "split_half_r": 0.075,
+      "split_half_r_sb": 0.14,
+      "m50": 2312,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.122
+     }
+    },
+    {
+     "id": "mpc",
+     "display": "Metres per carry",
+     "short": "m/carry",
+     "unit": "metres per carry",
+     "unit_short": "m/carry",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 11,
+     "basis": "rate",
+     "family": "carrying",
+     "explanation": "Metres per carry: how far a carry goes on average.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.307,
+      "n_pairs": 220,
+      "split_half_r": 0.372,
+      "split_half_r_sb": 0.542,
+      "m50": 319,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.105
+     }
+    },
+    {
+     "id": "pas",
+     "display": "Passes per 80",
+     "short": "Passes",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 12,
+     "basis": "rate",
+     "family": "creating",
+     "explanation": "Passes per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.623,
+      "n_pairs": 229,
+      "split_half_r": 0.677,
+      "split_half_r_sb": 0.807,
+      "m50": 90,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.124
+     }
+    },
+    {
+     "id": "tkpct",
+     "display": "Tackle success",
+     "short": "Tackle %",
+     "unit": "%",
+     "unit_short": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 13,
+     "basis": "rate",
+     "family": "defence",
+     "explanation": "Tackle success: tackles made out of tackles attempted.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.328,
+      "n_pairs": 220,
+      "split_half_r": 0.176,
+      "split_half_r_sb": 0.299,
+      "m50": 883,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.035
+     }
+    },
+    {
+     "id": "mt",
+     "display": "Missed tackles per 80",
+     "short": "Missed",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 14,
+     "basis": "rate",
+     "family": "defence",
+     "explanation": "Missed tackles per 80 minutes (fewer is better).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.332,
+      "n_pairs": 229,
+      "split_half_r": 0.239,
+      "split_half_r_sb": 0.385,
+      "m50": 601,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": -0.038
+     }
+    },
+    {
+     "id": "rk",
+     "display": "Rucks won per 80",
+     "short": "Rucks",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 15,
+     "basis": "rate",
+     "family": "breakdown",
+     "explanation": "Rucks won per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.475,
+      "n_pairs": 229,
+      "split_half_r": 0.863,
+      "split_half_r_sb": 0.926,
+      "m50": 30,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.184
+     }
+    },
+    {
+     "id": "toc",
+     "display": "Turnovers conceded per 80",
+     "short": "TO conc",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 16,
+     "basis": "rate",
+     "family": "discipline",
+     "explanation": "Turnovers conceded per 80 minutes (fewer is better).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.145,
+      "n_pairs": 229,
+      "split_half_r": 0.126,
+      "split_half_r_sb": 0.224,
+      "m50": 1304,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.007
+     }
+    },
+    {
+     "id": "pc",
+     "display": "Penalties conceded per 80",
+     "short": "Pens",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 17,
+     "basis": "rate",
+     "family": "discipline",
+     "explanation": "Penalties conceded per 80 minutes (fewer is better).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.039,
+      "n_pairs": 229,
+      "split_half_r": 0.135,
+      "split_half_r_sb": 0.237,
+      "m50": 1211,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.024
+     }
+    },
+    {
+     "id": "kfh",
+     "display": "Kicks from hand per 80",
+     "short": "Kicks",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 18,
+     "basis": "rate",
+     "family": "kicking",
+     "explanation": "Kicks from hand per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.776,
+      "n_pairs": 229,
+      "split_half_r": 0.773,
+      "split_half_r_sb": 0.872,
+      "m50": 55,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": -0.021
+     }
+    },
+    {
+     "id": "kpct",
+     "display": "Goal-kicking success",
+     "short": "Goal %",
+     "unit": "%",
+     "unit_short": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 19,
+     "basis": "rate",
+     "family": "kicking",
+     "explanation": "Goal-kicking success: conversions and penalties kicked out of attempts.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": null,
+      "n_pairs": 0,
+      "split_half_r": -0.142,
+      "split_half_r_sb": -0.331,
+      "m50": null,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": null
+     }
+    }
+   ],
+   "view": {
+    "why": "Centres: metres, breaks and defenders beaten, then offloads and try assists.",
+    "excel": [
+     "m",
+     "cb",
+     "db"
+    ],
+    "value": [
+     "val80"
+    ],
+    "x": "m",
+    "y": "cb",
+    "color": "val80"
+   }
+  },
+  {
+   "id": "back_three",
+   "entity": "player",
+   "display": "Back three",
+   "peer_group": "position group back_three (W, FB)",
+   "position_field": "grp",
+   "position_codes": [
+    "back_three"
+   ],
+   "minimum": {
+    "field": "min",
+    "value": 160.0,
+    "unit": "minutes",
+    "note": "minutes in the window (the last two years on the Board, a calendar year for a season row)"
+   },
+   "basis": "per 80 minutes, shrunk toward the group with 240 minutes of prior",
+   "metrics": [
+    {
+     "id": "val80",
+     "display": "Scrum value per 80",
+     "short": "Value",
+     "unit": "points per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "headline",
+     "order": 1,
+     "basis": "rate",
+     "family": "value",
+     "explanation": "Our player value: points added to the final margin per 80 minutes above a replacement-level player in the same position group, from what each carry, break, tackle, turnover and penalty is worth (a model fitted on 2004-2018 tests), plus goal kicking above an average kicker.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.286,
+      "n_pairs": 312,
+      "split_half_r": null,
+      "split_half_r_sb": null,
+      "m50": null,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.323
+     }
+    },
+    {
+     "id": "m",
+     "display": "Metres per 80",
+     "short": "Metres",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "headline",
+     "order": 2,
+     "basis": "rate",
+     "family": "carrying",
+     "explanation": "Metres gained with the ball in hand per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.319,
+      "n_pairs": 312,
+      "split_half_r": 0.384,
+      "split_half_r_sb": 0.555,
+      "m50": 307,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.252
+     }
+    },
+    {
+     "id": "cb",
+     "display": "Clean breaks per 80",
+     "short": "Breaks",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "headline",
+     "order": 3,
+     "basis": "rate",
+     "family": "carrying",
+     "explanation": "Clean breaks (carries through the defensive line) per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.277,
+      "n_pairs": 312,
+      "split_half_r": 0.312,
+      "split_half_r_sb": 0.476,
+      "m50": 424,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.207
+     }
+    },
+    {
+     "id": "db",
+     "display": "Defenders beaten per 80",
+     "short": "Beaten",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "headline",
+     "order": 4,
+     "basis": "rate",
+     "family": "carrying",
+     "explanation": "Defenders beaten per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.318,
+      "n_pairs": 312,
+      "split_half_r": 0.4,
+      "split_half_r_sb": 0.571,
+      "m50": 288,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.224
+     }
+    },
+    {
+     "id": "tries",
+     "display": "Tries per 80",
+     "short": "Tries",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "headline",
+     "order": 5,
+     "basis": "rate",
+     "family": "scoring",
+     "explanation": "Tries per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.144,
+      "n_pairs": 312,
+      "split_half_r": 0.104,
+      "split_half_r_sb": 0.189,
+      "m50": 1648,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.055
+     }
+    },
+    {
+     "id": "mpc",
+     "display": "Metres per carry",
+     "short": "m/carry",
+     "unit": "metres per carry",
+     "unit_short": "m/carry",
+     "direction": "higher",
+     "set": "headline",
+     "order": 6,
+     "basis": "rate",
+     "family": "carrying",
+     "explanation": "Metres per carry: how far a carry goes on average.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.255,
+      "n_pairs": 302,
+      "split_half_r": 0.212,
+      "split_half_r_sb": 0.35,
+      "m50": 718,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.159
+     }
+    },
+    {
+     "id": "kfh",
+     "display": "Kicks from hand per 80",
+     "short": "Kicks",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "headline",
+     "order": 7,
+     "basis": "rate",
+     "family": "kicking",
+     "explanation": "Kicks from hand per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.728,
+      "n_pairs": 312,
+      "split_half_r": 0.73,
+      "split_half_r_sb": 0.844,
+      "m50": 71,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.043
+     }
+    },
+    {
+     "id": "tk",
+     "display": "Tackles per 80",
+     "short": "Tackles",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "headline",
+     "order": 8,
+     "basis": "rate",
+     "family": "defence",
+     "explanation": "Tackles made per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.37,
+      "n_pairs": 312,
+      "split_half_r": 0.425,
+      "split_half_r_sb": 0.596,
+      "m50": 260,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": -0.079
+     }
+    },
+    {
+     "id": "pts",
+     "display": "Points per 80",
+     "short": "Points",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 9,
+     "basis": "rate",
+     "family": "scoring",
+     "explanation": "Points scored per 80 minutes: tries, conversions, penalties and drop goals.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.536,
+      "n_pairs": 312,
+      "split_half_r": 0.426,
+      "split_half_r_sb": 0.598,
+      "m50": 259,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.149
+     }
+    },
+    {
+     "id": "ta",
+     "display": "Try assists per 80",
+     "short": "Try ast",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 10,
+     "basis": "rate",
+     "family": "creating",
+     "explanation": "Try assists (the last pass or kick before a try) per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.187,
+      "n_pairs": 312,
+      "split_half_r": 0.149,
+      "split_half_r_sb": 0.26,
+      "m50": 1094,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.04
+     }
+    },
+    {
+     "id": "car",
+     "display": "Carries per 80",
+     "short": "Carries",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 11,
+     "basis": "rate",
+     "family": "carrying",
+     "explanation": "Carries (runs with the ball) per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.401,
+      "n_pairs": 312,
+      "split_half_r": 0.545,
+      "split_half_r_sb": 0.705,
+      "m50": 161,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.201
+     }
+    },
+    {
+     "id": "off",
+     "display": "Offloads per 80",
+     "short": "Offloads",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 12,
+     "basis": "rate",
+     "family": "creating",
+     "explanation": "Offloads (passes out of a tackle) per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.379,
+      "n_pairs": 312,
+      "split_half_r": 0.278,
+      "split_half_r_sb": 0.436,
+      "m50": 498,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.064
+     }
+    },
+    {
+     "id": "pas",
+     "display": "Passes per 80",
+     "short": "Passes",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 13,
+     "basis": "rate",
+     "family": "creating",
+     "explanation": "Passes per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.648,
+      "n_pairs": 312,
+      "split_half_r": 0.759,
+      "split_half_r_sb": 0.863,
+      "m50": 61,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.115
+     }
+    },
+    {
+     "id": "tkpct",
+     "display": "Tackle success",
+     "short": "Tackle %",
+     "unit": "%",
+     "unit_short": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 14,
+     "basis": "rate",
+     "family": "defence",
+     "explanation": "Tackle success: tackles made out of tackles attempted.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.024,
+      "n_pairs": 302,
+      "split_half_r": 0.095,
+      "split_half_r_sb": 0.173,
+      "m50": 1850,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": -0.087
+     }
+    },
+    {
+     "id": "mt",
+     "display": "Missed tackles per 80",
+     "short": "Missed",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 15,
+     "basis": "rate",
+     "family": "defence",
+     "explanation": "Missed tackles per 80 minutes (fewer is better).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.112,
+      "n_pairs": 312,
+      "split_half_r": 0.392,
+      "split_half_r_sb": 0.563,
+      "m50": 298,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.067
+     }
+    },
+    {
+     "id": "rk",
+     "display": "Rucks won per 80",
+     "short": "Rucks",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 16,
+     "basis": "rate",
+     "family": "breakdown",
+     "explanation": "Rucks won per 80 minutes.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.324,
+      "n_pairs": 312,
+      "split_half_r": 0.856,
+      "split_half_r_sb": 0.922,
+      "m50": 32,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.031
+     }
+    },
+    {
+     "id": "toc",
+     "display": "Turnovers conceded per 80",
+     "short": "TO conc",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 17,
+     "basis": "rate",
+     "family": "discipline",
+     "explanation": "Turnovers conceded per 80 minutes (fewer is better).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": 0.114,
+      "n_pairs": 312,
+      "split_half_r": 0.117,
+      "split_half_r_sb": 0.21,
+      "m50": 1443,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": 0.007
+     }
+    },
+    {
+     "id": "pc",
+     "display": "Penalties conceded per 80",
+     "short": "Pens",
+     "unit": "per 80",
+     "unit_short": "/80",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 18,
+     "basis": "rate",
+     "family": "discipline",
+     "explanation": "Penalties conceded per 80 minutes (fewer is better).",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": -0.005,
+      "n_pairs": 312,
+      "split_half_r": 0.089,
+      "split_half_r_sb": 0.163,
+      "m50": 1978,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": -0.075
+     }
+    },
+    {
+     "id": "kpct",
+     "display": "Goal-kicking success",
+     "short": "Goal %",
+     "unit": "%",
+     "unit_short": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 19,
+     "basis": "rate",
+     "family": "kicking",
+     "explanation": "Goal-kicking success: conversions and penalties kicked out of attempts.",
+     "in_payload": true,
+     "reliability": {
+      "yoy_r": null,
+      "n_pairs": 0,
+      "split_half_r": 0.348,
+      "split_half_r_sb": 0.516,
+      "m50": 395,
+      "m50_unit": "minutes"
+     },
+     "predictive": {
+      "target": "next-year Scrum value per 80",
+      "r": null
+     }
+    }
+   ],
+   "view": {
+    "why": "Wings and full-backs: metres, breaks, tries and the kicking game.",
+    "excel": [
+     "m",
+     "cb",
+     "db"
+    ],
+    "value": [
+     "val80"
+    ],
+    "x": "m",
+    "y": "cb",
+    "color": "val80"
+   }
+  },
+  {
+   "id": "teams",
+   "entity": "team",
+   "display": "Teams",
+   "peer_group": "test sides with six or more tests in two years",
+   "metrics": [
+    {
+     "id": "pf",
+     "display": "Points scored",
+     "short": "Pts for",
+     "unit": "per test",
+     "direction": "higher",
+     "set": "headline",
+     "order": 1,
+     "style": false,
+     "explanation": "Points scored per test, opponent-adjusted over the last two years.",
+     "in_payload": true,
+     "group": "Attack"
+    },
+    {
+     "id": "tf",
+     "display": "Tries scored",
+     "short": "Tries for",
+     "unit": "per test",
+     "direction": "higher",
+     "set": "headline",
+     "order": 2,
+     "style": false,
+     "explanation": "Tries scored per test, opponent-adjusted over the last two years.",
+     "in_payload": true,
+     "group": "Attack"
+    },
+    {
+     "id": "metres",
+     "display": "Metres carried",
+     "short": "Metres",
+     "unit": "per test",
+     "direction": "higher",
+     "set": "headline",
+     "order": 3,
+     "style": false,
+     "explanation": "Metres carried per test, opponent-adjusted over the last two years.",
+     "in_payload": true,
+     "group": "Attack"
+    },
+    {
+     "id": "gainline",
+     "display": "Carries over the gain line",
+     "short": "Gain line",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 4,
+     "style": false,
+     "explanation": "Carries over the gain line (a share), opponent-adjusted over the last two years.",
+     "in_payload": true,
+     "group": "Attack"
+    },
+    {
+     "id": "breaks",
+     "display": "Clean breaks",
+     "short": "Breaks",
+     "unit": "per test",
+     "direction": "higher",
+     "set": "headline",
+     "order": 5,
+     "style": false,
+     "explanation": "Clean breaks per test, opponent-adjusted over the last two years.",
+     "in_payload": true,
+     "group": "Attack"
+    },
+    {
+     "id": "beaten",
+     "display": "Defenders beaten",
+     "short": "Beaten",
+     "unit": "per test",
+     "direction": "higher",
+     "set": "headline",
+     "order": 6,
+     "style": false,
+     "explanation": "Defenders beaten per test, opponent-adjusted over the last two years.",
+     "in_payload": true,
+     "group": "Attack"
+    },
+    {
+     "id": "offloads",
+     "display": "Offloads",
+     "short": "Offloads",
+     "unit": "per test",
+     "direction": "higher",
+     "set": "headline",
+     "order": 7,
+     "style": true,
+     "explanation": "Offloads per test, opponent-adjusted over the last two years.",
+     "in_payload": true,
+     "group": "Attack"
+    },
+    {
+     "id": "pa",
+     "display": "Points conceded",
+     "short": "Pts against",
+     "unit": "per test",
+     "direction": "lower",
+     "set": "headline",
+     "order": 8,
+     "style": false,
+     "explanation": "Points conceded per test, opponent-adjusted over the last two years.",
+     "in_payload": true,
+     "group": "Defence"
+    },
+    {
+     "id": "ta",
+     "display": "Tries conceded",
+     "short": "Tries agst",
+     "unit": "per test",
+     "direction": "lower",
+     "set": "headline",
+     "order": 9,
+     "style": false,
+     "explanation": "Tries conceded per test, opponent-adjusted over the last two years.",
+     "in_payload": true,
+     "group": "Defence"
+    },
+    {
+     "id": "tackle_pct",
+     "display": "Tackle success",
+     "short": "Tackle %",
+     "unit": "%",
+     "direction": "higher",
+     "set": "headline",
+     "order": 10,
+     "style": false,
+     "explanation": "Tackle success (a share), opponent-adjusted over the last two years.",
+     "in_payload": true,
+     "group": "Defence"
+    },
+    {
+     "id": "metres_a",
+     "display": "Metres conceded",
+     "short": "Metres agst",
+     "unit": "per test",
+     "direction": "lower",
+     "set": "headline",
+     "order": 11,
+     "style": false,
+     "explanation": "Metres conceded per test, opponent-adjusted over the last two years.",
+     "in_payload": true,
+     "group": "Defence"
+    },
+    {
+     "id": "to_won",
+     "display": "Turnovers won",
+     "short": "TO won",
+     "unit": "per test",
+     "direction": "higher",
+     "set": "headline",
+     "order": 12,
+     "style": false,
+     "explanation": "Turnovers won per test, opponent-adjusted over the last two years.",
+     "in_payload": true,
+     "group": "Defence"
+    },
+    {
+     "id": "scrum_pct",
+     "display": "Scrums won",
+     "short": "Scrum %",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 13,
+     "style": false,
+     "explanation": "Scrums won (a share), opponent-adjusted over the last two years.",
+     "in_payload": true,
+     "group": "Set piece"
+    },
+    {
+     "id": "lineout_pct",
+     "display": "Lineouts won",
+     "short": "Lineout %",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 14,
+     "style": false,
+     "explanation": "Lineouts won (a share), opponent-adjusted over the last two years.",
+     "in_payload": true,
+     "group": "Set piece"
+    },
+    {
+     "id": "steals",
+     "display": "Lineout steals",
+     "short": "Steals",
+     "unit": "per test",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 15,
+     "style": false,
+     "explanation": "Lineout steals per test, opponent-adjusted over the last two years.",
+     "in_payload": true,
+     "group": "Set piece"
+    },
+    {
+     "id": "maul_m",
+     "display": "Maul metres",
+     "short": "Maul m",
+     "unit": "per test",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 16,
+     "style": false,
+     "explanation": "Maul metres per test, opponent-adjusted over the last two years.",
+     "in_payload": true,
+     "group": "Set piece"
+    },
+    {
+     "id": "pens",
+     "display": "Penalties conceded",
+     "short": "Pens",
+     "unit": "per test",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 17,
+     "style": false,
+     "explanation": "Penalties conceded per test, opponent-adjusted over the last two years.",
+     "in_payload": true,
+     "group": "Discipline"
+    },
+    {
+     "id": "cards",
+     "display": "Cards",
+     "short": "Cards",
+     "unit": "per test",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 18,
+     "style": false,
+     "explanation": "Cards per test, opponent-adjusted over the last two years.",
+     "in_payload": true,
+     "group": "Discipline"
+    },
+    {
+     "id": "to_conc",
+     "display": "Turnovers conceded",
+     "short": "TO conc",
+     "unit": "per test",
+     "direction": "lower",
+     "set": "secondary",
+     "order": 19,
+     "style": false,
+     "explanation": "Turnovers conceded per test, opponent-adjusted over the last two years.",
+     "in_payload": true,
+     "group": "Discipline"
+    },
+    {
+     "id": "kick_m",
+     "display": "Kicking metres",
+     "short": "Kick m",
+     "unit": "per test",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 20,
+     "style": true,
+     "explanation": "Kicking metres per test, opponent-adjusted over the last two years.",
+     "in_payload": true,
+     "group": "Kicking"
+    },
+    {
+     "id": "kick_pct",
+     "display": "Goal-kicking success",
+     "short": "Goal %",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 21,
+     "style": false,
+     "explanation": "Goal-kicking success (a share), opponent-adjusted over the last two years.",
+     "in_payload": true,
+     "group": "Kicking"
+    },
+    {
+     "id": "terr",
+     "display": "Territory",
+     "short": "Territory",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 22,
+     "style": true,
+     "explanation": "Territory (a share), opponent-adjusted over the last two years.",
+     "in_payload": true,
+     "group": "Kicking"
+    },
+    {
+     "id": "poss",
+     "display": "Possession",
+     "short": "Possession",
+     "unit": "%",
+     "direction": "higher",
+     "set": "secondary",
+     "order": 23,
+     "style": true,
+     "explanation": "Possession (a share), opponent-adjusted over the last two years.",
+     "in_payload": true,
+     "group": "Kicking"
+    }
+   ]
+  }
+ ],
+ "our_models": {
+  "models": {
+   "value": {
+    "name": "Scrum value",
+    "about": "Our player value: points added per 80 minutes above a replacement-level player in the same position, from a regression of the final margin on the process statistics."
+   },
+   "rating": {
+    "name": "Our team rating",
+    "about": "Points better than an average test side on a neutral ground, with home advantage, travel and rest taken out."
+   }
+  },
+  "metrics": {
+   "val80": "value",
+   "rating": "rating"
+  }
+ }
+}
