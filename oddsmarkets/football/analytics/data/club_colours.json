@@ -4072,6 +4072,7 @@
 "345530":["#007840", "#c6b77b", "sofascore"],
 "347959":["#006d3e", "#ffffff", "sofascore"],
 "347960":["#ff0000", "#ffffff", "sofascore"],
+"348439":["#0a2fdf", "#ffffff", "sofascore"],
 "351120":["#ffffff", "#0000ff", "sofascore"],
 "353799":["#48a6e4", "#ffffff", "sofascore"],
 "353848":["#0161ac", "#ffffff", "sofascore"],
@@ -4168,6 +4169,7 @@
 "455765":["#ffffff", "#b00000", "sofascore"],
 "458584":["#d42322", "#ffffff", "crest"],
 "464803":["#3b674b", "#ca1833", "crest"],
+"465466":["#e6051b", "#ffffff", "sofascore"],
 "466776":["#89b4c4", "#ffc200", "sofascore"],
 "467309":["#3a0559", "#e4cae5", "sofascore"],
 "480375":["#ffc100", "#0000ff", "sofascore"],
@@ -4243,5 +4245,6 @@
 "1110453":["#ff6600", "#000000", "sofascore"],
 "1115009":["#ed1c24", "#000000", "sofascore"],
 "1134718":["#ffffff", "#24b444", "sofascore"],
-"1134850":["#ff0000", "#222226", "sofascore"]
+"1134850":["#ff0000", "#222226", "sofascore"],
+"1274633":["#d10f2f", "#ffffff", "sofascore"]
 }
