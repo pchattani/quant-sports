@@ -1451,6 +1451,7 @@ function buildClubs(el, K, pool) {
     addL('title', isCup ? 'Winner' : 'Title');
     if (kd === 'conference') { addL('p_playoffs', 'Playoffs'); addL('shield', 'Supporters\' Shield'); }
     if (kd === 'playoff') addL('p_playoffs', 'Liguilla');
+    if (kd === 'torneo') { addL('p_libertadores', 'Libertadores'); addL('p_relegation', 'Relegation'); }
     if (kd === 'cup') addL('p_conference', 'Reaches the final');
     k.bands.forEach(function (b) { addL('band:' + b.key, b.label); });
     addL('exp_pts', 'Expected points'); addL('range', '5th–95th percentile of points');
@@ -1462,7 +1463,7 @@ function buildClubs(el, K, pool) {
     var bands = r.bands || p.bands || {};
     if (key === 'title') return pct(isCup ? (isNum(p.p_cup) ? p.p_cup : r.p_title) : (isNum(r.p_title) ? r.p_title : p.p_title), 1);
     if (key === 'shield') return pct(p.p_title, 1);
-    if (key === 'p_playoffs' || key === 'p_conference') return isNum(p[key]) ? pct(p[key], 1) : '—';
+    if (key === 'p_playoffs' || key === 'p_conference' || key === 'p_libertadores' || key === 'p_relegation') return isNum(p[key]) ? pct(p[key], 1) : '—';
     if (key.indexOf('band:') === 0) { var bk = key.slice(5); return isNum(bands[bk]) ? pct(bands[bk], 1) : '—'; }
     if (key === 'exp_pts') return isNum(r.exp_pts) ? num(r.exp_pts, 1) : isNum(p.exp_pts) ? num(p.exp_pts, 1) : '—';
     if (key === 'range') return isNum(r.p05) ? num(r.p05, 0) + '–' + num(r.p95, 0) : '—';

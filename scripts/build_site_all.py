@@ -86,6 +86,8 @@ from oddsmarkets.football.competitions.league.config import (  # noqa: E402
     with_sims,
 )
 from oddsmarkets.football.competitions.league.simulator import LeagueResults, LeagueSimulator  # noqa: E402
+from oddsmarkets.football.competitions.league import torneo as _torneo  # noqa: E402
+from oddsmarkets.football.competitions.league import torneo_payloads as _torneo_pl  # noqa: E402
 from oddsmarkets.football.competitions.league.store import (  # noqa: E402
     _POSTPONED,
     _status_of,
@@ -268,6 +270,11 @@ TABS_FIXED = ["overview", "bracket", "fixtures", "probs", "matches", "history", 
 TABS_PRE = ["overview", "fixtures", "matches", "methodology"]
 TABS_INTERNATIONAL = ["overview", "table", "bracket", "fixtures", "power", "team", "players", "analytics", "matches", "market", "methodology"]
 TABS_LIGA = ["overview", "zones", "table", "bracket", "fixtures", "anual", "relegation", "probs", "power", "team", "players", "analytics", "matches", "market", "history", "methodology"]
+# Colombia, Uruguay and Peru: the stage tables, the aggregate (anual) and relegation views of the Table tab, and the
+# playoffs (2 Nov 2026).
+# The national cup whose champion takes a continental place in a torneo league's allocation.
+TORNEO_CUPS = {"primera-a-colombia": "copa-colombia"}
+TABS_TORNEO = ["overview", "table", "bracket", "fixtures", "anual", "relegation", "probs", "power", "team", "players", "analytics", "matches", "market", "history", "methodology"]
 
 # Why a cup is fixtures-only before its main phase, per competition.
 PRE_PHASE_NOTES = {
@@ -1193,6 +1200,11 @@ def build_history_json(out_dir: Path, results, cfg, keep_store: int = 400, keep_
         snapshot["band_key"] = first_up.key
     if cfg.playoff:
         snapshot["shield"] = top(results.p_title)
+    if getattr(cfg, "torneo", None) is not None:
+        # Colombia, Uruguay, Peru: the aggregate table's top, relegation (promedio or table) and the Libertadores
+        snapshot["anual"] = top({t: (d[0] if d else 0.0) for t, d in results.p_agg_position.items()})
+        snapshot["relegation"] = top(results.p_relegation)
+        snapshot["libertadores"] = top(results.p_libertadores)
 
     if not any(s.get("ts") == stamp for s in snapshots):
         snapshots.append(snapshot)
@@ -1725,6 +1737,130 @@ def build_league(cfg: LeagueConfig, entry: dict, args, sims: int | None,
         "synthetic": synthetic, "store_fresh": store_fresh, "season_stale": season_stale,
         "favourite": favourite, "p_favourite": round(fav_p, 4),
         "favourite_label": "MLS Cup" if cfg.conferences else ("Liguilla" if cfg.playoff else "Title"),
+        **index_extras(fixtures["matches"], players, standings),
+        "_fixtures": fixtures["matches"], "_players": players, "_teams": teams_payload["teams"],
+        "_strength": strength_payload["rows"], "_probs": probs_payload["teams"], "_floor": floor,
+    }
+
+
+def build_torneo(cfg: LeagueConfig, entry: dict, args, sims: int | None,
+                 pooled: DixonColesModel | None = None, cup_dist: dict[str, float] | None = None) -> dict:
+    """
+    Colombia, Uruguay, Peru: a calendar-year season of several stages and an aggregate table
+    (competitions/league/torneo.py). Everything below the tables is the plain league's: the model, players,
+    analytics, fixtures, match pages, power and the market; the tables, chances and playoffs are the torneo's.
+    `cup_dist` is the national cup's champion distribution where it feeds a berth (Colombia's Copa BetPlay).
+    """
+    out_dir = DATA_DIR / cfg.slug
+    if sims:
+        cfg = with_sims(cfg, sims)
+    base = {"slug": cfg.slug, "name": cfg.name, "short_name": cfg.short_name, "country": cfg.country,
+            "kind": "torneo", "tabs": TABS_TORNEO}
+    store = load_store(out_dir / "store.json")
+    if not store.get("matches"):
+        logger.warning("%s: no store — skipped", cfg.slug)
+        return {**base, "ok": False, "reason": "no store yet"}
+    age = store_age_hours(store)
+    store_fresh = age is not None and age < _stale_after(store)
+    synthetic = bool((store.get("meta") or {}).get("synthetic"))
+
+    tstate = _torneo.torneo_state_from_store(store, cfg, entry)
+    logger.info(tstate.summary())
+    if not tstate.teams:
+        return {**base, "ok": False, "reason": "no teams"}
+    # The plain-league state of the whole season (every stage's round robin): power, form and the schedule read it.
+    # Its remaining fixtures are the torneo's (a dead postponed copy of a finished stage is not still to play).
+    state = league_state_from_store(store, cfg, previous_rank=entry.get("previous_rank") or {}, teams=entry.get("teams") or [])
+    left_ids = {m.game_id for s in tstate.stages for m in s.regular_left + s.playoff_left} | {m.game_id for m in tstate.season_left}
+    state.remaining = [m for m in state.remaining if m.game_id in left_ids]
+
+    train_df = training_frame(store, cfg)
+    params, method = model_params_for(cfg.slug)
+    use_pooled = pooled if method == "pooled" else None
+    if method == "pooled" and pooled is None:
+        method = "pooled (fit unavailable; own fit)"
+    logger.info("%s model params (%s): %s", cfg.slug, method, params)
+    model, cal = build_model(train_df, tstate.teams, state.previous_rank, cfg, params, pooled=use_pooled)
+
+    players = aggregate_players(_season_view(store), cfg)
+    floor = add_percentiles(players)
+    candidates = build_boot_candidates_from(players)
+    boot = GoldenBootModel(candidates, seed=cfg.random_seed) if candidates else None
+    res = _torneo.TorneoSimulator(model, tstate, cfg=cfg, seed=args.seed, boot_model=boot, cup_dist=cup_dist).run()
+    boot_probs = boot.probabilities(res.n_sims) if boot else {}
+
+    teams_payload = {
+        "teams": {t: {"slug": _slug(t), "conference": None, "team_id": tstate.team_ids.get(t),
+                      "crest": crest_path(cfg.slug, tstate.team_ids.get(t))} for t in tstate.teams},
+        "updated_at": _now(),
+    }
+    _write(out_dir, "teams.json", teams_payload)
+    table = _torneo_pl.build_table_json(tstate, res, cfg)
+    _write(out_dir, "table.json", table)
+    probs_payload = _torneo_pl.build_probs_json(tstate, res, cfg)
+    _write(out_dir, "probs.json", probs_payload)
+    _write(out_dir, "bracket.json", _torneo_pl.build_bracket_json(tstate, res, cfg))
+    cup_winner = None
+    if cup_dist:
+        top_cup = max(cup_dist.items(), key=lambda kv: kv[1])
+        cup_winner = top_cup[0] if top_cup[1] >= 0.999 else None
+    _write(out_dir, "anual.json", _torneo_pl.build_anual_json(tstate, res, cfg, cup_winner))
+    _write(out_dir, "relegation.json", _torneo_pl.build_relegation_json(tstate, res, cfg))
+    strength_payload = build_strength_json(model, state, store, cfg)
+    _write(out_dir, "strength.json", strength_payload)
+    live_players, leaders = build_players_json(players, store, boot_probs, candidates, floor)
+    _write(out_dir, "players_live.json", live_players)
+    _write(out_dir, "player_leaders.json", leaders)
+    _write(out_dir, "shots.json", {"players": shots_by_player(_season_view(store), cfg)})
+    _write(out_dir, "history.json", build_history_json(out_dir, res, cfg, season=tstate.season_name))
+    season_id = (store.get("meta") or {}).get("season_id")
+    sp = {}
+    try:
+        sp = _race.set_pieces(_season_view(store), lambda name: normalize_team_name(name, cfg.registry))
+    except Exception as exc:  # noqa: BLE001 - a Race-tab extra never fails the competition's build
+        logger.warning("%s: set-piece profile failed: %s", cfg.slug, exc)
+    po_labels = {"qf": "Quarter-final", "sf": "Semi-final", "final": "Final"}
+    fixtures = write_analytics(
+        out_dir, store, cfg.registry, model, _season_filter(season_id), players,
+        player_match_logs(_season_view(store), cfg), team_match_stats(_season_view(store), cfg), match_details(store, cfg),
+        floor=floor, season=tstate.season_name, round_labels=po_labels, lineup_terms=LINEUP_TERMS.get(cfg.slug),
+        extra={"set_pieces": sp},
+    )
+    title_model = dict(res.p_title)
+    write_market_odds(out_dir, None if args.no_market else fetch_markets_safe(cfg, fixtures["matches"], title_model.keys(), tstate.season_name),
+                      model, title_model, adjust=lineup_lines(fixtures["matches"]))
+
+    last = last_finished_date(state)
+    season_stale = bool(last and (datetime.now(timezone.utc) - last).days > SEASON_STALE_DAYS)
+    favourite = max(res.p_title, key=lambda t: res.p_title[t])
+    cur = tstate.current
+    meta = {
+        "updated_at": _now(), "n_sims": res.n_sims, "runtime_s": round(res.runtime_s, 2),
+        "season": tstate.season_name, "games_played": tstate.games_played, "games_total": tstate.games_total,
+        "league_complete": tstate.complete, "store_fresh": store_fresh, "synthetic": synthetic,
+        "store_age_hours": round(age, 1) if age is not None else None, "season_stale": season_stale,
+        "training_matches": int(len(train_df)), "calibration": cal,
+        "model": {
+            "elo_home_advantage": params["elo_home_advantage"], "elo_k_league": params["k_league"],
+            "dc_weight": params["dc_weight"] if model.dc.is_fitted else 0.0, "dc_xi": params["xi"],
+            "dc_ridge": params["ridge"], "dc_fitted": model.dc.is_fitted, "params_method": method,
+        },
+        "h2h_tiebreak": cfg.h2h_tiebreak, "source": "Sofascore",
+        "phase": cur.key, "stage_label": cur.fmt.label, "stage_status": _torneo_pl.stage_status(cur),
+        "torneo": {"aggregate_label": cfg.torneo.aggregate_label, "format": _torneo_pl.format_lines(cfg),
+                   "promedio_history": tstate.prior_seasons, "champion": tstate.champion,
+                   "stage_champions": {s.key: s.champion for s in tstate.stages}},
+        "detail_matches": len(store.get("lineups") or {}), "detail_season": len(_season_view(store).get("lineups") or {}),
+        "sheet_matches": len(store.get("team_stats") or {}),
+    }
+    _write(out_dir, "meta.json", meta)
+    standings = table.get("standings") or []
+    return {
+        **base, "ok": True, "season": tstate.season_name, "updated_at": meta["updated_at"],
+        "games_played": tstate.games_played, "games_total": tstate.games_total,
+        "synthetic": synthetic, "store_fresh": store_fresh, "season_stale": season_stale,
+        "favourite": favourite, "p_favourite": round(res.p_title[favourite], 4),
+        "favourite_label": _torneo_pl.title_label(tstate, cfg), "stage": cur.fmt.label,
         **index_extras(fixtures["matches"], players, standings),
         "_fixtures": fixtures["matches"], "_players": players, "_teams": teams_payload["teams"],
         "_strength": strength_payload["rows"], "_probs": probs_payload["teams"], "_floor": floor,
@@ -2624,6 +2760,8 @@ def main() -> int:
     for slug, cfg in LEAGUES.items():
         if args.only and slug not in args.only:
             continue
+        if cfg.torneo is not None:
+            continue                    # built after the cups (the Copa BetPlay feeds a Colombian berth)
         try:
             competitions.append(build_league(cfg, seasons.get(slug) or {}, args, args.sims, pooled=pooled))
         except Exception as exc:  # noqa: BLE001
@@ -2657,6 +2795,18 @@ def main() -> int:
                 "kind": "cup", "cup_kind": cfg.kind, "ok": False, "reason": str(exc), "tabs": TABS_CUP,
                 "family": cfg.family, "family_label": CUP_FAMILIES.get(cfg.family, cfg.family),
             })
+
+    # Colombia, Uruguay and Peru, after the cups: a national cup's simulated champion can take a berth.
+    for slug, cfg in LEAGUES.items():
+        if cfg.torneo is None or (args.only and slug not in args.only):
+            continue
+        try:
+            competitions.append(build_torneo(cfg, seasons.get(slug) or {}, args, args.sims, pooled=pooled,
+                                             cup_dist=champions.get(TORNEO_CUPS.get(slug, ""))))
+        except Exception as exc:  # noqa: BLE001
+            logger.error("%s: build failed: %s\n%s", slug, exc, traceback.format_exc())
+            competitions.append({"slug": slug, "name": cfg.name, "short_name": cfg.short_name, "country": cfg.country,
+                                 "kind": "torneo", "ok": False, "reason": str(exc), "tabs": TABS_TORNEO})
 
     if not args.skip_liga and (not args.only or LIGA_ARGENTINA_SLUG in args.only):
         try:

@@ -645,6 +645,7 @@ function headline(c, prob, bands) {
   if (!prob) return [];
   var k = c.kind;
   if (k === 'liga') return [['Champion', prob.p_title], ['Top 8', prob.p_top8], ['Libertadores', prob.p_libertadores], ['Relegation', prob.p_relegation]];
+  if (k === 'torneo') return [['Champion', prob.p_title], ['Libertadores', prob.p_libertadores], ['Sudamericana', prob.p_sudamericana], ['Relegation', prob.p_relegation]];
   if (k === 'conference') return [['MLS Cup', prob.p_cup], ['Playoffs', prob.p_playoffs], ['Shield', prob.p_title]];
   if (k === 'playoff') return [['Champion', prob.p_cup], ['Liguilla', prob.p_playoffs]];
   if (k === 'cup') return [['Win it', prob.p_cup], ['Reach the final', prob.p_conference]];

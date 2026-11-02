@@ -338,6 +338,37 @@ SUPERCOPA_ARGENTINA = _domestic("supercopa-argentina", "Supercopa Argentina", "S
 # guard and pinned here, so the French "Trophee des Champions" (339) or another country's trophy can never be taken.
 TROFEO_DE_CAMPEONES = _domestic("trofeo-de-campeones", "Trofeo de Campeones", "Trofeo de Campeones", "Argentina", "Trofeo de Campeones", "Argentina", _ONE,
                                 sofascore_id=18436, family="super")
+# Colombia, Uruguay, Chile and Peru (added 2 Nov 2026). Sofascore ids found by search on 2 Nov 2026 and pinned, so
+# a namesake in another country ("Copa de la Liga" exists in Chile, Peru and Argentina) can never be taken. Rounds
+# before the bracket below (the groups, Colombia's Fase 1A/1B) are listed as qualifying, as in the other cups.
+# Copa BetPlay 2026: from 19 Aug the Round of 16 and quarter-finals are single matches, the semi-finals and the
+# final two-legged (Publimetro, 19 Aug 2026); the champion takes Sudamericana Colombia 1 (Reglamento Liga 2026,
+# Art. 31).
+COPA_COLOMBIA = _domestic("copa-colombia", "Copa BetPlay DIMAYOR", "Copa Colombia", "Colombia", "Copa Colombia", "Colombia",
+                          (("r16", 1), ("qf", 1), ("sf", 2), ("final", 2)), sofascore_id=1335, neutral_final=False)
+# The two previous champions over two legs (2026: Santa Fe beat Junior).
+SUPERLIGA_COLOMBIA = _domestic("superliga-colombia", "Superliga BetPlay", "Superliga", "Colombia", "Superliga de Colombia", "Colombia",
+                               (("final", 2),), sofascore_id=10756, family="super", neutral_final=False)
+# The league champion against the Intermedio winner, one match at the Centenario (extra time, then penalties).
+SUPERCOPA_URUGUAYA = _domestic("supercopa-uruguaya", "Supercopa Uruguaya", "Supercopa Uruguaya", "Uruguay", "Supercopa Uruguaya", "Uruguay",
+                               _ONE, sofascore_id=11705, family="super")
+# Copa Chile 2026 (Bases Copa Chile 2026): eight groups of four, then two-legged Round of 16, quarter-finals and
+# semi-finals, and a single-match final; the champion meets the league's third for Libertadores Chile 4.
+COPA_CHILE = _domestic("copa-chile", "Copa Chile", "Copa Chile", "Chile", "Copa Chile", "Chile",
+                       (("r16", 2), ("qf", 2), ("sf", 2), ("final", 1)), sofascore_id=1221)
+# Copa de la Liga 2026 (Bases Copa de la Liga 2026, new): four groups of four, two-legged semi-finals, a
+# single-match final at a neutral ground; the champion takes Libertadores Chile 3.
+COPA_DE_LA_LIGA_CHILE = _domestic("copa-de-la-liga-chile", "Copa de la Liga (Chile)", "Copa de la Liga", "Chile", "Copa de la Liga", "Chile",
+                                  (("sf", 2), ("final", 1)), sofascore_id=32734)
+# Four clubs since 2026 (the league's first two and the two cup finalists, or the cup champions from 2027):
+# single-match semi-finals and final, penalties when level.
+SUPERCOPA_DE_CHILE = _domestic("supercopa-de-chile", "Supercopa de Chile", "Supercopa de Chile", "Chile", "Supercopa de Chile", "Chile",
+                               _FOUR, sofascore_id=1309, family="super")
+# Copa de la Liga 2026 (Peru, new; Liga 1 and Liga 2 clubs): groups, single-match Round of 16 and quarter-finals,
+# two-legged semi-finals and a single-match final (15 Nov 2026, Trujillo). Its champion gets two points in the 2027
+# Acumulada and a place in the new 2027 super cup; no CONMEBOL place.
+COPA_DE_LA_LIGA_PERU = _domestic("copa-de-la-liga-peru", "Copa de la Liga (Peru)", "Copa de la Liga", "Peru", "Copa de la Liga", "Peru",
+                                 (("r16", 1), ("qf", 1), ("sf", 2), ("final", 1)), sofascore_id=35067)
 KINGS_CUP = _domestic("kings-cup", "Saudi King's Cup", "King's Cup", "Saudi Arabia", "King Cup", "Saudi Arabia",
                       (("r32", 1), ("r16", 1), ("qf", 1), ("sf", 1), ("final", 1)), sofascore_id=2058)
 SAUDI_SUPER_CUP = _domestic("saudi-super-cup", "Saudi Super Cup", "Saudi Super Cup", "Saudi Arabia", "Saudi Super Cup", "Saudi Arabia", _FOUR, family="super")
@@ -405,6 +436,8 @@ CUPS: dict[str, CupConfig] = {
         TACA_DE_PORTUGAL, TACA_DA_LIGA, SUPERTACA, BELGIAN_CUP, BELGIAN_SUPER_CUP,
         COPA_DO_BRASIL, SUPERCOPA_DO_BRASIL, COPA_ARGENTINA, SUPERCOPA_ARGENTINA, TROFEO_DE_CAMPEONES,
         KINGS_CUP, SAUDI_SUPER_CUP, US_OPEN_CUP, CAMPEON_DE_CAMPEONES,
+        COPA_COLOMBIA, SUPERLIGA_COLOMBIA, SUPERCOPA_URUGUAYA, COPA_CHILE, COPA_DE_LA_LIGA_CHILE, SUPERCOPA_DE_CHILE,
+        COPA_DE_LA_LIGA_PERU,
         WORLD_CUP, EURO, COPA_AMERICA, NATIONS_LEAGUE, EURO_QUALIFIERS,
         WC_QUAL_UEFA, WC_QUAL_CONMEBOL, WC_QUAL_CONCACAF, WC_QUAL_CAF, WC_QUAL_AFC,
         AFCON, AFCON_QUALIFIERS, ASIAN_CUP, GOLD_CUP, CONCACAF_NATIONS_LEAGUE, FRIENDLIES,
@@ -422,4 +455,6 @@ COUNTRY_LEAGUE: dict[str, str] = {
     "FRA": "ligue-1", "NED": "eredivisie", "NLD": "eredivisie", "POR": "primeira-liga", "PRT": "primeira-liga",
     "BRA": "brasileirao", "USA": "mls", "CAN": "mls", "SAU": "saudi-pro-league", "KSA": "saudi-pro-league",
     "ARG": "liga-argentina", "MEX": "liga-mx", "BEL": "belgian-pro-league",
+    "COL": "primera-a-colombia", "URY": "primera-division-uruguay", "URU": "primera-division-uruguay",
+    "CHL": "liga-de-primera", "CHI": "liga-de-primera", "PER": "liga-1-peru",
 }

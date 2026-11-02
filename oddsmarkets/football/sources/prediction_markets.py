@@ -62,6 +62,11 @@ MARKETS: dict[str, tuple[str | None, str | None, str | None, str | None]] = {
     "liga-mx": ("mex", "KXLIGAMXGAME", "KXLIGAMX", None),
     "saudi-pro-league": ("spl", "KXSAUDIPLGAME", None, None),
     "liga-argentina": ("arg", "KXARGPREMDIVGAME", "KXARGPREMDIV", None),
+    # Polymarket's sports list carries these four leagues (2 Nov 2026); no Kalshi series is known for them
+    "primera-a-colombia": ("col1", None, None, None),
+    "primera-division-uruguay": ("uru1", None, None, None),
+    "liga-de-primera": ("chi1", None, None, None),
+    "liga-1-peru": ("per1", None, None, None),
     "champions-league": ("ucl", "KXUCLGAME", "KXUCL", "champions-league"),
     "europa-league": ("uel", "KXUELGAME", "KXUEL", None),
     "conference-league": (None, "KXUECLGAME", "KXUECL", None),

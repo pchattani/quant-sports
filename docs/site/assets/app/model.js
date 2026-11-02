@@ -628,7 +628,7 @@ function competitionCard(c, m, t, b) {
   var k = c.kind || 'league';
   var played = isNum(m.games_played) ? m.games_played : c.games_played, total = isNum(m.games_total) ? m.games_total : c.games_total;
   var tiles = [
-    FB.kpi('Season', esc(k === 'liga' ? 'Torneo ' + (m.phase === 'clausura' ? 'Clausura' : 'Apertura') : (FB.currentSeason(c).season || m.season || c.season || '—')), { text: true, sub: (played || 0) + ' of ' + (total || 0) + ' matches played' }),
+    FB.kpi('Season', esc(k === 'liga' ? 'Torneo ' + (m.phase === 'clausura' ? 'Clausura' : 'Apertura') : k === 'torneo' && m.stage_label ? (FB.currentSeason(c).season || m.season || '') + ' · ' + m.stage_label : (FB.currentSeason(c).season || m.season || c.season || '—')), { text: true, sub: (played || 0) + ' of ' + (total || 0) + ' matches played' }),
     FB.kpi('Simulations', m.unsimulated || !(m.n_sims > 0) ? 'none' : FB.int(m.n_sims), { sub: m.unsimulated ? 'national teams are not simulated' : !(m.n_sims > 0) ? 'nothing to simulate yet' : isNum(m.runtime_s) ? 'run in ' + num(m.runtime_s, 1) + ' s' : '' }),
     FB.kpi('Training matches', isNum(m.training_matches) ? FB.int(m.training_matches) : '—', { sub: model.params_method ? 'parameters: ' + esc(model.params_method) : '' }),
     FB.dataTile(m, 'Store'),
@@ -649,6 +649,11 @@ function competitionCard(c, m, t, b) {
   if (k === 'liga') {
     format.push('30 clubs in two zones of 15; each club plays 16 matches (14 in its zone plus 2 interzone). The top 8 of each zone reach a single-match Round of 16 on a fixed tree; the final is at a neutral venue.');
     format.push('The Tabla Anual adds Apertura and Clausura points; it decides the Libertadores and Sudamericana berths behind the two champions and the Copa Argentina winner. Two clubs go down: the worst three-season promedio and the last club in the Tabla Anual.');
+  } else if (k === 'torneo') {
+    (((t.torneo || {}).format) || ((m.torneo || {}).format) || []).forEach(function (x) { format.push(esc(x)); });
+    (t.adjustments || []).forEach(function (a) { format.push(esc(a.team) + ': ' + (a.points > 0 ? '+' : '') + a.points + ' points' + (a.stage ? ' in the ' + a.stage : ' in the table') + ' (sanctions and awarded results Sofascore\'s match list does not carry; checked against its standings).'); });
+    if ((t.unlisted_results || []).length) format.push((t.unlisted_results.length) + ' result' + (t.unlisted_results.length === 1 ? '' : 's') + ' the competition counts and Sofascore\'s match list lacks are entered from its standings (an awarded match 3-0, the others 1-0 or 0-0 by the points).');
+    if (b.note) format.push(esc(b.note));
   } else if (k === 'cup' || c.cup_kind) {
     var ck = c.cup_kind || m.cup_kind || '';
     if (CUP_KIND_TEXT[ck]) format.push('Format (' + esc(ck.replace('_', ' ')) + '): ' + CUP_KIND_TEXT[ck] + '.');

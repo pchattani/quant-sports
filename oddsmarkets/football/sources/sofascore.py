@@ -423,9 +423,14 @@ def _iso(ts: object) -> str | None:
 
 def event_record(event: dict, canon: Callable[[str], str], season_id: int,
                  canon2: Callable[[str, str | None], str] | None = None,
-                 round_slugs: dict[str, str] | None = None, international: bool = False) -> tuple[str, dict] | None:
+                 round_slugs: dict[str, str] | None = None, international: bool = False,
+                 torneo_labels: bool = False) -> tuple[str, dict] | None:
     """
     One raw Sofascore event as a store record.
+
+    `torneo_labels` (the leagues played as several tournaments a year: Colombia, Uruguay, Peru) adds `torneo`, the
+    tournament the match belongs to as Sofascore labels it ("apertura", "clausura" — Colombia's Finalización —
+    or "intermedio"), and files Colombia's cuadrangulares ("..., Championship, Group A") as playoff matches.
 
     The record shape is shared with the Argentine store (`home`, `away`, `round`,
     `status`, `hs`, `as`, `date`) with two additions: `stage` says whether the match
@@ -488,6 +493,16 @@ def event_record(event: dict, canon: Callable[[str], str], season_id: int,
     round_key: object = ko if ko else round_info.get("round")
     if round_key is None and round_info.get("name"):
         round_key = str(round_info["name"])
+    torneo = None
+    if torneo_labels:
+        folded = _fold(label)
+        torneo = ("intermedio" if "intermedio" in folded else "apertura" if "apertura" in folded
+                  else "clausura" if ("clausura" in folded or "finalizacion" in folded) else None)
+        # Colombia's cuadrangulares: "..., Championship, Group A" from 2025, "..., Apertura, Group A" before. Uruguay's
+        # Intermedio groups are its regular phase and carry no group label.
+        if stage == "league" and ("championship" in folded or "cuadrangular" in folded
+                                  or (group and torneo != "intermedio")):
+            stage = "playoff"
     split_group = None
     if stage == "split":
         split_group = "top" if "championship" in label else "europe" if "conference" in label else "relegation"
@@ -528,6 +543,7 @@ def event_record(event: dict, canon: Callable[[str], str], season_id: int,
         "split_group": split_group,
         "agg_winner": agg_winner,
         "leg": round_info.get("cupRoundType") and None,
+        **({"torneo": torneo} if torneo else {}),
         **({"pens": [int(ph), int(pa)]} if ph is not None and pa is not None else {}),
     }
 

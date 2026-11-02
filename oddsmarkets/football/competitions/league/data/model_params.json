@@ -572,6 +572,114 @@
         "n": 193
       },
       "kept": "the parameters on file: the new choice does not beat them beyond noise"
+    },
+    "primera-a-colombia": {
+      "method": "per-league",
+      "params": {
+        "xi": 0.0035,
+        "ridge": 2.0,
+        "elo_home_advantage": 70.0,
+        "k_league": 15,
+        "dc_weight": 1.0
+      },
+      "log_loss": 1.01229,
+      "baseline_log_loss": 1.05806,
+      "scores": {
+        "default": 1.01692,
+        "global": 1.02018,
+        "per-league": 1.01229,
+        "pooled": 1.01906
+      },
+      "n_eval": 472,
+      "per_league_params": {
+        "xi": 0.0035,
+        "ridge": 2.0,
+        "elo_home_advantage": 70.0,
+        "k_league": 15,
+        "dc_weight": 1.0
+      },
+      "added": "2 Nov 2026: scripts/tune_league_models.py over every league (the pooled fit on all 16), walk-forward on the Sofascore store (2025-2026; Colombia 2024-2026); only this league's entry was taken from the run"
+    },
+    "primera-division-uruguay": {
+      "method": "global",
+      "params": {
+        "xi": 0.008,
+        "ridge": 2.0,
+        "elo_home_advantage": 50.0,
+        "k_league": 15,
+        "dc_weight": 1.0
+      },
+      "log_loss": 1.07725,
+      "baseline_log_loss": 1.08785,
+      "scores": {
+        "default": 1.08731,
+        "global": 1.07725,
+        "per-league": 1.07675,
+        "pooled": 1.09303
+      },
+      "n_eval": 334,
+      "per_league_params": {
+        "xi": 0.008,
+        "ridge": 2.0,
+        "elo_home_advantage": 30.0,
+        "k_league": 15,
+        "dc_weight": 0.9
+      },
+      "added": "2 Nov 2026: scripts/tune_league_models.py over every league (the pooled fit on all 16), walk-forward on the Sofascore store (2025-2026; Colombia 2024-2026); only this league's entry was taken from the run"
+    },
+    "liga-de-primera": {
+      "method": "per-league",
+      "params": {
+        "xi": 0.0035,
+        "ridge": 2.0,
+        "elo_home_advantage": 50.0,
+        "k_league": 15,
+        "dc_weight": 0.8
+      },
+      "log_loss": 1.03815,
+      "baseline_log_loss": 1.05579,
+      "scores": {
+        "default": 1.04408,
+        "global": 1.04551,
+        "per-league": 1.03815,
+        "pooled": 1.04033
+      },
+      "n_eval": 247,
+      "per_league_params": {
+        "xi": 0.0035,
+        "ridge": 2.0,
+        "elo_home_advantage": 50.0,
+        "k_league": 15,
+        "dc_weight": 0.8
+      },
+      "added": "2 Nov 2026: scripts/tune_league_models.py over every league (the pooled fit on all 16), walk-forward on the Sofascore store (2025-2026; Colombia 2024-2026); only this league's entry was taken from the run"
+    },
+    "liga-1-peru": {
+      "method": "per-league",
+      "params": {
+        "xi": 0.001,
+        "ridge": 2.0,
+        "elo_home_advantage": 90.0,
+        "k_league": 15,
+        "dc_weight": 0.8
+      },
+      "log_loss": 0.96996,
+      "baseline_log_loss": 1.02208,
+      "scores": {
+        "default": 0.97807,
+        "global": 0.99485,
+        "per-league": 0.96996,
+        "pooled": 0.97644
+      },
+      "n_eval": 356,
+      "per_league_params": {
+        "xi": 0.001,
+        "ridge": 2.0,
+        "elo_home_advantage": 90.0,
+        "k_league": 15,
+        "dc_weight": 0.8
+      },
+      "added": "2 Nov 2026: scripts/tune_league_models.py over every league (the pooled fit on all 16), walk-forward on the Sofascore store (2025-2026; Colombia 2024-2026); only this league's entry was taken from the run"
     }
   }
 }

@@ -93,7 +93,8 @@ TIERS: dict[str, dict[str, float]] = {
         "sudamericana": 22, "afcon": 30, "gold-cup": 24, "asian-cup": 24, "coupe-de-france": 20, "efl-cup": 20,
         "saudi-pro-league": 20, "liga-argentina": 20, "uefa-super-cup": 24, "community-shield": 16,
         "supercopa-espana": 20, "wc-qual-caf": 18, "wc-qual-afc": 18, "wc-qual-concacaf": 18,
-        "euro-qualifiers": 24, "friendlies": 6, "*": 14,
+        "euro-qualifiers": 24, "friendlies": 6,
+        "primera-a-colombia": 18, "primera-division-uruguay": 16, "liga-de-primera": 16, "liga-1-peru": 14, "*": 14,
     },
 }
 PRESEASON_FACTOR = 0.4
@@ -124,6 +125,12 @@ RIVALRIES = {
     frozenset(("Flamengo", "Fluminense")): "Fla-Flu",
     frozenset(("Galatasaray", "Fenerbahçe")): "Intercontinental derby",
     frozenset(("América", "Guadalajara")): "El Súper Clásico",
+    frozenset(("Nacional", "Club Atlético Peñarol")): "Clásico del fútbol uruguayo",
+    frozenset(("Alianza Lima", "Universitario de Deportes")): "Clásico del fútbol peruano",
+    frozenset(("Colo-Colo", "Universidad de Chile")): "Superclásico chileno",
+    frozenset(("Millonarios", "Independiente Santa Fe")): "Clásico capitalino",
+    frozenset(("Atlético Nacional", "Independiente Medellín")): "Clásico paisa",
+    frozenset(("América de Cali", "Deportivo Cali")): "Clásico vallecaucano",
     # US leagues (nicknames as the Home page prints them)
     frozenset(("Yankees", "Red Sox")): "Yankees v Red Sox",
     frozenset(("Dodgers", "Giants")): "Dodgers v Giants",

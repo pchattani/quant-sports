@@ -430,6 +430,14 @@ BELGIAN_PRO_LEAGUE_ALIASES: dict[str, str] = {
     "SK Beveren": "Beveren", "Waasland-Beveren": "Beveren",
 }
 
+# Colombia, Uruguay, Chile and Peru (2 Nov 2026): the canonical name is Sofascore's own spelling, the one the
+# Libertadores and Sudamericana stores have used for these clubs since September, so adding the leagues renames
+# nothing already stored. Aliases go here only when Sofascore itself spells a club two ways.
+PRIMERA_A_COLOMBIA_ALIASES: dict[str, str] = {}
+PRIMERA_DIVISION_URUGUAY_ALIASES: dict[str, str] = {}
+LIGA_DE_PRIMERA_ALIASES: dict[str, str] = {}
+LIGA_1_PERU_ALIASES: dict[str, str] = {}
+
 REGISTRIES: dict[str, dict[str, str]] = {
     "international": INTERNATIONAL_ALIASES,
     "liga_argentina": LIGA_ARGENTINA_ALIASES,
@@ -445,6 +453,10 @@ REGISTRIES: dict[str, dict[str, str]] = {
     "saudi_pro_league": SAUDI_PRO_LEAGUE_ALIASES,
     "liga_mx": LIGA_MX_ALIASES,
     "belgian_pro_league": BELGIAN_PRO_LEAGUE_ALIASES,
+    "primera_a_colombia": PRIMERA_A_COLOMBIA_ALIASES,
+    "primera_division_uruguay": PRIMERA_DIVISION_URUGUAY_ALIASES,
+    "liga_de_primera": LIGA_DE_PRIMERA_ALIASES,
+    "liga_1_peru": LIGA_1_PERU_ALIASES,
 }
 
 # Country (alpha-3) -> registry, for cup entrants: a club is canonicalised through
@@ -457,6 +469,8 @@ COUNTRY_REGISTRY: dict[str, str] = {
     "FRA": "ligue_1", "NED": "eredivisie", "NLD": "eredivisie", "POR": "primeira_liga", "PRT": "primeira_liga",
     "BRA": "brasileirao", "USA": "mls", "CAN": "mls", "SAU": "saudi_pro_league", "KSA": "saudi_pro_league",
     "ARG": "liga_argentina", "MEX": "liga_mx", "BEL": "belgian_pro_league",
+    "COL": "primera_a_colombia", "URY": "primera_division_uruguay", "URU": "primera_division_uruguay",
+    "CHL": "liga_de_primera", "CHI": "liga_de_primera", "PER": "liga_1_peru",
 }
 
 

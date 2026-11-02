@@ -61,6 +61,11 @@ def test_every_league_has_a_registry_and_consistent_bands() -> None:
             assert 1 <= band.first <= band.last <= cfg.n_teams, (slug, band.key)
         ups = [b for b in cfg.bands if b.kind == "up"]
         downs = [b for b in cfg.bands if b.kind == "down"]
+        if cfg.torneo is not None:
+            # Colombia, Uruguay, Peru: berths and relegation come from the torneo format (the aggregate table and the
+            # promedio), not from bands of a stage's table
+            assert cfg.torneo.relegation_places > 0 and cfg.torneo.libertadores > 0, slug
+            continue
         assert ups, slug
         # Every plain league relegates; a league with a playoff (MLS, Liga MX,
         # where relegation is suspended) need not.

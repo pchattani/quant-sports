@@ -1,7 +1,7 @@
 {
 "source":"Wikidata (www.wikidata.org Special:EntityData): season items (P3450) and their winners (P1346)",
 "licence":"CC0 1.0",
-"fetched_at":"2026-10-30T18:51:36Z",
+"fetched_at":"2026-11-02T15:48:54Z",
 "competitions":{
 "premier-league":{
 "qid":"Q9448",
@@ -15984,6 +15984,1350 @@
 "year":2019,
 "winner":"Mexico men's national football team",
 "winner_qid":"Q164089"
+}
+]
+},
+"primera-division-uruguay":{
+"qid":"Q287453",
+"label":"Uruguayan Primera División",
+"editions":[
+{
+"season":"1900 Uruguayan Primera División",
+"year":1900,
+"winner":"Central Uruguay Railway Cricket Club",
+"winner_qid":"Q2592343"
+},
+{
+"season":"1901 Uruguayan Primera División",
+"year":1901,
+"winner":"Central Uruguay Railway Cricket Club",
+"winner_qid":"Q2592343"
+},
+{
+"season":"1902 Uruguayan Primera División",
+"year":1902,
+"winner":"Club Nacional de Football",
+"winner_qid":"Q499616"
+},
+{
+"season":"1903 Uruguayan Primera División",
+"year":1903,
+"winner":"Club Nacional de Football",
+"winner_qid":"Q499616"
+},
+{
+"season":"1905 Uruguayan Primera División",
+"year":1905,
+"winner":"Central Uruguay Railway Cricket Club",
+"winner_qid":"Q2592343"
+},
+{
+"season":"1906 Uruguayan Primera División",
+"year":1906,
+"winner":"Montevideo Wanderers Fútbol Club",
+"winner_qid":"Q872702"
+},
+{
+"season":"1907 Uruguayan Primera División",
+"year":1907,
+"winner":"Central Uruguay Railway Cricket Club",
+"winner_qid":"Q2592343"
+},
+{
+"season":"1908 Uruguayan Primera División",
+"year":1908,
+"winner":"River Plate Football Club",
+"winner_qid":"Q391014"
+},
+{
+"season":"1910 Uruguayan Primera División",
+"year":1910,
+"winner":"River Plate Football Club",
+"winner_qid":"Q391014"
+},
+{
+"season":"1911 Uruguayan Primera División",
+"year":1911,
+"winner":"Central Uruguay Railway Cricket Club",
+"winner_qid":"Q2592343"
+},
+{
+"season":"1914 Uruguayan Primera División",
+"year":1914,
+"winner":"River Plate Football Club",
+"winner_qid":"Q391014"
+},
+{
+"season":"1918 Uruguayan Primera División",
+"year":1918,
+"winner":"Club Atlético Peñarol",
+"winner_qid":"Q16320"
+},
+{
+"season":"1923 Uruguayan Primera División",
+"year":1923,
+"winner":"Club Nacional de Football",
+"winner_qid":"Q499616"
+},
+{
+"season":"1924 Uruguayan Primera División",
+"year":1924,
+"winner":"Club Nacional de Football",
+"winner_qid":"Q499616"
+},
+{
+"season":"1927 Uruguayan Primera División",
+"year":1927,
+"winner":"Rampla Juniors Football Club",
+"winner_qid":"Q509801"
+},
+{
+"season":"1976 Uruguayan Primera División",
+"year":1976,
+"winner":"Defensor Sporting Club",
+"winner_qid":"Q844238"
+},
+{
+"season":"1987 Uruguayan Primera División",
+"year":1987,
+"winner":"Defensor Sporting Club",
+"winner_qid":"Q844238"
+},
+{
+"season":"1989 Uruguayan Primera División",
+"year":1989,
+"winner":"C.A. Progreso",
+"winner_qid":"Q420106"
+},
+{
+"season":"1991 Uruguayan Primera División",
+"year":1991,
+"winner":"Defensor Sporting Club",
+"winner_qid":"Q844238"
+},
+{
+"season":"2007–08 Uruguayan Primera División season",
+"year":2007,
+"winner":"Defensor Sporting Club",
+"winner_qid":"Q844238"
+},
+{
+"season":"2008–09 Uruguayan Primera División season",
+"year":2008,
+"winner":"Club Nacional de Football",
+"winner_qid":"Q499616"
+},
+{
+"season":"2009–10 Uruguayan Primera División season",
+"year":2009,
+"winner":"Club Atlético Peñarol",
+"winner_qid":"Q16320"
+},
+{
+"season":"2010–11 Uruguayan Primera División season",
+"year":2010,
+"winner":"Club Nacional de Football",
+"winner_qid":"Q499616"
+},
+{
+"season":"2011–12 Uruguayan Primera División season",
+"year":2011,
+"winner":"Club Nacional de Football",
+"winner_qid":"Q499616"
+},
+{
+"season":"2012–13 Uruguayan Primera División season",
+"year":2012,
+"winner":"Club Atlético Peñarol",
+"winner_qid":"Q16320"
+},
+{
+"season":"2013–14 Uruguayan Primera División season",
+"year":2013,
+"winner":"Danubio F.C.",
+"winner_qid":"Q584316"
+},
+{
+"season":"2014–15 Uruguayan Primera División season",
+"year":2014,
+"winner":"Club Nacional de Football",
+"winner_qid":"Q499616"
+},
+{
+"season":"2015–16 Uruguayan Primera División season",
+"year":2015,
+"winner":"Club Atlético Peñarol",
+"winner_qid":"Q16320"
+},
+{
+"season":"2016 Uruguayan Primera División season",
+"year":2016,
+"winner":"Club Nacional de Football",
+"winner_qid":"Q499616"
+},
+{
+"season":"2017 Uruguayan Primera División season",
+"year":2017,
+"winner":"Club Atlético Peñarol",
+"winner_qid":"Q16320"
+},
+{
+"season":"2018 Uruguayan Primera División season",
+"year":2018,
+"winner":"Club Atlético Peñarol",
+"winner_qid":"Q16320"
+},
+{
+"season":"2025 Uruguayan Primera División season",
+"year":2025,
+"winner":"Club Nacional de Football",
+"winner_qid":"Q499616"
+},
+{
+"season":"2025 Uruguayan Primera División season",
+"year":2025,
+"winner":"C.D. Nacional",
+"winner_qid":"Q216459"
+}
+]
+},
+"liga-de-primera":{
+"qid":"Q606832",
+"label":"Chilean Primera División",
+"editions":[
+{
+"season":"1933 Primera División de Chile",
+"year":1933,
+"winner":"Club Deportivo Magallanes",
+"winner_qid":"Q515425"
+},
+{
+"season":"1934 Primera División de Chile",
+"year":1934,
+"winner":"Club Deportivo Magallanes",
+"winner_qid":"Q515425"
+},
+{
+"season":"1935 Primera División de Chile",
+"year":1935,
+"winner":"Club Deportivo Magallanes",
+"winner_qid":"Q515425"
+},
+{
+"season":"1936 Primera División de Chile",
+"year":1936,
+"winner":"Audax Italiano",
+"winner_qid":"Q758689"
+},
+{
+"season":"1937 Primera División de Chile",
+"year":1937,
+"winner":"Club Social y Deportivo Colo-Colo",
+"winner_qid":"Q207373"
+},
+{
+"season":"1938 Primera División de Chile",
+"year":1938,
+"winner":"Club Deportivo Magallanes",
+"winner_qid":"Q515425"
+},
+{
+"season":"1939 Primera División de Chile",
+"year":1939,
+"winner":"Club Social y Deportivo Colo-Colo",
+"winner_qid":"Q207373"
+},
+{
+"season":"1940 Primera División de Chile",
+"year":1940,
+"winner":"Club Universidad de Chile",
+"winner_qid":"Q737753"
+},
+{
+"season":"1941 Primera División de Chile",
+"year":1941,
+"winner":"Club Social y Deportivo Colo-Colo",
+"winner_qid":"Q207373"
+},
+{
+"season":"1942 Primera División de Chile",
+"year":1942,
+"winner":"Santiago Morning",
+"winner_qid":"Q1023222"
+},
+{
+"season":"1943 Primera División de Chile",
+"year":1943,
+"winner":"Unión Española",
+"winner_qid":"Q1129059"
+},
+{
+"season":"1944 Primera División de Chile",
+"year":1944,
+"winner":"Club Social y Deportivo Colo-Colo",
+"winner_qid":"Q207373"
+},
+{
+"season":"1945 Primera División de Chile",
+"year":1945,
+"winner":"Club de Deportes Green Cross",
+"winner_qid":"Q1023187"
+},
+{
+"season":"1946 Primera División de Chile",
+"year":1946,
+"winner":"Audax Italiano",
+"winner_qid":"Q758689"
+},
+{
+"season":"1947 Primera División de Chile",
+"year":1947,
+"winner":"Club Social y Deportivo Colo-Colo",
+"winner_qid":"Q207373"
+},
+{
+"season":"1948 Primera División de Chile",
+"year":1948,
+"winner":"Audax Italiano",
+"winner_qid":"Q758689"
+},
+{
+"season":"1949 Primera División de Chile",
+"year":1949,
+"winner":"Club Deportivo Universidad Católica",
+"winner_qid":"Q427446"
+},
+{
+"season":"1950 Chilean Primera División season",
+"year":1950,
+"winner":"Everton de Viña del Mar",
+"winner_qid":"Q1103684"
+},
+{
+"season":"1951 Primera División de Chile",
+"year":1951,
+"winner":"Unión Española",
+"winner_qid":"Q1129059"
+},
+{
+"season":"1952 Primera División de Chile",
+"year":1952,
+"winner":"Everton de Viña del Mar",
+"winner_qid":"Q1103684"
+},
+{
+"season":"1953 Primera División de Chile",
+"year":1953,
+"winner":"Club Social y Deportivo Colo-Colo",
+"winner_qid":"Q207373"
+},
+{
+"season":"1954 Primera División de Chile",
+"year":1954,
+"winner":"Club Deportivo Universidad Católica",
+"winner_qid":"Q427446"
+},
+{
+"season":"1955 Primera División de Chile",
+"year":1956,
+"winner":"C.D. Palestino",
+"winner_qid":"Q719719"
+},
+{
+"season":"1956 Primera División de Chile",
+"year":1956,
+"winner":"Club Social y Deportivo Colo-Colo",
+"winner_qid":"Q207373"
+},
+{
+"season":"1957 Primera División de Chile",
+"year":1958,
+"winner":"Audax Italiano",
+"winner_qid":"Q758689"
+},
+{
+"season":"1958 Primera División de Chile",
+"year":1958,
+"winner":"Santiago Wanderers",
+"winner_qid":"Q719338"
+},
+{
+"season":"1959 Primera División de Chile",
+"year":1959,
+"winner":"Club Universidad de Chile",
+"winner_qid":"Q737753"
+},
+{
+"season":"1960 Primera División de Chile",
+"year":1960,
+"winner":"Club Social y Deportivo Colo-Colo",
+"winner_qid":"Q207373"
+},
+{
+"season":"1961 Primera División de Chile",
+"year":1961,
+"winner":"Club Deportivo Universidad Católica",
+"winner_qid":"Q427446"
+},
+{
+"season":"1962 Primera División de Chile",
+"year":1962,
+"winner":"Club Universidad de Chile",
+"winner_qid":"Q737753"
+},
+{
+"season":"1963 Primera División de Chile",
+"year":1963,
+"winner":"Club Social y Deportivo Colo-Colo",
+"winner_qid":"Q207373"
+},
+{
+"season":"1964 Primera División de Chile",
+"year":1964,
+"winner":"Club Universidad de Chile",
+"winner_qid":"Q737753"
+},
+{
+"season":"1965 Primera División de Chile",
+"year":1965,
+"winner":"Club Universidad de Chile",
+"winner_qid":"Q737753"
+},
+{
+"season":"1966 Primera División de Chile",
+"year":1966,
+"winner":"Club Deportivo Universidad Católica",
+"winner_qid":"Q427446"
+},
+{
+"season":"1967 Primera División de Chile",
+"year":1967,
+"winner":"Club Universidad de Chile",
+"winner_qid":"Q737753"
+},
+{
+"season":"1968 Primera División de Chile",
+"year":1968,
+"winner":"Santiago Wanderers",
+"winner_qid":"Q719338"
+},
+{
+"season":"1969 Primera División de Chile",
+"year":1969,
+"winner":"Club Universidad de Chile",
+"winner_qid":"Q737753"
+},
+{
+"season":"1970 Primera División de Chile",
+"year":1970,
+"winner":"Club Social y Deportivo Colo-Colo",
+"winner_qid":"Q207373"
+},
+{
+"season":"1971 Primera División de Chile",
+"year":1971,
+"winner":"Unión San Felipe",
+"winner_qid":"Q572940"
+},
+{
+"season":"1972 Primera División de Chile",
+"year":1972,
+"winner":"Club Social y Deportivo Colo-Colo",
+"winner_qid":"Q207373"
+},
+{
+"season":"1973 Primera División de Chile",
+"year":1973,
+"winner":"Unión Española",
+"winner_qid":"Q1129059"
+},
+{
+"season":"1974 Primera División de Chile",
+"year":1974,
+"winner":"Club Deportivo Huachipato",
+"winner_qid":"Q1023191"
+},
+{
+"season":"1975 Primera División de Chile",
+"year":1975,
+"winner":"Unión Española",
+"winner_qid":"Q1129059"
+},
+{
+"season":"1976 Primera División de Chile",
+"year":1976,
+"winner":"Everton de Viña del Mar",
+"winner_qid":"Q1103684"
+},
+{
+"season":"1977 Primera División de Chile",
+"year":1977,
+"winner":"Unión Española",
+"winner_qid":"Q1129059"
+},
+{
+"season":"1978 Primera División de Chile",
+"year":1978,
+"winner":"C.D. Palestino",
+"winner_qid":"Q719719"
+},
+{
+"season":"1979 Primera División de Chile",
+"year":1979,
+"winner":"Club Social y Deportivo Colo-Colo",
+"winner_qid":"Q207373"
+},
+{
+"season":"1980 Primera División de Chile",
+"year":1980,
+"winner":"Cobreloa",
+"winner_qid":"Q643338"
+},
+{
+"season":"1981 Primera División de Chile",
+"year":1981,
+"winner":"Club Social y Deportivo Colo-Colo",
+"winner_qid":"Q207373"
+},
+{
+"season":"1982 Primera División de Chile",
+"year":1982,
+"winner":"Cobreloa",
+"winner_qid":"Q643338"
+},
+{
+"season":"1983 Primera División de Chile",
+"year":1983,
+"winner":"Club Social y Deportivo Colo-Colo",
+"winner_qid":"Q207373"
+},
+{
+"season":"1984 Primera División de Chile",
+"year":1984,
+"winner":"Club Deportivo Universidad Católica",
+"winner_qid":"Q427446"
+},
+{
+"season":"1985 Primera División de Chile",
+"year":1985,
+"winner":"Cobreloa",
+"winner_qid":"Q643338"
+},
+{
+"season":"1986 Segunda División de Chile",
+"year":1986,
+"winner":"Club Social y Deportivo Colo-Colo",
+"winner_qid":"Q207373"
+},
+{
+"season":"1987 Primera División de Chile",
+"year":1987,
+"winner":"Club Deportivo Universidad Católica",
+"winner_qid":"Q427446"
+},
+{
+"season":"1988 Primera División de Chile",
+"year":1988,
+"winner":"Cobreloa",
+"winner_qid":"Q643338"
+},
+{
+"season":"1989 Primera División de Chile",
+"year":1989,
+"winner":"Club Social y Deportivo Colo-Colo",
+"winner_qid":"Q207373"
+},
+{
+"season":"1990 Primera División de Chile",
+"year":1990,
+"winner":"Club Social y Deportivo Colo-Colo",
+"winner_qid":"Q207373"
+},
+{
+"season":"1991 Primera División de Chile",
+"year":1991,
+"winner":"Club Social y Deportivo Colo-Colo",
+"winner_qid":"Q207373"
+},
+{
+"season":"1992 Primera División de Chile",
+"year":1992,
+"winner":"Cobreloa",
+"winner_qid":"Q643338"
+},
+{
+"season":"1993 Primera División de Chile",
+"year":1993,
+"winner":"Club Social y Deportivo Colo-Colo",
+"winner_qid":"Q207373"
+},
+{
+"season":"1994 Chilean Primera División season",
+"year":1994,
+"winner":"Club Universidad de Chile",
+"winner_qid":"Q737753"
+},
+{
+"season":"1995 Chilean Primera División season",
+"year":1995,
+"winner":"Club Universidad de Chile",
+"winner_qid":"Q737753"
+},
+{
+"season":"1996 Chilean Primera División season",
+"year":1996,
+"winner":"Club Social y Deportivo Colo-Colo",
+"winner_qid":"Q207373"
+},
+{
+"season":"1997 Torneo Apertura (Chile)",
+"year":1997,
+"winner":"Club Deportivo Universidad Católica",
+"winner_qid":"Q427446"
+},
+{
+"season":"1997 Torneo Clausura",
+"year":1997,
+"winner":"Club Social y Deportivo Colo-Colo",
+"winner_qid":"Q207373"
+},
+{
+"season":"1998 Chilean Primera División season",
+"year":1998,
+"winner":"Club Social y Deportivo Colo-Colo",
+"winner_qid":"Q207373"
+},
+{
+"season":"1999 Primera División de Chile",
+"year":1999,
+"winner":"Club Universidad de Chile",
+"winner_qid":"Q737753"
+},
+{
+"season":"2000 Primera División de Chile",
+"year":2000,
+"winner":"Club Universidad de Chile",
+"winner_qid":"Q737753"
+},
+{
+"season":"2001 Primera División de Chile",
+"year":2001,
+"winner":"Santiago Wanderers",
+"winner_qid":"Q719338"
+},
+{
+"season":"2002 Torneo Apertura",
+"year":2002,
+"winner":"Club Deportivo Universidad Católica",
+"winner_qid":"Q427446"
+},
+{
+"season":"2002 Torneo Clausura",
+"year":2002,
+"winner":"Club Social y Deportivo Colo-Colo",
+"winner_qid":"Q207373"
+},
+{
+"season":"2003 Torneo Apertura",
+"year":2003,
+"winner":"Cobreloa",
+"winner_qid":"Q643338"
+},
+{
+"season":"2003 Torneo Clausura",
+"year":2003,
+"winner":"Cobreloa",
+"winner_qid":"Q643338"
+},
+{
+"season":"2004 Torneo Apertura",
+"year":2004,
+"winner":"Club Universidad de Chile",
+"winner_qid":"Q737753"
+},
+{
+"season":"2004 Torneo Clausura",
+"year":2004,
+"winner":"Cobreloa",
+"winner_qid":"Q643338"
+},
+{
+"season":"2005 Torneo Apertura",
+"year":2005,
+"winner":"Unión Española",
+"winner_qid":"Q1129059"
+},
+{
+"season":"2005 Torneo Clausura",
+"year":2005,
+"winner":"Club Deportivo Universidad Católica",
+"winner_qid":"Q427446"
+},
+{
+"season":"2006 Torneo Apertura",
+"year":2006,
+"winner":"Club Social y Deportivo Colo-Colo",
+"winner_qid":"Q207373"
+},
+{
+"season":"2006 Torneo Clausura",
+"year":2006,
+"winner":"Club Social y Deportivo Colo-Colo",
+"winner_qid":"Q207373"
+},
+{
+"season":"2007 Chilean Primera División season",
+"year":2007,
+"winner":"Club Social y Deportivo Colo-Colo",
+"winner_qid":"Q207373"
+},
+{
+"season":"2007 Torneo Clausura",
+"year":2007,
+"winner":"Club Social y Deportivo Colo-Colo",
+"winner_qid":"Q207373"
+},
+{
+"season":"2008 Chilean Primera División season",
+"year":2008,
+"winner":"Everton de Viña del Mar",
+"winner_qid":"Q1103684"
+},
+{
+"season":"2008 Torneo Clausura",
+"year":2008,
+"winner":"Club Social y Deportivo Colo-Colo",
+"winner_qid":"Q207373"
+},
+{
+"season":"2009 Chilean Primera División season",
+"year":2009,
+"winner":"Club Universidad de Chile",
+"winner_qid":"Q737753"
+},
+{
+"season":"2009 Torneo Clausura",
+"year":2009,
+"winner":"Club Social y Deportivo Colo-Colo",
+"winner_qid":"Q207373"
+},
+{
+"season":"2011 Chilean Primera División season",
+"year":2011,
+"winner":"Club Universidad de Chile",
+"winner_qid":"Q737753"
+},
+{
+"season":"2011 Torneo Clausura",
+"year":2011,
+"winner":"Club Universidad de Chile",
+"winner_qid":"Q737753"
+},
+{
+"season":"2012 Chilean Primera División season",
+"year":2012,
+"winner":"Club Universidad de Chile",
+"winner_qid":"Q737753"
+},
+{
+"season":"2012 Torneo Clausura",
+"year":2012,
+"winner":"Club Deportivo Huachipato",
+"winner_qid":"Q1023191"
+},
+{
+"season":"2013 Torneo Apertura",
+"year":2013,
+"winner":"O'Higgins F.C.",
+"winner_qid":"Q719722"
+},
+{
+"season":"2014 Torneo Clausura",
+"year":2013,
+"winner":"Club Social y Deportivo Colo-Colo",
+"winner_qid":"Q207373"
+},
+{
+"season":"Torneo Apertura 2014",
+"year":2014,
+"winner":"Club Universidad de Chile",
+"winner_qid":"Q737753"
+},
+{
+"season":"2015 Torneo Apertura",
+"year":2015,
+"winner":"Club Social y Deportivo Colo-Colo",
+"winner_qid":"Q207373"
+},
+{
+"season":"Torneo Clausura 2015 (Chile)",
+"year":2015,
+"winner":"Cobresal",
+"winner_qid":"Q642669"
+},
+{
+"season":"2016 Torneo Apertura",
+"year":2016,
+"winner":"Club Deportivo Universidad Católica",
+"winner_qid":"Q427446"
+},
+{
+"season":"2016 Torneo Clausura",
+"year":2016,
+"winner":"Club Deportivo Universidad Católica",
+"winner_qid":"Q427446"
+},
+{
+"season":"2017 Torneo Clausura (Chile)",
+"year":2017,
+"winner":"Club Universidad de Chile",
+"winner_qid":"Q737753"
+},
+{
+"season":"Torneo de Transición 2017",
+"year":2017,
+"winner":"Club Social y Deportivo Colo-Colo",
+"winner_qid":"Q207373"
+},
+{
+"season":"2018 Chilean Primera División",
+"year":2018,
+"winner":"Club Deportivo Universidad Católica",
+"winner_qid":"Q427446"
+},
+{
+"season":"2025 Chilean Primera División",
+"year":2025,
+"winner":"Coquimbo Unido",
+"winner_qid":"Q2407595"
+}
+]
+},
+"supercopa-uruguaya":{
+"qid":"Q22084933",
+"label":"Supercopa Uruguaya",
+"editions":[
+{
+"season":"2018 Supercopa Uruguaya",
+"year":2018,
+"winner":"Club Atlético Peñarol",
+"winner_qid":"Q16320"
+},
+{
+"season":"2019 Supercopa Uruguaya",
+"year":2019,
+"winner":"Club Nacional de Football",
+"winner_qid":"Q499616"
+},
+{
+"season":"2020 Supercopa Uruguaya",
+"year":2020,
+"winner":"Liverpool F.C. (Montevideo)",
+"winner_qid":"Q1131189"
+},
+{
+"season":"2021 Supercopa Uruguaya",
+"year":2021,
+"winner":"Club Nacional de Football",
+"winner_qid":"Q499616"
+},
+{
+"season":"2022 Supercopa Uruguaya",
+"year":2022,
+"winner":"Club Atlético Peñarol",
+"winner_qid":"Q16320"
+},
+{
+"season":"2023 Supercopa Uruguaya",
+"year":2023,
+"winner":"Liverpool F.C. (Montevideo)",
+"winner_qid":"Q1131189"
+},
+{
+"season":"2024 Supercopa Uruguaya",
+"year":2024,
+"winner":"Liverpool F.C. (Montevideo)",
+"winner_qid":"Q1131189"
+},
+{
+"season":"2025 Supercopa Uruguaya",
+"year":2025,
+"winner":"Club Nacional de Football",
+"winner_qid":"Q499616"
+},
+{
+"season":"2026 Supercopa Uruguaya",
+"year":2026,
+"winner":"Club Atlético Peñarol",
+"winner_qid":"Q16320"
+}
+]
+},
+"liga-1-peru":{
+"qid":"Q606652",
+"label":"Peruvian Primera División",
+"editions":[
+{
+"season":"1912 Liga Peruana de Football",
+"year":1912,
+"winner":"Lima Cricket and Football Club",
+"winner_qid":"Q6548806"
+},
+{
+"season":"1913 Liga Peruana de Football",
+"year":1913,
+"winner":"Jorge Chávez No. 1",
+"winner_qid":"Q5774347"
+},
+{
+"season":"1914 Liga Peruana de Football",
+"year":1914,
+"winner":"Lima Cricket and Football Club",
+"winner_qid":"Q6548806"
+},
+{
+"season":"1915 Liga Peruana de Football",
+"year":1915,
+"winner":"Sport José Gálvez",
+"winner_qid":"Q5842656"
+},
+{
+"season":"1916 Liga Peruana de Football",
+"year":1916,
+"winner":"Sport José Gálvez",
+"winner_qid":"Q5842656"
+},
+{
+"season":"1917 Liga Peruana de Football",
+"year":1917,
+"winner":"Sport Juan Bielovucic",
+"winner_qid":"Q7579358"
+},
+{
+"season":"1918 Liga Peruana de Football",
+"year":1918,
+"winner":"Club Alianza Lima",
+"winner_qid":"Q572957"
+},
+{
+"season":"1919 Liga Peruana de Football",
+"year":1919,
+"winner":"Club Alianza Lima",
+"winner_qid":"Q572957"
+},
+{
+"season":"1920 Liga Peruana de Football",
+"year":1920,
+"winner":"Sport Inca",
+"winner_qid":"Q7579355"
+},
+{
+"season":"1921 Liga Peruana de Football",
+"year":1921,
+"winner":"Sport Progreso",
+"winner_qid":"Q7579375"
+},
+{
+"season":"1926 Peruvian Primera División",
+"year":1926,
+"winner":"Sport Progreso",
+"winner_qid":"Q7579375"
+},
+{
+"season":"1927 Peruvian Primera División",
+"year":1927,
+"winner":"Club Alianza Lima",
+"winner_qid":"Q572957"
+},
+{
+"season":"1928 Peruvian Primera División",
+"year":1928,
+"winner":"Club Alianza Lima",
+"winner_qid":"Q572957"
+},
+{
+"season":"1929 Peruvian Primera División",
+"year":1929,
+"winner":"Club Universitario de Deportes",
+"winner_qid":"Q19066"
+},
+{
+"season":"1930 Peruvian Primera División",
+"year":1930,
+"winner":"Atlético Chalaco",
+"winner_qid":"Q2587236"
+},
+{
+"season":"1931 Peruvian Primera División",
+"year":1931,
+"winner":"Club Alianza Lima",
+"winner_qid":"Q572957"
+},
+{
+"season":"1932 Peruvian Primera División",
+"year":1932,
+"winner":"Club Alianza Lima",
+"winner_qid":"Q572957"
+},
+{
+"season":"1933 Peruvian Primera División",
+"year":1933,
+"winner":"Club Alianza Lima",
+"winner_qid":"Q572957"
+},
+{
+"season":"1934 Peruvian Primera División",
+"year":1934,
+"winner":"Club Universitario de Deportes",
+"winner_qid":"Q19066"
+},
+{
+"season":"1935 Peruvian Primera División",
+"year":1935,
+"winner":"Sport Boys",
+"winner_qid":"Q603060"
+},
+{
+"season":"1937 Peruvian Primera División",
+"year":1937,
+"winner":"Sport Boys",
+"winner_qid":"Q603060"
+},
+{
+"season":"1938 Peruvian Primera División",
+"year":1938,
+"winner":"Club Deportivo Municipal",
+"winner_qid":"Q1191683"
+},
+{
+"season":"1939 Peruvian Primera División",
+"year":1939,
+"winner":"Club Universitario de Deportes",
+"winner_qid":"Q19066"
+},
+{
+"season":"1940 Peruvian Primera División",
+"year":1940,
+"winner":"Club Deportivo Municipal",
+"winner_qid":"Q1191683"
+},
+{
+"season":"1941 Peruvian Primera División",
+"year":1941,
+"winner":"Club Universitario de Deportes",
+"winner_qid":"Q19066"
+},
+{
+"season":"1942 Peruvian Primera División",
+"year":1942,
+"winner":"Sport Boys",
+"winner_qid":"Q603060"
+},
+{
+"season":"1943 Peruvian Primera División",
+"year":1943,
+"winner":"Club Deportivo Municipal",
+"winner_qid":"Q1191683"
+},
+{
+"season":"1945 Peruvian Primera División",
+"year":1945,
+"winner":"Club Universitario de Deportes",
+"winner_qid":"Q19066"
+},
+{
+"season":"1946 Peruvian Primera División",
+"year":1946,
+"winner":"Club Universitario de Deportes",
+"winner_qid":"Q19066"
+},
+{
+"season":"1947 Peruvian Primera División",
+"year":1947,
+"winner":"Atlético Chalaco",
+"winner_qid":"Q2587236"
+},
+{
+"season":"1948 Peruvian Primera División",
+"year":1948,
+"winner":"Club Alianza Lima",
+"winner_qid":"Q572957"
+},
+{
+"season":"1949 Peruvian Primera División",
+"year":1949,
+"winner":"Club Universitario de Deportes",
+"winner_qid":"Q19066"
+},
+{
+"season":"1950 Peruvian Primera División",
+"year":1950,
+"winner":"Club Deportivo Municipal",
+"winner_qid":"Q1191683"
+},
+{
+"season":"1966 Torneo Descentralizado",
+"year":1966,
+"winner":"Club Universitario de Deportes",
+"winner_qid":"Q19066"
+},
+{
+"season":"1967 Torneo Descentralizado",
+"year":1967,
+"winner":"Club Universitario de Deportes",
+"winner_qid":"Q19066"
+},
+{
+"season":"1968 Torneo Descentralizado",
+"year":1968,
+"winner":"Club Sporting Cristal",
+"winner_qid":"Q604581"
+},
+{
+"season":"1969 Torneo Descentralizado",
+"year":1969,
+"winner":"Club Universitario de Deportes",
+"winner_qid":"Q19066"
+},
+{
+"season":"1970 Torneo Descentralizado",
+"year":1970,
+"winner":"Club Sporting Cristal",
+"winner_qid":"Q604581"
+},
+{
+"season":"1971 Torneo Descentralizado",
+"year":1971,
+"winner":"Club Universitario de Deportes",
+"winner_qid":"Q19066"
+},
+{
+"season":"1973 Torneo Descentralizado",
+"year":1973,
+"winner":"Club Atletico Defensor Lima 1931",
+"winner_qid":"Q2979845"
+},
+{
+"season":"1975 Torneo Descentralizado",
+"year":1975,
+"winner":"Club Alianza Lima",
+"winner_qid":"Q572957"
+},
+{
+"season":"1978 Torneo Descentralizado",
+"year":1978,
+"winner":"Club Alianza Lima",
+"winner_qid":"Q572957"
+},
+{
+"season":"1980 Torneo Descentralizado",
+"year":1980,
+"winner":"Club Sporting Cristal",
+"winner_qid":"Q604581"
+},
+{
+"season":"1981 Torneo Descentralizado",
+"year":1981,
+"winner":"FBC Melgar",
+"winner_qid":"Q602542"
+},
+{
+"season":"1982 Torneo Descentralizado",
+"year":1982,
+"winner":"Club Universitario de Deportes",
+"winner_qid":"Q19066"
+},
+{
+"season":"1985 Torneo Descentralizado",
+"year":1985,
+"winner":"Club Universitario de Deportes",
+"winner_qid":"Q19066"
+},
+{
+"season":"1986 Torneo Descentralizado",
+"year":1986,
+"winner":"Asociación Deportiva San Agustín",
+"winner_qid":"Q4807506"
+},
+{
+"season":"1987 Torneo Descentralizado",
+"year":1987,
+"winner":"Club Universitario de Deportes",
+"winner_qid":"Q19066"
+},
+{
+"season":"1988 Torneo Descentralizado",
+"year":1988,
+"winner":"Club Sporting Cristal",
+"winner_qid":"Q604581"
+},
+{
+"season":"1989 Torneo Descentralizado",
+"year":1989,
+"winner":"Unión Huaral",
+"winner_qid":"Q1847803"
+},
+{
+"season":"1991 Torneo Descentralizado",
+"year":1991,
+"winner":"Club Sporting Cristal",
+"winner_qid":"Q604581"
+},
+{
+"season":"1992 Torneo Descentralizado",
+"year":1992,
+"winner":"Club Universitario de Deportes",
+"winner_qid":"Q19066"
+},
+{
+"season":"1993 Torneo Descentralizado",
+"year":1993,
+"winner":"Club Universitario de Deportes",
+"winner_qid":"Q19066"
+},
+{
+"season":"1994 Torneo Descentralizado",
+"year":1994,
+"winner":"Club Sporting Cristal",
+"winner_qid":"Q604581"
+},
+{
+"season":"1995 Torneo Descentralizado",
+"year":1995,
+"winner":"Club Sporting Cristal",
+"winner_qid":"Q604581"
+},
+{
+"season":"1996 Torneo Descentralizado",
+"year":1996,
+"winner":"Club Sporting Cristal",
+"winner_qid":"Q604581"
+},
+{
+"season":"1997 Torneo Descentralizado",
+"year":1997,
+"winner":"Club Alianza Lima",
+"winner_qid":"Q572957"
+},
+{
+"season":"1998 Torneo Descentralizado",
+"year":1998,
+"winner":"Club Universitario de Deportes",
+"winner_qid":"Q19066"
+},
+{
+"season":"1999 Torneo Descentralizado",
+"year":1999,
+"winner":"Club Universitario de Deportes",
+"winner_qid":"Q19066"
+},
+{
+"season":"2000 Torneo Descentralizado",
+"year":2000,
+"winner":"Club Universitario de Deportes",
+"winner_qid":"Q19066"
+},
+{
+"season":"2001 Torneo Descentralizado",
+"year":2001,
+"winner":"Club Alianza Lima",
+"winner_qid":"Q572957"
+},
+{
+"season":"2002 Torneo Descentralizado",
+"year":2002,
+"winner":"Club Sporting Cristal",
+"winner_qid":"Q604581"
+},
+{
+"season":"2003 Torneo Descentralizado",
+"year":2003,
+"winner":"Club Alianza Lima",
+"winner_qid":"Q572957"
+},
+{
+"season":"2004 Torneo Descentralizado",
+"year":2004,
+"winner":"Club Alianza Lima",
+"winner_qid":"Q572957"
+},
+{
+"season":"2005 Torneo Descentralizado",
+"year":2005,
+"winner":"Club Sporting Cristal",
+"winner_qid":"Q604581"
+},
+{
+"season":"2006 Torneo Descentralizado",
+"year":2006,
+"winner":"Club Alianza Lima",
+"winner_qid":"Q572957"
+},
+{
+"season":"2007 Torneo Descentralizado",
+"year":2007,
+"winner":"CD Universidad San Martín",
+"winner_qid":"Q602582"
+},
+{
+"season":"2008 Torneo Descentralizado",
+"year":2008,
+"winner":"CD Universidad San Martín",
+"winner_qid":"Q602582"
+},
+{
+"season":"2009 Torneo Descentralizado",
+"year":2009,
+"winner":"Club Universitario de Deportes",
+"winner_qid":"Q19066"
+},
+{
+"season":"2010 Torneo Descentralizado",
+"year":2010,
+"winner":"CD Universidad San Martín",
+"winner_qid":"Q602582"
+},
+{
+"season":"2011 Torneo Descentralizado",
+"year":2011,
+"winner":"Club Juan Aurich",
+"winner_qid":"Q603017"
+},
+{
+"season":"2012 Torneo Descentralizado",
+"year":2012,
+"winner":"Club Sporting Cristal",
+"winner_qid":"Q604581"
+},
+{
+"season":"2013 Torneo Descentralizado",
+"year":2013,
+"winner":"Club Universitario de Deportes",
+"winner_qid":"Q19066"
+},
+{
+"season":"2014 Torneo Descentralizado",
+"year":2014,
+"winner":"Club Sporting Cristal",
+"winner_qid":"Q604581"
+},
+{
+"season":"2015 Torneo Descentralizado",
+"year":2015,
+"winner":"FBC Melgar",
+"winner_qid":"Q602542"
+},
+{
+"season":"2016 Torneo Descentralizado",
+"year":2016,
+"winner":"Club Sporting Cristal",
+"winner_qid":"Q604581"
+},
+{
+"season":"2017 Torneo Descentralizado",
+"year":2017,
+"winner":"Club Alianza Lima",
+"winner_qid":"Q572957"
 }
 ]
 }

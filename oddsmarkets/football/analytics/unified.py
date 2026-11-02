@@ -100,6 +100,10 @@ CALENDAR_COMPETITIONS = frozenset({
     "libertadores", "sudamericana", "recopa-sudamericana", "concacaf-champions-cup", "leagues-cup", "campeones-cup",
     "club-world-cup", "intercontinental-cup", "copa-do-brasil", "supercopa-do-brasil", "copa-argentina",
     "supercopa-argentina", "us-open-cup", "campeon-de-campeones",
+    # Colombia, Uruguay, Chile and Peru (2 Nov 2026): calendar-year leagues and their cups
+    "primera-a-colombia", "primera-division-uruguay", "liga-de-primera", "liga-1-peru", "copa-colombia",
+    "superliga-colombia", "supercopa-uruguaya", "copa-chile", "copa-de-la-liga-chile", "supercopa-de-chile",
+    "copa-de-la-liga-peru",
 })
 # World club competitions bring both frames together (the Club World Cup in June and July, the
 # Intercontinental Cup from September to December): like international football, an appearance
@@ -2124,7 +2128,8 @@ def season_totals(rows: list[dict]) -> list[dict]:
 
 
 # Leagues whose title is decided after the table (a play-off or a final): first place is not the trophy there.
-PLAYOFF_TITLE_LEAGUES = frozenset({"mls", "liga-mx", LIGA_ARGENTINA_SLUG})
+PLAYOFF_TITLE_LEAGUES = frozenset({"mls", "liga-mx", LIGA_ARGENTINA_SLUG, "primera-a-colombia", "primera-division-uruguay",
+                                   "liga-1-peru"})
 
 
 def won_title(r: dict) -> bool:

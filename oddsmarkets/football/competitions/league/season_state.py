@@ -109,6 +109,10 @@ class LeagueState:
                 table[m.home_team].add_result(m.home_goals, m.away_goals, self.cfg)
             if m.away_team in table:
                 table[m.away_team].add_result(m.away_goals, m.home_goals, self.cfg)
+        # Sanctions and awarded results the match list does not carry (config.point_adjustments, stage "").
+        for stage, team, pts in getattr(self.cfg, "point_adjustments", ()) or ():
+            if not stage and team in table:
+                table[team].points += int(pts)
         return table
 
     def _sort_key(self, team: str, rec: TeamRecord):

@@ -38,7 +38,7 @@ from oddsmarkets.common import follow as FL
 log = logging.getLogger(__name__)
 
 SITE, SPORT, SCOPE = "site", "football", "club"
-LEAGUE_KINDS = ("league", "conference", "playoff", "liga")
+LEAGUE_KINDS = ("league", "conference", "playoff", "liga", "torneo")
 # the leagues read with "the" in a sentence ("2nd in the Premier League"; "1st in LaLiga")
 WITH_THE = {"premier-league", "bundesliga", "eredivisie", "brasileirao", "saudi-pro-league", "belgian-pro-league"}
 # the profile: the predictive team metrics of team_stats.json (process over style; fouls, distance and the like left out)
@@ -176,7 +176,8 @@ class _Comp:
         self.mpt = tb.get("matches_per_team")
         groups = []
         if tb.get("standings"):
-            groups.append(("", tb["standings"]))
+            # a torneo league's table is its current stage's ("3rd in the Clausura")
+            groups.append((((tb.get("stage") or {}).get("label") or "") if self.kind == "torneo" else "", tb["standings"]))
         for g, rs in (tb.get("conferences") or {}).items():
             groups.append((g, rs))
         for g, rs in groups:
@@ -391,6 +392,10 @@ def build(data: Path, now: datetime | None = None, out_dir: Path | None = None) 
             dn = [b for b in L.bands if b.get("kind") == "down"]
             p_up = _num(bands.get(up["key"])) if up else None
             p_dn = sum(float(bands.get(b["key"]) or 0) for b in dn) if dn else None
+            if L.kind == "torneo":
+                # Colombia, Uruguay, Peru: relegation is the promedio or the aggregate table, not a band of the stage
+                p_dn = _num(pr.get("p_relegation"))
+                dn = [{"label": "Relegation"}] if p_dn is not None else []
             rows_c = []
             if p_title is not None:
                 ser = L.series["title"].get(t) if title_key == "p_title" else None
@@ -402,6 +407,10 @@ def build(data: Path, now: datetime | None = None, out_dir: Path | None = None) 
                 ser = L.series["band"].get(t) if L.band_key == up["key"] else None
                 rows_c.append({"key": "p_" + up["key"], "label": up.get("label") or "Top", "p": round(p_up, 4),
                                "d7": FL.change_since(ser, asof, 7) if ser else None, "_imp": 2 if 0.05 <= p_up <= 0.97 else 0})
+            p_lib = _num(pr.get("p_libertadores")) if L.kind == "torneo" else None
+            if p_lib is not None and 0.0005 < p_lib:
+                rows_c.append({"key": "p_libertadores", "label": "Libertadores", "p": round(p_lib, 4), "d7": None,
+                               "_imp": 2 if 0.05 <= p_lib <= 0.97 else 0})
             if dn and p_dn is not None and p_dn >= 0.005:
                 ser = L.series["relegation"].get(t)
                 rows_c.append({"key": "p_rel", "label": dn[0].get("label") if len(dn) == 1 else "Drop", "p": round(p_dn, 4),

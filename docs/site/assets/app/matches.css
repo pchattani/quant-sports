@@ -81,6 +81,8 @@
 /* team statistics */
 .fb-mx-sheethead { display: flex; justify-content: space-between; gap: 10px; margin-bottom: var(--sp-3); }
 .fb-mx-sheethead span:last-child .fb-ent { flex-direction: row-reverse; }
+.fb-mx-sheethead > span { min-width: 0; display: flex; }   /* a long club name ellipsises at 375 instead of widening the page */
+.fb-mx-sheethead > span:last-child { justify-content: flex-end; }
 .fb-mx-sheet { display: grid; gap: var(--sp-4) var(--sp-6); grid-template-columns: repeat(auto-fill, minmax(min(420px, 100%), 1fr)); align-items: start; }
 .fb-mx-sg .qk-kicker { margin-bottom: 6px; }
 .fb-mx-duel { display: grid; grid-template-columns: 64px minmax(0, 1fr) 64px; gap: 2px 8px; align-items: center; padding: 5px 0; }

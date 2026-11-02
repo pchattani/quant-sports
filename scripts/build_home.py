@@ -110,6 +110,7 @@ FOOTBALL_PRIORITY = [
     "club-world-cup", "conference-league", "mls", "brasileirao", "eredivisie", "primeira-liga",
     "liga-mx", "saudi-pro-league", "liga-argentina", "sudamericana", "fa-cup", "copa-del-rey",
     "coppa-italia", "dfb-pokal", "coupe-de-france", "efl-cup", "belgian-pro-league",
+    "primera-a-colombia", "liga-de-primera", "primera-division-uruguay", "liga-1-peru",
 ]
 TITLE_LEAGUES = ["premier-league", "la-liga", "serie-a", "bundesliga", "ligue-1", "mls",
                  "brasileirao", "eredivisie", "primeira-liga", "liga-mx", "saudi-pro-league"]
@@ -1571,7 +1572,10 @@ SEARCH_GO_SUB = {
     "baseball": {"MLB team": 0},
     "f1": {"Driver": 0, "Constructor": 1},
 }
-SEARCH_GO_COUNTRY = {"ENG": 0, "ESP": 1, "ITA": 2, "DEU": 3, "FRA": 4}     # football: the big five's clubs first
+# football: the big five's clubs first, then the South American leagues' together (Brazil, Argentina, then Colombia,
+# Uruguay, Chile and Peru, added 2 Nov 2026); every other country sorts by size after
+SEARCH_GO_COUNTRY = {"ENG": 0, "ESP": 1, "ITA": 2, "DEU": 3, "FRA": 4,
+                     "BRA": 5, "ARG": 6, "COL": 7, "URY": 8, "CHL": 9, "PER": 10}
 SEARCH_GO_LEVEL = {"cfb": 0, "mbb": 1, "wbb": 2, "mch": 3, "wch": 4}       # college: the Campus's own level order
 
 

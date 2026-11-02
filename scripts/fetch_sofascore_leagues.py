@@ -124,9 +124,15 @@ def refresh_fixtures(store: dict, cfg, entry: dict) -> dict:
 
     current_id = int(seasons[0]["season_id"])
     fetched_any = False
+    stamps = dict((store.get("meta") or {}).get("seasons_refreshed") or {})
+    now = datetime.now(timezone.utc)
     for season in seasons:
         sid = int(season["season_id"])
         tid = int(season.get("tournament_id") or cfg.sofascore_id)
+        if sid != current_id and complete_past_season(store, sid, stamps.get(str(sid)), now):
+            logger.info("%s: season %s (%s) finished and refreshed within %d days: kept", cfg.slug, sid,
+                        season.get("name"), PAST_SEASON_REFRESH_DAYS)
+            continue
         events = sofascore.season_events(tid, sid)
         if not events:
             logger.warning("%s: season %s returned no events — keeping stored fixtures", cfg.slug, sid)
@@ -134,7 +140,8 @@ def refresh_fixtures(store: dict, cfg, entry: dict) -> dict:
         fetched_any = True
         n = 0
         for ev in events:
-            rec = sofascore.event_record(ev, canon, sid, canon2=canon2, round_slugs=round_slugs, international=international)
+            rec = sofascore.event_record(ev, canon, sid, canon2=canon2, round_slugs=round_slugs, international=international,
+                                         torneo_labels=getattr(cfg, "torneo", None) is not None)
             if rec is None:
                 continue
             gid, record = rec
@@ -163,6 +170,7 @@ def refresh_fixtures(store: dict, cfg, entry: dict) -> dict:
             store["matches"][gid] = record
             n += 1
         status["matches_seen"] += n
+        stamps[str(sid)] = now.strftime("%Y-%m-%dT%H:%M:%SZ")
         finished = sum(1 for e in events if (e.get("status") or {}).get("type") == "finished")
         logger.info("%s: season %s (%s): %d fixtures, %d finished", cfg.slug, sid, season.get("name"), n, finished)
 
@@ -184,8 +192,33 @@ def refresh_fixtures(store: dict, cfg, entry: dict) -> dict:
         "season_id": current_id,
         "season_name": seasons[0].get("name"),
         "fixtures_refreshed_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "seasons_refreshed": stamps,
     }
     return status
+
+
+# A finished past season (every stored match of it played, cancelled or awarded) is refetched once a week, not every
+# hour: the leagues that keep several past seasons in their store (Colombia's and Uruguay's promedio windows) would
+# otherwise pay a dozen fixture pages an hour for lists that cannot change (2 Nov 2026).
+PAST_SEASON_REFRESH_DAYS = 7
+# A past season's postponed or cancelled copies are dead once the next season is current, so only a match still to
+# kick off or under way keeps it open.
+_OPEN_STATUSES = {"notstarted", "inprogress", "live", "scheduled"}
+
+
+def complete_past_season(store: dict, sid: int, stamp: str | None, now: datetime | None = None) -> bool:
+    """True when the store holds season `sid` with nothing left to play and it was refreshed in the last week."""
+    if not stamp:
+        return False
+    try:
+        then = datetime.strptime(stamp, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return False
+    now = now or datetime.now(timezone.utc)
+    if (now - then).total_seconds() > PAST_SEASON_REFRESH_DAYS * 86400:
+        return False
+    ms = [m for m in (store.get("matches") or {}).values() if m.get("season_id") == sid and not m.get("superseded_by")]
+    return bool(ms) and not any(str(m.get("status") or "").lower() in _OPEN_STATUSES for m in ms)
 
 
 DORMANT_DAYS = 7
@@ -398,6 +431,8 @@ def main() -> int:
                         help="also re-fetch matches stored in the older, thinner detail format")
     parser.add_argument("--probe", action="store_true", help="connectivity check only")
     parser.add_argument("--force", action="store_true", help="rewrite stores even if only live scores changed")
+    parser.add_argument("--detail-only", action="store_true",
+                        help="skip the fixture lists (kept fresh by the hourly task) and spend the budget on detail")
     parser.add_argument("--refresh-dormant", action="store_true",
                         help="refetch the fixtures of out-of-season competitions too (they otherwise refresh daily)")
     args = parser.parse_args()
@@ -452,7 +487,10 @@ def main() -> int:
         before = len(store["lineups"])
         signature = store_signature(store)
         stamp_before = (store.get("meta") or {}).get("fixtures_refreshed_at")
-        if not args.refresh_dormant and is_dormant(store):
+        if args.detail_only and store.get("matches"):
+            # A detail backfill between hourly runs: the hourly task keeps the fixture lists fresh.
+            status = {"ok": True, "matches_seen": len(store["matches"]), "new_fetched": 0, "failures": 0, "dormant": True}
+        elif not args.refresh_dormant and is_dormant(store):
             logger.info("%s: dormant (no fixture within %d days, refreshed today) — fixture list kept", slug, DORMANT_DAYS)
             status = {"ok": True, "matches_seen": len(store["matches"]), "new_fetched": 0, "failures": 0, "dormant": True}
         else:
@@ -468,6 +506,10 @@ def main() -> int:
         scope = followed if getattr(cfg, "detail_scope", "all") == "followed" else None
         past_tier = TIER_LEAGUE_PAST if slug in LEAGUES else TIER_CUP_PAST if getattr(cfg, "family", "") == "cup" else TIER_OTHER_PAST
         queue = detail_queue(store, args.refresh_detail, scope, past_tier=past_tier, club_followed=followed)
+        # Seasons kept only for their results (the older seasons of a promedio window) get no detail.
+        no_detail = {int(x["season_id"]) for x in entry.get("seasons") or [] if x.get("detail") is False}
+        if no_detail:
+            queue = [(g, m) for g, m in queue if m.get("season_id") not in no_detail]
         if queue:
             logger.info("%s: %d matches want detail", slug, len(queue))
         else:

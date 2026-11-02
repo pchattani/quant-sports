@@ -35,7 +35,7 @@ ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(ROOT))
 
 from oddsmarkets.football.competitions.cup.config import CUPS  # noqa: E402
-from oddsmarkets.football.competitions.league.config import LEAGUES  # noqa: E402
+from oddsmarkets.football.competitions.league.config import CONMEBOL_LEAGUES, LEAGUES  # noqa: E402
 from oddsmarkets.football.sources import sofascore  # noqa: E402
 from oddsmarkets.football.sources.sofascore import list_seasons, standings_blocks  # noqa: E402
 from oddsmarkets.football.sources.teams import normalize_team_name  # noqa: E402
@@ -60,6 +60,17 @@ def _overall_block(blocks: list[dict], cfg) -> dict | None:
         plain = blocks
     plain = [b for b in plain if b["rows"]]
     return max(plain, key=lambda b: len(b["rows"])) if plain else None
+
+
+def _season_year(season: dict) -> int:
+    """The calendar year of a season, from its `year` ("2026", "25/26" -> 2026) or its name."""
+    import re
+    for raw in (season.get("year"), season.get("name")):
+        m = re.findall(r"\d{2,4}", str(raw or ""))
+        if m:
+            y = int(m[-1])
+            return y + 2000 if y < 100 else y
+    return 0
 
 
 def resolve_id(cfg) -> int | None:
@@ -125,6 +136,23 @@ def discover_league(cfg) -> dict | None:
     # Clausura): the current season is the newer of the two newest, and the
     # history is the other plus the current tournament's previous edition.
     alt_id = getattr(cfg, "alt_sofascore_id", None)
+    torneo = getattr(cfg, "torneo", None)
+    if torneo is not None and torneo.relegation_by == "promedio":
+        # A promedio league keeps every season of the promedio window in its store (Colombia: 2024-I to 2026-II,
+        # Uruguay: 2025 and 2026), from both tournaments when the halves were filed apart. The fetcher refreshes a
+        # finished past season only weekly (fetch_sofascore_leagues.complete_past_season), so the extra seasons
+        # cost one fetch each, not one an hour.
+        cand = [{**s, "tournament_id": cfg.sofascore_id} for s in seasons]
+        if alt_id:
+            cand += [{**s, "tournament_id": alt_id} for s in list_seasons(alt_id)]
+        cand.sort(key=lambda s: -int(s["season_id"]))
+        current = cand[0]
+        first_year = _season_year(current) - torneo.promedio_years + 1
+        kept = [current] + [s for s in cand[1:] if _season_year(s) >= first_year]
+        # Per-match detail (line-ups, shots) only for the current and the previous year, as every other league
+        # keeps; the older seasons are there for their results.
+        kept = [s if _season_year(s) >= _season_year(current) - 1 else {**s, "detail": False} for s in kept]
+        alt_id = None
     if alt_id:
         alt = [{**s, "tournament_id": alt_id} for s in list_seasons(alt_id)[:1]]
         cand = sorted(kept[:1] + alt, key=lambda s: -int(s["season_id"]))
@@ -143,6 +171,15 @@ def discover_league(cfg) -> dict | None:
     }
 
     blocks = standings_blocks(current["tournament_id"], int(current["season_id"]))
+    if getattr(cfg, "torneo", None) is not None or cfg.slug in CONMEBOL_LEAGUES or getattr(cfg, "point_adjustments", ()):
+        # Sofascore's own points and matches per table, kept so the build can check its tables (and the point
+        # sanctions in the config) against them.
+        entry["standings_points"] = {
+            b["name"]: {normalize_team_name(r["team"], cfg.registry): [r.get("points"), r.get("matches")]
+                        for r in b["rows"]}
+            for b in blocks if b["rows"]
+        }
+        entry["standings_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     overall = _overall_block(blocks, cfg)
     if overall:
         entry["teams"] = [normalize_team_name(r["team"], cfg.registry) for r in overall["rows"]]
