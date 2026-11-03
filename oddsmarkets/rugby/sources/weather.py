@@ -94,7 +94,12 @@ class Client:
                 time.sleep(20 * (attempt + 1))
                 continue
             if r.status_code == 200:
-                d = r.json()
+                try:
+                    d = r.json()
+                except ValueError:
+                    log.warning("open-meteo %s -> 200 without JSON (%r); backing off", kind, r.text[:80])
+                    time.sleep(60 * (attempt + 1))
+                    continue
                 p.parent.mkdir(parents=True, exist_ok=True)
                 tmp = p.with_name(p.name + f".{os.getpid()}.tmp")
                 with gzip.open(tmp, "wt", encoding="utf-8") as fh:

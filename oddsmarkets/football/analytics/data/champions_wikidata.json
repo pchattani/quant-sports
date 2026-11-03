@@ -1,7 +1,7 @@
 {
 "source":"Wikidata (www.wikidata.org Special:EntityData): season items (P3450) and their winners (P1346)",
 "licence":"CC0 1.0",
-"fetched_at":"2026-11-02T15:48:54Z",
+"fetched_at":"2026-11-03T15:30:24Z",
 "competitions":{
 "premier-league":{
 "qid":"Q9448",
@@ -7112,12 +7112,6 @@
 "winner_qid":"Q8701"
 },
 {
-"season":"2009–10 UEFA Europa League",
-"year":2009,
-"winner":"Fulham F.C.",
-"winner_qid":"Q18708"
-},
-{
 "season":"2010–11 UEFA Europa League",
 "year":2010,
 "winner":"FC Porto",
@@ -9132,18 +9126,6 @@
 "year":2008,
 "winner":"Manchester United F.C.",
 "winner_qid":"Q18656"
-},
-{
-"season":"2008 FIFA Club World Cup",
-"year":2008,
-"winner":"Liga Deportiva Universitaria de Quito",
-"winner_qid":"Q249643"
-},
-{
-"season":"2008 FIFA Club World Cup",
-"year":2008,
-"winner":"CF Pachuca",
-"winner_qid":"Q736937"
 },
 {
 "season":"2009 FIFA Club World Cup",
@@ -15152,12 +15134,6 @@
 "winner_qid":"Q134925"
 },
 {
-"season":"UEFA Euro 2004",
-"year":2004,
-"winner":"Portugal men's national football team",
-"winner_qid":"Q267245"
-},
-{
 "season":"UEFA Euro 2008",
 "year":2008,
 "winner":"Spain men's national football team",
@@ -15872,18 +15848,6 @@
 "winner_qid":"Q164089"
 },
 {
-"season":"1971 CONCACAF Championship",
-"year":1971,
-"winner":"Haiti men's national football team",
-"winner_qid":"Q236006"
-},
-{
-"season":"1971 CONCACAF Championship",
-"year":1971,
-"winner":"Costa Rica men's national football team",
-"winner_qid":"Q194387"
-},
-{
 "season":"1985 CONCACAF Championship",
 "year":1985,
 "winner":"Canadian men's national soccer team",
@@ -16182,12 +16146,6 @@
 "year":2025,
 "winner":"Club Nacional de Football",
 "winner_qid":"Q499616"
-},
-{
-"season":"2025 Uruguayan Primera División season",
-"year":2025,
-"winner":"C.D. Nacional",
-"winner_qid":"Q216459"
 }
 ]
 },
