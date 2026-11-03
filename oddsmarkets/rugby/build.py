@@ -138,6 +138,11 @@ def card(S: Scope, m: dict, fc: dict | None = None) -> dict:
         c["note"] = m["note"]
     if m.get("hs") is not None and m["status"] in ("final", "live"):
         c["hs"], c["as"] = m["hs"], m["as"]
+    if m.get("ro"):
+        c["ro"] = 1                    # before 1891: the result only (no common points system); hs/as are stand-ins
+    rf = (m.get("referee") or {}).get("name")
+    if rf:
+        c["ref"] = rf
     if fc:
         c["p"] = [r1(fc["p_home"], 4), r1(fc["p_draw"], 4), r1(fc["p_away"], 4)]
         c["m"] = r1(fc["margin"])
@@ -272,8 +277,58 @@ class SimModel:
         return {"exp_h": (tot + mg) / 2, "exp_a": (tot - mg) / 2}
 
 
+def women_comps(S: Scope, w: dict) -> dict:
+    """The women's tab: the Women's Six Nations (the latest table with bonus points, past champions) and WXV (each
+    tier's table in the latest edition), both from Wikipedia's season pages, and the World Cup's past finals."""
+    out = {}
+    yr = S.now.year
+    for y in range(yr, 2000, -1):
+        rs = results_of(S, "w6n", y)
+        if len(rs) >= 10:
+            tt = sorted({r["home"] for r in rs} | {r["away"] for r in rs})
+            out["w6n"] = {"key": "w6n", "name": "Women's Six Nations", "season": y,
+                          "table": comps.table(rs, tt, bonus=y >= 2017, grand_slam=y >= 2017),
+                          "results": [_res_row(r, S, w) for r in rs],
+                          "winners": winners(S, "w6n", None, bonus_from=2017, grand_slam_from=2017)}
+            break
+    for y in range(yr, 2022, -1):
+        rs = results_of(S, "wxv", y)
+        if len(rs) < 6:
+            continue
+        # the three tiers play apart: one table per group of sides that met each other
+        groups: list[set] = []
+        for r in rs:
+            hit = [g for g in groups if r["home"] in g or r["away"] in g]
+            g = set().union(*hit) | {r["home"], r["away"]} if hit else {r["home"], r["away"]}
+            groups = [x for x in groups if x not in hit] + [g]
+        tiers = []
+        for g in groups:
+            sub = [r for r in rs if r["home"] in g]
+            tiers.append({"teams": sorted(g), "table": comps.table(sub, sorted(g)), "results": [_res_row(r, S, w) for r in sub]})
+        # WXV 1 first: the tier whose sides have the best ratings today
+        tiers.sort(key=lambda t: -sum(w["model"].rating(ids_by_name(S).get(n, "")) for n in t["teams"]) / max(1, len(t["teams"])))
+        for i, t in enumerate(tiers):
+            t["label"] = f"WXV {i + 1}"
+        out["wxv"] = {"key": "wxv", "name": "WXV", "season": y, "tiers": tiers}
+        break
+    rw = []
+    for y in sorted({int(m["date"][:4]) for m in S.finals if m.get("comp") == "wrwc"}):
+        ms = [m for m in S.finals if m.get("comp") == "wrwc" and int(m["date"][:4]) == y]
+        if len(ms) < 10:
+            continue
+        f = max(ms, key=lambda m: m["date"])
+        hw = f["hs"] > f["as"]
+        rw.append({"season": y, "team": S.name(f["home" if hw else "away"]["id"]), "runner_up": S.name(f["away" if hw else "home"]["id"]),
+                   "score": [max(f["hs"], f["as"]), min(f["hs"], f["as"])], "id": f["id"], "n": len(ms)})
+    if rw:
+        out["wrwc"] = {"key": "wrwc", "name": "Women's Rugby World Cup", "season": rw[-1]["season"], "winners": rw}
+    return out
+
+
 def comp_payloads(S: Scope, w: dict, rep: dict, sims: int) -> dict:
     out = {}
+    if S.scope == "women":
+        return women_comps(S, w)
     if S.scope != "men":
         return out
     ids = ids_by_name(S)
@@ -365,6 +420,8 @@ def winners(S: Scope, comp: str, teams: list[str] | None, bonus_from: int = 0, g
     out = []
     yrs = sorted({int(m["date"][:4]) for m in S.finals if m.get("comp") == comp})
     for y in yrs:
+        if comp == "six" and y < 1994:
+            continue                    # titles were shared before points difference (1994); our list starts there
         rs = results_of(S, comp, y, teams)
         if len(rs) < 6:
             continue

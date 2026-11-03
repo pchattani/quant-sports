@@ -20,7 +20,8 @@ SC.SNAME = { men: 'Men’s tests', women: 'Women’s tests' };
 SC.SSHORT = { men: 'Men', women: 'Women' };
 SC.SITE = 'The Quant Scrum';
 SC.COMP = { six: 'Six Nations', trc: 'Rugby Championship', nc: 'Nations Championship', rwc: 'Rugby World Cup', test: 'Test',
-  lions: 'Lions tour', tri20: 'Tri Nations', wrwc: 'Women’s World Cup', oly7m: 'Olympic sevens', oly7w: 'Olympic sevens' };
+  lions: 'Lions tour', tri20: 'Tri Nations', wrwc: 'Women’s World Cup', oly7m: 'Olympic sevens', oly7w: 'Olympic sevens',
+  w6n: 'Women’s Six Nations', wxv: 'WXV' };
 SC.POS = { P: 'Prop', H: 'Hooker', L: 'Lock', FL: 'Flanker', N8: 'Number 8', SH: 'Scrum-half', FH: 'Fly-half', C: 'Centre', W: 'Wing', FB: 'Full-back', R: 'Replacement' };
 SC.GROUP = { front_row: 'Front row', lock: 'Locks', back_row: 'Back row', halves: 'Half-backs', centres: 'Centres', back_three: 'Back three' };
 SC.GROUP1 = { front_row: 'front-rower', lock: 'lock', back_row: 'back-rower', halves: 'half-back', centres: 'centre', back_three: 'back-three player' };
@@ -113,6 +114,13 @@ SC.date = function (iso, withTime) {
 SC.year = function (iso) { return String(iso || '').slice(0, 4); };
 SC.cls = function (v) { return isNum(v) ? (v > 0 ? 'pos' : v < 0 ? 'neg' : '') : ''; };
 SC.compName = function (k) { return SC.COMP[k] || 'Test'; };
+/* a score as text: before 1891 there was no common points system, so those tests carry the result only (W–L, home
+   or "us" first) */
+SC.scoreText = function (a, b, ro) {
+  if (!isNum(a) || !isNum(b)) return 'v';
+  if (ro) return a > b ? 'W–L' : a < b ? 'L–W' : 'D–D';
+  return a + '–' + b;
+};
 SC.posName = function (p) { return SC.POS[p] || p || ''; };
 
 /* ── matches: the payload card -> the kit's game shape ───────────────── */
@@ -125,9 +133,10 @@ SC.game = function (S, c) {
   var st = c.status === 'final' ? 'final' : c.status === 'live' ? 'live' : 'pre';
   return { sport: 'rugby', id: c.id, start: c.date, status: st, tba: !!c.tba,
     league: SC.compName(c.comp) + (c.neutral ? ' · Neutral' : ''), home: SC.side(S, c.home), away: SC.side(S, c.away),
-    hs: isNum(c.hs) ? c.hs : null, as: isNum(c.as) ? c.as : null, p_home: isNum(p[0]) ? p[0] : null, p_draw: isNum(p[1]) ? p[1] : null,
+    hs: isNum(c.hs) && !c.ro ? c.hs : null, as: isNum(c.as) && !c.ro ? c.as : null, p_home: isNum(p[0]) ? p[0] : null, p_draw: isNum(p[1]) ? p[1] : null,
     p_away: isNum(p[2]) ? p[2] : null, neutral: c.neutral ? true : undefined, pre_only: st === 'live' ? true : undefined,
-    note: c.note || '', href: SC.matchHref(S, c.id) };
+    note: c.ro ? ((c.hs > c.as ? SC.tname(S, c.home) + ' won' : c.hs < c.as ? SC.tname(S, c.away) + ' won' : 'Drawn') + ' (no points system before 1891: the result only)') : (c.note || ''),
+    href: SC.matchHref(S, c.id), ro: c.ro ? true : undefined };
 };
 SC.card = function (S, c, o) { o = o || {}; return QK.gameCard(SC.game(S, c), { sport: false, why: !!o.why, homeFirst: true, market: false, form: false }); };
 SC.margin = function (S, c) {

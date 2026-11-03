@@ -99,6 +99,15 @@ def main(argv=None) -> int:
     rep["paired"]["kal_vs_best_dev"] = dict(M.paired(chosen_rows, kal_rows, *M.DEV), against=chosen_name)
     if rep["paired"]["kal_vs_best"]["better"] and rep["rungs"]["kal"]["cal_test"]["ece"] <= rep["rungs"][chosen_name]["cal_test"]["ece"] + tol:
         chosen, chosen_rows, chosen_name = kal, kal_rows, "kal"
+    # rung: altitude (the Highveld effect), tuned on the development years from the best rung so far
+    alt, _ = M.tune(ms, chosen, M.GRID_ALT, rounds=1)
+    alt_rows = M.walk(ms, alt)
+    rep["rungs"]["alt"] = {"params": M.as_dict(alt), "dev": M.score(alt_rows, *M.DEV), "test": M.score(alt_rows, *test),
+                           "cal_test": M.calibration(alt_rows, *test)}
+    rep["paired"]["alt_vs_best"] = dict(M.paired(chosen_rows, alt_rows, *test), against=chosen_name)
+    rep["paired"]["alt_vs_best_dev"] = dict(M.paired(chosen_rows, alt_rows, *M.DEV), against=chosen_name)
+    if alt.c_alt and rep["paired"]["alt_vs_best"]["better"] and rep["rungs"]["alt"]["cal_test"]["ece"] <= rep["rungs"][chosen_name]["cal_test"]["ece"] + tol:
+        chosen, chosen_rows, chosen_name = alt, alt_rows, "alt"
     rep["paired"]["split_vs_best"] = M.paired(chosen_rows, split_rows, *test)
     rep["paired"]["split_vs_best"]["against"] = chosen_name
     if rep["paired"]["split_vs_best"]["better"] and rep["rungs"]["split"]["cal_test"]["ece"] <= rep["rungs"][chosen_name]["cal_test"]["ece"] + tol:
@@ -140,6 +149,14 @@ def main(argv=None) -> int:
     rep["value"] = M.fit_value(ms)
     # the replica against published values
     rep["replica"] = validate.replica_check(rk, ms)
+    # the same scores on ESPN's tests only (Wikipedia-only tests have ids starting "w"), for a before/after on the
+    # test set the earlier fits used
+    espn_only = lambda rows: [r for r in rows if not str(r["id"]).startswith("w")]
+    rep["espn_only"] = {k: {"dev": M.score(espn_only(r), *M.DEV), "test": M.score(espn_only(r), *test)}
+                        for k, r in (("wr", wr_rows), ("elo", elo_rows), ("unc", unc_rows), ("kal", kal_rows), ("alt", alt_rows),
+                                     ("chosen", chosen_rows))}
+    rep["sources"] = {"wikipedia_tests": sum(1 for m in ms if str(m["id"]).startswith("w")), "espn_tests": sum(1 for m in ms if not str(m["id"]).startswith("w")),
+                      "merge": store.MERGE_REPORT.get(a.scope)}
     rep["seconds"] = round(time.time() - t0, 1)
 
     params = {"scope": a.scope, "model": chosen_name, "params": M.as_dict(chosen), "total_params": M.as_dict(split),
@@ -150,7 +167,7 @@ def main(argv=None) -> int:
     sfx = "" if a.scope == "men" else f"_{a.scope}"
     (FITTED / f"params{sfx}.json").write_text(json.dumps(params, indent=1), encoding="utf-8")
     (FITTED / f"report{sfx}.json").write_text(json.dumps(rep, indent=1), encoding="utf-8")
-    for k in ("wr", "elo", "unc", "ctx", "kal", "split", "hybrid", "hybrid_unc"):
+    for k in ("wr", "elo", "unc", "ctx", "kal", "alt", "split", "hybrid", "hybrid_unc"):
         if k not in rep["rungs"]:
             continue
         print(k, rep["rungs"][k]["dev"], rep["rungs"][k]["test"], "ece", rep["rungs"][k]["cal_test"]["ece"])

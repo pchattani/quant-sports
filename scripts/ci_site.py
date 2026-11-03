@@ -227,7 +227,14 @@ def guard_scrum(ctx: dict) -> list[str]:
     stores = ROOT / "data/rugby/stores"
     year = ctx["today"].year
     missing = [y for y in range(1995, year + 1) if not (stores / "men" / f"{y}.json.gz").exists()]
-    return [f"men's stores missing for {len(missing)} years ({missing[0]}..{missing[-1]})"] if missing else []
+    out = [f"men's stores missing for {len(missing)} years ({missing[0]}..{missing[-1]})"] if missing else []
+    # the side stores (the history before 1995, referees, caps, bios, weather): a build without them would publish a
+    # thinner site, so a runner that has neither the feed nor the seed copy does not deploy
+    side = stores / "side"
+    for f in ("wiki/men.json.gz", "bios.json.gz", "venues.json.gz", "weather.json.gz"):
+        if not (side / f).exists():
+            out.append(f"side store missing: data/rugby/stores/side/{f}")
+    return out
 
 
 def guard_campus(ctx: dict) -> list[str]:
@@ -436,7 +443,10 @@ def cmd_seed(site: str) -> int:
 
 FEEDS = {"ace": ["data/tennis/td"],      # tennis-data.co.uk answers 403 to runners: the PC fetches its workbooks
          # college hockey: College Hockey News is fetched from the PC only; its season stores come in the snapshot
-         "campus": ["data/college/stores/mch", "data/college/stores/wch"]}
+         "campus": ["data/college/stores/mch", "data/college/stores/wch"],
+         # rugby's second-wave side stores (Wikipedia results, referees and caps; ESPN core bios; Open-Meteo weather),
+         # fetched on the PC only (scripts/scrum_extra_refresh.py)
+         "scrum": ["data/rugby/stores/side"]}
 
 
 def cmd_feed(site: str) -> int:

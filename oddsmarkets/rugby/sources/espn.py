@@ -35,6 +35,7 @@ from .. import config
 logger = logging.getLogger(__name__)
 
 SITE = "https://site.api.espn.com/apis/site/v2/sports/rugby"
+CORE = "https://sports.core.api.espn.com/v2/sports/rugby"
 HEADERS = {"User-Agent": config.USER_AGENT, "Accept": "application/json"}
 TIMEOUT = 30
 
@@ -177,6 +178,48 @@ def scoreboard(c: Client, slug: str, year: int, refresh: bool = False) -> dict |
 def summary(c: Client, slug: str, event_id: str, refresh: bool = False) -> dict | None:
     p = raw_root() / "summary" / str(event_id)[-2:] / f"{event_id}.json.gz"
     return c.cached(p, f"{SITE}/{slug}/summary", {"event": str(event_id)}, refresh)
+
+
+def athlete(c: Client, athlete_id: str, refresh: bool = False) -> dict | None:
+    """The core API's athlete record (date of birth, height, weight, birthplace, position): the bio the summary's
+    box score lacks for about 40% of the players (every Nations Championship 2026 player, most tier-two and three
+    players). Cached under raw/athletes/<nn>/<id>.json.gz."""
+    p = raw_root() / "athletes" / str(athlete_id)[-2:] / f"{athlete_id}.json.gz"
+    return c.cached(p, f"{CORE}/athletes/{athlete_id}", None, refresh)
+
+
+def athlete_cached(athlete_id: str) -> dict | None:
+    p = raw_root() / "athletes" / str(athlete_id)[-2:] / f"{athlete_id}.json.gz"
+    if not p.exists():
+        return None
+    try:
+        with gzip.open(p, "rt", encoding="utf-8") as fh:
+            return json.load(fh)
+    except (OSError, ValueError):
+        return None
+
+
+def parse_athlete(d: dict | None) -> dict:
+    """Bio fields in the store's athlete shape: dob, ht_cm, wt_kg, pos, born, city (empty dict when nothing)."""
+    if not isinstance(d, dict):
+        return {}
+    out = {}
+    if d.get("dateOfBirth"):
+        out["dob"] = str(d["dateOfBirth"])[:10]
+    h, w = _num(d.get("height")), _num(d.get("weight"))
+    if h and 50 <= h <= 90:                                   # inches
+        out["ht_cm"] = round(h * 2.54)
+    if w and 120 <= w <= 400:                                 # pounds
+        out["wt_kg"] = round(w * 0.4536)
+    pos = d.get("position") or {}
+    if pos.get("abbreviation"):
+        out["pos"] = pos["abbreviation"]
+    bp = d.get("birthPlace") or {}
+    if bp.get("country"):
+        out["born"] = bp["country"]
+    if bp.get("city"):
+        out["city"] = bp["city"]
+    return out
 
 
 def summary_cached(event_id: str) -> bool:

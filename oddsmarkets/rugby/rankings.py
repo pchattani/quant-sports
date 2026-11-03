@@ -21,6 +21,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import date
 
+# our rebuild rolls the exchange from the first World Cup (1987), the start of ESPN's record; the official rankings began
+# in 2003 from seeded points, and rolling from 1871 drifts further from them (checked 2 Nov 2026)
+REPLICA_FROM = 1987
 HOME_BONUS = 3.0
 HOME_BONUS_ENDS = "2026-07-01"          # World Rugby removed the home allowance from 1 July 2026
 NEW_MEMBER_SWITCH = "2012-12-01"

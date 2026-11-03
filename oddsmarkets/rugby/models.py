@@ -35,6 +35,9 @@ from .ratings import Model, Params, brier, logloss, ncdf, outcome
 DEV = (2004, 2018)
 TEST_FROM = 2019
 BURN_FROM = 1995
+# the World Rugby rebuild starts with the first World Cup (1987), the start of ESPN's record: the official rankings
+# began in 2003 from seeded points, and rolling the exchange from 1871 drifts further from them (checked 2 Nov 2026)
+REPLICA_FROM = rankings.REPLICA_FROM
 
 
 def eligible(matches: list[dict]) -> list[dict]:
@@ -112,6 +115,9 @@ GRID_KAL = {"v0": [100.0, 225.0, 400.0, 625.0, 900.0, 1600.0, 2500.0, 3600.0], "
             "mclip": [0.0, 30.0, 40.0, 50.0, 60.0, 80.0], "anchor": [0.0, 0.25, 0.5, 0.75, 1.0],
             "b_map": [1.0, 1.4, 1.8, 2.2, 2.6, 3.0]}
 GRID_CTX = {"c_km": [0.0, 0.5, 1.0, 1.5, 2.0, 3.0], "c_tz": [0.0, 0.1, 0.2, 0.3, 0.5], "c_rest": [0.0, 0.25, 0.5, 1.0]}
+# altitude (2 Nov 2026): points for a home side at a venue 1,000 m or higher against a side from lower down
+# (nations.altitude_edge; venue elevation from Open-Meteo, static so no look-ahead)
+GRID_ALT = {"c_alt": [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 8.0]}
 
 
 # ── the World Rugby replica as a forecaster ────────────────────────────────────────────────────────────────
@@ -123,6 +129,8 @@ def replica(matches: list[dict], seed: dict | None = None) -> tuple[rankings.Ran
     rk = rankings.Ranker(seed=seed or {}, default=default)
     rows = []
     for m in matches:
+        if year(m) < REPLICA_FROM:
+            continue                      # the rebuild starts where it always has (the 1987 World Cup), not in 1871
         h, a = m["home"]["id"], m["away"]["id"]
         NAMES[h], NAMES[a] = m["home"]["name"], m["away"]["name"]
         if nations.invitational(m["home"]["name"]) or nations.invitational(m["away"]["name"]):

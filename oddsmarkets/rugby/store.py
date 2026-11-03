@@ -77,10 +77,30 @@ def load(scope: str, year: int) -> dict | None:
         return None
 
 
-def load_all(scope: str, upto: int | None = None, tests_only: bool = True) -> tuple[list[dict], dict]:
+MERGE_REPORT: dict = {}
+_EXTRA: dict = {}
+
+
+def bios() -> dict:
+    """The ESPN core-API bios (scripts/scrum_bios.py): {athlete_id: {dob, ht_cm, wt_kg, pos, born, city}}."""
+    p = side_dir() / "bios.json.gz"
+    k = ("bios", str(p))
+    if k not in _EXTRA:
+        try:
+            _EXTRA[k] = (read_gz(p) or {}).get("athletes") or {} if p.exists() else {}
+        except (OSError, ValueError):
+            _EXTRA[k] = {}
+    return _EXTRA[k]
+
+
+def load_all(scope: str, upto: int | None = None, tests_only: bool = True, with_bios: bool = True,
+             with_wiki: bool = True) -> tuple[list[dict], dict]:
     """Every match of a scope (sorted by date) and the merged athlete table. For the international scopes,
     tests_only drops tour matches against club and provincial sides (a Lions tour's midweek games) and shows each
-    nation under one name (nations.canonical)."""
+    nation under one name (nations.canonical). with_bios fills a player's missing bio fields from the core-API
+    bios store (a field the match summaries gave wins). with_wiki adds the Wikipedia-only tests (every test before
+    ESPN's coverage, the small nations) and the referee and attendance of ESPN's tests (wiki.merge; off with
+    SOURCE_WIKIPEDIA_RUGBY_ENABLED=0)."""
     from . import nations
     matches, athletes = [], {}
     for y in years(scope):
@@ -97,10 +117,65 @@ def load_all(scope: str, upto: int | None = None, tests_only: bool = True) -> tu
         for k, v in (s.get("athletes") or {}).items():
             cur = athletes.get(k)
             athletes[k] = v if cur is None else {**cur, **{kk: vv for kk, vv in v.items() if vv}}
+    if with_bios:
+        for k, b in bios().items():
+            cur = athletes.get(k)
+            if cur is not None:
+                for kk, vv in b.items():
+                    if vv and not cur.get(kk):
+                        cur[kk] = vv
     matches.sort(key=lambda m: (m.get("date") or "", m.get("id")))
+    if with_wiki and tests_only and scope in ("men", "women"):
+        from . import wiki
+        matches, rep = wiki.merge(scope, matches)
+        if upto is not None:
+            matches = [m for m in matches if int(str(m.get("date") or "0")[:4] or 0) <= upto]
+        MERGE_REPORT[scope] = rep
+    if tests_only:
+        attach_elevation(matches)
     return matches, athletes
 
 
 def save(scope: str, year: int, matches: list[dict], athletes: dict) -> Path:
     return write_gz(store_path(scope, year), {"v": VERSION, "scope": scope, "year": int(year), "built": now(),
                                                "matches": matches, "athletes": athletes})
+
+
+def stores_extra(name: str, key: str = "matches") -> dict:
+    """A side store keyed by match or venue (weather.json.gz -> "matches", venues.json.gz -> "venues"); {} when
+    missing or unreadable. Cached per process."""
+    p = side_dir() / f"{name}.json.gz"
+    k = (name, key, str(p))
+    if k not in _EXTRA:
+        try:
+            _EXTRA[k] = (read_gz(p) or {}).get(key) or {} if p.exists() else {}
+        except (OSError, ValueError):
+            _EXTRA[k] = {}
+    return _EXTRA[k]
+
+
+def attach_elevation(matches: list[dict]) -> int:
+    """Each match's venue elevation (m) from the venues store (scripts/scrum_weather.py, Open-Meteo) as
+    match["venue"]["elev"]; static, so no look-ahead. Nothing when SOURCE_OPENMETEO_RUGBY_ENABLED=0."""
+    import os
+    if (os.environ.get("SOURCE_OPENMETEO_RUGBY_ENABLED") or "1").strip().lower() in ("0", "false", "no", "off", ""):
+        return 0
+    vs = stores_extra("venues", "venues")
+    n = 0
+    for m in matches:
+        v = m.get("venue")
+        if not isinstance(v, dict):
+            continue
+        rec = vs.get(f"{(v.get('name') or '').strip()}|{(v.get('city') or '').strip()}")
+        e = (rec or {}).get("elev")
+        if isinstance(e, (int, float)):
+            v["elev"] = round(float(e))
+            n += 1
+    return n
+
+
+def side_dir() -> Path:
+    """The second-wave side stores (2 Nov 2026): bios.json.gz (ESPN core-API bios), venues.json.gz and
+    weather.json.gz (Open-Meteo), wiki/<scope>.json.gz (Wikipedia). Fetched on the PC only; they reach CI in the
+    stores snapshot (scripts/push_stores.py, ci_site.py FEEDS) and the seed branch. Private, never published."""
+    return paths()["stores"] / "side"

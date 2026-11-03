@@ -20,6 +20,7 @@ function byDay(S, list) {
     var d = SC.date(c.date);
     if (d !== day) { if (day !== null) out += '</div>'; day = d; out += '<div class="sc-day"><b>' + esc(d) + '</b></div><div class="qk-watch sc-watch">'; }
     var why = isNum(c.m) ? SC.margin(S, c) + (c.p && isNum(c.p[1]) && c.p[1] >= 0.03 ? ' · draw ' + SC.pct(c.p[1]) : '') + (isNum(c.t) ? ' · about ' + Math.round(c.t) + ' points' : '') : (c.venue || '');
+    if (c.ref) why = (why ? why + ' · ' : '') + 'referee ' + c.ref;
     out += QK.gameCard(SC.game(S, c), { sport: false, homeFirst: true, why: why || false, market: false, form: false });
   });
   return out + (day !== null ? '</div>' : '');
@@ -41,7 +42,7 @@ function resultsTable(S, list, o) {
       }
     }
     return [{ v: c.date, html: '<a href="' + esc(SC.matchHref(S, c.id)) + '">' + esc(SC.date(c.date)) + '</a>' }, { v: c.comp, html: esc(SC.compName(c.comp)) },
-      { v: SC.tname(S, c.home), html: U.teamEnt(S, c.home) }, { v: (c.hs || 0) - (c.as || 0), html: '<a class="sc-score" href="' + esc(SC.matchHref(S, c.id)) + '">' + (isNum(c.hs) ? c.hs + '–' + c.as : 'v') + '</a>' },
+      { v: SC.tname(S, c.home), html: U.teamEnt(S, c.home) }, { v: (c.hs || 0) - (c.as || 0), html: '<a class="sc-score" href="' + esc(SC.matchHref(S, c.id)) + '">' + SC.scoreText(c.hs, c.as, c.ro) + '</a>' },
       { v: SC.tname(S, c.away), html: U.teamEnt(S, c.away) }, { v: isNum(p[0]) ? Math.max(p[0], p[2]) : -1, html: esc(call) }, { v: right, html: right || '—' }];
   });
   return U.table(cols, rows, { cls: 'sc-results', maxHeight: o.maxHeight || 720 });
@@ -168,6 +169,24 @@ function scoreRace(el, S, M) {
     yName: 'Points', xName: 'Minute', endLabels: true, yFmt: function (v) { return String(Math.round(v)); } });
 }
 
+/* referee, venue, altitude, weather and crowd (Wikipedia, Open-Meteo); the forecast as issued for an upcoming test */
+function conditions(S, M) {
+  var c = M.match, items = [], V = M.venue || {}, W = M.weather || {};
+  if (M.referee) items.push({ label: 'Referee', value: M.referee.name, sub: (M.referee.union ? M.referee.union + ' · ' : '') + '<a class="qk-link" href="' + esc(SC.href(S, 'model', null, 'tab=refs&ref=' + encodeURIComponent(M.referee.k))) + '">tendencies</a>', html: true });
+  if (V.place || isNum(V.elev)) items.push({ label: 'Venue', value: isNum(V.elev) ? fmt.num(V.elev) + ' m' : '—', sub: (V.place ? esc(V.place) : '') + (V.alt ? ' · at altitude: the visitors come up from lower ground' : (isNum(V.elev) ? ' · above sea level' : '')), html: true });
+  if (isNum(W.temp)) {
+    var fc = W.kind === 'forecast';
+    items.push({ label: fc ? 'Forecast at kick-off' : 'Weather at kick-off', value: Math.round(W.temp) + '°C', sub: [isNum(W.wind) ? 'wind ' + Math.round(W.wind) + ' km/h' + (isNum(W.gust) ? ' (gusts ' + Math.round(W.gust) + ')' : '') : '', isNum(W.rain) ? (W.rain >= 0.1 ? W.rain + ' mm of rain' : 'dry') : '', isNum(W.rh) ? W.rh + '% humidity' : ''].filter(Boolean).join(', ') + (fc ? ' (forecast as issued)' : '') });
+  }
+  if (isNum(M.attendance) && M.attendance > 0) items.push({ label: 'Crowd', value: fmt.num(M.attendance), sub: '' });
+  var out = items.length ? QK.stats(items) : '';
+  var notes = [];
+  if (M.ro) notes.push('<b>' + esc(c.hs > c.as ? SC.tname(S, c.home) + ' won.' : c.hs < c.as ? SC.tname(S, c.away) + ' won.' : 'A draw.') + '</b> Before 1891 the four home unions counted goals and tries with no common points system, so this test carries the result only.');
+  if (M.source) notes.push('Result from Wikipedia (“' + esc(M.source.page) + '”, ' + esc(M.source.licence) + '); our main source has no record of this test, so there are no line-ups or statistics.');
+  if (W.temp !== undefined) notes.push('<a href="https://open-meteo.com/" target="_blank" rel="noopener">Weather data by Open-Meteo.com</a> (CC BY 4.0)' + (W.kind === 'forecast' ? '' : ': the hours of the match from the ERA5 reanalysis. It is known only after the match, so it never enters our pre-match numbers.'));
+  return out + (notes.length ? U.note(notes.join(' ')) : '');
+}
+
 var EV_WORD = { 'try': 'Try', con: 'Conversion', pg: 'Penalty goal', dg: 'Drop goal', yc: 'Yellow card', rc: 'Red card', on: 'On', off: 'Off' };
 
 SC.route('match', function (page, P) {
@@ -188,7 +207,7 @@ SC.route('match', function (page, P) {
       (isNum(F.total) ? ' in a ' + Math.round(F.total) + '-point test' : '') + '.' : '';
     html += QK.previewCard(g, { kicker: kick, noun: 'test', homeFirst: true, factors: factors, factorsTitle: 'How they matched up before the start', noteExtra: extra });
     // the result against the forecast
-    if (c.status === 'final' && F.p) {
+    if (c.status === 'final' && F.p && !c.ro) {
       var hw = c.hs > c.as, dr = c.hs === c.as, pw = hw ? F.p[0] : dr ? F.p[1] : F.p[2];
       var mg = c.hs - c.as;
       var verdict = dr ? 'A draw, which we had at ' + SC.pct(F.p[1]) + '.' : (pw >= 0.5 ? 'As expected: ' : pw >= 0.4 ? 'A near coin flip: ' : 'An upset: ') + esc(SC.tname(S, hw ? c.home : c.away)) + ' won at ' + SC.pct(pw) + ' in our numbers.';
@@ -200,6 +219,7 @@ SC.route('match', function (page, P) {
     } else if (M.wr === undefined && F.p) {
       html += '';
     }
+    html += conditions(S, M);
     var moments = M.events && M.events.length ? U.card('Key moments', 'Tries, kicks, cards and changes as the feed records them.', '<ol class="sc-events">' + M.events.filter(function (e) { return e[1] !== 'on' && e[1] !== 'off'; }).map(function (e) {
       var tid = e[2] === 'h' ? c.home : c.away;
       return '<li class="ev-' + esc(e[1]) + '"><span class="mn num">' + (isNum(e[0]) ? e[0] + '’' : '') + '</span>' + QK.teamMark(SC.mark(S, tid), 'sm') + '<span class="w">' + esc(EV_WORD[e[1]] || e[1]) + '</span>' +
@@ -226,7 +246,7 @@ SC.route('match', function (page, P) {
         if (!M.lines[k]) return;
         html += U.card(SC.tname(S, tid) + ': the matchday 23', 'Starters 1-15, then the replacements. Minutes come from the substitutions; "~" marks an estimate where the feed has none.' + (M.has_stats ? ' Value is the player’s game value (see above).' : ''), lineTable(S, M.lines[k], tid, !!M.has_stats), { flush: true });
       });
-    } else if (c.status === 'final') {
+    } else if (c.status === 'final' && !M.source) {
       html += U.note('Our source has no line-ups or player statistics for this match.');
     }
     if (F.p && c.status !== 'final') {

@@ -5,7 +5,7 @@
 (function () {
 'use strict';
 var esc = QK.esc, isNum = QK.isNum, fmt = QK.fmt, U = SC.ui;
-var ORDER = ['nc', 'six', 'trc', 'rwc'];
+var ORDER = ['nc', 'six', 'trc', 'rwc', 'w6n', 'wxv', 'wrwc'];
 
 function teamCell(S, name) {
   var id = SC.byName(S, name);
@@ -103,7 +103,8 @@ function rwcBracket(S, d) {
 }
 
 var VIEW_LABEL = { table: 'Table', chances: 'Chances', bracket: 'Bracket', history: 'History', fixtures: 'Fixtures' };
-var VIEWS = { nc: ['table', 'chances', 'bracket', 'fixtures'], six: ['chances', 'table', 'history'], trc: ['table', 'history'], rwc: ['chances', 'bracket', 'history'] };
+var VIEWS = { nc: ['table', 'chances', 'bracket', 'fixtures'], six: ['chances', 'table', 'history'], trc: ['table', 'history'], rwc: ['chances', 'bracket', 'history'],
+  w6n: ['table', 'history'], wxv: ['table'], wrwc: ['history'] };
 
 SC.route('standings', function (page, P) {
   var S = P.S;
@@ -174,6 +175,17 @@ SC.route('standings', function (page, P) {
           }).join('') + '</div>';
       } else if (view === 'bracket') html += U.card('The knockout bracket', 'Australia, 23 October to 13 November 2027.', rwcBracket(S, d));
       else html += U.card('World Cup winners', 'Every final in our data.', history(S, d.winners, 'rwc'), { flush: true });
+    } else if (tab === 'w6n') {
+      if (view === 'history') html += U.card('Champions', 'Each Women’s Six Nations in our data (Wikipedia’s season pages), as our table computes them.', history(S, d.winners, 'six'), { flush: true });
+      else html += U.card(d.season + ' Women’s Six Nations: final table', 'Bonus points as the championship awards them (since 2017), including 3 for a Grand Slam. Results from Wikipedia (CC BY-SA 4.0).', tableHTML(S, d.table, { gs: true }), { flush: true }) +
+        U.card('Results', '', U.table([{ label: 'Date', align: 'left' }, { label: 'Home', align: 'left' }, { label: 'Score' }, { label: 'Away', align: 'left' }, { label: 'Our home chance' }],
+          (d.results || []).map(function (r) { return [{ v: r.date, html: esc(SC.date(r.date)) }, teamCell(S, r.home), { v: r.hs - r.as, html: '<a href="' + esc(SC.matchHref(S, r.id)) + '">' + r.hs + '–' + r.as + '</a>' }, teamCell(S, r.away), { v: r.p, html: SC.pct(r.p) }]; }), { cls: 'sc-table' }), { flush: true });
+    } else if (tab === 'wxv') {
+      html += (d.tiers || []).map(function (t) {
+        return U.card(d.season + ' ' + t.label, 'Each side plays three matches against the other group in its tier; a win is 4 points, with the standard bonus points. Results from Wikipedia (CC BY-SA 4.0).', tableHTML(S, t.table), { flush: true });
+      }).join('') + U.note('The tiers are labelled by the strength of their sides in our ratings today.');
+    } else if (tab === 'wrwc') {
+      html += U.card('Women’s World Cup winners', 'Every final in our data.', history(S, d.winners, 'rwc'), { flush: true });
     }
     body.innerHTML = html;
     U.wire(body);

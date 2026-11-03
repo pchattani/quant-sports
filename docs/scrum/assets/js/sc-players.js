@@ -79,9 +79,12 @@ SC.route('player', function (page, P) {
     var bio = Pp.bio || {};
     var meta = [];
     if (isNum(Pp.age)) meta.push(['Age', String(Math.floor(Pp.age))]);
-    if (bio.ht_cm) meta.push(['Height', bio.ht_cm + ' cm']);
-    if (bio.wt_kg) meta.push(['Weight', bio.wt_kg + ' kg']);
+    var ph = Pp.phys || {};
+    if (bio.ht_cm) meta.push(['Height', bio.ht_cm + ' cm' + (isNum(ph.ht_pct) ? ' (' + QK.ordinal(ph.ht_pct) + ' pct)' : '')]);
+    if (bio.wt_kg) meta.push(['Weight', bio.wt_kg + ' kg' + (isNum(ph.wt_pct) ? ' (' + QK.ordinal(ph.wt_pct) + ' pct)' : '')]);
+    if (bio.born) meta.push(['Born', bio.born]);
     meta.push(['Tests', String(Pp.caps)]);
+    if (Pp.wcaps && isNum(Pp.wcaps.caps)) meta.push(['Career caps', String(Pp.wcaps.caps)]);
     if (Pp.capt) meta.push(['Captain', Pp.capt + ' times']);
     var val = C && C.v ? C.v.val80 : null;
     var gname = SC.GROUP[Pp.grp] || 'position';
@@ -96,9 +99,13 @@ SC.route('player', function (page, P) {
     var html = '<nav class="sc-crumb"><a href="' + esc(SC.href(S, 'scout', null, 'grp=' + (Pp.grp || 'back_row'))) + '">Scouting Room</a> / ' + esc(Pp.name) + '</nav>';
     html += QK.playerHeader({ name: Pp.name, number: num, pos: SC.posName(Pp.pos), kicker: SC.SNAME[S] + ' · ' + gname, team: { name: t.name, abbr: t.abbr, colour: t.colour, alt: t.alt, href: SC.teamHref(S, Pp.team) },
       meta: meta, strip: [{ label: 'Scrum value per 80', value: isNum(val) ? SC.signed(val, 1) : '—', pctl: C && C.q ? C.pc.val80 : null, signal: true },
-        { label: 'Tests', value: String(Pp.caps), sub: Pp.starts + ' starts' }, { label: 'Points', value: String(Pp.pts), sub: Pp.tries + ' tries' },
+        { label: Pp.wcaps && isNum(Pp.wcaps.caps) ? 'Career caps' : 'Tests', value: String(Pp.wcaps && isNum(Pp.wcaps.caps) ? Pp.wcaps.caps : Pp.caps), sub: Pp.wcaps && isNum(Pp.wcaps.caps) ? Pp.caps + ' in our data, ' + Pp.starts + ' starts' : Pp.starts + ' starts' }, { label: 'Points', value: String(Pp.pts), sub: Pp.tries + ' tries' },
         { label: 'Won', value: Pp.wdl ? Pp.wdl[0] + ' of ' + Pp.caps : '—', sub: Pp.wdl ? Pp.wdl.join('–') : '' }, { label: 'Span', value: SC.year(Pp.first) + '–' + SC.year(Pp.last).slice(2), sub: fmt.num(Pp.min) + ' minutes' }],
       short: short });
+    if ((isNum(ph.ht_pct) || isNum(ph.wt_pct)) && Pp.phys_med) {
+      html += U.note('Physical profile against ' + esc(gname.toLowerCase()) + ' capped in the last four years (' + Pp.phys_med.n + ' with a bio): ' +
+        [isNum(ph.ht_pct) ? QK.ordinal(ph.ht_pct) + ' percentile for height (the middle ' + gname.toLowerCase().replace(/s$/, '') + ' is ' + Pp.phys_med.ht + ' cm)' : '', isNum(ph.wt_pct) ? QK.ordinal(ph.wt_pct) + ' for weight (' + Pp.phys_med.wt + ' kg)' : ''].filter(Boolean).join(', ') + '. Heights and weights are ESPN’s, as listed.');
+    }
     // percentiles within the position (the hollow ring is the last full year with enough minutes)
     var prevS = (Pp.seasons || []).filter(function (s) { return s.q && s.pc && s.y < new Date(QK.now()).getUTCFullYear(); }).slice(-1)[0] || null;
     if (C && C.v) {

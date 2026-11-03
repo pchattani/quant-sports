@@ -235,7 +235,7 @@ SC.route('team', function (page, P) {
         var r = SC.result(S, c, tid), opp = String(c.home) === String(tid) ? c.away : c.home, home = String(c.home) === String(tid);
         var us = home ? c.hs : c.as, th = home ? c.as : c.hs;
         var p = c.p ? (home ? c.p[0] : c.p[2]) : null;
-        return '<li><span class="sc-res ' + r + '">' + r + '</span><span class="s">' + esc(SC.date(c.date)) + '</span>' + (home ? 'v ' : 'at ') + U.teamEnt(S, opp) + '<a class="v" href="' + esc(SC.matchHref(S, c.id)) + '">' + us + '–' + th + '</a>' + (isNum(p) ? '<span class="s">we gave ' + SC.pct(p) + '</span>' : '') + '</li>';
+        return '<li><span class="sc-res ' + r + '">' + r + '</span><span class="s">' + esc(SC.date(c.date)) + '</span>' + (home ? 'v ' : 'at ') + U.teamEnt(S, opp) + '<a class="v" href="' + esc(SC.matchHref(S, c.id)) + '">' + SC.scoreText(us, th, c.ro) + '</a>' + (isNum(p) ? '<span class="s">we gave ' + SC.pct(p) + '</span>' : '') + '</li>';
       }).join('') + '</ul>') + '</div></div>';
     // the profile against every side
     if (T.profile) {
@@ -256,7 +256,7 @@ SC.route('team', function (page, P) {
       html += '<div class="qk-g75 sc-gap"><div>' + U.card('Results against our chances', 'The last ' + T.xw.length + ' tests: wins (a draw counts half) against the wins our pre-test chances expected.', U.chart('tp-xw', 280, 'Wins against expected wins')) + '</div><div>' +
         QK.explain('<b>Who’s for real?</b> ' + esc(t.name) + ' won ' + SC.f(last[1], 1) + ' of these tests against ' + SC.f(last[2], 1) + ' expected: ' + (Math.abs(gap) < 1.5 ? 'about what the numbers said.' : gap > 0 ? SC.f(gap, 1) + ' more, close wins and upsets that seldom last.' : SC.f(-gap, 1) + ' fewer, near misses that tend to turn.')) + '</div></div>';
     }
-    html += '<div class="qk-g2 sc-gap">' + U.card('Our rating over time', 'Month by month; 0 is an average test side.', U.chart('tp-rating', 300, 'Rating history')) +
+    html += '<div class="qk-g2 sc-gap">' + U.card('Our rating over time', 'Month by month since ' + esc(SC.year((T.rating_hist || [[''] ])[0][0])) + ' (results before ESPN’s coverage from Wikipedia); 0 is an average test side.', U.chart('tp-rating', 300, 'Rating history')) +
       U.card('World Rugby points over time', 'Our rebuild of the official points, month by month.', U.chart('tp-wr', 300, 'World Rugby points history')) + '</div>';
     // results and fixtures
     var rcols = [{ label: 'Date', align: 'left' }, { label: 'Competition', align: 'left' }, { label: 'Opponent', align: 'left' }, { label: '' }, { label: 'Score' }, { label: 'Our chance' }];
@@ -264,24 +264,30 @@ SC.route('team', function (page, P) {
       var home = String(c.home) === String(tid), opp = home ? c.away : c.home, us = home ? c.hs : c.as, th = home ? c.as : c.hs;
       var p = c.p ? (home ? c.p[0] : c.p[2]) : null, r = SC.result(S, c, tid);
       return [{ v: c.date, html: '<a href="' + esc(SC.matchHref(S, c.id)) + '">' + esc(SC.date(c.date)) + '</a>' }, { v: c.comp, html: esc(SC.compName(c.comp)) }, { v: SC.tname(S, opp), html: (home ? 'v ' : 'at ') + U.teamEnt(S, opp) },
-        { v: r, html: r ? '<span class="sc-res ' + r + '">' + r + '</span>' : '<span class="qk-muted">Next</span>' }, { v: isNum(us) ? us - th : 0, html: isNum(us) ? us + '–' + th : '—' }, { v: p || 0, html: isNum(p) ? SC.pct(p) : '—' }];
+        { v: r, html: r ? '<span class="sc-res ' + r + '">' + r + '</span>' : '<span class="qk-muted">Next</span>' }, { v: isNum(us) ? us - th : 0, html: isNum(us) ? SC.scoreText(us, th, c.ro) : '—' }, { v: p || 0, html: isNum(p) ? SC.pct(p) : '—' }];
     }), { cls: 'sc-table', maxHeight: 640 }), { flush: true });
     // head to head
-    html += U.card('Head to head', 'Every opponent in our data, all time.', U.table([{ label: 'Opponent', align: 'left', sticky: true }, { label: 'P' }, { label: 'W' }, { label: 'D' }, { label: 'L' }, { label: 'Win %' }, { label: 'PF' }, { label: 'PA' }, { label: 'Last', align: 'left' }],
+    html += U.card('Head to head', 'Every opponent in our data, all time (from ' + esc(SC.year(T.first)) + '; points for and against leave out the tests before 1891, which have the result only).', U.table([{ label: 'Opponent', align: 'left', sticky: true }, { label: 'P' }, { label: 'W' }, { label: 'D' }, { label: 'L' }, { label: 'Win %' }, { label: 'PF' }, { label: 'PA' }, { label: 'Last', align: 'left' }],
       (T.h2h || []).map(function (h) {
         return [{ v: SC.tname(S, h.opp), html: U.teamEnt(S, h.opp) }, { v: h.p, html: String(h.p) }, { v: h.w, html: String(h.w) }, { v: h.d, html: String(h.d) }, { v: h.l, html: String(h.l) },
           { v: h.w / h.p, html: SC.pct(h.w / h.p) }, { v: h.pf, html: String(h.pf) }, { v: h.pa, html: String(h.pa) },
-          { v: h.last ? h.last.date : '', html: h.last ? '<a href="' + esc(SC.matchHref(S, h.last.id)) + '">' + h.last.us + '–' + h.last.them + ', ' + esc(SC.year(h.last.date)) + '</a>' : '' }];
+          { v: h.last ? h.last.date : '', html: h.last ? '<a href="' + esc(SC.matchHref(S, h.last.id)) + '">' + SC.scoreText(h.last.us, h.last.them, h.last.ro) + ', ' + esc(SC.year(h.last.date)) + '</a>' : '' }];
       }), { cls: 'sc-table', maxHeight: 560 }), { flush: true });
     html += combosHtml(S, T);
     // squad and the most capped
     var pcols = [{ label: 'Player', align: 'left', sticky: true }, { label: 'Pos', align: 'left' }, { label: 'Age' }, { label: 'Caps' }, { label: 'Pts' }, { label: 'Tries' }, { label: 'Value' }, { label: 'Last test', align: 'left' }];
+    var hasW = (T.squad || []).some(function (r) { return isNum(r.wcaps); });
     var prow = function (r) {
       return [{ v: r.n, html: '<a href="' + esc(SC.playerHref(S, r.id)) + '">' + esc(r.n) + '</a>' }, { v: r.pos || '', html: '<span title="' + esc(SC.posName(r.pos)) + '">' + esc(r.pos || '') + '</span>' },
-        { v: r.age || 0, html: isNum(r.age) ? String(Math.floor(r.age)) : '—' }, { v: r.caps, html: String(r.caps) }, { v: r.pts, html: String(r.pts) }, { v: r.tries, html: String(r.tries) },
+        { v: r.age || 0, html: isNum(r.age) ? String(Math.floor(r.age)) : '—' }, { v: isNum(r.wcaps) ? r.wcaps : r.caps, html: isNum(r.wcaps) ? '<b title="Career caps (Wikipedia)">' + r.wcaps + '</b>' + (r.wcaps !== r.caps ? ' <span class="qk-muted" title="Tests in our data">' + r.caps + '</span>' : '') : String(r.caps) }, { v: r.pts, html: String(r.pts) }, { v: r.tries, html: String(r.tries) },
         { v: isNum(r.val) ? r.val : -99, html: isNum(r.val) ? '<span class="sc-ours">' + SC.signed(r.val, 1) + '</span>' : '—' }, { v: r.last || '', html: esc(r.last ? SC.date(r.last) : '') }];
     };
-    html += '<div class="qk-g2 sc-gap">' + U.card('The squad', 'Everyone capped in the last 12 months, by position. Value is our Scrum value per 80 minutes (regular players only). Caps are tests in our data.', U.table(pcols, (T.squad || []).map(prow), { cls: 'sc-table', maxHeight: 640 }), { flush: true }) +
+    var careerCard = (T.career_caps || []).length ? U.card('Most capped, all time', 'Career caps for ' + esc(t.name) + ', from Wikipedia’s records (CC BY-SA 4.0), as of ' + esc(SC.date(T.caps_asof)) + '.',
+      U.table([{ label: 'Player', align: 'left', sticky: true }, { label: 'Caps' }, { label: 'Career', align: 'left' }], T.career_caps.map(function (r) {
+        return [{ v: r.name, html: r.id ? '<a href="' + esc(SC.playerHref(S, r.id)) + '">' + esc(r.name) + '</a>' : esc(r.name) }, { v: r.caps, html: '<b>' + r.caps + '</b>' }, { v: r.years || '', html: esc(r.years || '') }];
+      }), { cls: 'sc-table', maxHeight: 640 }), { flush: true }) : '';
+    html += '<div class="qk-g2 sc-gap">' + U.card('The squad', 'Everyone capped in the last 12 months, by position. Value is our Scrum value per 80 minutes (regular players only). ' + (hasW ? 'Caps in bold are career caps (Wikipedia’s squad list); the grey number is tests in our data.' : 'Caps are tests in our data.'), U.table(pcols, (T.squad || []).map(prow), { cls: 'sc-table', maxHeight: 640 }), { flush: true }) + careerCard +
+      '</div><div class="qk-g2 sc-gap">' +
       U.card('Most capped', 'The most tests for ' + esc(t.name) + ' in our data (since ' + esc(SC.year(T.first)) + '; older tests are missing, so these are not official cap counts).', U.table(pcols, (T.most_capped || []).map(prow), { cls: 'sc-table', maxHeight: 640 }), { flush: true }) + '</div>';
     if ((T.top_points || []).length) html += '<div class="qk-g2 sc-gap">' + U.card('Most points', 'In our data.', U.table(pcols, T.top_points.map(prow), { cls: 'sc-table' }), { flush: true }) +
       U.card('Most tries', 'In our data.', U.table(pcols, (T.top_tries || []).map(prow), { cls: 'sc-table' }), { flush: true }) + '</div>';

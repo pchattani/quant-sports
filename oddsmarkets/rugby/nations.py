@@ -145,6 +145,23 @@ def lookup(name: str) -> dict | None:
 INVITATIONAL = {"BIL", "BAR", "WXV", "NZM", "PIS", "EIR", "ARX", "ENS", "IRA", "SCA", "TGX", "FIW", "ANZ", "ESA", "FNP", "PUX"}
 
 
+# sides whose home tests are mostly at altitude (1,000 m or higher): a home side at altitude gets no altitude edge
+# against them (ratings.Params.c_alt, the Highveld effect)
+ALT_M = 1000.0
+ALT_HOME = {"South Africa", "Kenya", "Zimbabwe", "Namibia", "Mexico", "Colombia", "Uganda", "Zambia", "Botswana",
+            "Eswatini", "Madagascar", "Ethiopia", "Rwanda", "Bolivia", "Peru"}
+
+
+def altitude_edge(match: dict) -> int:
+    """1 when the home side plays at a venue 1,000 m or higher (match["venue"]["elev"], Open-Meteo) against a side
+    that does not play its own home tests at altitude; 0 otherwise (and at neutral venues)."""
+    e = (match.get("venue") or {}).get("elev")
+    if not isinstance(e, (int, float)) or e < ALT_M or match.get("neutral"):
+        return 0
+    away = base_name(canonical((match.get("away") or {}).get("name") or ""))
+    return 0 if away in ALT_HOME else 1
+
+
 def invitational(name: str) -> bool:
     r = lookup(name)
     return bool(r) and r["code"] in INVITATIONAL

@@ -61,13 +61,24 @@ GLOSSARY = [
      "with less time left, the same lead is worth more."),
     ("Grades", "Each position group's best regulars by Scrum value, ranked against the ranked sides: A is the top 15%, "
      "F the bottom 15%."),
+    ("Career caps", "A player's tests for his country over his whole career, from Wikipedia's squad and records tables; "
+     "'tests in our data' counts only the tests our sources hold."),
+    ("Result only (before 1891)", "The early home unions counted goals and tries with no common points system, so those "
+     "tests carry the winner (W-L) but no score, and the scoring records start in 1891."),
+    ("Referee tendencies", "Per referee: penalties and cards a test, the home side's share of the penalties, and how the "
+     "home side did against our pre-match chances. Small samples swing; read the number of tests."),
+    ("At altitude", "A home test at a venue 1,000 m or more above sea level (Johannesburg is 1,750 m, Pretoria 1,340 m) "
+     "against visitors from lower down."),
+    ("Weather at kick-off", "Temperature, wind and rain over the hours of the test, from Open-Meteo's reanalysis; known only "
+     "afterwards, so it never enters our pre-match numbers. Upcoming tests show the forecast as issued."),
 ]
 
 
 def build_index(data: Path, scopes: dict, now: datetime | None = None) -> dict:
     now = now or B.now_utc()
     idx = {"ok": True, "site": config.SITE, "updated_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"), "scopes": scopes,
-           "credit": "Results, line-ups and match statistics from ESPN's public site data.",
+           "credit": "Results, line-ups, match statistics and bios from ESPN's public site data; historic results, referees "
+                     "and caps from Wikipedia (CC BY-SA 4.0); weather data by Open-Meteo.com (CC BY 4.0).",
            "default": "men"}
     B.write(data / "index.json", idx)
     return idx

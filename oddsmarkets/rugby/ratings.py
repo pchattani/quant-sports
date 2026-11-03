@@ -11,6 +11,7 @@ and a defence rating `dfn` (points it stops). Before a match:
     H       home advantage in points (0 at a neutral venue)
     travel  c_km * (log1p(km_away/1000) - log1p(km_home/1000)) + c_tz * (zones_away - zones_home)
     rest    c_rest * (min(rest_h, 28) - min(rest_a, 28)) / 7          (days since each side's last test)
+    alt     c_alt * [home venue 1,000 m or higher and the away side not from altitude]  (nations.altitude_edge)
 
 Win, draw and loss chances come from a normal margin with a spread that widens with the mismatch,
 sd = s0 + s1*|m|; a draw is a final margin inside +-0.5. After the match each side's ratings move by the
@@ -50,6 +51,7 @@ class Params:
     c_km: float = 0.0         # travel: points per log-thousand-km of extra travel
     c_tz: float = 0.0         # travel: points per extra time zone
     c_rest: float = 0.0       # rest: points per extra week
+    c_alt: float = 0.0        # altitude: points for a home side at a venue 1,000 m up against a side from lower down
     s0: float = 11.5          # margin spread at a level match
     s1: float = 0.12          # extra spread per point of expected margin
     s_tier: float = 0.0       # extra spread per tier step of the weaker side (tests between lesser sides swing more)
@@ -106,6 +108,8 @@ class Model:
         # caller (fitted on the development years)
         self.wr = None
         self.wr_fit: dict | None = None
+        from .rankings import REPLICA_FROM
+        self.wr_from = REPLICA_FROM
         if self.p.wr3 or self.p.anchor > 0:
             from . import rankings
             self.wr = rankings.Ranker(default=lambda t, d: {1: 78.0, 2: 66.0, 3: 52.0}[nations.tier(self.name.get(t, ""))])
@@ -166,7 +170,8 @@ class Model:
         # carries no home advantage: the feed's flag says home, the venue says otherwise
         neutral = bool(m.get("neutral")) or kh > AWAY_FROM_HOME_KM
         return {"neutral": neutral, "km_h": kh, "km_a": ka, "tz_h": zh, "tz_a": za,
-                "rest_h": rest(m["home"]["id"]), "rest_a": rest(m["away"]["id"])}
+                "rest_h": rest(m["home"]["id"]), "rest_a": rest(m["away"]["id"]),
+                "alt": 0 if neutral else nations.altitude_edge(m)}
 
     def expect(self, m: dict, ctx: dict | None = None) -> dict:
         p = self.p
@@ -178,6 +183,8 @@ class Model:
         edge += p.c_km * (math.log1p(ctx["km_a"] / 1000.0) - math.log1p(ctx["km_h"] / 1000.0))
         edge += p.c_tz * (ctx["tz_a"] - ctx["tz_h"])
         edge += p.c_rest * (min(ctx["rest_h"], 28.0) - min(ctx["rest_a"], 28.0)) / 7.0
+        if p.c_alt:
+            edge += p.c_alt * ctx.get("alt", 0)
         if p.split:
             eh = self.mu / 2 + self.att[h["id"]] - self.dfn[a["id"]] + edge / 2
             ea = self.mu / 2 + self.att[a["id"]] - self.dfn[h["id"]] - edge / 2
@@ -239,7 +246,7 @@ class Model:
             self.att[a] -= kk(a) * err / 2
             self.dfn[a] -= kk(a) * err / 2
         self.mu += p.k_mu * ((float(m["hs"]) + float(m["as"])) - e["total"])
-        if self.wr is not None and not nations.invitational(m["home"]["name"]) and not nations.invitational(m["away"]["name"]):
+        if self.wr is not None and not nations.invitational(m["home"]["name"]) and not nations.invitational(m["away"]["name"])                 and str(m.get("date") or "")[:4] >= str(self.wr_from):
             self.wr.update(h, a, int(m["hs"]), int(m["as"]), m.get("date") or "", neutral=bool(m.get("neutral")),
                            world_cup=m.get("comp") in ("rwc", "wrwc"))
         for t in (h, a):

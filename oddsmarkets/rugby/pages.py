@@ -10,10 +10,11 @@ from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
-from . import analytics as AN, build as B, comps, config, models, nations, players as PL, rankings, store, validate
+from . import analytics as AN, build as B, comps, config, extras as X, models, nations, players as PL, rankings, store, validate
 from .sources import espn
 
 COMP_NAME = {v["key"]: v["name"] for v in config.COMPS.values()}
+COMP_NAME.update({"w6n": "Women's Six Nations", "wxv": "WXV"})
 COMP_TIER = {"rwc": 50, "wrwc": 40, "nc": 38, "six": 40, "trc": 36, "lions": 42, "tri20": 30, "test": 22,
              "oly7m": 24, "oly7w": 22}
 r1 = B.r1
@@ -69,6 +70,20 @@ def match_page(S, w, rep, m, ana) -> dict:
     fc = w["fc"].get(m["id"]) or w["up"].get(m["id"])
     out = {"ok": True, "match": B.card(S, m, fc), "season": int(m["date"][:4]), "comp_name": COMP_NAME.get(m.get("comp"), ""),
            "attendance": m.get("attendance")}
+    rf = m.get("referee") or {}
+    if rf.get("name"):
+        out["referee"] = {"name": rf["name"], "union": rf.get("union") or "", "k": X.fold(rf["name"])}
+    vi = X.venue_of(m)
+    if vi:
+        out["venue"] = {"place": vi.get("place"), "elev": round(vi["elev"]) if isinstance(vi.get("elev"), (int, float)) else None,
+                        "alt": X.at_altitude(m)}
+    wx = X.weather_of(m)
+    if wx:
+        out["weather"] = {k: wx.get(k) for k in ("temp", "rh", "wind", "gust", "rain", "kind", "issued") if wx.get(k) is not None}
+    if m.get("source") == "wikipedia":
+        out["source"] = {"name": "Wikipedia", "page": m.get("page") or "", "licence": "CC BY-SA 4.0"}
+    if m.get("ro"):
+        out["ro"] = 1
     hh, ah = m.get("hh"), m.get("ah")       # [half-time, full-time] for each side
     evs = [e for e in (m.get("events") or []) if isinstance(e[0], (int, float)) and e[5] is not None]
     if hh and ah and ((hh[0] or 0) + (ah[0] or 0) > 0 or (m.get("hs") or 0) + (m.get("as") or 0) == 0):
@@ -90,7 +105,7 @@ def match_page(S, w, rep, m, ana) -> dict:
                            "rating": [r1(fc.get("r_h"), 2), r1(fc.get("r_a"), 2)], "edge": r1(fc.get("edge")),
                            "travel_km": [round(ctx.get("km_h", 0)), round(ctx.get("km_a", 0))],
                            "zones": [r1(ctx.get("tz_h"), 1), r1(ctx.get("tz_a"), 1)],
-                           "rest": [ctx.get("rest_h"), ctx.get("rest_a")]}
+                           "rest": [ctx.get("rest_h"), ctx.get("rest_a")], "alt": ctx.get("alt") or 0}
     # World Rugby exchange (replica): the points each side took
     ex = rep["exchange"].get(m["id"])
     if ex:
@@ -295,7 +310,7 @@ def rankings_payload(S, w, rep) -> dict:
 # ── teams ─────────────────────────────────────────────────────────────────────────────────────────────────
 
 def h2h(S, tid) -> list:
-    rec = defaultdict(lambda: {"p": 0, "w": 0, "d": 0, "l": 0, "pf": 0, "pa": 0, "last": None})
+    rec = defaultdict(lambda: {"p": 0, "w": 0, "d": 0, "l": 0, "pf": 0, "pa": 0, "last": None, "first": None})
     for m in B.team_results(S, tid):
         home = m["home"]["id"] == tid
         opp = m["away"]["id"] if home else m["home"]["id"]
@@ -303,9 +318,13 @@ def h2h(S, tid) -> list:
         r = rec[opp]
         r["p"] += 1
         r["w" if us > th else ("d" if us == th else "l")] += 1
-        r["pf"] += us
-        r["pa"] += th
-        r["last"] = {"id": m["id"], "date": m["date"][:10], "us": us, "them": th}
+        if not m.get("ro"):
+            r["pf"] += us
+            r["pa"] += th
+        else:
+            r["ro"] = r.get("ro", 0) + 1
+        r["first"] = r["first"] or m["date"][:10]
+        r["last"] = {"id": m["id"], "date": m["date"][:10], "us": us, "them": th, "ro": 1 if m.get("ro") else 0}
     out = [{"opp": o, **v} for o, v in rec.items()]
     out.sort(key=lambda r: (-r["p"], r["opp"]))
     return out
@@ -342,7 +361,8 @@ def team_page(S, w, rep, ana, prof, tid, comps_out, ratings: dict | None = None)
         cur = rec.get("cur") or {}
         return {"id": aid, "n": a.get("name") or aid, "pos": rec.get("pos"), "caps": caps[aid], "pts": int(pts[aid]),
                 "tries": int(tries[aid]), "last": last_seen.get(aid), "age": AN.age_on(a.get("dob"), S.today),
-                "val": r1((cur.get("rates") or {}).get("val80"), 2) if cur.get("qual") else None}
+                "val": r1((cur.get("rates") or {}).get("val80"), 2) if cur.get("qual") else None,
+                "wcaps": (CAPS.get("by_aid") or {}).get(aid, {}).get("caps")}
     squad = sorted((prow(a) for a in recent), key=lambda r: (PL.GROUP_ORDER.index(PL.POS_GROUP.get(r["pos"] or "", "back_three")) if r["pos"] else 9, -r["caps"]))
     most = [prow(a) for a, _n in caps.most_common(20)]
     top_pts = [prow(a) for a, _n in pts.most_common(10) if pts[a] > 0]
@@ -389,7 +409,8 @@ def team_page(S, w, rep, ana, prof, tid, comps_out, ratings: dict | None = None)
             "record": [allrec["w"], allrec["d"], allrec["l"]], "first": res[0]["date"][:10] if res else None,
             "results": rows, "next": nxt, "h2h": h2h(S, tid), "squad": squad, "most_capped": most,
             "top_points": top_pts, "top_tries": top_tries, "profile": profile,
-            "rating_hist": monthly([h for h in hist if h[0] >= "2003-01-01"]), "wr_hist": wr_hist, "chances": chances,
+            "rating_hist": monthly(hist), "wr_hist": wr_hist, "chances": chances,
+            "career_caps": (CAPS.get("most") or {}).get(tid), "caps_asof": CAPS.get("asof"),
             "xw": xw, "combos": combos(S, ana, tid), "grades": (GRADES.get(S.scope) or {}).get(tid)}
 
 
@@ -421,6 +442,11 @@ def combos(S, ana, tid) -> list:
                     "rows": [{"a": a, "an": (S.athletes.get(a) or {}).get("name") or a, "b": b, "bn": (S.athletes.get(b) or {}).get("name") or b,
                               **v} for (a, b), v in rows]})
     return out
+
+
+# career caps (Wikipedia) and physical profiles, filled by build_scope before the team and player pages
+CAPS: dict = {}
+PHYS: dict = {}
 
 
 # position-group grades: each side's best regulars at the position (Scrum value per 80, the current window), ranked
@@ -562,7 +588,9 @@ def player_page(S, ana, aid, w) -> dict:
             "cur": {"from": ana["cur_from"], "n": cur["agg"]["n"], "min": int(cur["agg"]["min"]), "q": 1 if cur.get("qual") else 0,
                     "v": {k: r1(cur["rates"].get(k), 3) for k in AN.PM_IDS if cur["rates"].get(k) is not None},
                     "pc": {k: v for k, v in (cur.get("pct") or {}).items() if v is not None}} if cur else None,
-            "seasons": seasons, "log": log, "similar": sim, "splits": splits(S, ana, aid, rec)}
+            "seasons": seasons, "log": log, "similar": sim, "splits": splits(S, ana, aid, rec),
+            "wcaps": (CAPS.get("by_aid") or {}).get(aid), "phys": (PHYS.get("by_aid") or {}).get(aid),
+            "phys_med": (PHYS.get("median") or {}).get(rec.get("grp"))}
 
 
 SPLIT_KEYS = ["val80", "m", "car", "cb", "tk", "tkpct", "pc", "pts"]
@@ -769,13 +797,15 @@ def lab_payload(S, w, ana=None) -> dict:
     val = (S.report or {}).get("value") or {}
     return {"ok": True, "years": years, "margins": [[k, margins[k]] for k in range(0, 61)], "value": val,
             "territory": territory_conversion(S), "setpiece": setpiece_years(S), "positions": position_profile(ana) if ana else None,
-            "home_adv": r1(S.p.H, 2), "travel": {"c_km": S.p.c_km, "c_tz": S.p.c_tz, "c_rest": S.p.c_rest}}
+            "home_adv": r1(S.p.H, 2), "travel": {"c_km": S.p.c_km, "c_tz": S.p.c_tz, "c_rest": S.p.c_rest, "c_alt": S.p.c_alt},
+            "clock": X.scoring_clock(S), "ages": X.age_curve(S, ana) if ana else None, "weather": X.weather_lab(S, w)}
 
 
 def records_payload(S, ana) -> dict:
     fin = S.finals
-    big = sorted(fin, key=lambda m: -abs(m["hs"] - m["as"]))[:15]
-    high = sorted(fin, key=lambda m: -(m["hs"] + m["as"]))[:15]
+    scored = [m for m in fin if not m.get("ro")]
+    big = sorted(scored, key=lambda m: -abs(m["hs"] - m["as"]))[:15]
+    high = sorted(scored, key=lambda m: -(m["hs"] + m["as"]))[:15]
     def mrow(m):
         return {"id": m["id"], "date": m["date"][:10], "home": m["home"]["id"], "away": m["away"]["id"], "hs": m["hs"], "as": m["as"], "comp": m.get("comp")}
     # longest winning runs
@@ -826,7 +856,30 @@ def records_payload(S, ana) -> dict:
             "most_tries": [prow(x) for x in sorted(tot, key=lambda x: -x[3])[:25]],
             "match_points": [grow(x) for x in sorted(best_pts, key=lambda x: (-x[0], x[2]["date"]))[:15]],
             "match_tries": [grow(x) for x in sorted(best_tries, key=lambda x: (-x[0], x[2]["date"]))[:15]],
-            "span": [fin[0]["date"][:10], fin[-1]["date"][:10]] if fin else None, "n": len(fin)}
+            "span": [fin[0]["date"][:10], fin[-1]["date"][:10]] if fin else None, "n": len(fin),
+            "career_caps": career_caps_all(S), "n_wiki": sum(1 for m in fin if m.get("source") == "wikipedia"),
+            "decades": decades(S)}
+
+
+def career_caps_all(S) -> list:
+    """The most-capped players of every nation (Wikipedia's all-time tables), merged, top 30."""
+    rows = []
+    for tid, lst in (CAPS.get("most") or {}).items():
+        for r in lst:
+            rows.append({"team": tid, "n": r["name"], "caps": r["caps"], "years": r.get("years") or "", "id": r.get("id")})
+    rows.sort(key=lambda r: -r["caps"])
+    return rows[:30]
+
+
+def decades(S) -> list:
+    """Tests a decade in our data, and how many came from Wikipedia rather than ESPN."""
+    by = defaultdict(lambda: [0, 0])
+    for m in S.finals:
+        d = int(m["date"][:3]) * 10
+        by[d][0] += 1
+        if m.get("source") == "wikipedia":
+            by[d][1] += 1
+    return [[d, v[0], v[1]] for d, v in sorted(by.items())]
 
 
 # ── overview ──────────────────────────────────────────────────────────────────────────────────────────────
@@ -1022,7 +1075,7 @@ def build_scope(scope: str, data_root: Path, sims: int = 20000, now: datetime | 
     rk = rankings.Ranker(default=lambda t, d: {1: 78.0, 2: 66.0, 3: 52.0}[nations.tier(S.name(t))])
     for m in S.finals:
         h, a = m["home"]["id"], m["away"]["id"]
-        if nations.invitational(m["home"]["name"]) or nations.invitational(m["away"]["name"]):
+        if nations.invitational(m["home"]["name"]) or nations.invitational(m["away"]["name"]) or int(m["date"][:4]) < models.REPLICA_FROM:
             continue
         if rep["source"] == "anchored" and m["date"][:10] > validate.PUBLISHED_DATE:
             break
@@ -1038,6 +1091,10 @@ def build_scope(scope: str, data_root: Path, sims: int = 20000, now: datetime | 
     rep["exchange"] = ex
     ana = AN.player_tables(S.finals, S.athletes, S.today, S.fit.get("value"))
     prof = AN.team_profiles(S.finals, S.today)
+    CAPS.clear()
+    CAPS.update(X.caps_tables(S, ana))
+    PHYS.clear()
+    PHYS.update(X.physical(S, ana))
     comps_out = B.comp_payloads(S, w, rep, sims)
     rk_pay = rankings_payload(S, w, rep)
     rep["wr_rank"] = {r["id"]: r["rank"] for r in rk_pay["table"]}
@@ -1071,9 +1128,11 @@ def build_scope(scope: str, data_root: Path, sims: int = 20000, now: datetime | 
     sizes["model"] += B.write(data / "model.json", model_payload(S, w, rep, flog))
     sizes["lab"] += B.write(data / "lab.json", lab_payload(S, w, ana))
     sizes["records"] += B.write(data / "records.json", records_payload(S, ana))
+    sizes["referees"] += B.write(data / "referees.json", X.referees_payload(S, w))
     info = {"ok": True, "label": config.SCOPES[scope]["label"], "short": config.SCOPES[scope]["short"],
             "teams": {tid: dict(S.teams[tid], **({"active": 1} if tid in set(team_ids) else {})) for tid in S.teams}, "years": yp["years"], "latest": S.finals[-1]["date"][:10],
             "next": S.upcoming[0]["date"] if S.upcoming else None, "comps": sorted(comps_out),
-            "n_matches": len(S.finals), "n_players": len(ana["players"]), "first": S.finals[0]["date"][:10]}
+            "n_matches": len(S.finals), "n_players": len(ana["players"]), "first": S.finals[0]["date"][:10],
+            "merge": store.MERGE_REPORT.get(scope), "caps": {k: CAPS.get(k) for k in ("matched", "rows")}}
     return {"ok": True, "info": info, "sizes": dict(sizes), "search": search_rows(S, ana), "S": S, "w": w, "rep": rep,
             "ana": ana, "prof": prof, "comps": comps_out, "ratings": ratings}
