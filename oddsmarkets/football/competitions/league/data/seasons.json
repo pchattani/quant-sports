@@ -1,5 +1,5 @@
 {
-  "discovered_at": "2026-11-02T14:49:57Z",
+  "discovered_at": "2026-11-03T16:59:46Z",
   "leagues": {
     "premier-league": {
       "tournament_id": 17,
@@ -3519,6 +3519,71 @@
       "conferences": {},
       "previous_rank": {},
       "family": "domestic"
+    },
+    "super-lig": {
+      "tournament_id": 52,
+      "seasons": [
+        {
+          "season_id": 98080,
+          "name": "Super Lig 26/27",
+          "year": "26/27",
+          "tournament_id": 52
+        },
+        {
+          "season_id": 77805,
+          "name": "Super Lig 25/26",
+          "year": "25/26",
+          "tournament_id": 52
+        }
+      ],
+      "teams": [
+        "Galatasaray",
+        "Amedspor",
+        "Trabzonspor",
+        "Beşiktaş JK",
+        "Kasımpaşa",
+        "Fenerbahçe",
+        "Çorum FK",
+        "Kocaelispor",
+        "Göztepe",
+        "Başakşehir FK",
+        "Erzurumspor FK",
+        "Alanyaspor",
+        "Çaykur Rizespor",
+        "Gençlerbirliği",
+        "Konyaspor",
+        "Gaziantep FK",
+        "Samsunspor",
+        "Eyüpspor"
+      ],
+      "conferences": {},
+      "previous_rank": {
+        "Galatasaray": 1,
+        "Fenerbahçe": 2,
+        "Trabzonspor": 3,
+        "Beşiktaş JK": 4,
+        "Başakşehir FK": 5,
+        "Göztepe": 6,
+        "Samsunspor": 7,
+        "Çaykur Rizespor": 8,
+        "Konyaspor": 9,
+        "Kocaelispor": 10,
+        "Alanyaspor": 11,
+        "Gaziantep FK": 12,
+        "Kasımpaşa": 13,
+        "Gençlerbirliği": 14,
+        "Eyüpspor": 15,
+        "Antalyaspor": 16,
+        "Kayserispor": 17,
+        "Fatih Karagümrük": 18
+      },
+      "bands_seen": [
+        "Champions League",
+        "Champions League Qualification",
+        "Conference League Qualification",
+        "Europa League Qualification",
+        "Relegation"
+      ]
     }
   }
 }
