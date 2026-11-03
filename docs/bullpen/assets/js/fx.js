@@ -79,10 +79,11 @@ FX.rowsOf = x => {
 
 // ── level, season, names ───────────────────────────────────────────────────
 
-/* The level of a page: params.level, else the state's ('mlb' | 'aaa'). */
+/* The level of a page: params.level, else the state's. */
 FX.L = (params, state) => {
-  const l = (params && (params.level || params.L)) || (state && state.level) || (BP.state && BP.state.level) || 'mlb';
-  return String(l).toLowerCase() === 'aaa' ? 'aaa' : 'mlb';
+  const l = String((params && (params.level || params.L)) || (state && state.level) || (BP.state && BP.state.level) || 'mlb').toLowerCase();
+  if (l === 'npb') return 'npb';
+  return BP.LEVELS && BP.LEVELS.indexOf(l) >= 0 ? l : 'mlb';
 };
 FX.S = (params, state, L) => {
   const raw = params && (params.season || (params.query || {}).s);

@@ -110,14 +110,15 @@ K.FAMILY = { FF: 'fastball', SI: 'fastball', FC: 'fastball', FA: 'fastball', SL:
 
 // ── level, season, index ───────────────────────────────────────────────────
 
-K.LEVELS = ['mlb', 'aaa', 'npb'];
-K.LN = L => (L === 'aaa' ? 'Triple-A' : L === 'npb' ? 'NPB' : 'MLB');
-/* The level: 'mlb', 'aaa' or 'npb' (the npb level reaches this kit only through the pages that support it: the lab and
+K.LEVELS = ['mlb', 'aaa', 'aa', 'hia', 'a', 'npb'];
+K.LN = L => (has('levelLong') ? BP.levelLong(L) : (L === 'aaa' ? 'Triple-A' : L === 'npb' ? 'NPB' : 'MLB'));
+/* The level: one of BP.LEVELS, or 'npb' (the npb level reaches this kit only through the pages that support it: the lab and
  * compare, which read npb/<S>/lab.json). */
 K.L = (params, state) => {
   const st = state || BP.state || {};
   const t = String((params && (params.level || params.L || params.league)) || st.level || st.league || 'mlb').toLowerCase();
-  return t === 'aaa' ? 'aaa' : t === 'npb' ? 'npb' : 'mlb';
+  if (t === 'npb') return 'npb';
+  return BP.LEVELS && BP.LEVELS.indexOf(t) >= 0 ? t : 'mlb';
 };
 K.ready = () => (K.INDEX ? Promise.resolve(K.INDEX) : BP.load('index.json').then(d => { K.INDEX = d || {}; K.learnIndex(K.INDEX); return K.INDEX; }));
 K.curSeason = L => {

@@ -237,6 +237,10 @@ def build(ctx: SeasonContext) -> dict:
     A = ctx.agg()
     pit = A.get("pit") if A else None
     if pit is None or not len(pit):
+        from oddsmarkets.baseball.analytics import lines_catalog as LC
+        alt = LC.pitchers_from_lines(ctx, METRICS)
+        if alt:
+            return alt
         return {"ok": False, "reason": f"no pitch data for {ctx.level} {ctx.season}", "level": ctx.level, "season": ctx.season}
     ex = A.get("pit_ex", pd.DataFrame())
     lines = A.get("lines", pd.DataFrame())

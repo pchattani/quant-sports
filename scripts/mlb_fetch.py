@@ -33,6 +33,7 @@ standings, 40-man rosters, injured lists and the last two weeks of transactions.
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import sys
 import time
@@ -162,7 +163,8 @@ def _settled(day: str, at: str | None) -> bool:
 
 def statcast(c: Client, level: str, s: dict, refresh: bool, today: date, chunk_days: int = 1) -> None:
     season = s["season"]
-    if season < canon.STATCAST_FROM[level]:
+    if season < canon.STATCAST_FROM.get(level, 9999):
+        logger.info("%s %d statcast: no published pitch table at this level", level, season)
         return
     m = savant.load_manifest(level, season)
     days = sorted({g["date"] for g in s["games"].values()
@@ -384,6 +386,14 @@ def people(c: Client, level: str, s: dict, refresh: bool) -> None:
         ids.update(x for x in (g.get("decisions") or {}).values() if x)
         if g.get("umpire_hp"):
             ump.add(g["umpire_hp"])
+    for group in ("hitting", "pitching"):
+        cache = st.cache_root() / "statsapi" / "lines" / level / f"season_{group}_{season}.json"
+        if cache.exists():
+            try:
+                rows = (json.loads(cache.read_text(encoding="utf-8")).get("rows")) or {}
+            except (OSError, ValueError):
+                rows = {}
+            ids.update(str(i) for i in rows if str(i).isdigit())
     p = st.statcast_path(level, season)
     if p.exists():
         import pyarrow.parquet as pq

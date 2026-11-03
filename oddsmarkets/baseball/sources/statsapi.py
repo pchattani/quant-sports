@@ -208,7 +208,7 @@ def team_record(t: dict, level: str, season: int) -> dict:
     rec = {"name": t.get("name"), "abbr": t.get("abbreviation"), "short": t.get("teamName") or t.get("clubName"),
            "league": league, "division": div, "venue": _pid(t.get("venue")),
            "colour": (canon.TEAMS.get(tid) or {}).get("colour")}
-    if level == "aaa":
+    if level != "mlb":
         rec["parent"] = _pid(t.get("parentOrgId"))
         rec["city"] = t.get("locationName")
     return rec

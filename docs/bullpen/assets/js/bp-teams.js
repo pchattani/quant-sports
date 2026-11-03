@@ -174,7 +174,7 @@ function power() {
     const names = Array.from(new Set(all.map(keyOf))).sort((a, b) => a.localeCompare(b));
     groups = names.map(n => ({ label: n || 'Clubs', rows: all.filter(t => keyOf(t) === n).map(row) }));
   }
-  const lg = ST.L === 'aaa' ? 'Triple-A' : 'MLB';
+  const lg = BP.levelLong(ST.L);
   host.innerHTML = QK.sectionHead({ kicker: 'Power board', title: 'Every club, ranked by our rating', sub: 'Our team rating is the run differential per game we expect against an average club. The bar splits it into offence (batting and baserunning), pitching and defence (fielding and framing); the volt tick is the total.' +
     (ST.sim ? ' Postseason and title chances come from 20,000 simulated seasons.' : ''), actions: U().seg('tm-pw', 'Group the board', [['division', 'Division'], ['league', 'League'], ['all', 'All ' + ids().length]], ST.pw) }) +
     '<div class="qk-card"><div class="qk-card-body">' + QK.powerBars(null, { groups: groups, valueLabel: 'Our rating', unit: 'runs per game against an average club', formLabel: 'Last 10',

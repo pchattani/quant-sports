@@ -242,7 +242,7 @@ function tradePage(el, params) {
   const qy = params.query || {};
   const st = { a: qy.a || '', b: qy.b || '', ao: parseIds(qy.ao), bo: parseIds(qy.bo), done: qy.done || '' };
   el.innerHTML = BP.muted('Loading…');
-  if (L === 'aaa') { el.innerHTML = BP.pageHead('Trade simulator', 'Triple-A') + BP.muted('The trade simulator covers MLB and NPB; Triple-A rosters turn over too fast for it to mean much. <a href="' + BP.href('trade', 'mlb') + '">MLB trade simulator →</a>'); return null; }
+  if (L !== 'mlb') { el.innerHTML = BP.pageHead('Trade simulator', BP.levelLong(L)) + BP.muted('The trade simulator covers MLB. <a href="' + BP.href('trade', 'mlb') + '">MLB trade simulator →</a>'); return null; }
   const pre = !st.a && !st.b ? presetTrade(L, S) : Promise.resolve(null);
   return pre.then(cands => {
     if (!cands || !cands.length) return null;

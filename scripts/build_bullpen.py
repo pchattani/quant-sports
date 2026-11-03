@@ -759,6 +759,15 @@ def title_block(ws: dict, champ: str, cards: list[dict], calls: dict | None) -> 
             "pre_n": len(ranked) or None}
 
 
+def _callup(b: Build, today: date) -> None:
+    """Prospect rankings: the chance of moving up next season and of reaching MLB within four seasons."""
+    from oddsmarkets.baseball.models import callup
+    payload = callup.board(canon.current_season(today))
+    if payload.get("ok"):
+        b.write("callup.json", payload)
+        logger.info("call-up rankings: %d players", len(payload.get("players") or []))
+
+
 def index_payload(b: Build, levels: dict[str, dict], today: date) -> dict:
     prev = an.read_json(b.data / "index.json") or {}
     out = {"ok": True, "updated_at": _now(), "levels": dict(prev.get("levels") or {})}
@@ -899,7 +908,7 @@ def main(argv: list[str] | None = None) -> int:
         b.step("umpire scorecards", usc)
     shared_all: dict = {}
     levels: dict[str, dict] = {}
-    for level in ["mlb", "aaa"]:
+    for level in list(canon.LEVELS):
         if level in args.levels:
             levels[level] = b.step(f"level {level}", lambda: build_level(b, level, args, cfg, shared_all), {}) or {}
     shared_all.pop("mlb_full", None)
@@ -998,6 +1007,7 @@ def main(argv: list[str] | None = None) -> int:
             b.step("players_index", lambda: b.write("players_index.json", prev))
         logger.info("careers: %d player files", len(idx))
     b.write_or_fail("index.json", "index", lambda: index_payload(b, levels, today))
+    b.step("call-up rankings", lambda: _callup(b, today))
     # My Teams: one small follow card per club (data/follow/<L>/<tid>.json; oddsmarkets/common/follow.py), from the
     # payloads this run has just written; Home and the overview read only these
     from oddsmarkets.baseball.analytics import follow_build as FLB

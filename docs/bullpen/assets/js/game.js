@@ -231,7 +231,7 @@ function header(g, L, S, season) {
   const rec = t => BP.RECORDS[String(t)] || '';
   A.record = rec(g.away); H.record = rec(g.home);
   const tag = g.series ? BP.seriesText(g.series) : (g.gtype && g.gtype !== 'R' ? BP.roundLabel(g.gtype) : '');
-  const G = { sport: 'baseball', id: g.gpk, start: g.start || g.date, status: live ? 'live' : fin ? 'final' : 'pre', league: (L === 'aaa' ? 'Triple-A' : 'MLB') + (tag ? ' · ' + tag : ''),
+  const G = { sport: 'baseball', id: g.gpk, start: g.start || g.date, status: live ? 'live' : fin ? 'final' : 'pre', league: BP.levelLong(L) + (tag ? ' · ' + tag : ''),
     home: H, away: A, hs: isNum(g.hs) ? Number(g.hs) : null, as: isNum(g.as) ? Number(g.as) : null,
     p_home: wpH !== null ? wpH : pH, wp_home: wpH, p_pre: live && wpH !== null ? pH : null, pre_only: live && wpH === null ? true : undefined,
     period: live && isNum(g.inning) ? g.inning : null };
@@ -249,7 +249,7 @@ function header(g, L, S, season) {
   if (!started && isNum(m.extra_innings) && m.extra_innings > 0.02) extra.push('about 1 game in ' + Math.max(2, Math.round(1 / m.extra_innings)) + ' like this goes to extra innings');
   const sp = g.probables || {};
   const spLine = !started && (sp.home || sp.away) ? '<div class="bp-sp-line"><span>Probable starters</span>' + (sp.away ? BP.playerLink(sp.away, { role: 'pitcher', level: L, surname: true }) : 'TBD') + ' <span class="qk-muted">v</span> ' + (sp.home ? BP.playerLink(sp.home, { role: 'pitcher', level: L, surname: true }) : 'TBD') + '</div>' : '';
-  const lvlWord = L === 'aaa' ? 'Triple-A' : 'MLB', tagShort = g.series ? BP.seriesText(g.series, true) : tag;
+  const lvlWord = BP.levelLong(L), tagShort = g.series ? BP.seriesText(g.series, true) : tag;
   /* the occasion names its level already ("Triple-A National Championship Game"): no "Triple-A · Triple-A ..." */
   const card = QK.previewCard(G, { kicker: tag ? (tagShort.indexOf(lvlWord) === 0 ? tagShort : lvlWord + ' · ' + tagShort) : lvlWord + (g._park && g._park.name ? ' · ' + g._park.name : ''),
     nick: t => t.short || t.name,

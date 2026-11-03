@@ -16,8 +16,9 @@ them on each call) follows.
 
 Conventions
 -----------
-* Levels "mlb" / "aaa"; seasons are calendar years; ids are MLBAM ids as strings (Retrosheet-only players
-  "r:<retroid>"), teams MLBAM team ids, games gamePk strings.
+* Levels "mlb", "aaa", "aa" (Double-A), "hia" (High-A) and "a" (Single-A); seasons are calendar years;
+  ids are MLBAM ids as strings (Retrosheet-only players "r:<retroid>"), teams MLBAM team ids, games
+  gamePk strings.
 * Numbers are rounded at the payload boundary: probabilities 4 dp, rates 3 dp, "plus" scores integers;
   percentages (fmt "pct") are stored as fractions (0.273 = 27.3 %).
 * Nothing here raises on missing data: a metric that cannot be computed is None, a model that is not
@@ -33,12 +34,14 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
+from oddsmarkets.baseball import canon as _canon
+
 ROOT = Path(__file__).resolve().parents[3]
-LEVELS = ("mlb", "aaa")
+LEVELS = _canon.LEVELS
 # OAA shrinkage k in chances (fielding percentiles): our year-to-year M50 is about 480 chances and the odd/even-game
 # M50 355 (outfield) to 501 (infield) (docs/METRICS_SPEC.md, baseball stabilisation); 60 was 6-8x too light
 OAA_K = 400.0
-LEVEL_NAMES = {"mlb": "MLB", "aaa": "Triple-A"}
+LEVEL_NAMES = dict(_canon.LEVEL_NAMES)
 RETRO_NOTICE = ('The information used here was obtained free of charge from and is copyrighted by Retrosheet. '
                 'Interested parties may contact Retrosheet at "www.retrosheet.org".')
 CHADWICK_ATTRIBUTION = "Player identifiers from the Chadwick Baseball Bureau register (ODC-BY 1.0)."

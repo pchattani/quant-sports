@@ -276,7 +276,7 @@ function render(el, params) {
       'The players leading and trailing at every position are in the <a class="qk-link" href="' + BP.href('scout', L, S) + '?view=leaders">Scouting Room’s Leaders</a>.</p>' +
       '<div class="section-note">' + (res.fallback ? 'Computed from the final regular-season games while the season payload is built; our chances and expected records arrive with it. ' : '') +
       (SIMCOLS ? 'Chances: ' + (d.sim && (d.sim.n_sims || d.sim.sims) ? BP.int(d.sim.n_sims || d.sim.sims) + ' ' : '') + 'simulations of the rest of the season and the bracket from our team ratings (x: clinched a place, y: the division, z: the division and a bye, e: eliminated). ' :
-        'We do not simulate the Triple-A season, so the table shows records, run differential and our team ratings only. ') +
+        'We do not simulate the ' + BP.levelLong(L) + ' season, so the table shows records, run differential and our team ratings only. ') +
       'Pythagorean records use exponent 1.83.' + (SIMCOLS ? ' Magic numbers count wins plus division-rival losses to clinch.' : '') + '</div>';
     BP.wireToggles(document.getElementById('std-tabs'), 'data-v', k => { VIEW = k; draw(); });
     draw();
@@ -297,7 +297,7 @@ function chancesView(el, params) {
   el.innerHTML = QK.sectionHead({ kicker: 'Chances · ' + BP.levelName(L) + ' ' + S, title: 'Who wins it all?', sub: 'Our chances from simulating the rest of the season and the bracket 20,000 times: the title, the postseason, each division, the seeds, and how the race has moved.' }) +
     '<div id="ch-body">' + QK.skeleton('card', 2) + '</div>';
   if (BP.levelInfo(L).sim === false) {
-    document.getElementById('ch-body').innerHTML = QK.empty('No simulation for Triple-A', 'We simulate the major-league season and bracket only. The Triple-A table and the league finals are on the Table and Bracket tabs.');
+    document.getElementById('ch-body').innerHTML = QK.empty('No simulation for ' + BP.levelLong(L), 'We simulate the major-league season and bracket only. The table is on the Table tab.');
     return null;
   }
   return BP.loadYear('season.json', L, S).then(d => {

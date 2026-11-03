@@ -33,6 +33,41 @@ function sub(r, keys) { for (let i = 0; i < keys.length; i++) { const x = r[keys
    (data/aaa/<S>/value.json "p_value": expected MLB WAR over the next four seasons, discounted, from the season's line;
    established major leaguers are left out by the model), the five most valuable summed, the top three named. Triple-A
    only: the deeper farm (Double-A down) is not in our data. */
+/* Call-up rankings (data/callup.json): P(higher level next season) and P(25 PA or BF in MLB within four seasons). */
+function rankBoard(host) {
+  if (!host) return;
+  const k = K(), U = BP.ui;
+  const LN = { mlb: 'MLB', aaa: 'AAA', aa: 'AA', hia: 'A+', a: 'A' };
+  const pct = x => (k.isNum(x) ? (Math.round(x * 1000) / 10).toFixed(1) + '%' : '—');
+  BP.load('callup.json').then(d => {
+    if (!host.isConnected || !d || d.ok === false || !d.players || !d.players.length) return;
+    const v = d.model || {};
+    const check = (((v.H || {}).mlb || {}).validation) || (((v.P || {}).mlb || {}).validation);
+    const note = check ? ' Checked on 2021 and 2022, log loss ' + check.logloss + (check.beats_level ? ', ahead of level alone (' + check.logloss_level + ').' : '. Level alone was as good, so that is the ranking.') : '';
+    host.innerHTML = QK.sectionHead({ kicker: 'Rankings · ' + (d.season || ''), title: 'The call-up board', sub: 'Everyone with 100 plate appearances or batters faced at his highest level, ranked by the chance of a major-league season within four years. Stat lines only, no scouting grades.' + note }) +
+      '<div class="bp-ctl" id="pr-rank-ctl"></div><div id="pr-rank-t"></div>';
+    const draw = kind => {
+      const rows = d.players.filter(r => !kind || r.kind === kind).slice(0, 250);
+      QK.leaderboard(document.getElementById('pr-rank-t'), { dense: true, rank: true, maxHeight: 640, rowHref: r => BP.playerHref(r.pid, { level: r.level, role: r.kind }),
+        columns: [
+          { key: 'name', label: 'Player', type: 'entity', sub: 'sub', href: r => BP.playerHref(r.pid, { level: r.level, role: r.kind }) },
+          { key: 'lvl', label: 'Level' },
+          { key: 'org', label: 'Club' },
+          { key: 'age', label: 'Age', num: true, fmt: x => (k.isNum(x) ? k.num(x, 1) : '—') },
+          { key: 'z', label: 'Line', num: true, fmt: x => (k.isNum(x) ? k.num(x, 1) : '—'), tip: 'Performance against his level, in standard deviations' },
+          { key: 'p_up', label: 'Up next year', num: true, fmt: pct },
+          { key: 'p_mlb', label: 'MLB in 4 years', type: 'bar', fmt: pct }
+        ],
+        rows: rows.map(r => ({ pid: r.pid, name: r.name || k.name(r.pid) || r.pid, level: r.level, kind: r.kind,
+          sub: [r.pos, r.team ? k.teamAbbr(r.team) : ''].filter(Boolean).join(' · '),
+          lvl: LN[r.level] || r.level, org: r.parent ? k.teamAbbr(r.parent) : '', age: r.age, z: r.z, p_up: r.p_up, p_mlb: r.p_mlb })) });
+    };
+    const ctl = document.getElementById('pr-rank-ctl');
+    ctl.innerHTML = U.seg('pr-rank-kind', 'Kind', [['all', 'All'], ['hitter', 'Hitters'], ['pitcher', 'Pitchers']], 'all');
+    QK.seg(document.getElementById('pr-rank-kind'), kind => draw(kind === 'all' ? '' : kind));
+    draw('');
+  });
+}
 function farm(host, S, all) {
   if (!host) return;
   const k = K(), U = BP.ui;
@@ -71,7 +106,8 @@ function farm(host, S, all) {
 function render(el, params, state) {
   const k = K();
   const U = BP.ui;
-  el.innerHTML = QK.sectionHead({ kicker: 'Prospects · Triple-A', title: 'Triple-A to the majors', sub: 'Every Triple-A player\'s line translated to the majors, and what our model would expect on the day of a call-up.' }) +
+  el.innerHTML = QK.sectionHead({ kicker: 'Prospects', title: 'Who reaches the majors', sub: 'The chance a prospect moves up next season and reaches the majors within four years, then the Triple-A lines translated to the majors.' }) +
+    '<section class="qk-section" id="pr-rank"></section>' +
     '<div id="pr-kpis"></div><section class="qk-section" id="pr-farm"></section>' +
     '<section class="qk-card"><div class="qk-card-body"><div class="bp-ctl">' + U.seg('pr-kind', 'Kind', [['hitter', 'Hitters'], ['pitcher', 'Pitchers']], ST.kind) +
     '<label>Search<input id="pr-q" class="gq-search" type="search" placeholder="name or club…"></label><label>Parent club<select id="pr-parent"><option value="">All organisations</option></select></label></div></div></section>' +
@@ -84,6 +120,7 @@ function render(el, params, state) {
     if (!k.alive(el)) return;
     const S = o.S, d = o.d, $ = id => document.getElementById(id);
     const all = { hitter: listOf(d, 'hitter'), pitcher: listOf(d, 'pitcher') };
+    rankBoard($('pr-rank'));
     if (!all.hitter.length && !all.pitcher.length) { $('pr-card').innerHTML = U.card2('Prospects', '', QK.empty('Not built yet', 'The ' + S + ' Triple-A prospect file is not available.')); $('pr-prev').innerHTML = ''; return; }
     all.hitter.concat(all.pitcher).forEach(r => { if (r.name) k.learn(r.pid, { name: r.name, pos: r.pos, team: r.team }); });
     farm($('pr-farm'), S, all);

@@ -245,7 +245,7 @@ function draw(el, c) {
     h += '<section class="qk-section"><div class="qk-g2">';
     if (nxt) {
       const g = BP.kitGame(nxt, L);
-      g.league = L === 'aaa' ? 'Triple-A' : 'MLB';
+      g.league = BP.levelLong(L);
       g.home.record = BP.RECORDS[String(nxt.home)] || ''; g.away.record = BP.RECORDS[String(nxt.away)] || '';
       /* how the clubs match up: our team ratings (season.json), as on the game page */
       const rows0 = BP.standingsRows ? BP.standingsRows(c.season || {}) : {};

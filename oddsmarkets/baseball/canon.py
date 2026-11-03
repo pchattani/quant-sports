@@ -6,7 +6,8 @@ codes, names by season, league and division by season).
 Teams are keyed by MLBAM team id (string in stores). Relocations and renames are kept per season, e.g.
 Indians -> Guardians (2022), Oakland Athletics -> Athletics (Sacramento, 2025), Florida -> Miami Marlins
 (2012), Expos -> Nationals (2005), Devil Rays -> Rays (2008); Houston moved NL -> AL in 2013 and Milwaukee
-AL -> NL in 1998. Triple-A teams (sportId 11) are read per season from the Stats API, not hard-coded.
+AL -> NL in 1998. Minor-league clubs (sportId 11 Triple-A, 12 Double-A, 13 High-A, 14 Single-A) are read
+per season from the Stats API, not hard-coded.
 
 Verified on 1 Oct 2026 against /api/v1/teams?sportId=1&season=2015 and 2026, ESPN's MLB team list and the
 2025 Retrosheet event files.
@@ -15,8 +16,12 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 
-LEVELS = ("mlb", "aaa")
-SPORT_ID = {"mlb": 1, "aaa": 11}
+LEVELS = ("mlb", "aaa", "aa", "hia", "a")
+SPORT_ID = {"mlb": 1, "aaa": 11, "aa": 12, "hia": 13, "a": 14}
+LEVEL_NAMES = {"mlb": "MLB", "aaa": "Triple-A", "aa": "Double-A", "hia": "High-A", "a": "Single-A"}
+# Baseball Savant publishes a full pitch table for MLB (2015 on) and Triple-A (2023 on). A minors search
+# without a level filter also returns a handful of tracked Single-A parks and no Double-A or High-A games
+# (probed 12 Aug 2025 and 15 Jul 2026), so the lower three levels are built from the official counting lines.
 STATCAST_FROM = {"mlb": 2015, "aaa": 2023}
 
 GAME_TYPES = {

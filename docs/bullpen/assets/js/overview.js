@@ -439,10 +439,11 @@ function render(el, params) {
     const inPost = !decided && phase === 'postseason' && post && post.series && post.series.length;
     const round = inPost && post.round ? BP.roundLabel(post.round) : '';
     const kicker = [BP.levelLong(L), S, PHASE[phase] || BP.titleCase(phase), round].filter(Boolean).join(' · ');
-    const title = L === 'aaa' ? 'Triple-A, by the numbers.' : isCurrent ? 'Every MLB game, by the numbers.' : 'The ' + S + ' season, by the numbers.';
+    const title = L === 'mlb' ? (isCurrent ? 'Every MLB game, by the numbers.' : 'The ' + S + ' season, by the numbers.') : BP.levelLong(L) + ', by the numbers.';
     const sub = !isCurrent ? 'The final standings, how good every club really was, who was lucky, and the players behind it.'
       : L === 'aaa' ? 'Statcast for the International and Pacific Coast Leagues, with major-league translations for every prospect.'
-        : 'Our win chance for every game from a plate-appearance simulation with the lineups and starters, postseason chances from 20,000 simulated brackets, Statcast percentiles and the players behind it all.';
+        : L === 'mlb' ? 'Our win chance for every game from a plate-appearance simulation with the lineups and starters, postseason chances from 20,000 simulated brackets, Statcast percentiles and the players behind it all.'
+          : 'The same pages as the majors, filled from the official season lines. Pitch tracking is not published at this level.';
 
     // scoreboard lists
     const seen = {};
@@ -473,7 +474,7 @@ function render(el, params) {
       h += '<section class="qk-section ql-week">' + QK.sectionHead({ kicker: 'This week in MLB', title: '<span id="ov-wk">The week so far</span>', html: true, sub: esc(stageLine(dig.stage, phase)) }) +
         '<div id="ov-week"></div><div id="ov-feat" class="ql-feat"></div></section>';
     } else if (isCurrent && today.length + next.length > 0) {
-      h += intro({ tag: kicker, title: 'Triple-A, by the numbers.', lede: sub,
+      h += intro({ tag: kicker, title: BP.levelLong(L) + ', by the numbers.', lede: sub,
         links: [{ label: 'Games', sub: 'Every game, our chance', href: BP.href('games', L, S) }, { label: 'Standings', sub: 'The table', href: BP.href('standings', L, S) }, { label: 'Prospects', sub: 'Major-league translations', href: BP.href('prospects', L, S) }] });
       h += FOLLOW_SLOT;
     } else {

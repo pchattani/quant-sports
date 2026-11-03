@@ -111,6 +111,24 @@ jobs:
         run: |
           uv run --frozen python scripts/mlb_fetch.py --level aaa --refresh-current --budget 300
 
+      - name: 'Fetch Double-A'
+        continue-on-error: true
+        timeout-minutes: 8
+        run: |
+          uv run --frozen python scripts/mlb_fetch.py --level aa --refresh-current --budget 200
+
+      - name: 'Fetch High-A'
+        continue-on-error: true
+        timeout-minutes: 8
+        run: |
+          uv run --frozen python scripts/mlb_fetch.py --level hia --refresh-current --budget 200
+
+      - name: 'Fetch Single-A'
+        continue-on-error: true
+        timeout-minutes: 8
+        run: |
+          uv run --frozen python scripts/mlb_fetch.py --level a --refresh-current --budget 200
+
       - name: 'Build'
         id: build
         timeout-minutes: 80

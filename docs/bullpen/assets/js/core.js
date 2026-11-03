@@ -94,9 +94,11 @@ const ACE_URL = 'https://pchattani.github.io/the-quant-ace/';
 const GRIDIRON_URL = 'https://pchattani.github.io/the-quant-gridiron/';
 const RINK_URL = 'https://pchattani.github.io/the-quant-rink/';
 const SITE = 'The Quant Bullpen';
-const LEVELS = ['mlb', 'aaa'];   // NPB taken off the public site 15 Oct 2026 (npb.jp terms); its code stays in the repo
-const LEVEL_NAME = { mlb: 'MLB', aaa: 'AAA', npb: 'NPB' };
-const LEVEL_LONG = { mlb: 'Major League Baseball', aaa: 'Triple-A', npb: 'Nippon Professional Baseball' };
+const LEVELS = ['mlb', 'aaa', 'aa', 'hia', 'a'];   // NPB taken off the public site 15 Oct 2026 (npb.jp terms); its code stays in the repo
+const LEVEL_NAME = { mlb: 'MLB', aaa: 'AAA', aa: 'AA', hia: 'A+', a: 'A', npb: 'NPB' };
+const LEVEL_LONG = { mlb: 'Major League Baseball', aaa: 'Triple-A', aa: 'Double-A', hia: 'High-A', a: 'Single-A', npb: 'Nippon Professional Baseball' };
+/* Longest prefix first, so "aaa" is not read as "a". npb stays routable even though it is not in the switch. */
+const LEVEL_PREFIX = 'mlb|aaa|aa|hia|a|npb';
 const LS_LEVEL = 'qb-level';
 
 /* MLB teams (MLBAM ids) as in the 2026 store: the fallback until index.json "teams" loads. [abbr, name, short, league, division, colour, venue] */
@@ -324,7 +326,7 @@ function redirectOf(r) {
 
 function normPattern(s) {
   let p = String(s || '').trim().replace(/^#/, '').replace(/^\/+|\/+$/g, '').replace(/<(\w+)>/g, ':$1');
-  p = p.replace(/^(:L|:level|mlb|aaa|npb)(\/|$)/, '');
+  p = p.replace(new RegExp('^(:L|:level|' + LEVEL_PREFIX + ')(\\/|$)'), '');
   return p;
 }
 function shape(p) { return p.split('/').map(s => (s.charAt(0) === ':' ? ':' : s)).join('/'); }
@@ -647,7 +649,7 @@ function putPlayer(pid, info) { if (!pid || !info) return; NAMES[pid] = Object.a
 /* Harvest names, teams, umpires and venues from any payload that carries them. */
 function learn(p, d) {
   if (!d || typeof d !== 'object') return;
-  const lm = /^(mlb|aaa|npb)\//.exec(p);
+  const lm = new RegExp('^(' + LEVEL_PREFIX + ')/').exec(p);
   const L = lm ? lm[1] : null;
   try {
     if (p === 'players_index.json') {
@@ -1102,7 +1104,7 @@ function gameCard(g, opts) {
   const k = kitGame(g, L);
   if (o.season) k.href = gameHref(g.gpk || g.id, L, o.season);
   const tag = o.series === false ? '' : (g.series ? seriesText(g.series, true) : (g.gtype && g.gtype !== 'R' ? roundLabel(g.gtype) : ''));
-  k.league = [o.date ? fmtDate(g.date, { year: false }) : '', tag || (L === 'aaa' ? 'Triple-A' : 'MLB')].filter(Boolean).join(' · ');
+  k.league = [o.date ? fmtDate(g.date, { year: false }) : '', tag || levelLong(L)].filter(Boolean).join(' · ');
   const prob = g.probables || {};
   const sub = side => {
     const bits = [];
@@ -1130,7 +1132,7 @@ function gameCard(g, opts) {
 function kitGame(g, L) {
   const st = gameState(g), m = g.model || {}, mk = g.market || {};
   const live = st === 'live';
-  return { sport: 'baseball', league: g.series ? seriesText(g.series, true) : (L === 'aaa' ? 'Triple-A' : 'MLB'), id: g.gpk, start: g.start || g.date,
+  return { sport: 'baseball', league: g.series ? seriesText(g.series, true) : levelLong(L), id: g.gpk, start: g.start || g.date,
     status: st === 'live' ? 'live' : st === 'final' ? 'final' : 'pre', home: teamObj(g.home, L), away: teamObj(g.away, L),
     hs: isNum(g.hs) ? g.hs : null, as: isNum(g.as) ? g.as : null,
     p_home: live && isNum(g.wp_home) ? g.wp_home : (isNum(m.p_home) ? m.p_home : null), market_home: isNum(mk.p_home) ? mk.p_home : null, market_src: mk.sources || mk.source || null,
@@ -1378,7 +1380,7 @@ function switchLevel(L) {
   if (to === 'notfound' || !routeEntry(to)) to = 'hub';
   if ((routeEntry(to) || {}).global) {
     setLevelState(L);
-    const h = String(location.hash || '#/').replace(/^#\/(mlb|aaa|npb)\//, '#/').replace(/\?.*$/, '');
+    const h = String(location.hash || '#/').replace(new RegExp('^#\\/(' + LEVEL_PREFIX + ')\\/'), '#/').replace(/\?.*$/, '');
     if (h !== location.hash) go(h); else render();
     return;
   }
@@ -1451,8 +1453,9 @@ function loadSearch() {
     Object.keys(TEAMS).forEach(tid => {
       const x = TEAMS[tid];
       if (!x.name || x.placeholder || x.level === 'npb') return;
-      const L = x.level === 'aaa' ? 'aaa' : 'mlb';
-      items.push({ sport: 'baseball', t: x.name, s: [L === 'aaa' ? 'Triple-A club' + (x.parent ? ' · ' + teamAbbr(x.parent) : '') : 'Club · ' + (x.division || 'MLB'), x.abbr].filter(Boolean).join(' · '),
+      const L = isLevel(x.level) ? x.level : 'mlb';
+      const club = L === 'mlb' ? 'Club · ' + (x.division || 'MLB') : levelLong(L) + ' club' + (x.parent ? ' · ' + teamAbbr(x.parent) : '');
+      items.push({ sport: 'baseball', t: x.name, s: [club, x.abbr].filter(Boolean).join(' · '),
         href: teamHref(tid, L), order: L === 'mlb' ? 0 : 2 });
     });
     Object.keys(NAMES).forEach(pid => {
@@ -1460,7 +1463,8 @@ function loadSearch() {
       if (!x.name) return;
       const lv = Array.isArray(x.levels) ? x.levels : (x.levels ? String(x.levels).split(/[,|]/) : []);
       if (lv.length && lv.every(v => String(v).toLowerCase() === 'npb')) return;
-      const L = lv.indexOf('mlb') >= 0 || !lv.length ? 'mlb' : 'aaa';
+      const farm = ['aaa', 'aa', 'hia', 'a'].filter(v => lv.indexOf(v) >= 0)[0];
+      const L = lv.indexOf('mlb') >= 0 || !lv.length ? 'mlb' : (farm || 'aaa');
       items.push({ sport: 'baseball', t: x.name, s: [x.pos ? (isPitcher(pid) ? 'Pitcher' : 'Hitter') + ' · ' + x.pos : 'Player', x.team ? teamAbbr(x.team) : '', lv.length ? lv.filter(v => String(v).toLowerCase() !== 'npb').map(v => String(v).toUpperCase()).join('/') : ''].filter(Boolean).join(' · '),
         href: playerHref(pid, { level: L }), order: L === 'mlb' ? 1 : 3 });
     });
