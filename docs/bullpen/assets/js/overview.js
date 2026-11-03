@@ -222,7 +222,7 @@ function formFill(host, L, S) {
    national championship game) and the call-ups and top prospects (prospects.json: callups, ranked, mlb_eq). */
 function aaaFill(el, post, L, S) {
   const fin = el.querySelector('#ov-aaa-fin'), up = el.querySelector('#ov-aaa-up');
-  if (fin && post && (post.series || []).length) {
+  if (fin && L === 'aaa' && post && (post.series || []).length) {
     const list = post.series || [];
     const ch = list.find(x => x.round === 'CH');
     const champ = post.champion;
@@ -245,14 +245,14 @@ function aaaFill(el, post, L, S) {
     const P = d.players || {};
     const ups = (d.callups || Object.keys(P).filter(pid => (P[pid].mlb_this_season || 0) > 0 && isNum(P[pid].age) && P[pid].age < 25).sort((a, b) => P[b].mlb_this_season - P[a].mlb_this_season)).slice(0, 8);
     const hit = ((d.ranked || {}).hitters || []).slice(0, 5), pit = ((d.ranked || {}).pitchers || []).slice(0, 5);
-    const ent = (pid, sub) => { const x = P[pid] || {}; return '<li>' + BP.playerLink(pid, { level: 'aaa', season: S, name: x.name, role: x.kind === 'pitcher' ? 'pitcher' : 'hitter' }) + '<span class="sb">' + esc(sub) + '</span></li>'; };
+    const ent = (pid, sub) => { const x = P[pid] || {}; return '<li>' + BP.playerLink(pid, { level: L, season: S, name: x.name, role: x.kind === 'pitcher' ? 'pitcher' : 'hitter' }) + '<span class="sb">' + esc(sub) + '</span></li>'; };
     const org = x => (x.parent ? BP.teamAbbr(x.parent) + ' · ' : '');
     let h = '';
     if (ups.length) h += QK.sectionHead({ kicker: 'Called up', title: 'Who made the jump', sub: 'Triple-A players who made their major-league debut this season, the most big-league time first.', actions: '<a class="qk-more" href="#/prospects">Every prospect</a>' }) +
       QK.storyCards(ups.map(pid => { const x = P[pid]; const pit = x.kind === 'pitcher'; return { kicker: (x.parent ? BP.teamShort(x.parent) : 'MLB') + ' · ' + (x.pos || (pit ? 'P' : '')), name: x.name, sub: 'age ' + Math.floor(x.age || 0),
         value: x.mlb_this_season, unit: pit ? 'MLB batters faced' : 'MLB plate appearances', href: BP.playerHref(pid, { level: 'mlb', role: pit ? 'pitcher' : 'hitter' }),
         text: pit ? 'Triple-A: ' + (isNum((x.aaa || {}).k_pct) ? U.pct(x.aaa.k_pct) + ' strikeouts, ' : '') + (isNum((x.aaa || {}).ra9) ? BP.num(x.aaa.ra9, 2) + ' runs a nine' : '') : 'Triple-A: ' + (isNum((x.aaa || {}).woba) ? 'wOBA ' + BP.fmtAvg(x.aaa.woba) : '') + (isNum((x.aaa || {}).hr) ? ', ' + x.aaa.hr + ' home runs' : '') }; }));
-    if (hit.length || pit.length) h += '<div style="margin-top:var(--sp-5)">' + QK.sectionHead({ kicker: 'Top prospects', title: 'Ready for the majors?', sub: 'The best Triple-A lines translated to the major leagues: hitters by their MLB-equivalent wOBA, pitchers by strikeouts minus walks; 100 PA or batters faced or more.', tag: 'h3' }) +
+    if (hit.length || pit.length) h += '<div style="margin-top:var(--sp-5)">' + QK.sectionHead({ kicker: 'Top prospects', title: 'Ready for the majors?', actions: '<a class="qk-more" href="#/prospects?plevel=' + esc(L) + '">Every prospect</a>', sub: 'The best ' + BP.levelLong(L) + ' lines translated to the major leagues: hitters by their MLB-equivalent wOBA, pitchers by strikeouts minus walks; 100 PA or batters faced or more.', tag: 'h3' }) +
       '<div class="qk-grid"><div class="qk-span-6">' + U.card2('Hitters', 'MLB-equivalent wOBA', '<ol class="bp-list bp-lead ov-pros">' + hit.map(pid => ent(pid, org(P[pid]) + 'wOBA ' + BP.fmtAvg((P[pid].mlb_eq || {}).woba))).join('') + '</ol>') + '</div>' +
       '<div class="qk-span-6">' + U.card2('Pitchers', 'MLB-equivalent strikeouts minus walks', '<ol class="bp-list bp-lead ov-pros">' + pit.map(pid => ent(pid, org(P[pid]) + 'K−BB ' + U.pct((P[pid].mlb_eq || {}).k_bb_pct))).join('') + '</ol>') + '</div></div></div>';
     up.innerHTML = h;
@@ -443,7 +443,7 @@ function render(el, params) {
     const sub = !isCurrent ? 'The final standings, how good every club really was, who was lucky, and the players behind it.'
       : L === 'aaa' ? 'Statcast for the International and Pacific Coast Leagues, with major-league translations for every prospect.'
         : L === 'mlb' ? 'Our win chance for every game from a plate-appearance simulation with the lineups and starters, postseason chances from 20,000 simulated brackets, Statcast percentiles and the players behind it all.'
-          : 'The same pages as the majors, filled from the official season lines. Pitch tracking is not published at this level.';
+          : 'Every pitch of every game from the official game feeds: counts, calls, charted locations and contact quality, with run values, win probability, park factors, WAR and major-league translations. Most parks at this level have no ball tracking, so there are no exit velocities or pitch speeds.';
 
     // scoreboard lists
     const seen = {};
@@ -492,7 +492,7 @@ function render(el, params) {
     }
     /* round 9: Triple-A leads with its own story: how the season finished (the league finals and the national
        championship), the players it sent up, and the best prospects by our major-league translation */
-    if (L === 'aaa') h += '<section class="qk-section" id="ov-aaa-fin"></section><section class="qk-section" id="ov-aaa-up"></section>';
+    if (L !== 'mlb') h += '<section class="qk-section" id="ov-aaa-fin"></section><section class="qk-section" id="ov-aaa-up"></section>';
     if (hasGames) h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'What to watch', title: '<span id="ov-gh">Today</span>', html: true, sub: 'Our chance for each side, with a line on why it’s worth your time. Live games update as they go.',
       actions: U.seg('ov-when', 'Games', [['today', 'Today'], ['next', 'Next'], ['results', 'Results']], first) }) + '<div class="qk-watch" id="ov-games"></div></section>';
     const hot = hotItems(src.leaders || {}, L);
@@ -548,7 +548,7 @@ function render(el, params) {
     followFill(el.querySelector('#ov-follow'), rows, L, S);
     if (recapOn) recapFill(el.querySelector('#ov-recap'), played, season, L, S, { title: decided ? (dig.stage || {}).title : null });
     if (landing) { formFill(el.querySelector('#ov-form'), L, S); chaseFill(el.querySelector('#ov-chase'), L, S); }
-    if (L === 'aaa') aaaFill(el, sp, L, S);
+    if (L !== 'mlb') aaaFill(el, sp, L, S);
 
     // this week: the top lines, then the game that matters most (or the World Series race when nothing big is on)
     if (landing) {

@@ -411,11 +411,21 @@ def for_season(level: str, season: int, use_cache: bool = True) -> dict:
         return {"ok": False, "reason": f"no pitch table for {level} {season}"}
 
     def build():
+        from oddsmarkets.baseball import canon
         from oddsmarkets.baseball.models import catchprob, framing, parks, xwoba
         p = _c.load_pitches(level, season, list(dict.fromkeys(COLUMNS + xwoba.COLUMNS + catchprob.COLUMNS + framing.COLUMNS)))
         if p is None or not len(p):
             return {"ok": False, "reason": "empty"}
         store = _c.load_store(level, season)
+        if level in canon.FEED_PITCH_LEVELS:
+            # no exit velocity or tracked locations: batting from results (regressed and raw), no fielding or framing runs
+            try:
+                pk = parks.park_factors(level, season)
+            except Exception:
+                pk = None
+            none = pd.DataFrame({"pid": pd.Series(dtype=str), "runs": pd.Series(dtype=float)})
+            res = season_war(p, store, level, season, xw=results_xw(p), fielding=none, framing_t=none, park=pk)
+            return _war_payload(res, basis="results")
         fc = catchprob.for_season(level, season)
         fielding = _c_frame(fc.get("fielders")) if fc.get("ok") else None
         fr = framing.for_season(level, season)
@@ -432,18 +442,34 @@ def for_season(level: str, season: int, use_cache: bool = True) -> dict:
             stab = None
         xw = xwoba.score_season(p, store, xwoba.sprint_map(season))
         res = season_war(p, store, level, season, xw=xw, fielding=fielding, framing_t=framing_t, park=pk, stab_pa=stab)
-        b = res["batters"].reset_index().rename(columns={"index": "pid"})
-        pt = res["pitchers"].reset_index().rename(columns={"index": "pid"})
-        cols_b = ["pid", "pos", "pa", "xwoba_n", "batting", "bat_results", "baserunning", "ebt_runs", "wsb", "sb_est",
-                  "cs_est", "fielding", "framing", "pos_runs", "league_adj", "replacement", "rar", "war"]
-        cols_p = ["pid", "games", "starts", "bf", "ip", "runs", "ra9_ra9", "war_ra9", "xruns", "ra9_x", "war_x", "gmli", "reliever"]
-        return {"ok": True, "version": MODEL_VERSION, "constants": res["constants"],
-                "totals": {"batters": float(b["war"].sum()), "pitchers_ra9": float(pt["war_ra9"].sum()),
-                           "pitchers_x": float(pt["war_x"].sum())},
-                "batters": _c.frame_rows(b[[c for c in cols_b if c in b]].sort_values("war", ascending=False)),
-                "pitchers": _c.frame_rows(pt[[c for c in cols_p if c in pt]].sort_values("war_ra9", ascending=False))}
+        return _war_payload(res)
     key = _c.file_key(path, MODEL_VERSION, _c.FITTED / f"stabilise_{level}.json", _c.FITTED / f"parks_{level}.json")
     return _c.cached("war", f"{level}_{season}", key, build, use_cache)
+
+
+def _war_payload(res: dict, basis: str = "xwoba") -> dict:
+    b = res["batters"].reset_index().rename(columns={"index": "pid"})
+    pt = res["pitchers"].reset_index().rename(columns={"index": "pid"})
+    cols_b = ["pid", "pos", "pa", "xwoba_n", "batting", "bat_results", "baserunning", "ebt_runs", "wsb", "sb_est",
+              "cs_est", "fielding", "framing", "pos_runs", "league_adj", "replacement", "rar", "war"]
+    cols_p = ["pid", "games", "starts", "bf", "ip", "runs", "ra9_ra9", "war_ra9", "xruns", "ra9_x", "war_x", "gmli", "reliever"]
+    return {"ok": True, "version": MODEL_VERSION, "basis": basis, "constants": res["constants"],
+            "totals": {"batters": float(b["war"].sum()), "pitchers_ra9": float(pt["war_ra9"].sum()),
+                       "pitchers_x": float(pt["war_x"].sum())},
+            "batters": _c.frame_rows(b[[c for c in cols_b if c in b]].sort_values("war", ascending=False)),
+            "pitchers": _c.frame_rows(pt[[c for c in cols_p if c in pt]].sort_values("war_ra9", ascending=False))}
+
+
+def results_xw(p: pd.DataFrame) -> dict:
+    """season_war's xwOBA input where there is no exit velocity: each PA's own wOBA value stands in for its expectation
+    (batting runs are then regressed results; pitchers' x-runs are wOBA allowed)."""
+    ev = p["events"].astype("string")
+    last = p[ev.notna() & p["woba_denom"].notna()].drop_duplicates(["game_pk", "at_bat_number"], keep="last")
+    w = pd.to_numeric(last["woba_value"], errors="coerce").fillna(0.0).astype(float)
+    d = pd.to_numeric(last["woba_denom"], errors="coerce").fillna(0.0).astype(float)
+    pa = pd.DataFrame({"game_pk": last["game_pk"].to_numpy(), "at_bat_number": last["at_bat_number"].to_numpy(),
+                       "woba": w.to_numpy(), "denom": d.to_numpy(), "xwoba": w.to_numpy(), "xwoba_n": w.to_numpy()})
+    return {"pa": pa}
 
 
 def _c_frame(obj) -> pd.DataFrame | None:

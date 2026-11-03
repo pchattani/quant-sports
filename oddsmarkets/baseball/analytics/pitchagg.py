@@ -36,7 +36,7 @@ SEASON_COLS = ["game_pk", "game_date", "game_type", "at_bat_number", "pitch_numb
                "estimated_woba_using_speedangle", "estimated_ba_using_speedangle", "estimated_slg_using_speedangle",
                "woba_value", "woba_denom", "babip_value", "iso_value", "delta_run_exp", "delta_home_win_exp",
                "bat_score", "post_bat_score", "fielder_2", "n_thruorder_pitcher", "bat_speed", "swing_length",
-               "vy0", "vz0", "ay", "az", "arm_angle"]
+               "vy0", "vz0", "ay", "az", "arm_angle", "chart_x", "chart_z", "hardness"]
 GAME_COLS = SEASON_COLS + ["des", "spin_axis", "vx0", "ax", "home_score", "away_score", "post_home_score", "post_away_score",
                            "home_win_exp", "attack_angle", "umpire"]
 REGULAR = ("R",)
@@ -105,8 +105,11 @@ def spray_angle(hc_x, hc_y) -> np.ndarray:
 
 
 def attack_zone(df: pd.DataFrame) -> np.ndarray:
-    """0 heart, 1 shadow, 2 chase, 3 waste, -1 unknown."""
+    """0 heart, 1 shadow, 2 chase, 3 waste, -1 unknown. An untracked pitch (the feed-built levels) uses its charted
+    location."""
     x, z = _f(df, "plate_x"), _f(df, "plate_z")
+    x = np.where(np.isfinite(x), x, _f(df, "chart_x"))
+    z = np.where(np.isfinite(z), z, _f(df, "chart_z"))
     top, bot = _f(df, "sz_top"), _f(df, "sz_bot")
     top = np.where(np.isfinite(top) & (top - bot > 0.8), top, 3.4)
     bot = np.where(np.isfinite(bot) & (top - bot > 0.8), bot, 1.55)
@@ -261,6 +264,10 @@ def flags(df: pd.DataFrame) -> pd.DataFrame:
     for nm, v in (("gb", "ground_ball"), ("ld", "line_drive"), ("fbb", "fly_ball"), ("pu", "popup")):
         out[nm] = (bip & bb.eq(v).to_numpy()).astype(np.float32)
     out["bbt_n"] = out["gb"] + out["ld"] + out["fbb"] + out["pu"]
+    hd = _s(df, "hardness") if "hardness" in df else pd.Series("", index=df.index)
+    for nm, v in (("hd_hard", "hard"), ("hd_med", "medium"), ("hd_soft", "soft")):
+        out[nm] = (bip & hd.eq(v).to_numpy()).astype(np.float32)
+    out["hd_n"] = out["hd_hard"] + out["hd_med"] + out["hd_soft"]
     hx, hy = _f(df, "hc_x"), _f(df, "hc_y")
     ang = spray_angle(hx, hy)
     lefty = _s(df, "stand").eq("L").to_numpy()

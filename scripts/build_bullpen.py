@@ -257,8 +257,8 @@ def build_season(b: Build, level: str, season: int, full: bool, cfg: dict, share
     awards = None
     if level == "mlb" and (full or cfg["light_awards"]):
         awards = b.write_or_fail(d + "awards.json", f"awards {level} {season}", lambda: AW.build(ctx, hit, pit), level=level, season=season)
-    if level == "aaa":
-        mlb = shared.get("mlb_full", {}).get(season) or {}
+    if level in ("aaa", "aa", "hia", "a"):
+        mlb = (shared.get("mlb_full", {}).get(season) or {}) if level == "aaa" else {}
         b.write_or_fail(d + "prospects.json", f"prospects {season}", lambda: PR.build(ctx, hit, pit, mlb.get("proj"), mlb.get("hitters"),
                                                                                        mlb.get("pitchers")), level=level, season=season)
     # game pages

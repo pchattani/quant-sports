@@ -39,6 +39,7 @@ CHUNK = 150_000
 # name -> (module, call); every call returns a dict
 _B = ("physics", "stuff", "location", "pitching", "tunneling", "swing", "battrack", "fatigue")
 _C = ("xwoba", "catchprob", "framing", "umpire", "re24", "war")
+_TRACKED = _B + ("xwoba", "catchprob", "framing", "umpire")
 
 
 def _file_key(*parts: Any) -> str:
@@ -141,6 +142,10 @@ class SeasonContext:
         if name in _B or name in _C:
             if not self.has_pitches():
                 return {"ok": False, "reason": f"no pitch table for {L} {S}"}
+            from oddsmarkets.baseball import canon
+            if L in canon.FEED_PITCH_LEVELS and name in _TRACKED:
+                return {"ok": False, "reason": f"{name} needs tracked pitch locations or batted-ball data, which most "
+                                               f"{canon.LEVEL_NAMES[L]} parks do not have"}
             mod = importlib.import_module(f"oddsmarkets.baseball.models.{name}")
             return mod.for_season(L, S)
         if name == "parks":

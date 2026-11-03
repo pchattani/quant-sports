@@ -103,27 +103,34 @@ function farm(host, S, all) {
     rows: ids.map(x => ({ o: x.o, name: k.teamName(x.o), sum: x.sum, top: x.top, who: '' })) });
   });
 }
+const PL = [['aaa', 'Triple-A'], ['aa', 'Double-A'], ['hia', 'High-A'], ['a', 'Single-A']];
 function render(el, params, state) {
   const k = K();
   const U = BP.ui;
-  el.innerHTML = QK.sectionHead({ kicker: 'Prospects', title: 'Who reaches the majors', sub: 'The chance a prospect moves up next season and reaches the majors within four years, then the Triple-A lines translated to the majors.' }) +
+  const q0 = (params.query || {}).plevel || ST.level || (PL.some(x => x[0] === (state || {}).level) ? state.level : 'aaa');
+  ST.level = PL.some(x => x[0] === q0) ? q0 : 'aaa';
+  const LV = ST.level, LNAME = PL.filter(x => x[0] === LV)[0][1];
+  el.innerHTML = QK.sectionHead({ kicker: 'Prospects', title: 'Who reaches the majors', sub: 'The chance a prospect moves up next season and reaches the majors within four years, then each minor level\'s lines translated to the majors.' }) +
     '<section class="qk-section" id="pr-rank"></section>' +
     '<div id="pr-kpis"></div><section class="qk-section" id="pr-farm"></section>' +
-    '<section class="qk-card"><div class="qk-card-body"><div class="bp-ctl">' + U.seg('pr-kind', 'Kind', [['hitter', 'Hitters'], ['pitcher', 'Pitchers']], ST.kind) +
+    '<section class="qk-card"><div class="qk-card-body"><div class="bp-ctl">' + U.seg('pr-level', 'Level', PL, LV) + U.seg('pr-kind', 'Kind', [['hitter', 'Hitters'], ['pitcher', 'Pitchers']], ST.kind) +
     '<label>Search<input id="pr-q" class="gq-search" type="search" placeholder="name or club…"></label><label>Parent club<select id="pr-parent"><option value="">All organisations</option></select></label></div></div></section>' +
-    '<section class="qk-section">' + QK.sectionHead({ kicker: 'Call-up previews', title: 'Ready now', sub: 'The six with the best major-league translation, and what our projection expects from them next season.' }) + '<div class="qk-grid" id="pr-prev"></div></section>' +
+    '<section class="qk-section">' + QK.sectionHead({ kicker: 'Call-up previews', title: LV === 'aaa' ? 'Ready now' : 'Best translations', sub: LV === 'aaa' ? 'The six with the best major-league translation, and what our projection expects from them next season.' : 'The six ' + LNAME + ' players with the best major-league translation.' }) + '<div class="qk-grid" id="pr-prev"></div></section>' +
     '<section class="qk-section"><div id="pr-card"></div></section>';
   return k.ready().then(() => {
-    const S = k.S({ query: params.query || {}, level: 'aaa' }, { level: 'aaa', season: (state || {}).season });
-    return Promise.all([k.loadY('aaa', S, 'prospects.json'), k.loadNames()]).then(res => ({ S: S, d: res[0] }));
+    const S = k.S({ query: params.query || {}, level: LV }, { level: LV, season: (state || {}).season });
+    return Promise.all([k.loadY(LV, S, 'prospects.json'), k.loadNames(), BP.load('callup.json').catch(() => null)]).then(res => ({ S: S, d: res[0], cu: res[2] }));
   }).then(o => {
     if (!k.alive(el)) return;
     const S = o.S, d = o.d, $ = id => document.getElementById(id);
+    const CU = {};
+    if (o.cu && o.cu.season === S) (o.cu.players || []).forEach(r => { CU[String(r.pid)] = r; });
     const all = { hitter: listOf(d, 'hitter'), pitcher: listOf(d, 'pitcher') };
     rankBoard($('pr-rank'));
-    if (!all.hitter.length && !all.pitcher.length) { $('pr-card').innerHTML = U.card2('Prospects', '', QK.empty('Not built yet', 'The ' + S + ' Triple-A prospect file is not available.')); $('pr-prev').innerHTML = ''; return; }
+    QK.seg($('pr-level'), v => { ST.level = v; render(el, params, state); });
+    if (!all.hitter.length && !all.pitcher.length) { $('pr-card').innerHTML = U.card2('Prospects', '', QK.empty('Not built yet', 'The ' + S + ' ' + LNAME + ' prospect file is not available.')); $('pr-prev').innerHTML = ''; return; }
     all.hitter.concat(all.pitcher).forEach(r => { if (r.name) k.learn(r.pid, { name: r.name, pos: r.pos, team: r.team }); });
-    farm($('pr-farm'), S, all);
+    if (LV === 'aaa') farm($('pr-farm'), S, all);
     const parents = Array.from(new Set(all.hitter.concat(all.pitcher).map(r => r.parent || r.org || r.mlb_team).filter(Boolean)));
     $('pr-parent').innerHTML = '<option value="">All organisations</option>' + parents.sort((a, b) => k.teamAbbr(a).localeCompare(k.teamAbbr(b))).map(t => '<option value="' + k.esc(t) + '">' + k.esc(k.teamAbbr(t) + ' · ' + k.teamName(t)) + '</option>').join('');
     const aaa = r => Object.assign({}, r, sub(r, ['aaa', 'stats', 'line']));
@@ -134,10 +141,10 @@ function render(el, params, state) {
     const bh = best(all.hitter, 'woba'), bp = best(all.pitcher, 'k_bb_pct');
     const up = all.hitter.concat(all.pitcher).filter(r => k.isNum(r.mlb_this_season) && r.mlb_this_season > 0).length;
     $('pr-kpis').innerHTML = '<div class="bp-kpis">' + QK.stats([
-      bh ? { label: 'Top-ranked hitter', value: k.surname(bh.name || k.name(bh.pid)) + ' ' + k.rate3(mle(bh).woba), signal: true, sub: 'major-league equivalent wOBA · ' + k.teamAbbr(bh.parent || bh.org), href: k.hitterHref('aaa', bh.pid, S) } : null,
-      bp ? { label: 'Top-ranked pitcher', value: k.surname(bp.name || k.name(bp.pid)) + ' ' + k.fmtV(mle(bp).k_bb_pct, 'pct'), signal: true, sub: 'major-league equivalent K−BB% · ' + k.teamAbbr(bp.parent || bp.org), href: k.pitcherHref('aaa', bp.pid, S) } : null,
-      { label: 'Triple-A players', value: String(all.hitter.length + all.pitcher.length), sub: all.hitter.length + ' hitters, ' + all.pitcher.length + ' pitchers' },
-      { label: 'Already in the majors', value: String(up), sub: 'played for the big club this season' }
+      bh ? { label: 'Top-ranked hitter', value: k.surname(bh.name || k.name(bh.pid)) + ' ' + k.rate3(mle(bh).woba), signal: true, sub: 'major-league equivalent wOBA · ' + k.teamAbbr(bh.parent || bh.org), href: k.hitterHref(LV, bh.pid, S) } : null,
+      bp ? { label: 'Top-ranked pitcher', value: k.surname(bp.name || k.name(bp.pid)) + ' ' + k.fmtV(mle(bp).k_bb_pct, 'pct'), signal: true, sub: 'major-league equivalent K−BB% · ' + k.teamAbbr(bp.parent || bp.org), href: k.pitcherHref(LV, bp.pid, S) } : null,
+      { label: LNAME + ' players', value: String(all.hitter.length + all.pitcher.length), sub: all.hitter.length + ' hitters, ' + all.pitcher.length + ' pitchers' },
+      LV === 'aaa' ? { label: 'Already in the majors', value: String(up), sub: 'played for the big club this season' } : stepsTile(d)
     ]) + '</div>';
     const draw = () => {
       const pit = ST.kind === 'pitcher';
@@ -147,17 +154,20 @@ function render(el, params, state) {
       const MC = (pit ? MLE_P : MLE_H).filter(c => rows.some(r => k.isNum(mle(r)[c[0]])));
       const key = MC[0];
       rows.sort((a, b) => (k.isNum(a.rank) ? a.rank : 9999) - (k.isNum(b.rank) ? b.rank : 9999) || ((key ? mle(b)[key[0]] : 0) || 0) - ((key ? mle(a)[key[0]] : 0) || 0));
-      const href = r => (pit ? k.pitcherHref('aaa', r.pid, S) : k.hitterHref('aaa', r.pid, S));
-      $('pr-card').innerHTML = U.card2(pit ? 'Pitchers' : 'Hitters', rows.length + ' players · Triple-A ' + S + ' · sorted by the major-league translation; blue columns are the major-league equivalents', '<div id="pr-table"></div>', { flush: true,
-        foot: '<span class="bp-fn">Major-league equivalents shift each Triple-A rate on the log-odds scale by the average change of players who played both levels in the same season, shrunk towards defaults. Ranks need 100+ PA or BF. Triple-A Statcast starts in 2023.</span>' });
+      const href = r => (pit ? k.pitcherHref(LV, r.pid, S) : k.hitterHref(LV, r.pid, S));
+      $('pr-card').innerHTML = U.card2(pit ? 'Pitchers' : 'Hitters', rows.length + ' players · ' + LNAME + ' ' + S + ' · sorted by the major-league translation; blue columns are the major-league equivalents', '<div id="pr-table"></div>', { flush: true,
+        foot: '<span class="bp-fn">' + (LV === 'aaa' ? 'Major-league equivalents shift each Triple-A rate on the log-odds scale by the average change of players who played both levels in the same season, shrunk towards defaults. Ranks need 100+ PA or BF. Triple-A Statcast starts in 2023.'
+          : 'Major-league equivalents chain one step per level (' + LNAME + ' up to the majors): each step shifts every rate on the log-odds scale by the average change of players who played both levels in the same season, shrunk towards defaults, and the steps add up. Ranks need 100+ PA or BF. The lines are built from every pitch of every game; most ' + LNAME + ' parks have no tracking, so there are no exit velocities or pitch speeds here.') + '</span>' });
       if (!rows.length) { $('pr-table').innerHTML = QK.empty('Nobody here', 'No prospect matches these filters.'); previews([], pit, S, mle, call); return; }
       const cols = [{ key: 'name', label: pit ? 'Pitcher' : 'Hitter', type: 'entity', sub: 'sub', mark: r => (r.parent || r.org ? U.team(r.parent || r.org, 'mlb') : null), href: href }]
-        .concat(AC.map(c => ({ key: 'a_' + c[0], label: c[1], num: true, fmt: x => k.fmtV(x, c[2]), tip: 'Triple-A ' + c[1] })))
-        .concat(MC.map((c, i) => (i === 0 ? { key: 'm_' + c[0], label: c[1], type: 'bar', fmt: x => k.fmtV(x, c[2]), tip: 'Major-league equivalent of this Triple-A line', cls: 'bp-mle' } : { key: 'm_' + c[0], label: c[1], num: true, fmt: x => k.fmtV(x, c[2]), tip: 'Major-league equivalent', cls: 'bp-mle' })))
-        .concat([{ key: 'proj', label: 'Next season', num: true, fmt: x => k.rate3(x), tip: 'Our projection of next season\'s MLB wOBA' + (pit ? ' allowed' : '') }, { key: 'mlbn', label: 'MLB this year', num: true, fmt: x => (k.isNum(x) && x > 0 ? k.int(x) : '—'), tip: (pit ? 'Batters faced' : 'Plate appearances') + ' in the majors this season' }]);
+        .concat(AC.map(c => ({ key: 'a_' + c[0], label: c[1], num: true, fmt: x => k.fmtV(x, c[2]), tip: LNAME + ' ' + c[1] })))
+        .concat(MC.map((c, i) => (i === 0 ? { key: 'm_' + c[0], label: c[1], type: 'bar', fmt: x => k.fmtV(x, c[2]), tip: 'Major-league equivalent of this ' + LNAME + ' line', cls: 'bp-mle' } : { key: 'm_' + c[0], label: c[1], num: true, fmt: x => k.fmtV(x, c[2]), tip: 'Major-league equivalent', cls: 'bp-mle' })))
+        .concat(Object.keys(CU).length ? [{ key: 'p_up', label: 'Up next year', num: true, fmt: x => (k.isNum(x) ? k.pct(x, 0) : '—'), tip: 'Chance of a higher level next season, from the call-up model' },
+          { key: 'p_mlb', label: 'MLB in 4 years', num: true, fmt: x => (k.isNum(x) ? k.pct(x, 0) : '—'), tip: 'Chance of 25 PA or batters faced in the majors within four seasons, from the call-up model (age and level included)' }] : [])
+        .concat(LV !== 'aaa' ? [] : [{ key: 'proj', label: 'Next season', num: true, fmt: x => k.rate3(x), tip: 'Our projection of next season\'s MLB wOBA' + (pit ? ' allowed' : '') }, { key: 'mlbn', label: 'MLB this year', num: true, fmt: x => (k.isNum(x) && x > 0 ? k.int(x) : '—'), tip: (pit ? 'Batters faced' : 'Plate appearances') + ' in the majors this season' }]);
       QK.leaderboard($('pr-table'), { dense: true, rank: true, maxHeight: 640, rowHref: href, columns: cols, rows: rows.map(r => {
         const a = aaa(r), m = mle(r), c = call(r);
-        const o2 = { pid: r.pid, name: r.name || k.name(r.pid), parent: r.parent, org: r.org, sub: [r.pos, k.isNum(r.age) ? 'age ' + Math.floor(r.age) : '', r.team ? k.teamAbbr(r.team) : '', r.rank ? '#' + r.rank : ''].filter(Boolean).join(' · '), proj: c.woba, mlbn: r.mlb_this_season };
+        const o2 = { pid: r.pid, name: r.name || k.name(r.pid), parent: r.parent, org: r.org, sub: [r.pos, k.isNum(r.age) ? 'age ' + Math.floor(r.age) : '', r.team ? k.teamAbbr(r.team) : '', r.rank ? '#' + r.rank : ''].filter(Boolean).join(' · '), proj: c.woba, mlbn: r.mlb_this_season, p_up: (CU[r.pid] || {}).p_up, p_mlb: (CU[r.pid] || {}).p_mlb };
         AC.forEach(cc => { o2['a_' + cc[0]] = a[cc[0]]; });
         MC.forEach(cc => { o2['m_' + cc[0]] = m[cc[0]]; });
         return o2;
@@ -173,6 +183,17 @@ function render(el, params, state) {
   });
 }
 
+/* The chained translation's size for a lower level: the summed log-odds shift of the strikeout rate, as the K% a
+   league-average hitter at the level would carry to the majors. */
+function stepsTile(d) {
+  const k = K();
+  const st = ((d || {}).steps || {}).hitter || [];
+  if (!st.length) return null;
+  const LN = { aaa: 'AAA', aa: 'AA', hia: 'A+', a: 'A', mlb: 'MLB' };
+  const kd = st.reduce((a, s) => a + ((((s.deltas || {}).K) || {}).delta || 0), 0);
+  const base = 0.22, eq = 1 / (1 + Math.exp(-(Math.log(base / (1 - base)) + kd)));
+  return { label: 'Steps to the majors', value: String(st.length), sub: st.map(s => LN[s.from] + '→' + LN[s.to]).join(' · ') + ' · a ' + k.pct(base, 0) + ' strikeout rate here is ' + k.pct(eq, 0) + ' in MLB' };
+}
 function previews(rows, pit, S, mle, call) {
   const k = K();
   const U = BP.ui;
@@ -182,7 +203,7 @@ function previews(rows, pit, S, mle, call) {
     const m = mle(r), c = call(r);
     const comp = c.components || {};
     const kk = comp.K, bb = comp.BB;
-    const href = pit ? k.pitcherHref('aaa', r.pid, S) : k.hitterHref('aaa', r.pid, S);
+    const href = pit ? k.pitcherHref(ST.level, r.pid, S) : k.hitterHref(ST.level, r.pid, S);
     const lines = (pit ? MLE_P : MLE_H).filter(x => k.isNum(m[x[0]])).slice(0, 3).map(x => '<li><span>' + k.esc(x[1]) + '</span><span class="v">' + k.fmtV(m[x[0]], x[2]) + '</span></li>').join('');
     const proj = [];
     if (k.isNum(c.woba)) proj.push('<li><span>Next season wOBA' + (pit ? ' allowed' : '') + '</span><span class="v">' + k.rate3(c.woba) + '</span></li>');

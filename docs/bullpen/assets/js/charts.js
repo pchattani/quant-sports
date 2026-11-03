@@ -259,7 +259,8 @@ function sprayChart(el, balls, opts) {
         marker: { size: 10, color: has.map(x => Number(x.b[key])), colorscale: XWOBA_SCALE, cmin: ls ? 60 : 0, cmax: ls ? 110 : 1.2,
           symbol: has.map(sym), line: { width: has.map(x => (BP.isHit(x.b.event) ? 1 : 2)), color: '#0d1117' },
           colorbar: { thickness: 8, len: 0.5, y: 0.7, tickfont: { size: 9, color: C.text2 }, outlinewidth: 0,
-            title: { text: ls ? 'EV' : (key === 'xwoba_savant' ? 'Savant' : 'xwOBA+'), font: { size: 9, color: C.text2 } } } },
+            title: { text: ls ? 'EV' : (key === 'xwoba_savant' ? 'Savant' : key === 'contact_val' ? 'Contact' : 'xwOBA+'), font: { size: 9, color: C.text2 } },
+            tickvals: key === 'contact_val' ? [0.15, 0.6, 1.1] : undefined, ticktext: key === 'contact_val' ? ['soft', 'med', 'hard'] : undefined } },
         hovertext: has.map(x => ballHover(x.b)), hoverinfo: 'text' });
     }
   }

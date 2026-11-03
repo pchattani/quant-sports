@@ -147,6 +147,10 @@ METRICS: list[dict] = [
     M("ld_pct", "LD%", "Batted ball", "pct", den="bip", k=600, scope="statcast", desc="Line drives."),
     M("fb_pct", "FB%", "Batted ball", "pct", den="bip", stab="fb_rate", scope="statcast", desc="Fly balls."),
     M("pu_pct", "PU%", "Batted ball", "pct", den="bip", k=250, scope="statcast", lower=True, desc="Pop-ups."),
+    M("hard_scored_pct", "Hard%", "Batted ball", "pct", den="bip", k=250, scope="statcast",
+      desc="Balls in play the official scorer charted as hard hit (levels without exit velocity)."),
+    M("soft_scored_pct", "Soft%", "Batted ball", "pct", den="bip", k=250, scope="statcast", lower=True,
+      desc="Balls in play the official scorer charted as softly hit."),
     M("pull_pct", "Pull%", "Spray", "pct", den="bip", stab="pull_rate", scope="statcast",
       desc="Spray angle more than 15 degrees to the pull side."),
     M("cent_pct", "Straightaway%", "Spray", "pct", den="bip", k=200, scope="statcast", desc="Within 15 degrees of centre."),
@@ -275,6 +279,20 @@ def _rate(a, b):
     return an.div(a, b)
 
 
+EXPECTED_SUMS = ("xw_num", "xba_num", "xslg_num", "xwc_sum", "v95_xw", "v90_xw", "vlo_xw", "fb_xw", "br_xw", "os_xw",
+                 "vlhp_xn", "vrhp_xn", "vlhb_xn", "vrhb_xn")
+
+
+def _no_expected(r: pd.Series) -> pd.Series:
+    """A line whose balls in play mostly carry no expected values (a level without exit velocity): the expected-stat
+    sums are blanked, since without the estimates they fall back to the results and would repeat wOBA as xwOBA."""
+    r = r.copy()
+    for c in EXPECTED_SUMS:
+        if c in r.index:
+            r[c] = np.nan
+    return r
+
+
 def _woba(num, den):
     return an.div(num, den)
 
@@ -322,6 +340,8 @@ def build(ctx: SeasonContext) -> dict:
         pa = float(r["pa"])
         if pa < 1:
             continue
+        if r["xwc_n"] < 0.5 * r["bip"]:
+            r = _no_expected(r)
         info = ctx.players.get(pid) or {}
         wr = war.get(pid) or {}
         pos = CT.pos_of(ctx, pid, wr.get("pos"))
@@ -413,6 +433,8 @@ def build(ctx: SeasonContext) -> dict:
         # batted ball
         for k, c in (("gb_pct", "gb"), ("ld_pct", "ld"), ("fb_pct", "fbb"), ("pu_pct", "pu")):
             v[k] = _rate(r[c], r["bbt_n"])
+        v["hard_scored_pct"] = _rate(r.get("hd_hard", 0), r.get("hd_n", 0))
+        v["soft_scored_pct"] = _rate(r.get("hd_soft", 0), r.get("hd_n", 0))
         for k, c in (("pull_pct", "pull"), ("cent_pct", "cent"), ("oppo_pct", "oppo"), ("pull_air_pct", "pull_air"),
                      ("oppo_air_pct", "oppo_air")):
             v[k] = _rate(r[c], r["spray_n"])
@@ -528,7 +550,11 @@ def build(ctx: SeasonContext) -> dict:
     means = CT.finish(ctx, rows, METRICS, reference, role_of, FLOORS)
     for r in rows.values():
         r["n"] = {k: (int(v) if v is not None else None) for k, v in r["n"].items()}
-    return {**CT.season_meta(ctx), "kind": "hitter", "metrics": [an.public_metric(m) for m in METRICS], "players": rows,
+    out_meta = CT.season_meta(ctx)
+    if CT.level_note(ctx):
+        out_meta.update(source="statsapi-feed", note=CT.level_note(ctx))
+    return {**out_meta, "kind": "hitter", "metrics": [an.public_metric(m) for m in CT.trim_metrics(ctx, METRICS, rows)],
+            "players": rows,
             "reference": {"rule": f"PA >= {REF_PA_PER_G} per team game (floor {FLOORS['pa']})", "n": len(reference),
                           "min_pa": round(ref_pa), "means": {k: an.rnd(v, 4) for k, v in means.items()}},
             "floors": FLOORS, "roles": sorted(set(role_of.values()))}

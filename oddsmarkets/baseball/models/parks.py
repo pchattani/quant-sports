@@ -95,6 +95,8 @@ def season_aggregates(bip: pd.DataFrame, pa: pd.DataFrame | None, store: dict | 
         p["bat_team"] = np.where(home_bat, p["home_team"], p["away_team"])
         p["k"] = (p["cls"] == "K").astype(float)
         p["bb"] = p["cls"].isin(["BB"]).astype(float)
+        for c in OUTCOMES:
+            p[f"c_{c}"] = (p["cls"] == c).astype(float)
         p["runs"] = p["runs_pa"].astype(float) if "runs_pa" in p else (p["post_bat_score"].astype(float) - p["bat_score"].astype(float))
         hr = {}
         for team in sorted(set(p["home_team"].astype(str)) | set(p["away_team"].astype(str))):
@@ -103,7 +105,9 @@ def season_aggregates(bip: pd.DataFrame, pa: pd.DataFrame | None, store: dict | 
             hr[team] = {"h_games": int(h["game_pk"].nunique()), "h_runs": float(h["runs"].sum()), "h_pa": int(len(h)),
                         "h_k": float(h["k"].sum()), "h_bb": float(h["bb"].sum()),
                         "r_games": int(r["game_pk"].nunique()), "r_runs": float(r["runs"].sum()), "r_pa": int(len(r)),
-                        "r_k": float(r["k"].sum()), "r_bb": float(r["bb"].sum())}
+                        "r_k": float(r["k"].sum()), "r_bb": float(r["bb"].sum()),
+                        **{f"h_{c}": float(h[f"c_{c}"].sum()) for c in OUTCOMES},
+                        **{f"r_{c}": float(r[f"c_{c}"].sum()) for c in OUTCOMES}}
         out["homeroad"] = hr
     out["weather"] = weather_rows(bip, store)
     return out
@@ -154,8 +158,9 @@ def season_for(level: str, season: int, use_cache: bool = True) -> dict:
         return {}
 
     def build():
+        from oddsmarkets.baseball import canon
         from oddsmarkets.baseball.models import re24, xwoba
-        bip = xwoba.load_bip(level, season)
+        bip = None if level in canon.FEED_PITCH_LEVELS else xwoba.load_bip(level, season)
         store = _c.load_store(level, season)
         p = _c.load_pitches(level, season, ["inning", "inning_topbot", "outs_when_up", "bat_score", "fld_score",
                                             "post_bat_score", "on_1b", "on_2b", "on_3b", "events", "home_team",
@@ -168,7 +173,7 @@ def season_for(level: str, season: int, use_cache: bool = True) -> dict:
                 bip = bip.merge(last[["game_pk", "at_bat_number", "hit_distance_sc"]], on=["game_pk", "at_bat_number"], how="left")
         bip = _neutral_classes(bip)
         return season_aggregates(bip, pa, store)
-    return _c.cached("parks", f"{level}_{season}", _c.file_key(path, MODEL_VERSION, "v2"), build, use_cache)
+    return _c.cached("parks", f"{level}_{season}", _c.file_key(path, MODEL_VERSION, "v3"), build, use_cache)
 
 
 def _neutral_classes(bip: pd.DataFrame | None) -> pd.DataFrame | None:
@@ -224,13 +229,27 @@ def combine(aggs: list[dict], store: dict | None = None) -> dict:
                 rr = hr[f"r_{kk}"] / max(hr["r_pa"], 1)
                 ratio = rh / max(rr, 1e-9)
                 fac[kk.upper()] = (hr["h_pa"] * ratio + K_PA) / (hr["h_pa"] + K_PA)
+            if not hands:
+                # no exit velocity (the feed-built levels): the hit classes by the home/road method too, per PA, with
+                # the contact factors' pseudo-events scaled to PAs
+                for c in OUTCOMES:
+                    if f"h_{c}" not in hr:
+                        continue
+                    rh = hr[f"h_{c}"] / max(hr["h_pa"], 1)
+                    rr = hr[f"r_{c}"] / max(hr["r_pa"], 1)
+                    if rr <= 0:
+                        continue
+                    k_pa = K[c] / max(rr, 1e-6) * 0.25
+                    fac[c] = (hr["h_pa"] * (rh / rr) + k_pa) / (hr["h_pa"] + k_pa)
+                fac.pop("woba_con", None)
         tid, t = teams.get(p, (None, {}))
         v = venues.get(str((t or {}).get("venue"))) if t else None
         parks[p] = {"abbr": p, "team": tid, "venue": (t or {}).get("venue"), "name": (v or {}).get("name"),
                     "dims": (v or {}).get("dims"), "walls": (v or {}).get("walls"), "elev_ft": (v or {}).get("elev_ft"),
                     "roof": (v or {}).get("roof"), "factors": fac,
                     "index": {k2: round(100 * v2, 1) for k2, v2 in fac.items() if v2 is not None},
-                    "by_hand": {h: _factors(r) for h, r in hands.items()}, "n_bip": int(tot.get("n", 0))}
+                    "by_hand": {h: _factors(r) for h, r in hands.items()}, "n_bip": int(tot.get("n", 0)),
+                    "method": "contact" if hands else "home/road"}
     return parks
 
 

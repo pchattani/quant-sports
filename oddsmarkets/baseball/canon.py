@@ -23,6 +23,10 @@ LEVEL_NAMES = {"mlb": "MLB", "aaa": "Triple-A", "aa": "Double-A", "hia": "High-A
 # without a level filter also returns a handful of tracked Single-A parks and no Double-A or High-A games
 # (probed 12 Aug 2025 and 15 Jul 2026), so the lower three levels are built from the official counting lines.
 STATCAST_FROM = {"mlb": 2015, "aaa": 2023}
+# Levels whose pitch table is built from the Stats API live feed instead (sources/feedpitch.py), and from when: the
+# 2021 reorganisation fixed the three levels as they are now
+FEED_PITCH_LEVELS = ("aa", "hia", "a")
+FEED_PITCH_FROM = 2021
 
 GAME_TYPES = {
     "R": "Regular season", "F": "Wild Card Series", "D": "Division Series", "L": "League Championship Series",

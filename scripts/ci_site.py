@@ -130,7 +130,7 @@ def prune_ace(rel: PurePosixPath, ctx: dict) -> bool:
     return False
 
 
-BULLPEN_KEEP = {"mlb": 1, "aaa": 1}
+BULLPEN_KEEP = {"mlb": 1, "aaa": 1, "aa": 1, "hia": 1, "a": 1}
 
 
 def prune_bullpen(rel: PurePosixPath, ctx: dict) -> bool:
@@ -268,6 +268,12 @@ def guard_bullpen(ctx: dict) -> list[str]:
         missing = [s for s in range(first, y + 1) if not (sc / lvl / f"{s}.parquet").exists()]
         if missing:
             problems.append(f"{lvl} Statcast tables missing for {missing}")
+    # the levels built from the game feeds (sources/feedpitch.py): a cold runner would rebuild the current season from
+    # one run's call budget and publish a few days of it
+    from oddsmarkets.baseball import canon
+    for lvl in canon.FEED_PITCH_LEVELS:
+        if not (sc / lvl / f"{y}.parquet").exists() and (ROOT / "docs/bullpen/data" / lvl / str(y) / "store.json").exists():
+            problems.append(f"{lvl} feed pitch table missing for {y}")
     for lvl, first in (("mlb", 2015), ("aaa", 2023)):
         missing = [s for s in range(first, y + 1) if not any(prep.glob(f"{lvl}_{s}_*.parquet"))]
         if missing:

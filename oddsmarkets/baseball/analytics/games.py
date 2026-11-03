@@ -40,7 +40,8 @@ logger = logging.getLogger(__name__)
 PAGE_VERSION = 1
 PITCH_COLS = ["inning", "half", "ab", "pitch_no", "batter", "pitcher", "pitch_type", "velo", "spin", "ivb", "hb", "plate_x",
               "plate_z", "sz_top", "sz_bot", "call", "desc", "stuff", "location", "launch_speed", "launch_angle", "xwoba_plus",
-              "xwoba_savant", "hc_x", "hc_y", "event", "re24", "wpa", "balls", "strikes", "outs", "pitching"]
+              "xwoba_savant", "hc_x", "hc_y", "event", "re24", "wpa", "balls", "strikes", "outs", "pitching", "bb_type",
+              "hardness", "charted"]
 FINAL = ("final",)
 _NEUTRAL: dict = {}
 
@@ -500,19 +501,28 @@ def _pitch_rows(gp: pd.DataFrame, wpa: dict) -> dict:
     ivb = PG._f(gp, "pfx_z") * 12
     hb = PG._f(gp, "pfx_x") * 12 * arm
     rows = []
+    # feed-built levels: where nothing tracked the pitch, the charted location (sources/feedpitch.py) stands in, flagged
+    px, pz = PG._f(gp, "plate_x"), PG._f(gp, "plate_z")
+    cx, cz = PG._f(gp, "chart_x"), PG._f(gp, "chart_z")
+    charted = ~np.isfinite(px) & np.isfinite(cx) & np.isfinite(cz)
+    px, pz = np.where(charted, cx, px), np.where(charted, cz, pz)
+    bbt = PG._s(gp, "bb_type")
+    hard = PG._s(gp, "hardness")
     for i, r in enumerate(gp.to_dict("records")):
         is_last = bool(last.iloc[i])
         abn = int(r["at_bat_number"])
         rows.append([int(r.get("inning") or 0), 0 if top.iloc[i] else 1, abn, int(r["pitch_number"]), str(int(r["batter"])),
                      str(int(r["pitcher"])), r.get("pitch_type") if isinstance(r.get("pitch_type"), str) else None,
                      _num(r.get("release_speed"), 1), an.inum(r.get("release_spin_rate")), _num(ivb[i], 1), _num(hb[i], 1),
-                     _num(r.get("plate_x"), 3), _num(r.get("plate_z"), 3), _num(r.get("sz_top"), 2), _num(r.get("sz_bot"), 2),
+                     _num(px[i], 3), _num(pz[i], 3), _num(r.get("sz_top"), 2), _num(r.get("sz_bot"), 2),
                      desc.iloc[i] or None, (des.iloc[i] or None) if is_last else None, an.inum(r.get("stuff")), an.inum(r.get("location")),
                      _num(r.get("launch_speed"), 1), an.inum(r.get("launch_angle")), _num(r.get("_xwp"), 3),
                      _num(r.get("estimated_woba_using_speedangle"), 3), _num(r.get("hc_x"), 1), _num(r.get("hc_y"), 1),
                      (ev.iloc[i] or None) if is_last else None, _num(r.get("delta_run_exp"), 3),
                      _num(wpa.get(abn), 4) if is_last else None, an.inum(r.get("balls")), an.inum(r.get("strikes")),
-                     an.inum(r.get("outs_when_up")), an.inum(r.get("pitching"))])
+                     an.inum(r.get("outs_when_up")), an.inum(r.get("pitching")),
+                     (bbt.iloc[i] or None) if is_last else None, (hard.iloc[i] or None) if is_last else None,
+                     1 if charted[i] else None])
     return {"cols": PITCH_COLS, "rows": rows}
 
 

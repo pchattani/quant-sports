@@ -498,17 +498,31 @@ function gamePanel(el, g, P, L) {
   const top = wp.top || [];
   const balls = P.filter(p => isNum(p.hc_x) && isNum(p.hc_y));
   const pk = g._park || {};
+  /* no ball tracking at this park (the feed-built minors): colour by the official scorer's soft / medium / hard */
+  const SCORER = { soft: 0.15, medium: 0.6, hard: 1.1 };
+  const tracked = balls.some(b => isNum(b.xwoba_plus) || isNum(b.xwoba_savant) || isNum(b.launch_speed));
+  if (!tracked) balls.forEach(b => { b.contact_val = SCORER[b.hardness]; });
   el.innerHTML = BP.card('Win probability', ((wp.espn || []).length ? 'ours (solid) v ESPN (dotted)' : 'ours') + ' · numbered: the biggest plays', '<div id="gm-wp" class="chart-box"></div>' +
       (top.length ? '<div class="wpa-list">' + top.map((t, k) => '<div class="wpa-row"><span class="wpa-n">' + (k + 1) + '</span><span class="wpa-inn">' + esc(BP.inningLabel(t.inning, t.half, true)) + '</span>' +
         '<span class="wpa-d">' + esc(t.desc || '') + '</span><span class="wpa-v ' + ((t.wpa || 0) > 0 ? 'edge-pos' : 'edge-neg') + '" title="Home win probability added">' + BP.signed((t.wpa || 0) * 100, 1) + '</span></div>').join('') +
         '<div class="section-note">Win probability added for ' + esc(BP.teamName(g.home)) + ', in points.</div></div>' : '')) +
-    '<div class="grid-23">' + BP.card('Spray chart', 'colour: expected wOBA on contact · filled: hits', '<div class="toggle-row" id="sp-ctl"></div><div id="gm-spray" class="chart-box"></div>') +
-      BP.card('Batted balls', 'xwOBA+ (our model: launch, hang time, park and sprint speed) beside Savant xwOBA', '<div id="gm-bb"></div>') + '</div>';
+    '<div class="grid-23">' + BP.card('Spray chart', tracked ? 'colour: expected wOBA on contact · filled: hits' : 'colour: the official scorer\'s soft / medium / hard · filled: hits', '<div class="toggle-row" id="sp-ctl"></div><div id="gm-spray" class="chart-box"></div>') +
+      BP.card('Batted balls', tracked ? 'xwOBA+ (our model: launch, hang time, park and sprint speed) beside Savant xwOBA' : 'the batted-ball type and the official scorer\'s contact grade (no ball tracking at this park)', '<div id="gm-bb"></div>') + '</div>';
   CH().wpChart('gm-wp', wp.ours || [], { espn: wp.espn, top: top, home: g.home, away: g.away, height: 330 });
-  let team = 'all', metric = 'xwoba_plus';
+  let team = 'all', metric = tracked ? 'xwoba_plus' : 'contact_val';
   const draw = () => {
     const list = team === 'all' ? balls : balls.filter(b => battingTeam(g, b.half) === team);
     CH().sprayChart('gm-spray', list, { dims: pk.dims, metric: metric, height: 400, emptyText: list.length ? '' : 'No batted balls yet.' });
+    if (!tracked) {
+      const rows2 = list.filter(b => b.event);
+      const HL = { soft: 'Soft', medium: 'Medium', hard: 'Hard' };
+      document.getElementById('gm-bb').innerHTML = rows2.length ? BP.tableHTML([{ label: 'Batter' }, { label: 'Inn', cls: 'hide-sm' }, { label: 'Result' }, { label: 'Type' }, { label: 'Contact' }],
+        rows2.map(b => [{ v: BP.playerName(b.batter), html: BP.playerLink(b.batter, { short: true, level: L }) }, { v: b.inning, html: esc(BP.inningLabel(b.inning, b.half, true)) },
+          { v: b.event, html: BP.isHit(b.event) ? '<b>' + esc(BP.eventLabel(b.event)) + '</b>' : esc(BP.eventLabel(b.event)) },
+          { v: b.bb_type || '', html: esc(String(b.bb_type || '—').replace('_', ' ')) }, { v: SCORER[b.hardness] || 0, html: esc(HL[b.hardness] || '—') }]),
+        { compact: true, cls: 'bb-table', id: 'bb-wrap' }) + '<div class="section-note">The contact grade is the official scorer\'s call, not a measurement; this park has no ball tracking, so there is no exit velocity or expected wOBA.</div>' : BP.muted('No batted balls yet.');
+      return;
+    }
     const rows = list.filter(b => isNum(b.xwoba_plus) || isNum(b.xwoba_savant) || isNum(b.launch_speed))
       .sort((a, b) => (Number(b.xwoba_plus) || 0) - (Number(a.xwoba_plus) || 0));
     document.getElementById('gm-bb').innerHTML = rows.length ? BP.tableHTML([{ label: 'Batter' }, { label: 'Inn', cls: 'hide-sm' }, { label: 'Result' }, { label: 'EV', align: 'right' }, { label: 'LA', align: 'right', cls: 'hide-sm' },
@@ -522,7 +536,7 @@ function gamePanel(el, g, P, L) {
   };
   const ctl = document.getElementById('sp-ctl');
   ctl.innerHTML = BP.toggles([{ key: 'all', label: 'Both teams' }, { key: String(g.away), label: BP.teamAbbr(g.away) }, { key: String(g.home), label: BP.teamAbbr(g.home) }], team, 'data-tm') +
-    '<span class="ctl-sep"></span>' + BP.toggles([{ key: 'xwoba_plus', label: 'xwOBA+' }, { key: 'xwoba_savant', label: 'Savant xwOBA' }, { key: 'launch_speed', label: 'Exit velo' }], metric, 'data-mt');
+    (tracked ? '<span class="ctl-sep"></span>' + BP.toggles([{ key: 'xwoba_plus', label: 'xwOBA+' }, { key: 'xwoba_savant', label: 'Savant xwOBA' }, { key: 'launch_speed', label: 'Exit velo' }], metric, 'data-mt') : '');
   BP.wireToggles(ctl, 'data-tm', k => { team = k; draw(); });
   BP.wireToggles(ctl, 'data-mt', k => { metric = k; draw(); });
   draw();
@@ -540,7 +554,7 @@ function pitchesPanel(el, g, P, L) {
   const types = []; P.forEach(p => { const t = String(p.pitch_type || '').toUpperCase(); if (t && types.indexOf(t) < 0) types.push(t); });
   types.sort((a, b) => BP.PITCH_ORDER.indexOf(a) - BP.PITCH_ORDER.indexOf(b));
   const teamOfP = pid => { const x = P.find(p => p.pitcher === pid); return x ? (half(x.half) === 'top' ? g.home : g.away) : null; };
-  el.innerHTML = BP.card('Pitch by pitch', 'filter, then read the zone (catcher\'s view) and the table',
+  el.innerHTML = BP.card('Pitch by pitch', 'filter, then read the zone (catcher\'s view) and the table' + (P.some(p => p.charted) ? ' · where the park has no pitch tracking, locations are the game charter\'s, so approximate' : ''),
     '<div class="pz-ctl">' +
       '<label>Pitcher<select id="pf-pitcher">' + opts([['all', 'All pitchers']].concat(pitchers.map(p => [p, BP.teamAbbr(teamOfP(p)) + ' · ' + BP.playerName(p)])), f.pitcher) + '</select></label>' +
       '<label>Batter<select id="pf-batter">' + opts([['all', 'All batters']].concat(batters.map(p => [p, BP.playerName(p)])), f.batter) + '</select></label>' +
@@ -550,7 +564,9 @@ function pitchesPanel(el, g, P, L) {
     '</div><div class="pz-grid"><div><div class="toggle-row" id="pz-col"></div><div id="gm-zone" class="chart-box"></div><div class="chart-note" id="pz-note"></div></div><div id="gm-ptab" class="pz-table"></div></div>');
   function ordinal(i) { return BP.ordinal(i); }
   const col = document.getElementById('pz-col');
-  col.innerHTML = 'Colour by ' + BP.toggles([{ key: 'type', label: 'Pitch type' }, { key: 'call', label: 'Result' }, { key: 'stuff', label: 'Stuff+' }, { key: 'xwoba', label: 'xwOBA+' }], f.colour, 'data-cb');
+  const tracked = types.length > 0;
+  if (!tracked && f.colour !== 'call') f.colour = 'call';
+  col.innerHTML = 'Colour by ' + BP.toggles(tracked ? [{ key: 'type', label: 'Pitch type' }, { key: 'call', label: 'Result' }, { key: 'stuff', label: 'Stuff+' }, { key: 'xwoba', label: 'xwOBA+' }] : [{ key: 'call', label: 'Result' }], f.colour, 'data-cb');
   const draw = () => {
     const list = P.filter(p => (f.pitcher === 'all' || p.pitcher === f.pitcher) && (f.batter === 'all' || p.batter === f.batter) &&
       (f.inning === 'all' || String(p.inning) === String(f.inning)) && (f.type === 'all' || String(p.pitch_type || '').toUpperCase() === f.type) &&

@@ -514,12 +514,12 @@ def aging_delta(aging: dict, comp: str, age: float | None) -> float:
     return float(a + b * z + c * z * z)
 
 
-def fit_translation(seasons: Iterable[int], role: str, min_n: float = 50) -> dict:
-    """AAA -> MLB deltas per component from players with both samples in a season."""
+def fit_translation(seasons: Iterable[int], role: str, min_n: float = 50, lo: str = "aaa", hi: str = "mlb") -> dict:
+    """lo -> hi (default AAA -> MLB) deltas per component from players with both samples in a season."""
     acc = {c: [] for c in STAB[role]}
     for s in seasons:
-        mh, mp = season_aggregates("mlb", s)
-        ah, ap = season_aggregates("aaa", s)
+        mh, mp = season_aggregates(hi, s)
+        ah, ap = season_aggregates(lo, s)
         M, A = (mh, ah) if role == "hitter" else (mp, ap)
         if not len(M) or not len(A):
             continue

@@ -85,6 +85,57 @@ def g(d: dict | None, k: str) -> float | None:
     return an.fnum((d or {}).get(k)) if d else None
 
 
+SCORER_KEYS = ("hard_scored_pct", "soft_scored_pct")
+
+
+def trim_metrics(ctx: SeasonContext, metrics: list[dict], rows: dict[str, dict]) -> list[dict]:
+    """The metrics a catalogue publishes: at a feed-built level only those with a value for at least a quarter of the
+    players (no velocity, spin or exit-velocity columns where nothing or almost nothing is tracked, e.g. a handful of
+    rehab games at a tracked park); elsewhere all of them but the scorer's hardness, which only the feed-built levels
+    carry."""
+    from oddsmarkets.baseball import canon
+    if ctx.level in canon.FEED_PITCH_LEVELS:
+        n: dict[str, int] = {}
+        for r in rows.values():
+            for k, v in (r.get("values") or {}).items():
+                if v is not None:
+                    n[k] = n.get(k, 0) + 1
+        need = max(1, 0.25 * len(rows))
+        keep = [m for m in metrics if n.get(m["key"], 0) >= need]
+    else:
+        have = {k for r in rows.values() for k, v in (r.get("values") or {}).items() if v is not None}
+        keep = [m for m in metrics if m["key"] not in SCORER_KEYS or m["key"] in have]
+    keys = {m["key"] for m in keep}
+    for r in rows.values():
+        for f in ("values", "pct", "pct_role"):
+            if isinstance(r.get(f), dict):
+                r[f] = {k: v for k, v in r[f].items() if k in keys}
+    return keep
+
+
+def level_note(ctx: SeasonContext) -> str | None:
+    """What a feed-built level's pitch table holds, with the season's tracked share."""
+    from oddsmarkets.baseball import canon
+    if ctx.level not in canon.FEED_PITCH_LEVELS:
+        return None
+    share = None
+    try:
+        from oddsmarkets.baseball.sources import savant
+        m = savant.load_manifest(ctx.level, ctx.season)
+        share = (m.get("tracked") or {}).get("share")
+    except Exception:                                            # noqa: BLE001
+        share = None
+    if share is None:
+        tracked = "only where Hawk-Eye tracks the park"
+    elif share < 0.005:
+        tracked = "only where Hawk-Eye tracks the park, and no park at this level was tracked this season"
+    else:
+        tracked = f"only where Hawk-Eye tracks the park ({round(100 * share)}% of this season's pitches)"
+    return ("Pitch by pitch from MLB's game feeds: every pitch's count and call, the charted location, the batted-ball "
+            "type, direction and the official scorer's hard / medium / soft at every park; velocity, spin, exit velocity "
+            f"and launch angle {tracked}. Columns that need tracking are left out where there is none.")
+
+
 def season_meta(ctx: SeasonContext, extra: dict | None = None) -> dict:
     return {"ok": True, "level": ctx.level, "season": ctx.season, "updated_at": an.now(), "phase": ctx.phase,
             "team_games": ctx.team_games(), "model_errors": dict(ctx.model_errors), **(extra or {})}

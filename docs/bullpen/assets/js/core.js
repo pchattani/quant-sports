@@ -513,7 +513,7 @@ function sectionBar(r) {
   const glob = (routeEntry(r.name) || {}).global;
   /* the MLB-only global pages (the bracket, the races, the club history) name MLB whatever level was last viewed */
   const mlbOnly = ['postseason', 'awards', 'history'].indexOf(r.name) >= 0;
-  const kicker = sec === 'model' ? SITE : mlbOnly ? LEVEL_LONG.mlb + (r.name === 'history' ? '' : ' · ' + S) : glob && r.name !== 'compare' ? SITE + ' · MLB and Triple-A' : LEVEL_LONG[L] + ' · ' + S;
+  const kicker = sec === 'model' ? SITE : mlbOnly ? LEVEL_LONG.mlb + (r.name === 'history' ? '' : ' · ' + S) : glob && r.name !== 'compare' ? SITE + ' · MLB and the minors' : LEVEL_LONG[L] + ' · ' + S;
   let back = '';
   if (detail) {
     const t = tabs.find(x => x[0] === detail) || [detail, TITLES[detail] || titleCase(detail), routeEntry(detail) && routeEntry(detail).global ? 'g' : ''];

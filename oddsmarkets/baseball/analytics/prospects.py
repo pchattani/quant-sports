@@ -1,6 +1,7 @@
 """
-prospects.json (Triple-A): every AAA player of the season with his Triple-A line (from the AAA catalogues), his
-MLB-equivalent rates and a call-up preview.
+prospects.json (each minor level): every player of the season with his line at the level (from its catalogues), his
+MLB-equivalent rates and, for Triple-A, a call-up preview. Below Triple-A the translation chains one fitted step per
+level (chain_translation).
 
 MLB equivalents (builder D's translations): each component rate r of a player's AAA counts is moved by the
 AAA -> MLB delta fitted on players with both samples in a season (logit for rates, linear for xwOBAcon;
@@ -23,25 +24,47 @@ from oddsmarkets.baseball.analytics.context import SeasonContext
 MIN_PA = 50
 
 
+LADDER = ("a", "hia", "aa", "aaa", "mlb")
+
+
+def chain_translation(PJ, level: str, seasons: list[int], role: str) -> tuple[dict, list[dict]]:
+    """level -> MLB deltas: the sum of each adjacent step's fitted deltas (A -> A+ -> AA -> AAA -> MLB), each step
+    fitted on players with both samples in a season and shrunk to the AAA -> MLB default; and the steps."""
+    i = LADDER.index(level)
+    total: dict[str, dict] = {}
+    steps = []
+    for lo, hi in zip(LADDER[i:-1], LADDER[i + 1:]):
+        try:
+            t = PJ.fit_translation(seasons, role, lo=lo, hi=hi)
+        except Exception:                                        # noqa: BLE001
+            t = {c: {"delta": v, "n": 0, "source": "default"} for c, v in PJ.TRANSLATE_DEFAULT[role].items()}
+        steps.append({"from": lo, "to": hi, "deltas": t})
+        for c, v in t.items():
+            acc = total.setdefault(c, {"delta": 0.0, "n": int(v.get("n") or 0), "source": "fitted"})
+            acc["delta"] += float(v.get("delta") or 0.0)
+            acc["n"] = min(acc["n"], int(v.get("n") or 0))
+            if v.get("source") != "fitted":
+                acc["source"] = "default"
+    return total, steps
+
+
 def build(ctx: SeasonContext, aaa_hitters: dict | None, aaa_pitchers: dict | None, mlb_proj: dict | None = None,
           mlb_hitters: dict | None = None, mlb_pitchers: dict | None = None) -> dict:
-    if ctx.level != "aaa":
-        return {"ok": False, "reason": "prospects are built from Triple-A", "level": ctx.level, "season": ctx.season}
+    """The level's prospects (any minor level; the arguments keep their Triple-A names: the level's own catalogues)."""
+    if ctx.level not in LADDER[:-1]:
+        return {"ok": False, "reason": "prospects are built from the minor leagues", "level": ctx.level, "season": ctx.season}
     try:
         from oddsmarkets.baseball.models import projections as PJ
     except Exception as exc:                                     # noqa: BLE001
         return {"ok": False, "reason": f"projections unavailable: {exc}", "season": ctx.season}
     try:
-        ah, ap = PJ.season_aggregates("aaa", ctx.season)
+        ah, ap = PJ.season_aggregates(ctx.level, ctx.season)
     except Exception as exc:                                     # noqa: BLE001
-        return {"ok": False, "reason": f"AAA aggregates: {exc}", "season": ctx.season}
+        return {"ok": False, "reason": f"{ctx.level} aggregates: {exc}", "season": ctx.season}
     seasons = [s for s in range(ctx.season - 2, ctx.season + 1)]
-    trans = {}
+    trans, steps = {}, {}
     for role in ("hitter", "pitcher"):
-        try:
-            trans[role] = PJ.fit_translation(seasons, role)
-        except Exception:                                        # noqa: BLE001
-            trans[role] = {c: {"delta": v, "n": 0, "source": "default"} for c, v in PJ.TRANSLATE_DEFAULT[role].items()}
+        trans[role], steps[role] = chain_translation(PJ, ctx.level, seasons, role)
     try:
         ww = PJ.woba_weights(ctx.season)
     except Exception:                                            # noqa: BLE001
@@ -88,7 +111,7 @@ def build(ctx: SeasonContext, aaa_hitters: dict | None, aaa_pitchers: dict | Non
                             # the MLB debut season (people.json): a debut this season with big-league time is a call-up
                             "debut": an.inum((ctx.people.get(pid) or {}).get("debut")) if isinstance(ctx.people, dict) else None}
     if not players:
-        return {"ok": False, "reason": "no Triple-A aggregates for this season", "level": ctx.level, "season": ctx.season}
+        return {"ok": False, "reason": f"no {ctx.level} aggregates for this season", "level": ctx.level, "season": ctx.season}
     hit = sorted((p for p, r in players.items() if r["kind"] == "hitter" and r["n"] >= 100), key=lambda p: -(players[p]["mlb_eq"]["woba"] or 0))
     pit = sorted((p for p, r in players.items() if r["kind"] == "pitcher" and r["n"] >= 100),
                  key=lambda p: -(players[p]["mlb_eq"].get("k_bb_pct") or -1))
@@ -100,5 +123,5 @@ def build(ctx: SeasonContext, aaa_hitters: dict | None, aaa_pitchers: dict | Non
     callups = sorted((p for p, r in players.items() if r.get("debut") == ctx.season and (r.get("mlb_this_season") or 0) > 0),
                      key=lambda p: -(players[p].get("mlb_this_season") or 0))
     return {"ok": True, "level": ctx.level, "season": ctx.season, "updated_at": an.now(), "players": players,
-            "ranked": {"hitters": hit[:100], "pitchers": pit[:100]}, "callups": callups, "translation": an.clean(trans), "woba_weights": ww,
+            "ranked": {"hitters": hit[:100], "pitchers": pit[:100]}, "callups": callups, "translation": an.clean(trans), "steps": an.clean(steps), "woba_weights": ww,
             "rules": {"min_pa": MIN_PA, "rank_min": 100}}

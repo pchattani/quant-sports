@@ -26,6 +26,7 @@ import pandas as pd
 from oddsmarkets.baseball import analytics as an
 from oddsmarkets.baseball.analytics import catalog as CT
 from oddsmarkets.baseball.analytics.context import SeasonContext
+from oddsmarkets.baseball.analytics import hitters as HT
 from oddsmarkets.baseball.analytics.hitters import _clutch
 
 M = an.metric
@@ -174,6 +175,10 @@ METRICS: list[dict] = [
     M("ld_pct", "LD%", "Contact allowed", "pct", lower=True, den="bip", k=800, scope="statcast", desc="Line drives."),
     M("fb_pct", "FB%", "Contact allowed", "pct", den="bip", k=150, scope="statcast", desc="Fly balls."),
     M("pu_pct", "PU%", "Contact allowed", "pct", den="bip", k=250, scope="statcast", desc="Pop-ups."),
+    M("hard_scored_pct", "Hard% allowed", "Contact allowed", "pct", den="bip", k=250, scope="statcast", lower=True,
+      desc="Balls in play the official scorer charted as hard hit (levels without exit velocity)."),
+    M("soft_scored_pct", "Soft% allowed", "Contact allowed", "pct", den="bip", k=250, scope="statcast",
+      desc="Balls in play the official scorer charted as softly hit."),
     M("pull_air_pct", "Pull-air% allowed", "Contact allowed", "pct", lower=True, den="bip", k=300, scope="statcast",
       desc="Pulled line drives and fly balls."),
     M("hr_fb", "HR/FB", "Contact allowed", "pct", lower=True, den="bip", k=1000, scope="statcast", desc="Home runs per fly ball."),
@@ -278,6 +283,8 @@ def build(ctx: SeasonContext) -> dict:
         bf = float(r["pa"])
         if bf < 1:
             continue
+        if r["xwc_n"] < 0.5 * r["bip"]:
+            r = HT._no_expected(r)
         ln = lines.loc[pid] if pid in lines.index else None
         outs = float(ln["outs"]) if ln is not None else 0.0
         ip = outs / 3
@@ -414,6 +421,8 @@ def build(ctx: SeasonContext) -> dict:
         v["sweet_pct"] = an.div(r["sweet"], r["la_n"])
         for k, c in (("gb_pct", "gb"), ("ld_pct", "ld"), ("fb_pct", "fbb"), ("pu_pct", "pu")):
             v[k] = an.div(r[c], r["bbt_n"])
+        v["hard_scored_pct"] = an.div(r.get("hd_hard", 0), r.get("hd_n", 0))
+        v["soft_scored_pct"] = an.div(r.get("hd_soft", 0), r.get("hd_n", 0))
         v["pull_air_pct"] = an.div(r["pull_air"], r["spray_n"])
         v["hr_fb"] = an.div(r["hr_fb"], r["fbb"])
         x = xw.get(pid) or {}
@@ -477,7 +486,11 @@ def build(ctx: SeasonContext) -> dict:
     for r in rows.values():
         r["n"] = {k: (round(v, 1) if isinstance(v, float) else v) for k, v in r["n"].items()}
     league_types = _league_types(ppt, ctx)
-    return {**CT.season_meta(ctx), "kind": "pitcher", "metrics": [an.public_metric(m) for m in METRICS], "players": rows,
+    out_meta = CT.season_meta(ctx)
+    if CT.level_note(ctx):
+        out_meta.update(source="statsapi-feed", note=CT.level_note(ctx))
+    return {**out_meta, "kind": "pitcher", "metrics": [an.public_metric(m) for m in CT.trim_metrics(ctx, METRICS, rows)],
+            "players": rows,
             "arsenal": arsenal, "arsenal_keys": ARSENAL_KEYS, "league_types": league_types,
             "reference": {"rule": f"BF >= {REF_BF_PER_G} per team game (floor {FLOORS['bf']})", "n": len(reference),
                           "min_bf": round(ref_bf), "means": {k: an.rnd(v, 4) for k, v in means.items()}},

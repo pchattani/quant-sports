@@ -689,7 +689,7 @@ function drawShared(body, ctx, side) {
   const wrap = document.createElement('div');
   let h = '<div class="card"><div class="card-header">Projection <span class="card-sub">Bullpen projections: each component regressed at its own stabilisation rate over three weighted seasons, with aging; ranges are the 10th to 90th percentiles.</span></div><div id="pp-proj"></div></div>';
   const rows = seasonsOf(c.seasons, side);
-  h += '<div class="card"><div class="card-header">Career <span class="card-sub">Every season on file, MLB and Triple-A. xwOBA+ and the pitch models start in 2015 (Triple-A in 2023).</span></div>' + (rows.length ? careerTable(rows, side === 'pit' ? PIT_COLS : HIT_COLS, ctx.L, meta) : k.muted('No season lines on file yet.')) + '</div>';
+  h += '<div class="card"><div class="card-header">Career <span class="card-sub">Every season on file, MLB and the minors. xwOBA+ and the pitch models start in 2015 (Triple-A in 2023); Double-A, High-A and Single-A are pitch by pitch from 2021, without ball tracking at most parks.</span></div>' + (rows.length ? careerTable(rows, side === 'pit' ? PIT_COLS : HIT_COLS, ctx.L, meta) : k.muted('No season lines on file yet.')) + '</div>';
   const hist = c.history || null;
   let histRows = [];
   if (hist && typeof hist === 'object' && !Array.isArray(hist)) {

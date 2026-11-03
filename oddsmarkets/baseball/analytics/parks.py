@@ -27,7 +27,7 @@ def build(ctx: SeasonContext) -> dict:
                       "lat": v.get("lat"), "lon": v.get("lon"),
                       "factors": an.clean({k: an.rnd(x, 3) for k, x in (p.get("factors") or {}).items()}),
                       "index": p.get("index"), "by_hand": {h: {k: an.rnd(x, 3) for k, x in (d or {}).items()} for h, d in (p.get("by_hand") or {}).items()},
-                      "n_bip": p.get("n_bip"), "season": env.get(vid)}
+                      "n_bip": p.get("n_bip"), "method": p.get("method"), "season": env.get(vid)}
     # venues without factors (new or neutral sites) still get their dimensions
     for t in an.real_teams(ctx.store):
         vid = str((teams.get(t) or {}).get("venue") or "")

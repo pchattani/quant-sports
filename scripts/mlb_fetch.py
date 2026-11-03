@@ -47,7 +47,7 @@ import pandas as pd  # noqa: E402
 
 from oddsmarkets.baseball import canon  # noqa: E402
 from oddsmarkets.baseball import store as st  # noqa: E402
-from oddsmarkets.baseball.sources import chadwick, espn, savant, statsapi  # noqa: E402
+from oddsmarkets.baseball.sources import chadwick, espn, feedpitch, savant, statsapi  # noqa: E402
 from oddsmarkets.baseball.sources._client import BudgetExhausted, Client  # noqa: E402
 
 logger = logging.getLogger("mlb_fetch")
@@ -164,6 +164,9 @@ def _settled(day: str, at: str | None) -> bool:
 def statcast(c: Client, level: str, s: dict, refresh: bool, today: date, chunk_days: int = 1) -> None:
     season = s["season"]
     if season < canon.STATCAST_FROM.get(level, 9999):
+        if level in canon.FEED_PITCH_LEVELS:
+            feed_pitches(c, level, s, refresh)
+            return
         logger.info("%s %d statcast: no published pitch table at this level", level, season)
         return
     m = savant.load_manifest(level, season)
@@ -227,6 +230,79 @@ def statcast(c: Client, level: str, s: dict, refresh: bool, today: date, chunk_d
                 level, season, info["rows"], info["days"], len(info["columns_present"]), len(m["capped"]))
 
 
+def feed_pitches(c: Client, level: str, s: dict, refresh: bool) -> None:
+    """The pitch table from the Stats API live feed (sources/feedpitch.py) for a level Savant does not publish: every
+    final game not yet in the season manifest, newest day first, one full feed each; the feed's lineups and mound
+    visits go into the store as the games phase would have put them. The season file is compacted and its season
+    columns (run values, wOBA values) recomputed when anything new came in."""
+    season = s["season"]
+    m = savant.load_manifest(level, season)
+    m["source"] = feedpitch.SOURCE
+    have = {str(g) for d in m["days"].values() for g in (d.get("games") or [])}
+    by_day: dict[str, list[str]] = {}
+    for gpk, g in s["games"].items():
+        if g.get("status") == "final" and g.get("gtype") in canon.SEASON_TYPES and g.get("date") and gpk not in have:
+            by_day.setdefault(str(g["date"])[:10], []).append(gpk)
+    if not by_day:
+        logger.info("%s %d pitches: nothing to fetch (%d games on file)", level, season, len(have))
+        _mark_statcast(s, m)
+        return
+    abbr = {tid: t.get("abbr") for tid, t in s["teams"].items() if t.get("abbr")}
+    n_games = sum(len(v) for v in by_day.values())
+    t0 = time.monotonic()
+    done = rows_run = 0
+    try:
+        for k, day in enumerate(sorted(by_day, reverse=True), 1):
+            frames, got = [], []
+            for gpk in sorted(by_day[day]):
+                f = feedpitch.feed(c, gpk)
+                if f is None:
+                    continue
+                try:
+                    rs = feedpitch.rows(f, abbr)
+                except Exception as exc:                         # noqa: BLE001 - one odd feed never stops the season
+                    logger.warning("%s %s pitches: feed not converted: %s", level, gpk, exc)
+                    continue
+                ex = statsapi.feed_extras(f)
+                rec = dict(s["games"][gpk])
+                for key, v in ex.items():
+                    if key == "lineups" and rec.get("lineups"):
+                        continue
+                    rec[key] = v
+                st.merge_game(s, rec)
+                st.mark(s, gpk, "feed")
+                if rs:
+                    frames.append(feedpitch.frame(rs))
+                got.append(int(gpk))
+            done += len(got)
+            if got:
+                df = pd.concat(frames, ignore_index=True) if frames else None
+                n = feedpitch.write_games(level, season, day, df if df is not None else feedpitch.frame([]), got)
+                old = (m["days"].get(day) or {}).get("games") or []
+                m["days"][day] = {"rows": n, "games": sorted(set(int(x) for x in old) | set(got)), "at": st.now()}
+                rows_run += 0 if df is None else len(df)
+            if k % 10 == 0:
+                savant.save_manifest(m)
+                st.save_owned(s, ["games"])
+                el = time.monotonic() - t0
+                logger.info("%s %d pitches: %d/%d games, %d pitches this run, %.2f s a game, ETA %.0f min (%d calls)",
+                            level, season, done, n_games, rows_run, el / max(done, 1),
+                            el / max(done, 1) * (n_games - done) / 60, c.used)
+    finally:
+        savant.save_manifest(m)
+        if done:
+            st.save_owned(s, ["games"])
+            info = savant.compact(level, season)
+            fin = feedpitch.finish_season(level, season)
+            m.update(rows=info["rows"], columns_present=info["columns_present"], compacted_at=st.now(),
+                     run_values={"states": fin.get("re_states"), "runs_per_half": fin.get("runs_per_half")},
+                     tracked={"share": fin.get("tracked_share")})
+            savant.save_manifest(m)
+            _mark_statcast(s, m)
+            logger.info("%s %d pitches: season file %d pitches over %d days, %d columns with data",
+                        level, season, info["rows"], info["days"], len(info["columns_present"]))
+
+
 def _mark_statcast(s: dict, m: dict) -> None:
     have = {str(g) for d in m["days"].values() for g in (d.get("games") or [])}
     for gpk, g in s["games"].items():
@@ -249,7 +325,7 @@ def games(c: Client, level: str, s: dict, refresh: bool, now: datetime) -> None:
         if stt == "live" and refresh and current:
             todo.append((gpk, g, True))
         elif stt == "final" and not st.fetched(s, gpk, "feed"):
-            if season >= ABS_FROM[level] or not g.get("lineups"):
+            if season >= ABS_FROM.get(level, 9999) or not g.get("lineups"):
                 todo.append((gpk, g, False))
         elif stt == "final" and refresh and current and age_h < 36:
             at = (s["meta"].get("feed") or {}).get(gpk) or ""
