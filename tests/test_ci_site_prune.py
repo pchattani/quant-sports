@@ -50,5 +50,5 @@ def test_prune_needs_keep_inside_prefix_and_a_token(monkeypatch):
 def test_generated_workflows_prune_after_saving():
     wf = (ROOT / "public_repo" / ".github" / "workflows" / "bullpen.yml").read_text(encoding="utf-8")
     assert "actions: write" in wf
-    assert "prunecaches --prefix bullpen-raw-v1-" in wf and "prunecaches --prefix bullpen-model-v1-" in wf
+    assert "prunecaches --prefix bullpen-raw-v2-" in wf and "prunecaches --prefix bullpen-model-v1-" in wf
     assert wf.index("Save raw data") < wf.index("Delete superseded raw-data caches")

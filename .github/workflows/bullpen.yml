@@ -62,8 +62,8 @@ jobs:
           path: |
             data/baseball/statcast
             data/baseball/retro
-          key: bullpen-raw-v1-none
-          restore-keys: bullpen-raw-v1-
+          key: bullpen-raw-v2-none
+          restore-keys: bullpen-raw-v2-
 
       - name: 'Restore model caches'
         id: model
@@ -171,7 +171,7 @@ jobs:
         if: ${{ !cancelled() }}
         id: rawkey
         run: |
-          uv run --frozen python scripts/ci_site.py cachekey --name bullpen-raw-v1 --paths data/baseball/statcast data/baseball/retro | tee -a "$GITHUB_OUTPUT"
+          uv run --frozen python scripts/ci_site.py cachekey --name bullpen-raw-v2 --paths data/baseball/statcast data/baseball/retro | tee -a "$GITHUB_OUTPUT"
 
       - name: 'Save raw data (only when it changed)'
         if: ${{ !cancelled() && steps.rawkey.outputs.files != '0' && steps.rawkey.outputs.key != steps.raw.outputs.cache-matched-key }}
@@ -188,7 +188,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          uv run --frozen python scripts/ci_site.py prunecaches --prefix bullpen-raw-v1- --keep "${{ steps.rawkey.outputs.key }}"
+          uv run --frozen python scripts/ci_site.py prunecaches --prefix bullpen-raw-v2- --keep "${{ steps.rawkey.outputs.key }}"
 
       - name: 'Save model caches (once a day, after a seed, and after a failed or partial-cache build)'
         if: ${{ !cancelled() && (!startsWith(steps.model.outputs.cache-matched-key, format('bullpen-model-v1-{0}', steps.ctx.outputs.today)) || steps.seed.outputs.seeded == 'true' || steps.build.outcome == 'failure' || contains(steps.model.outputs.cache-matched-key, '-partial-')) }}
