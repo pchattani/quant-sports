@@ -459,7 +459,9 @@ def game_pages(b: Build, ctx, cfg: dict, manifest: dict, prices: dict, sched: di
         if cfg["all_games"] or not exists or old_sigs.get(gpk) != s or (ctx.current and live and in_window):
             due.append(gpk)
     logger.info("%s %s: %d game pages due of %d", ctx.level, ctx.season, len(due), len(cards))
+    cutoff = GM.feed_cutoff(ctx)
     if not due:
+        b.step(f"slim game pages {ctx.level} {ctx.season}", lambda: _slim_pages(b, ctx, gdir, cutoff, set()), None)
         return new_sigs
     umps = UM.profiles(ump)
     re_info = None
@@ -492,17 +494,35 @@ def game_pages(b: Build, ctx, cfg: dict, manifest: dict, prices: dict, sched: di
                 pas = {str(k): v for k, v in pa_all.groupby("game_pk")}
         for gpk in batch:
             written += _one_page(b, ctx, gpk, groups.get(gpk), cards, prices, gdir, arsenal, umps, re_info, parks, fls.get(gpk), pas.get(gpk),
-                                 sigs=new_sigs)
+                                 sigs=new_sigs, cutoff=cutoff)
         del gp_all, groups, fls, pas
         gc.collect()
     for gpk in without:
-        written += _one_page(b, ctx, gpk, None, cards, prices, gdir, arsenal, umps, re_info, parks, sigs=new_sigs)
+        written += _one_page(b, ctx, gpk, None, cards, prices, gdir, arsenal, umps, re_info, parks, sigs=new_sigs, cutoff=cutoff)
     logger.info("%s %s: %d game pages written", ctx.level, ctx.season, written)
+    b.step(f"slim game pages {ctx.level} {ctx.season}", lambda: _slim_pages(b, ctx, gdir, cutoff, set(due)), None)
     return new_sigs
 
 
+def _slim_pages(b: Build, ctx, gdir: Path, cutoff: str | None, skip: set) -> int:
+    """Pages written before they aged past the feed levels' full-pitch window (or before slimming existed)."""
+    from oddsmarkets.baseball.analytics import games as GM
+    if cutoff is None or not gdir.exists():
+        return 0
+    n = 0
+    for p in gdir.glob("*.json"):
+        if p.stem in skip:
+            continue
+        page = an.read_json(p)
+        if page and GM.slim_pitches(page, cutoff):
+            b.write(f"{ctx.level}/{ctx.season}/games/{p.name}", page)
+            n += 1
+    logger.info("%s %s: %d game pages slimmed", ctx.level, ctx.season, n)
+    return n
+
+
 def _one_page(b: Build, ctx, gpk: str, gp, cards: dict, prices: dict, gdir: Path, arsenal: dict, umps: dict, re_info, parks,
-              fl=None, pa=None, sigs: dict | None = None) -> int:
+              fl=None, pa=None, sigs: dict | None = None, cutoff: str | None = None) -> int:
     from oddsmarkets.baseball.analytics import games as GM
     g = ctx.games[gpk]
     old = an.read_json(gdir / f"{gpk}.json") if (gdir / f"{gpk}.json").exists() else None
@@ -519,6 +539,7 @@ def _one_page(b: Build, ctx, gpk: str, gp, cards: dict, prices: dict, gdir: Path
         payload = {"ok": False, "reason": "game page could not be built", "gpk": gpk}
         if sigs is not None:
             sigs[gpk] = None                                     # unsigned: the next run tries again
+    GM.slim_pitches(payload, cutoff)
     b.write(f"{ctx.level}/{ctx.season}/games/{gpk}.json", payload)
     return 1
 

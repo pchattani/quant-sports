@@ -19,6 +19,19 @@ def test_page_sig_rewrites_a_placeholder_when_its_teams_or_date_change():
     assert GM.page_sig(f, 300, ("v",)) == GM.page_sig({**f, "start": "x", "venue": "9"}, 300, ("v",))
 
 
+def test_slim_pitches_drops_empty_columns_and_trims_old_games_to_pa_results():
+    rows = [[1, 1, None, "ball"], [1, 2, None, "foul"], [2, 1, None, "hit_into_play"], [3, 1, None, "ball"], [3, 2, None, "strike"]]
+    page = {"gtype": "R", "date": "2026-07-01", "pitches": {"cols": ["ab", "pitch_no", "velo", "call"], "rows": rows}}
+    recent = {**page, "date": "2026-08-20", "pitches": dict(page["pitches"])}
+    assert GM.slim_pitches(recent, "2026-08-01")
+    assert recent["pitches"]["cols"] == ["ab", "pitch_no", "call"] and len(recent["pitches"]["rows"]) == 5 and "pitches_trim" not in recent
+    assert GM.slim_pitches(page, "2026-08-01")
+    assert page["pitches_trim"] == "pa" and page["pitches"]["rows"] == [[1, 2, "foul"], [2, 1, "hit_into_play"], [3, 2, "strike"]]
+    assert not GM.slim_pitches(page, "2026-08-01")
+    post = {"gtype": "F", "date": "2026-07-01", "pitches": {"cols": ["ab", "call"], "rows": [[1, "a"], [1, "b"]]}}
+    assert not GM.slim_pitches(post, "2026-08-01") and len(post["pitches"]["rows"]) == 2
+
+
 def _ctx(level, teams, games):
     store = {"teams": teams, "games": {g["gpk"]: g for g in games}}
     return SimpleNamespace(level=level, season=2025, store=store, games=store["games"])

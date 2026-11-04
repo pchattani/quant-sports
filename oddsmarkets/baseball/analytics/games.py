@@ -33,6 +33,7 @@ import numpy as np
 import pandas as pd
 
 from oddsmarkets.baseball import analytics as an
+from oddsmarkets.baseball import canon
 from oddsmarkets.baseball.analytics import pitchagg as PG
 from oddsmarkets.baseball.analytics.context import SeasonContext, frame_rows
 
@@ -524,6 +525,42 @@ def _pitch_rows(gp: pd.DataFrame, wpa: dict) -> dict:
                      (bbt.iloc[i] or None) if is_last else None, (hard.iloc[i] or None) if is_last else None,
                      1 if charted[i] else None])
     return {"cols": PITCH_COLS, "rows": rows}
+
+
+FEED_FULL_DAYS = 42
+
+
+def feed_cutoff(ctx: SeasonContext) -> str | None:
+    """The first date whose regular-season games keep every pitch at the feed-built levels: the last FEED_FULL_DAYS of
+    the season so far. The Pages site has a 1 GB cap, and three levels of full pitch tables would take 400 MB of it."""
+    if ctx.level not in canon.FEED_PITCH_LEVELS:
+        return None
+    ds = [str(g.get("date"))[:10] for g in ctx.games.values() if g.get("gtype") == "R" and g.get("status") == "final" and g.get("date")]
+    if not ds:
+        return None
+    return (date.fromisoformat(max(ds)) - timedelta(days=FEED_FULL_DAYS)).isoformat()
+
+
+def slim_pitches(page: dict, cutoff: str | None) -> bool:
+    """Drops the pitch columns no pitch of the game has. A regular-season game before cutoff keeps only each PA's
+    last pitch (the result, spray, run and win values), flagged pitches_trim="pa". True when the page changed."""
+    pt = page.get("pitches") if isinstance(page, dict) else None
+    if not isinstance(pt, dict) or not pt.get("rows"):
+        return False
+    cols, rows = list(pt["cols"]), pt["rows"]
+    changed = False
+    if cutoff and page.get("gtype") == "R" and str(page.get("date") or "")[:10] < cutoff and page.get("pitches_trim") != "pa" and "ab" in cols:
+        ia = cols.index("ab")
+        rows = [r for i, r in enumerate(rows) if i + 1 == len(rows) or rows[i + 1][ia] != r[ia]]
+        page["pitches_trim"] = "pa"
+        changed = True
+    keep = [i for i in range(len(cols)) if any(r[i] is not None for r in rows)]
+    if len(keep) < len(cols):
+        cols, rows = [cols[i] for i in keep], [[r[i] for i in keep] for r in rows]
+        changed = True
+    if changed:
+        page["pitches"] = {"cols": cols, "rows": rows}
+    return changed
 
 
 def _scorecard(ctx: SeasonContext, g: dict, gp: pd.DataFrame, re_info: dict | None, umps: dict | None) -> dict | None:

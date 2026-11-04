@@ -554,7 +554,8 @@ function pitchesPanel(el, g, P, L) {
   const types = []; P.forEach(p => { const t = String(p.pitch_type || '').toUpperCase(); if (t && types.indexOf(t) < 0) types.push(t); });
   types.sort((a, b) => BP.PITCH_ORDER.indexOf(a) - BP.PITCH_ORDER.indexOf(b));
   const teamOfP = pid => { const x = P.find(p => p.pitcher === pid); return x ? (half(x.half) === 'top' ? g.home : g.away) : null; };
-  el.innerHTML = BP.card('Pitch by pitch', 'filter, then read the zone (catcher\'s view) and the table' + (P.some(p => p.charted) ? ' · where the park has no pitch tracking, locations are the game charter\'s, so approximate' : ''),
+  el.innerHTML = BP.card('Pitch by pitch', 'filter, then read the zone (catcher\'s view) and the table' + (P.some(p => p.charted) ? ' · where the park has no pitch tracking, locations are the game charter\'s, so approximate' : '') +
+    (g.pitches_trim === 'pa' ? ' · this game shows the last pitch of each plate appearance; every pitch is kept for the season\'s final six weeks and the playoffs' : ''),
     '<div class="pz-ctl">' +
       '<label>Pitcher<select id="pf-pitcher">' + opts([['all', 'All pitchers']].concat(pitchers.map(p => [p, BP.teamAbbr(teamOfP(p)) + ' · ' + BP.playerName(p)])), f.pitcher) + '</select></label>' +
       '<label>Batter<select id="pf-batter">' + opts([['all', 'All batters']].concat(batters.map(p => [p, BP.playerName(p)])), f.batter) + '</select></label>' +
