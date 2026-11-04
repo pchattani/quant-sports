@@ -237,6 +237,24 @@ def guard_scrum(ctx: dict) -> list[str]:
     return out
 
 
+def guard_green(ctx: dict) -> list[str]:
+    """The Quant Green: every tour's season stores from its first season (the ratings walk the whole history, and the
+    event pages and the sealed-test calibration read them back). The stores are in the Actions cache; a cold runner
+    seeds them from seed-green (scripts/push_seed.py --site green)."""
+    from oddsmarkets.golf import canon
+    base = ROOT / "data/golf"
+    year = ctx["today"].year
+    out = []
+    first = {"pga": 2001, "eur": 2020, "liv": 2022, "lpga": 2021}
+    for tour in canon.TOURS:
+        missing = [y for y in range(first[tour], year + 1) if not (base / tour / str(y) / "events.json").exists()]
+        if missing:
+            out.append(f"{tour} season stores missing for {len(missing)} seasons ({missing[0]}..{missing[-1]})")
+    if not (base / "players.json").exists():
+        out.append("golf players file missing")
+    return out
+
+
 def guard_campus(ctx: dict) -> list[str]:
     """Every season's store per level (the walk-forward backtests, the selection / committee-proxy fits and the
     history pages read them all), every football season's plays (the EP model and the EPA ratings) and the current
@@ -422,7 +440,8 @@ def _seed_from_branch(branch: str) -> int:
 SEEDS = {"gridiron": seed_gridiron, "rink": seed_branch("rink", guard_rink),
          "hardwood": seed_branch("hardwood", guard_hardwood), "bullpen": seed_branch("bullpen", guard_bullpen),
          "ace": seed_branch("ace", guard_ace), "paddock": seed_branch("paddock", guard_paddock),
-         "campus": seed_branch("campus", guard_campus), "scrum": seed_branch("scrum", guard_scrum)}
+         "campus": seed_branch("campus", guard_campus), "scrum": seed_branch("scrum", guard_scrum),
+         "green": seed_branch("green", guard_green)}
 
 
 def cmd_seed(site: str) -> int:
@@ -517,6 +536,7 @@ LOGS = {
     "rink": ("data/chance_log.json", "data/race_log.json"),
     "campus": ("data/*/chance_log.json", "data/*/race_log.json"),
     "scrum": (),              # the forecast log lives in the stores (data/rugby/stores/forecast_log_<scope>.json, cached)
+    "green": (),              # each event page keeps its pre-event chances; final pages are restored, never rewritten
 }
 
 
@@ -630,6 +650,9 @@ SITES = {
     # The Quant Scrum (international rugby union, Nov 2026): built, not launched until its Pages repo exists
     "scrum": {"docs": "scrum", "repo": "the-quant-scrum", "prune": None, "excluded": (),
               "guard": chain(guard_scrum, guard_payload_floor("scrum", 3000))},
+    # The Quant Green (golf, Nov 2026)
+    "green": {"docs": "green", "repo": "the-quant-green", "prune": None, "excluded": (),
+              "guard": chain(guard_green, guard_payload_floor("green", 3000))},
 }
 
 
