@@ -82,7 +82,7 @@ function dayMonth(iso) { return iso ? fmt.date(iso + 'T12:00:00', { day: 'numeri
 function playerLink(pid, name) { return '<a href="#/player/' + encodeURIComponent(pid) + '">' + esc(name || pid) + '</a>'; }
 function eventLink(id, name) { return '<a href="#/event/' + encodeURIComponent(id) + '">' + esc(name || id) + '</a>'; }
 var THIN = 8;
-function thinTag(wt) { return isNum(wt) && wt < THIN ? '<span class="ir-thin" data-tip="Fewer than ' + THIN + ' recent meets behind this rating: treat it with care">thin record</span>' : ''; }
+function thinTag(n) { return isNum(n) && n < THIN ? '<span class="ir-thin" data-tip="Fewer than ' + THIN + ' scored full-power meets behind this rating: treat it with care">thin record</span>' : ''; }
 function delta(actual, pred) {
   if (!isNum(actual) || !isNum(pred)) return '';
   var d = actual - pred;

@@ -83,7 +83,7 @@ IR.page('rankings', function (el, params) {
       rowHref: function (r) { return '#/player/' + encodeURIComponent(r.pid); },
       columns: [
         { key: 'rank', label: 'Rank', num: true, raw: true },
-        { key: 'name', label: 'Lifter', sticky: true, fmt: function (v, r) { return IR.playerLink(r.pid, v) + IR.thinTag(r.wt); } },
+        { key: 'name', label: 'Lifter', sticky: true, fmt: function (v, r) { return IR.playerLink(r.pid, v) + IR.thinTag(r.n); } },
         { key: 'cc', label: 'Country' },
         { key: 'rt', label: 'Rating', num: true, ours: 'Ratings', tip: 'Expected DOTS at a meet tomorrow', fmt: function (v) { return '<b>' + IR.rating(v) + '</b>'; } },
         { key: 'n', label: 'Meets', num: true, tip: 'Scored full-power meets behind the rating' },
