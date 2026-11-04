@@ -292,6 +292,7 @@ var ICON = {
   college: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2.5v15"/><path d="M4 3.5l12.5 3.8L4 11.2z"/><path d="M7 6.2l4.5 1.3"/></svg>',
   rugby: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><ellipse cx="10" cy="10" rx="8.2" ry="5" transform="rotate(-35 10 10)"/><path d="M6.4 13.6l7.2-7.2"/><path d="M8.2 10.4l1.4 1.4M9.8 8.8l1.4 1.4"/></svg>',
   golf: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 16.5V2.5l8 3.2-8 3.2"/><ellipse cx="9" cy="16.5" rx="6.5" ry="1.8"/></svg>',
+  powerlifting: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 10h16M4 6.5v7M16 6.5v7M6.5 8v4M13.5 8v4"/></svg>',
   empty: '<svg viewBox="0 0 36 36" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="5" y="8" width="26" height="20" rx="3"/><path d="M5 14h26M11 20h8M11 24h5"/></svg>',
   arrow: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg>'
 };
@@ -318,7 +319,9 @@ QK.ALL_SPORTS = [
   /* The Quant Scrum (international rugby union), launched 2 Nov 2026 */
   { key: 'rugby',      label: 'Rugby',      site: 'The Quant Scrum',      repo: 'the-quant-scrum',      folder: 'scrum',    leagues: 'Men’s tests · Six Nations, Rugby Championship, World Cup' },
   /* The Quant Green (golf: PGA Tour, DP World Tour, LIV, LPGA), built 4 Nov 2026 */
-  { key: 'golf',       label: 'Golf',       site: 'The Quant Green',      repo: 'the-quant-green',      folder: 'green',    leagues: 'PGA Tour · DP World Tour · LIV · LPGA', pending: true }
+  { key: 'golf',       label: 'Golf',       site: 'The Quant Green',      repo: 'the-quant-green',      folder: 'green',    leagues: 'PGA Tour · DP World Tour · LIV · LPGA', pending: true },
+  /* The Quant Iron (powerlifting), built 4 Nov 2026 */
+  { key: 'powerlifting', label: 'Powerlifting', site: 'The Quant Iron', repo: 'the-quant-iron', folder: 'iron', leagues: 'Raw · Wraps · Equipped · OpenPowerlifting archive', pending: true }
 ];
 QK.ALL_SPORTS.forEach(function (s) { s.url = PUB + s.repo + '/'; s.data = s.url + 'data/'; s.accent = 'var(--a-' + s.key + ')'; });
 QK.sport = function (key) { for (var i = 0; i < QK.ALL_SPORTS.length; i++) if (QK.ALL_SPORTS[i].key === key) return QK.ALL_SPORTS[i]; return null; };
@@ -358,7 +361,9 @@ var SECTION_LABELS = {
   /* rugby: no transfers market or fantasy game; the Value slot carries the rankings (ours and World Rugby's) */
   rugby: { value: 'Rankings', fantasy: null },
   /* golf: no teams, transfers or fantasy game; the Lab is not built yet */
-  golf: { fixtures: 'Events', standings: 'Rankings', teams: null, value: null, fantasy: null, lab: null }
+  golf: { fixtures: 'Events', standings: 'Rankings', teams: null, value: null, fantasy: null, lab: null },
+  /* powerlifting: no teams, transfers or fantasy game; Players is Lifters */
+  powerlifting: { fixtures: 'Meets', standings: 'Rankings', players: 'Lifters', teams: null, value: null, fantasy: null, lab: null }
 };
 /* Round 8 (28 Oct 2026): the Scouting Room. Players and Lab merge into one section, "Scouting Room" (key 'scout',
  * #/scout), in the Players slot; the Lab section is hidden. A site switches with one line:

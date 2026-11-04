@@ -94,6 +94,7 @@
   --a-college:    #f58cb8;
   --a-rugby:      #e07cff;
   --a-golf:       #3ddc97;
+  --a-powerlifting: #e6a06e;
   --accent:       var(--signal);   /* a site sets data-sport on <html>, which points --accent at its sport */
   --accent-soft:  color-mix(in srgb, var(--accent) 15%, transparent);
 
@@ -201,3 +202,4 @@
 :root[data-sport="college"]    { --accent: var(--a-college); }
 :root[data-sport="rugby"]      { --accent: var(--a-rugby); }
 :root[data-sport="golf"]       { --accent: var(--a-golf); }
+:root[data-sport="powerlifting"] { --accent: var(--a-powerlifting); }

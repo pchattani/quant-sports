@@ -237,6 +237,18 @@ def guard_scrum(ctx: dict) -> list[str]:
     return out
 
 
+def guard_iron(ctx: dict) -> list[str]:
+    """The Quant Iron: the OpenPowerlifting entries and meets tables. A cold runner seeds them from seed-iron
+    (scripts/push_seed.py --site iron); the weekly zip is re-fetched only when its ETag changes."""
+    base = ROOT / "data/powerlifting"
+    out = []
+    if not (base / "entries.parquet").exists():
+        out.append("powerlifting entries.parquet missing")
+    if not (base / "meets.parquet").exists():
+        out.append("powerlifting meets.parquet missing")
+    return out
+
+
 def guard_green(ctx: dict) -> list[str]:
     """The Quant Green: every tour's season stores from its first season (the ratings walk the whole history, and the
     event pages and the sealed-test calibration read them back). The stores are in the Actions cache; a cold runner
@@ -441,7 +453,8 @@ SEEDS = {"gridiron": seed_gridiron, "rink": seed_branch("rink", guard_rink),
          "hardwood": seed_branch("hardwood", guard_hardwood), "bullpen": seed_branch("bullpen", guard_bullpen),
          "ace": seed_branch("ace", guard_ace), "paddock": seed_branch("paddock", guard_paddock),
          "campus": seed_branch("campus", guard_campus), "scrum": seed_branch("scrum", guard_scrum),
-         "green": seed_branch("green", guard_green)}
+         "green": seed_branch("green", guard_green),
+         "iron": seed_branch("iron", guard_iron)}
 
 
 def cmd_seed(site: str) -> int:
@@ -537,6 +550,7 @@ LOGS = {
     "campus": ("data/*/chance_log.json", "data/*/race_log.json"),
     "scrum": (),              # the forecast log lives in the stores (data/rugby/stores/forecast_log_<scope>.json, cached)
     "green": (),              # each event page keeps its pre-event chances; final pages are restored, never rewritten
+    "iron": (),
 }
 
 
@@ -653,6 +667,8 @@ SITES = {
     # The Quant Green (golf, Nov 2026)
     "green": {"docs": "green", "repo": "the-quant-green", "prune": None, "excluded": (),
               "guard": chain(guard_green, guard_payload_floor("green", 3000))},
+    "iron": {"docs": "iron", "repo": "the-quant-iron", "prune": None, "excluded": (),
+             "guard": chain(guard_iron, guard_payload_floor("iron", 1500))},
 }
 
 

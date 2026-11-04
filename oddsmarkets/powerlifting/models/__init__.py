@@ -1,0 +1,1 @@
+"""Powerlifting models."""

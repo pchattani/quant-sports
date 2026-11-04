@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en-GB" data-sport="powerlifting" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Quant Iron</title>
+<meta name="description" content="Powerlifting by the numbers: walk-forward DOTS ratings, expected totals at a meet, results from the OpenPowerlifting archive and how the forecasts have done.">
+<meta property="og:site_name" content="The Quant Iron">
+<meta property="og:title" content="The Quant Iron">
+<meta property="og:description" content="Our powerlifting ratings in DOTS, expected totals, meet results and sealed-year calibration. Data from OpenPowerlifting.">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#000000">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23000000'/%3E%3Cpath d='M4 16h24M7 11v10M25 11v10M11 13v6M21 13v6' fill='none' stroke='%23e6a06e' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&family=Bebas+Neue&display=swap">
+<link rel="stylesheet" href="assets/qk/tokens.css">
+<link rel="stylesheet" href="assets/qk/quant.css">
+<link rel="stylesheet" href="assets/app/iron.css">
+</head>
+<body class="qk">
+<div id="qk-shell"></div>
+<main id="main" class="qk-page" tabindex="-1"><div id="app"><div role="status" aria-label="Loading"><div class="qk-skel line"></div><div class="qk-skel line"></div><div class="qk-skel line short"></div></div></div></main>
+<div id="qk-footer"></div>
+
+<template id="disclaimer-template"><div class="qk-legal">
+  <h3>Disclaimer and terms of use</h3>
+  <p class="qk-sub">Last updated 4 November 2026</p>
+  <p>The Quant Iron is an independent, non-commercial hobby project that applies statistical models to publicly
+  available powerlifting results. By using this site you agree to the terms below. If you do not agree, please do not use the site.</p>
+  <h4>1. Not betting, financial or professional advice</h4>
+  <p>Everything on this site &mdash; ratings, expected totals, DOTS forecasts and commentary &mdash;
+  is provided for <strong>information, education and entertainment only</strong>. None of it is betting, gambling,
+  financial, investment, coaching or any other professional advice, and none of it is a recommendation to place any wager
+  or follow any training plan. Model numbers carry no margin; they are not offers of any kind. The site does not accept
+  bets, take payments or link to bookmakers for commercial gain.</p>
+  <h4>2. Gambling responsibly</h4>
+  <p>If you choose to gamble elsewhere, you do so entirely at your own risk and responsibility. Only gamble where it is
+  legal for you to do so and if you are of legal age in your jurisdiction (18+ or 21+ in many places). Never stake more
+  than you can afford to lose. If gambling is causing you harm, free and confidential help is available:
+  <a href="https://www.connexontario.ca" target="_blank" rel="noopener">ConnexOntario</a> (Canada, 1-866-531-2600),
+  <a href="https://www.ncpgambling.org" target="_blank" rel="noopener">1-800-GAMBLER</a> (United States),
+  <a href="https://www.begambleaware.org" target="_blank" rel="noopener">BeGambleAware</a> (United Kingdom),
+  or <a href="https://www.gamblingtherapy.org" target="_blank" rel="noopener">Gambling Therapy</a> (worldwide).</p>
+  <h4>3. Models are estimates and can be wrong</h4>
+  <p>Model outputs are statistical estimates built on assumptions and incomplete data. A missed attempt, a missed
+  weight cut, an injury or a meet with a small field can move a total a long way from what we expected. Past results do
+  not predict future results. Scores and results may be delayed, incomplete, provisional or out of date, and pages can
+  show errors. The site and all content are provided <strong>&ldquo;as is&rdquo; and &ldquo;as available&rdquo;, without
+  warranties of any kind</strong>, express or implied, including accuracy, completeness, timeliness, fitness for a
+  particular purpose and non-infringement.</p>
+  <h4>4. Limitation of liability</h4>
+  <p>To the fullest extent permitted by law, the author accepts no liability for any loss or damage of any kind &mdash;
+  including financial loss, lost winnings, or losses from wagers, trades or other decisions &mdash; arising from use of,
+  reliance on, or inability to use this site or its content. You are solely responsible for your own decisions.</p>
+  <h4>5. No affiliation; trademarks</h4>
+  <p>This site is unofficial and is not affiliated with, endorsed by, sponsored by or connected to the International
+  Powerlifting Federation (IPF), USA Powerlifting, the USPA, the WRPF, OpenPowerlifting, any federation, meet, lifter,
+  sponsor, data provider, betting operator or prediction market. Federation, meet and sponsor names and marks belong to
+  their owners and appear only to identify the events and competitors discussed and to report factual sporting
+  statistics. No logos are used.</p>
+  <h4>6. Data sources</h4>
+  <p>This page uses data from the OpenPowerlifting project, <a href="https://www.openpowerlifting.org" target="_blank" rel="noopener">https://www.openpowerlifting.org</a>.
+  You may download a copy of the data at <a href="https://data.openpowerlifting.org" target="_blank" rel="noopener">https://data.openpowerlifting.org</a>.
+  OpenPowerlifting data is contributed to the public domain. OpenPowerlifting is not responsible for this site or its
+  models. Statistics shown here are derived (walk-forward ratings, expected totals) and may differ from official records.</p>
+  <h4>7. Rights holders and corrections</h4>
+  <p>If you own rights in any material on this site and object to its use, or you spot an error, contact the author
+  through <a href="https://github.com/pchattani" target="_blank" rel="noopener">GitHub (@pchattani)</a>. Material will be
+  reviewed promptly and removed or corrected where appropriate. Lifters who want a result amended should go through
+  OpenPowerlifting, which maintains the archive.</p>
+  <h4>8. Privacy</h4>
+  <p>The site sets no cookies, runs no analytics or advertising, and collects no personal data. Your browser remembers only
+  that you dismissed the first-visit notice, locally on your device. The page loads its fonts from Google Fonts and its
+  charting library from a content delivery network (cdn.jsdelivr.net); like any web server, these receive your IP address
+  when your browser makes a request. The site is hosted on GitHub Pages, whose own privacy terms apply to its server logs.</p>
+  <h4>9. Changes</h4>
+  <p>These terms may change at any time; the date above shows the latest version. Continued use of the site after a change
+  means you accept the updated terms. Nothing in these terms limits any rights you have that cannot be limited under the
+  law that applies to you.</p>
+</div>
+</template>
+
+<div id="first-visit-notice" class="ir-notice" hidden>
+  <span><strong>For information and entertainment only.</strong> Our ratings and expected totals are model estimates, not
+  betting or coaching advice. Unofficial: not affiliated with any federation or lifter; no logos are used.
+  <a href="#/disclaimer">Read the disclaimer and terms</a>.</span>
+  <button type="button" id="fv-dismiss" class="qk-btn primary">I understand</button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js" defer></script>
+<script src="assets/qk/quant.js" defer></script>
+<script src="assets/qk/quant-charts.js" defer></script>
+<script src="assets/app/core.js" defer></script>
+<script src="assets/app/pages.js" defer></script>
+<script src="assets/app/meet.js" defer></script>
+<script src="assets/app/boot.js" defer></script>
+</body>
+</html>
