@@ -527,18 +527,19 @@ def _pitch_rows(gp: pd.DataFrame, wpa: dict) -> dict:
     return {"cols": PITCH_COLS, "rows": rows}
 
 
-FEED_FULL_DAYS = 42
+FULL_PITCH_DAYS = 42
+TRIM_LEVELS = ("mlb", "aaa") + canon.FEED_PITCH_LEVELS
 
 
-def feed_cutoff(ctx: SeasonContext) -> str | None:
-    """The first date whose regular-season games keep every pitch at the feed-built levels: the last FEED_FULL_DAYS of
-    the season so far. The Pages site has a 1 GB cap, and three levels of full pitch tables would take 400 MB of it."""
-    if ctx.level not in canon.FEED_PITCH_LEVELS:
+def full_pitch_cutoff(ctx: SeasonContext) -> str | None:
+    """The first date whose regular-season games keep every pitch: the last FULL_PITCH_DAYS of the season so far.
+    The Pages site has a 1 GB cap, and five levels of full pitch tables would take 700 MB of it."""
+    if ctx.level not in TRIM_LEVELS:
         return None
     ds = [str(g.get("date"))[:10] for g in ctx.games.values() if g.get("gtype") == "R" and g.get("status") == "final" and g.get("date")]
     if not ds:
         return None
-    return (date.fromisoformat(max(ds)) - timedelta(days=FEED_FULL_DAYS)).isoformat()
+    return (date.fromisoformat(max(ds)) - timedelta(days=FULL_PITCH_DAYS)).isoformat()
 
 
 def slim_pitches(page: dict, cutoff: str | None) -> bool:

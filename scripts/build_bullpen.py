@@ -459,7 +459,7 @@ def game_pages(b: Build, ctx, cfg: dict, manifest: dict, prices: dict, sched: di
         if cfg["all_games"] or not exists or old_sigs.get(gpk) != s or (ctx.current and live and in_window):
             due.append(gpk)
     logger.info("%s %s: %d game pages due of %d", ctx.level, ctx.season, len(due), len(cards))
-    cutoff = GM.feed_cutoff(ctx)
+    cutoff = GM.full_pitch_cutoff(ctx)
     if not due:
         b.step(f"slim game pages {ctx.level} {ctx.season}", lambda: _slim_pages(b, ctx, gdir, cutoff, set()), None)
         return new_sigs
@@ -505,7 +505,7 @@ def game_pages(b: Build, ctx, cfg: dict, manifest: dict, prices: dict, sched: di
 
 
 def _slim_pages(b: Build, ctx, gdir: Path, cutoff: str | None, skip: set) -> int:
-    """Pages written before they aged past the feed levels' full-pitch window (or before slimming existed)."""
+    """Pages written before they aged past the full-pitch window (or before slimming existed)."""
     from oddsmarkets.baseball.analytics import games as GM
     if cutoff is None or not gdir.exists():
         return 0
