@@ -56,6 +56,45 @@ def test_season_files_follow_each_sites_index(tmp_path):
 def test_home_workflow_fetches_the_season_files():
     gen = (ROOT / "scripts" / "gen_ci_workflows.py").read_text(encoding="utf-8")
     assert "build_home.py --season-files" in gen
+    assert "get green the-quant-green" in gen and "get iron the-quant-iron" in gen
+
+
+def test_golf_and_iron_builders_from_index(tmp_path, monkeypatch):
+    def put(rel, obj):
+        p = tmp_path / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(json.dumps(obj), encoding="utf-8")
+
+    put("green/data/index.json", {
+        "updated_at": "2026-11-05T12:00:00Z",
+        "week": [{"id": "e1", "name": "The Open", "start": "2026-11-06", "status": "upcoming",
+                  "tour_name": "PGA Tour", "page": True, "fav": {"pid": "1", "name": "Scottie Scheffler", "win": 0.22}}],
+        "top": {"men": [{"pid": "1", "name": "Scottie Scheffler", "rt": 2.8}],
+                "women": [{"pid": "2", "name": "Jeeno Thitikul", "rt": 2.4}]},
+    })
+    put("green/data/search.json", {"players": [["1", "Scottie Scheffler", "USA"]], "events": []})
+    put("iron/data/index.json", {
+        "updated_at": "2026-11-05T12:00:00Z",
+        "top": {"men_raw": [{"pid": "a", "name": "John Haack", "rt": 140}],
+                "women_raw": [{"pid": "b", "name": "Amanda Lawrence", "rt": 130}]},
+        "recent": [{"id": "m1", "name": "USAPL Nationals", "fed": "USAPL"}],
+        "counts": {"scored": 1000},
+    })
+    monkeypatch.setattr(bh, "DOCS", tmp_path)
+    ctx = bh.Ctx("local", NOW)
+    golf, iron = {"games": [], "pool": [], "leaders": {}, "search": [], "futures": {}, "charts": {},
+                  "stats": [], "series": [], "races": [], "hot_teams": [], "champions": []}, {
+        "games": [], "pool": [], "leaders": {}, "search": [], "futures": {}, "charts": {},
+        "stats": [], "series": [], "races": [], "hot_teams": [], "champions": []}
+    g = bh.build_golf(ctx, "../green/", golf)
+    p = bh.build_powerlifting(ctx, "../iron/", iron)
+    assert g["updated_at"].startswith("2026-11-05")
+    assert "Scottie Scheffler" in [k["value"] for k in g["kpis"]]
+    assert golf["leaders"]["golf"]["rows"][0]["name"] == "Scottie Scheffler"
+    assert any(r[1] == "Scottie Scheffler" for r in golf["search"])
+    assert p["status"] == "1,000 scored lifts"
+    assert iron["leaders"]["powerlifting"]["rows"][0]["href"].endswith("#/player/a")
+    assert any(r[3].endswith("#/event/m1") for r in iron["search"])
 
 
 def test_team_nicknames_and_broadcast_fields():

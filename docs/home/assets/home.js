@@ -23,7 +23,7 @@ var $ = QK.$, $$ = QK.$$, esc = QK.esc, fmt = QK.fmt, isNum = QK.isNum;
 var D = null;               // home.json
 var PAGE = window.innerWidth < 600 ? 6 : 12;
 var state = { sport: 'all', when: 'now', shown: PAGE, calib: null };
-var NUMS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
+var NUMS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
 
 var shell = QK.shell({
   sport: null,
@@ -272,7 +272,7 @@ function ymd(s) { var m = /^(\d{4})-(\d\d)-(\d\d)$/.exec(String(s || '')); retur
 function surname(n) { var p = String(n || '').split(' '); return p.length > 1 ? p.slice(1).join(' ') : n; }
 
 /* ───────────────────────────── around the sports: one line each (stage, the next big game, who's hot) */
-var HOT_OF = { football: ['football'], f1: ['f1'], basketball: [], tennis: ['tennis_atp', 'tennis_wta'], baseball: ['baseball'], nfl: ['nfl'], hockey: ['hockey'], college: [], rugby: [] };
+var HOT_OF = { football: ['football'], f1: ['f1'], basketball: [], tennis: ['tennis_atp', 'tennis_wta'], baseball: ['baseball'], nfl: ['nfl'], hockey: ['hockey'], college: [], rugby: [], golf: ['golf'], powerlifting: ['powerlifting'] };
 function renderAround() {
   var by = {}; D.sports.forEach(function (s) { by[s.key] = s; });
   var lm = liveMap(), L = D.leaders || {};

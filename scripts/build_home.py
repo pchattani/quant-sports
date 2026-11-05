@@ -12,6 +12,8 @@ normalised file written here from the sport sites' already-built data trees:
     docs/rink/data      NHL        (index.json, <season>/season.json, players_index.json)
     docs/campus/data    college    (index.json, search.json)
     docs/scrum/data     rugby      (index.json, search.json, men/overview.json)
+    docs/green/data     golf       (index.json, search.json)
+    docs/iron/data      powerlifting (index.json, search.json)
 
 Nothing is fetched from the network. Every sport is optional: a missing or broken tree is
 logged and skipped, so the home page still builds with the sports that are present.
@@ -102,8 +104,10 @@ PENDING = [
     # The Quant Scrum (international rugby union, built 2 Nov 2026): add "rugby" to LAUNCHED once
     # pchattani/the-quant-scrum serves Pages (and drop `pending: true` in docs/_design/quant.js)
     ("rugby", "scrum", "scrum", "Rugby", "The Quant Scrum"),
+    ("golf", "green", "green", "Golf", "The Quant Green"),
+    ("powerlifting", "iron", "iron", "Powerlifting", "The Quant Iron"),
 ]
-LAUNCHED: set[str] = {"college", "rugby"}   # The Quant Campus, launched 21 Oct 2026; The Quant Scrum, 2 Nov 2026
+LAUNCHED: set[str] = {"college", "rugby", "golf", "powerlifting"}   # Campus 21 Oct; Scrum 2 Nov; Green and Iron 4 Nov 2026
 STALE_HOURS = 6   # a sport whose input is older than this is flagged stale in home.json
 
 # Football competitions in rough order of how many fans care; used to pick which fixtures
@@ -1318,6 +1322,99 @@ def build_rugby(ctx: Ctx, base: str, out: dict):
             "updated_at": idx.get("updated_at")}
 
 
+def build_golf(ctx: Ctx, base: str, out: dict):
+    """The Quant Green: docs/green/data/index.json (this week's events, rankings) and search.json."""
+    d = DOCS / "green" / "data"
+    idx = load(d / "index.json")
+    if not idx:
+        raise RuntimeError("index.json missing")
+    week = list(idx.get("week") or [])
+    games = []
+    for e in week:
+        fav = e.get("fav") or {}
+        href = base + ("#/event/" + str(e["id"]) if e.get("page") and e.get("id") else "")
+        g = game("golf", e.get("tour_name") or e.get("tour") or "Golf", e.get("id") or e.get("name"),
+                 e.get("start"), e.get("status"),
+                 team(e.get("name") or "Event"),
+                 team(fav.get("name") or "Field",
+                      href=base + "#/player/" + str(fav["pid"]) if fav.get("pid") else None),
+                 href=href or base, event=True, fav=fav.get("name"), fav_p=r4(fav.get("win")), players=True)
+        games.append(g)
+    out["games"].extend(pick_games(ctx, games, 2, 4))
+    out["pool"].extend(games)
+    men = list((idx.get("top") or {}).get("men") or [])
+    women = list((idx.get("top") or {}).get("women") or [])
+    if men:
+        out["leaders"]["golf"] = {"title": "Men's rating", "unit": "/round", "rows": [
+            {"name": r["name"], "value": r.get("rt"), "href": base + "#/player/" + str(r["pid"])}
+            for r in men[:10] if r.get("name") and r.get("pid")],
+            "hot": {"title": "Top rated, men",
+                    "expl": "Strokes a round better than an average PGA Tour player."}}
+    kpis = []
+    live = [e for e in week if norm_status(e.get("status")) == "live"]
+    nxt = live[0] if live else (week[0] if week else None)
+    fav = (nxt or {}).get("fav") or {}
+    if fav.get("name"):
+        kpis.append({"label": (nxt or {}).get("tour_name") or "This week", "value": fav["name"],
+                     "sub": f"{fav['win'] * 100:.0f}% to win" if fav.get("win") is not None else (nxt or {}).get("name") or ""})
+    if men:
+        kpis.append({"label": "Top rated", "value": men[0]["name"],
+                     "sub": f"{men[0]['rt']:+.2f} /round" if men[0].get("rt") is not None else "men"})
+    if women:
+        kpis.append({"label": "Women", "value": women[0]["name"],
+                     "sub": f"{women[0]['rt']:+.2f} /round" if women[0].get("rt") is not None else "LPGA"})
+    srch = load(d / "search.json") or {}
+    for p in (srch.get("players") or [])[:SEARCH_TOP_PLAYERS]:
+        if p and p[0] and p[1]:
+            out["search"].append(["golf", p[1], "Golfer" + (" · " + p[2] if len(p) > 2 and p[2] else ""),
+                                  base + "#/player/" + str(p[0])])
+    for e in week:
+        if e.get("id") and e.get("name") and e.get("page"):
+            out["search"].append(["golf", e["name"], e.get("tour_name") or "Event",
+                                  base + "#/event/" + str(e["id"])])
+    tours = [e.get("tour_name") or e.get("name") for e in week if e.get("tour_name") or e.get("name")]
+    status = " · ".join(tours[:3]) or "PGA Tour · DP World Tour · LIV · LPGA"
+    return {"phase": status, "status": status, "kpis": kpis[:3], "stage": status,
+            "updated_at": idx.get("updated_at")}
+
+
+def build_powerlifting(ctx: Ctx, base: str, out: dict):
+    """The Quant Iron: docs/iron/data/index.json (recent meets, ranking tops) and search.json."""
+    d = DOCS / "iron" / "data"
+    idx = load(d / "index.json")
+    if not idx:
+        raise RuntimeError("index.json missing")
+    top = idx.get("top") or {}
+    kpis = []
+    for key, label in (("men_raw", "Men raw"), ("women_raw", "Women raw")):
+        rows = list(top.get(key) or [])
+        if not rows:
+            continue
+        r0 = rows[0]
+        kpis.append({"label": label, "value": r0.get("name"),
+                     "sub": f"{r0.get('rt'):.0f} DOTS" if r0.get("rt") is not None else ""})
+        if key == "men_raw":
+            out["leaders"]["powerlifting"] = {"title": "Men · Raw", "unit": "DOTS", "rows": [
+                {"name": r["name"], "value": r.get("rt"), "href": base + "#/player/" + str(r["pid"])}
+                for r in rows[:10] if r.get("name") and r.get("pid")],
+                "hot": {"title": "Top rated, men raw",
+                        "expl": "DOTS (Konertz 2019) from the walk-forward rating."}}
+    srch = load(d / "search.json") or {}
+    for p in (srch.get("players") or [])[:SEARCH_TOP_PLAYERS]:
+        if p and p[0] and p[1]:
+            out["search"].append(["powerlifting", p[1],
+                                  "Lifter" + (" · " + p[2] if len(p) > 2 and p[2] else ""),
+                                  base + "#/player/" + str(p[0])])
+    for e in (idx.get("recent") or [])[:12]:
+        if e.get("id") and e.get("name"):
+            out["search"].append(["powerlifting", e["name"], e.get("fed") or "Meet",
+                                  base + "#/event/" + str(e["id"])])
+    n = (idx.get("counts") or {}).get("scored")
+    status = f"{n:,} scored lifts" if n else "OpenPowerlifting archive"
+    return {"phase": status, "status": status, "kpis": kpis[:3], "stage": status,
+            "updated_at": idx.get("updated_at")}
+
+
 def pct_text(p):
     """0.9999 -> '>99.9%', 0.0004 -> '<0.1%', else one decimal under 10% and whole numbers above."""
     if p is None:
@@ -1585,7 +1682,7 @@ def top_of_page(now, games, pool, series, sports):
 
 BUILDERS = {"football": build_football, "f1": build_f1, "basketball": build_basketball, "tennis": build_tennis,
             "baseball": build_baseball, "nfl": build_nfl, "hockey": build_hockey, "college": build_college,
-            "rugby": build_rugby}
+            "rugby": build_rugby, "golf": build_golf, "powerlifting": build_powerlifting}
 
 
 SEARCH_TOP_PLAYERS = 40      # players per site (per level on Campus) in the hub's search
