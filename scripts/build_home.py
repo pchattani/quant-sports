@@ -93,7 +93,6 @@ SPORTS = [
     ("football", "site", "footballer", "Football", "The Quant Footballer"),
     ("f1", "paddock", "paddock", "Formula 1", "The Quant Paddock"),
     ("basketball", "hardwood", "hardwood", "Basketball", "The Quant Hardwood"),
-    ("tennis", "ace", "ace", "Tennis", "The Quant Ace"),
     ("baseball", "bullpen", "bullpen", "Baseball", "The Quant Bullpen"),
     ("nfl", "gridiron", "gridiron", "NFL", "The Quant Gridiron"),
     ("hockey", "rink", "rink", "NHL", "The Quant Rink"),
@@ -104,10 +103,11 @@ PENDING = [
     # The Quant Scrum (international rugby union, built 2 Nov 2026): add "rugby" to LAUNCHED once
     # pchattani/the-quant-scrum serves Pages (and drop `pending: true` in docs/_design/quant.js)
     ("rugby", "scrum", "scrum", "Rugby", "The Quant Scrum"),
+    ("tennis", "ace", "ace", "Tennis", "The Quant Ace"),
     ("golf", "green", "green", "Golf", "The Quant Green"),
     ("powerlifting", "iron", "iron", "Powerlifting", "The Quant Iron"),
 ]
-LAUNCHED: set[str] = {"college", "rugby", "golf", "powerlifting"}   # Campus 21 Oct; Scrum 2 Nov; Green and Iron 4 Nov 2026
+LAUNCHED: set[str] = {"college", "rugby"}   # Campus 21 Oct 2026; Scrum 2 Nov 2026. Tennis, golf, powerlifting stay off the hub.
 STALE_HOURS = 6   # a sport whose input is older than this is flagged stale in home.json
 
 # Football competitions in rough order of how many fans care; used to pick which fixtures

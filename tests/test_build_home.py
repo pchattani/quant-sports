@@ -56,7 +56,17 @@ def test_season_files_follow_each_sites_index(tmp_path):
 def test_home_workflow_fetches_the_season_files():
     gen = (ROOT / "scripts" / "gen_ci_workflows.py").read_text(encoding="utf-8")
     assert "build_home.py --season-files" in gen
-    assert "get green the-quant-green" in gen and "get iron the-quant-iron" in gen
+    assert "get green the-quant-green" not in gen and "get iron the-quant-iron" not in gen
+
+
+def test_tennis_golf_and_iron_stay_off_the_hub():
+    assert "tennis" not in [s[0] for s in bh.SPORTS]
+    assert "tennis" in [s[0] for s in bh.PENDING] and "tennis" not in bh.LAUNCHED
+    assert "golf" in [s[0] for s in bh.PENDING] and "golf" not in bh.LAUNCHED
+    assert "powerlifting" in [s[0] for s in bh.PENDING] and "powerlifting" not in bh.LAUNCHED
+    js = (ROOT / "docs" / "_design" / "quant.js").read_text(encoding="utf-8")
+    tennis = [ln for ln in js.splitlines() if "key: 'tennis'" in ln][0]
+    assert "pending: true" in tennis
 
 
 def test_golf_and_iron_builders_from_index(tmp_path, monkeypatch):

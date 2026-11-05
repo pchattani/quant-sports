@@ -314,14 +314,15 @@ QK.ALL_SPORTS = [
   { key: 'baseball',   label: 'Baseball',   site: 'The Quant Bullpen',    repo: 'the-quant-bullpen',    folder: 'bullpen',  leagues: 'MLB · Triple-A' },
   { key: 'hockey',     label: 'Hockey',     site: 'The Quant Rink',       repo: 'the-quant-rink',       folder: 'rink',     leagues: 'NHL' },
   { key: 'f1',         label: 'F1',         site: 'The Quant Paddock',    repo: 'the-quant-paddock',    folder: 'paddock',  leagues: 'Formula 1 · 1950 to today' },
-  { key: 'tennis',     label: 'Tennis',     site: 'The Quant Ace',        repo: 'the-quant-ace',        folder: 'ace',      leagues: 'ATP · WTA' },
+  /* The Quant Ace (tennis): off the hub until more work lands */
+  { key: 'tennis',     label: 'Tennis',     site: 'The Quant Ace',        repo: 'the-quant-ace',        folder: 'ace',      leagues: 'ATP · WTA', pending: true },
   { key: 'college',    label: 'College',    site: 'The Quant Campus',     repo: 'the-quant-campus',     folder: 'campus',   leagues: 'CFB · Men’s and women’s college basketball' },
   /* The Quant Scrum (international rugby union), launched 2 Nov 2026 */
   { key: 'rugby',      label: 'Rugby',      site: 'The Quant Scrum',      repo: 'the-quant-scrum',      folder: 'scrum',    leagues: 'Men’s tests · Six Nations, Rugby Championship, World Cup' },
-  /* The Quant Green (golf: PGA Tour, DP World Tour, LIV, LPGA), launched 4 Nov 2026 */
-  { key: 'golf',       label: 'Golf',       site: 'The Quant Green',      repo: 'the-quant-green',      folder: 'green',    leagues: 'PGA Tour · DP World Tour · LIV · LPGA' },
-  /* The Quant Iron (powerlifting), launched 4 Nov 2026 */
-  { key: 'powerlifting', label: 'Powerlifting', site: 'The Quant Iron', repo: 'the-quant-iron', folder: 'iron', leagues: 'Raw · Wraps · Equipped · OpenPowerlifting archive' }
+  /* The Quant Green (golf: PGA Tour, DP World Tour, LIV, LPGA), built 4 Nov 2026 */
+  { key: 'golf',       label: 'Golf',       site: 'The Quant Green',      repo: 'the-quant-green',      folder: 'green',    leagues: 'PGA Tour · DP World Tour · LIV · LPGA', pending: true },
+  /* The Quant Iron (powerlifting), built 4 Nov 2026 */
+  { key: 'powerlifting', label: 'Powerlifting', site: 'The Quant Iron', repo: 'the-quant-iron', folder: 'iron', leagues: 'Raw · Wraps · Equipped · OpenPowerlifting archive', pending: true }
 ];
 QK.ALL_SPORTS.forEach(function (s) { s.url = PUB + s.repo + '/'; s.data = s.url + 'data/'; s.accent = 'var(--a-' + s.key + ')'; });
 QK.sport = function (key) { for (var i = 0; i < QK.ALL_SPORTS.length; i++) if (QK.ALL_SPORTS[i].key === key) return QK.ALL_SPORTS[i]; return null; };

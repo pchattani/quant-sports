@@ -36,11 +36,10 @@ def test_export_allowlist():
     assert c("tests/golf/test_espn.py") == "public"
 
 
-def test_kit_golf_entry_is_launched():
+def test_kit_golf_entry_is_pending_until_the_hub_launch():
     js = (ROOT / "docs" / "_design" / "quant.js").read_text(encoding="utf-8")
     line = [ln for ln in js.splitlines() if "key: 'golf'" in ln][0]
-    assert "site: 'The Quant Green'" in line and "repo: 'the-quant-green'" in line
-    assert "pending: true" not in line
+    assert "site: 'The Quant Green'" in line and "repo: 'the-quant-green'" in line and "pending: true" in line
     assert "golf: { fixtures: 'Events'" in js and "  golf: '<svg" in js
     css = (ROOT / "docs" / "_design" / "tokens.css").read_text(encoding="utf-8")
     assert css.count("--a-golf:") == 1
@@ -49,9 +48,7 @@ def test_kit_golf_entry_is_launched():
     spec = importlib.util.spec_from_file_location("build_home", ROOT / "scripts" / "build_home.py")
     bh = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(bh)
-    assert "golf" in [s[0] for s in bh.PENDING] and "golf" in bh.LAUNCHED and "golf" in bh.BUILDERS
-    gen = (ROOT / "scripts" / "gen_ci_workflows.py").read_text(encoding="utf-8")
-    assert "get green the-quant-green" in gen
+    assert "golf" in [s[0] for s in bh.PENDING] and "golf" not in bh.LAUNCHED and "golf" in bh.BUILDERS
 
 
 def test_front_end_has_no_optional_chaining():
