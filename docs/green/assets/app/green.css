@@ -37,3 +37,26 @@
 .gr-search { width: min(100%, 420px); }
 .gr-hole-bar { display: inline-block; height: 8px; vertical-align: middle; background: var(--a-golf); }
 .gr-hole-bar.hard { background: var(--coral, #ff7a6b); }
+
+/* 6 Nov 2026: the depth round (overview, Scouting Room, player, Lab, rankings) */
+.gr-sec { margin-top: var(--sp-6, 32px); }
+.gr-gap { margin-top: var(--sp-4, 16px); gap: var(--sp-4, 16px); }
+.gr-note { font: 400 var(--fs-sm)/1.5 var(--font-ui); color: var(--ink-3); margin: 10px 0 0; max-width: 980px; }
+.gr-crumb { font: 600 var(--fs-xs)/1.4 var(--font-ui); color: var(--ink-3); margin: 0 0 10px; }
+.gr-crumb a { color: var(--ink-2); }
+.gr-feat .gr-feat-t { font: 400 2rem/1 var(--font-display); text-transform: uppercase; margin: 6px 0 4px; }
+.gr-feat .gr-feat-t a { color: var(--ink-1); text-decoration: none; }
+.gr-cols2 { columns: 2 340px; column-gap: 28px; }
+.gr-cols2 li { break-inside: avoid; }
+.gr-up { color: var(--a-golf, #3ddc97); font-weight: 600; }
+.gr-down { color: var(--neg, #ff6a4d); font-weight: 600; }
+.gr-fin { display: inline-block; min-width: 2.4em; text-align: center; font: 600 11px/1.6 var(--font-cond); border: 1px solid var(--line-2); color: var(--ink-2); text-decoration: none; margin: 1px; }
+.gr-tabs { margin: var(--sp-3, 12px) 0 var(--sp-4, 16px); }
+.gr-floor { font: 400 var(--fs-sm)/1.45 var(--font-ui); color: var(--ink-3); margin: 0 0 10px; }
+.gr-min { display: inline-flex; align-items: center; gap: 8px; }
+.gr-chart-t { font: 700 var(--fs-md, 1rem)/1.2 var(--font-cond); text-transform: uppercase; letter-spacing: .03em; margin: 14px 0 6px; color: var(--ink-1); }
+.gr-top { margin: var(--sp-4, 16px) 0; }
+.gr-follow-line { margin: 10px 0; display: flex; gap: 8px; align-items: center; font-size: var(--fs-sm); }
+.gr-real { margin-top: var(--sp-4, 16px); }
+.gr-page .qk-chart { width: 100%; }
+@media (max-width: 640px) { .gr-cols2 { columns: 1; } .gr-feat .gr-feat-t { font-size: 1.6rem; } }

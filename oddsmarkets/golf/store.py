@@ -6,6 +6,8 @@ The golf store, one directory per tour and season under data/golf (git-ignored; 
   <tour>/<season>/rounds.parquet  one row per player-round: strokes, nines, tee time, holes recorded
   <tour>/<season>/holes.parquet   one row per player-hole (PGA Tour): strokes, par
   players.json                    {pid: {name, country, amateur}} across tours
+  stats/<tour>/<season>.json      {pid: {season statistics (sources/espn.py STATS), _at}} ({} when ESPN has none)
+  bios.json                       {pid: {dob, ht_in, pro, hand, born}} ({} when ESPN has none)
 
 An event is final once its leaderboard was fetched after ESPN marked it final; final events are never fetched again.
 """
@@ -82,3 +84,19 @@ def save_players(players: dict) -> None:
 def seasons(tour: str) -> list[int]:
     d = root() / tour
     return sorted(int(p.name) for p in d.iterdir() if p.is_dir() and p.name.isdigit()) if d.exists() else []
+
+
+def load_stats(tour: str, season: int) -> dict:
+    return _read_json(root() / "stats" / tour / f"{int(season)}.json", {})
+
+
+def save_stats(tour: str, season: int, stats: dict) -> None:
+    _write_json(root() / "stats" / tour / f"{int(season)}.json", stats)
+
+
+def load_bios() -> dict:
+    return _read_json(root() / "bios.json", {})
+
+
+def save_bios(bios: dict) -> None:
+    _write_json(root() / "bios.json", bios)

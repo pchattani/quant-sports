@@ -13,7 +13,9 @@ k0 is the prior's weight in rounds. Shifting m0 shifts every field par and so ev
 walk is translation-invariant): m0 only places the scale's zero, and `centre` re-zeroes ratings on the average PGA
 Tour player-round of the trailing year for display.
 
-Events in team formats are skipped. Multi-course events (Pebble Beach, the American Express) share one par per round
+Events in team formats are skipped, and so are events not yet final and incomplete rounds (fewer than 55 strokes, or
+fewer than 18 holes when the hole count is known): before 6 Nov 2026 about 900 partial rounds (a withdrawal mid-round,
+a round under way) entered the walk as full rounds and gave their players strokes gained of +15 to +69. Multi-course events (Pebble Beach, the American Express) share one par per round
 across their courses: ESPN gives no round's course, a known noise source.
 """
 from __future__ import annotations
@@ -26,7 +28,8 @@ import pandas as pd
 
 from .. import store
 
-MEN = ("pga", "eur", "liv")
+MEN = ("pga", "eur", "liv", "ntw")       # the Korn Ferry Tour joined on 6 Nov 2026 (it passed the promotion test)
+MIN_STROKES = 55
 
 
 @dataclass(frozen=True)
@@ -53,7 +56,11 @@ def load_rounds(tours: tuple[str, ...] = MEN, seasons: list[int] | None = None) 
             meta = pd.DataFrame([{"event": k, "start": v.get("start"), "team": bool(v.get("team")),
                                   "status": v.get("status")} for k, v in ev.items()])
             r = r.merge(meta, on="event", how="inner")
-            r = r[~r["team"] & r["start"].notna()]
+            r = r[~r["team"] & r["start"].notna() & (r["status"] == "final")]
+            r = r[r["strokes"] >= MIN_STROKES]
+            if "holes" in r.columns:
+                h = pd.to_numeric(r["holes"], errors="coerce")
+                r = r[~((h > 0) & (h < 18))]
             r["tour"] = t
             parts.append(r[["tour", "event", "pid", "round", "strokes", "start"]])
     if not parts:

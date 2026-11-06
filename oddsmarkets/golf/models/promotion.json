@@ -1,0 +1,167 @@
+{
+ "date": "2026-11-06",
+ "dev": [
+  2020,
+  2022
+ ],
+ "test": [
+  2023,
+  2025
+ ],
+ "note": "A = the walk shipped on 4 Nov (PGA Tour, DP World Tour, LIV; partial rounds in). C = partial rounds out. B = C plus the Korn Ferry Tour (shipped). Round level: mean squared error of the pre-event rating against the round's strokes gained, PGA Tour rounds, paired per event (negative favours the first). Event level: log loss per event on the sealed test years, paired; calibration error (ECE) over the same players.",
+ "tests": [
+  {
+   "name": "Partial rounds out (C against A)",
+   "round_dev": {
+    "n": 123,
+    "diff": -0.07165,
+    "lo": -0.09001,
+    "hi": -0.05329
+   },
+   "round_test": {
+    "n": 137,
+    "diff": -0.08105,
+    "lo": -0.10353,
+    "hi": -0.05858
+   },
+   "win": {
+    "n": 137,
+    "diff": -0.0007,
+    "lo": -0.00178,
+    "hi": 0.00038
+   },
+   "top10": {
+    "n": 137,
+    "diff": -0.00236,
+    "lo": -0.00387,
+    "hi": -0.00085
+   },
+   "cut": {
+    "n": 111,
+    "diff": -0.00258,
+    "lo": -0.00549,
+    "hi": 0.00034
+   },
+   "verdict": "shipped (a data fix: about 900 partial rounds had counted as full rounds)"
+  },
+  {
+   "name": "Korn Ferry Tour rounds in the walk (B against C)",
+   "round_dev": {
+    "n": 123,
+    "diff": -0.02923,
+    "lo": -0.04413,
+    "hi": -0.01434
+   },
+   "round_test": {
+    "n": 137,
+    "diff": -0.02777,
+    "lo": -0.03893,
+    "hi": -0.01662
+   },
+   "win": {
+    "n": 137,
+    "diff": -0.00029,
+    "lo": -0.00061,
+    "hi": 3e-05
+   },
+   "top10": {
+    "n": 137,
+    "diff": -0.00124,
+    "lo": -0.0021,
+    "hi": -0.00039
+   },
+   "cut": {
+    "n": 111,
+    "diff": -0.00311,
+    "lo": -0.00425,
+    "hi": -0.00197
+   },
+   "verdict": "shipped: better on rounds, top 10 and the cut out of sample; the win log loss gain is not significant"
+  },
+  {
+   "name": "Course history (a player's past strokes gained at the course, shrunk)",
+   "round_dev": {
+    "events": 113,
+    "rounds": 43501,
+    "diff": -0.0004,
+    "lo": -0.0067,
+    "hi": 0.0058
+   },
+   "round_test": {
+    "events": 126,
+    "rounds": 47610,
+    "diff": -0.0015,
+    "lo": -0.0081,
+    "hi": 0.0051
+   },
+   "choice": "k32.0_l0.5",
+   "verdict": "not shipped: the test interval includes zero; shown on course and event pages as history only"
+  }
+ ],
+ "both": {
+  "round_test": {
+   "n": 137,
+   "diff": -0.10882,
+   "lo": -0.13515,
+   "hi": -0.0825
+  },
+  "win": {
+   "n": 137,
+   "diff": -0.001,
+   "lo": -0.00209,
+   "hi": 0.0001
+  },
+  "top10": {
+   "n": 137,
+   "diff": -0.00361,
+   "lo": -0.00533,
+   "hi": -0.00188
+  },
+  "cut": {
+   "n": 111,
+   "diff": -0.00568,
+   "lo": -0.00889,
+   "hi": -0.00247
+  }
+ },
+ "logloss": {
+  "win": {
+   "A": 0.04545,
+   "C": 0.04475,
+   "B": 0.04446
+  },
+  "t10": {
+   "A": 0.29396,
+   "C": 0.2916,
+   "B": 0.29036
+  },
+  "cut": {
+   "A": 0.63643,
+   "C": 0.63385,
+   "B": 0.63075
+  }
+ },
+ "ece": {
+  "A": {
+   "win": 0.00165,
+   "t10": 0.00696,
+   "cut": 0.03826
+  },
+  "C": {
+   "win": 0.00189,
+   "t10": 0.00605,
+   "cut": 0.04232
+  },
+  "B": {
+   "win": 0.0014,
+   "t10": 0.00641,
+   "cut": 0.04252
+  }
+ },
+ "sd": {
+  "A": 3.1368006542265365,
+  "C": 2.815440150314559,
+  "B": 2.815540059821815
+ },
+ "events": 137
+}

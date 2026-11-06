@@ -26,6 +26,7 @@ from .. import canon
 logger = logging.getLogger(__name__)
 
 SITE = "https://site.api.espn.com/apis/site/v2/sports/golf"
+CORE = "https://sports.core.api.espn.com/v2/sports/golf/leagues"
 WEB = "https://site.web.api.espn.com/apis/site/v2/sports/golf"
 UA = "The Quant Sports golf (pchattani.github.io; golf analytics, non-commercial)"
 
@@ -47,6 +48,16 @@ def week_scoreboard(c: Client, tour: str) -> dict | None:
 
 def leaderboard(c: Client, tour: str, event_id: str) -> dict | None:
     return c.get(f"{WEB}/leaderboard", {"league": canon.tour_key(tour), "event": str(event_id)})
+
+
+def season_stats(c: Client, tour: str, year: int, pid: str) -> dict | None:
+    """A player's season statistics (ESPN core API): driving, greens, putting, sand saves, scoring; None on a 404."""
+    return c.get(f"{CORE}/{canon.tour_key(tour)}/seasons/{int(year)}/types/2/athletes/{pid}/statistics")
+
+
+def athlete(c: Client, tour: str, pid: str) -> dict | None:
+    """A player's bio (ESPN core API): date of birth, height, turned pro, hometown."""
+    return c.get(f"{CORE}/{canon.tour_key(tour)}/athletes/{pid}")
 
 
 # ── parsing ─────────────────────────────────────────────────────────────────
@@ -175,3 +186,41 @@ def parse_leaderboard(raw: dict | None, tour: str) -> dict | None:
                                   "out": _num(r.get("outScore")), "in": _num(r.get("inScore")),
                                   "tee_time": r.get("teeTime"), "to_par": _rel(r.get("displayValue"))})
     return out
+
+
+# the season statistics kept (ESPN name -> ours); zeros in the ball-striking block mean "not recorded"
+STATS = {"roundsPlayed": "rounds", "tournamentsPlayed": "events", "scoringAverage": "avg", "adjustedScoringAverage": "adj_avg",
+         "yardsPerDrive": "dist", "driveAccuracyPct": "acc", "greensInRegPct": "gir", "puttsGirAvg": "pp_gir",
+         "savePct": "sand", "birdiesPerRound": "bpr", "holesPlayed": "holes", "eagles": "eagles", "birdies": "birdies",
+         "pars": "pars", "bogeys": "bogeys", "doubles": "doubles", "fairwayHits": "fw_hit", "possibleFairways": "fw_poss",
+         "greensHit": "gir_hit", "girPoss": "gir_poss", "greensInRegPutts": "gir_putts", "saves": "saves",
+         "bunkers": "bunkers", "totalDrives": "drives", "totalDistance": "drive_yds"}
+STRIKING = ("dist", "acc", "gir", "pp_gir", "sand")
+
+
+def parse_stats(raw: dict | None) -> dict:
+    """{our name: value} from a season-statistics answer; {} when there is none. Ball-striking zeros are dropped."""
+    out: dict[str, float] = {}
+    for cat in (((raw or {}).get("splits") or {}).get("categories") or []):
+        for s in cat.get("stats") or []:
+            k = STATS.get(s.get("name"))
+            v = _num(s.get("value"))
+            if k and v is not None:
+                out[k] = round(v, 4)
+    for k in STRIKING:
+        if not out.get(k):
+            out.pop(k, None)
+    return out if out.get("rounds") else {}
+
+
+def parse_athlete(raw: dict | None) -> dict:
+    """{dob, ht_in, pro, hand, born} from a bio answer; {} when there is none."""
+    a = raw or {}
+    if not a.get("id"):
+        return {}
+    bp = a.get("birthPlace") or {}
+    born = ", ".join(x for x in (bp.get("city"), bp.get("state"), bp.get("country")) if x) if isinstance(bp, dict) else str(bp or "")
+    out = {"dob": str(a.get("dateOfBirth") or "")[:10] or None, "ht_in": _num(a.get("height")) or None,
+           "pro": a.get("turnedPro"), "hand": a.get("hand") if isinstance(a.get("hand"), str) else ((a.get("hand") or {}).get("abbreviation") if isinstance(a.get("hand"), dict) else None),
+           "born": born or None}
+    return {k: v for k, v in out.items() if v not in (None, "")}

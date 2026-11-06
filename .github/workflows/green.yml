@@ -83,11 +83,11 @@ jobs:
           uv run --frozen python scripts/ci_site.py seed --site green | tee "$RUNNER_TEMP/seed.out"
           grep -E "^seeded=(true|false)$" "$RUNNER_TEMP/seed.out" >> "$GITHUB_OUTPUT" || echo "seeded=false" >> "$GITHUB_OUTPUT"
 
-      - name: 'Fetch (ESPN: this week''s scoreboards and leaderboards; the full season every 6 hours)'
+      - name: 'Fetch (ESPN: this week''s scoreboards and leaderboards, the full season every 6 hours; season stats weekly; new players'' bios)'
         continue-on-error: true
         timeout-minutes: 10
         run: |
-          uv run --frozen python scripts/golf_fetch.py --max-age-h 6 --budget 300
+          uv run --frozen python scripts/golf_fetch.py --max-age-h 6 --budget 300 --stats --bios
 
       - name: 'Build'
         id: build

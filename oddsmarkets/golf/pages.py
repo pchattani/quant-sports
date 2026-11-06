@@ -30,14 +30,15 @@ import numpy as np
 import pandas as pd
 
 from . import canon, store
+from . import depth as DP
 from .models import backtest as BT
 from .models import ratings as R
 from .models import sim
 
 logger = logging.getLogger(__name__)
 
-MODEL_VERSION = 1
-STREAMS = {"men": ("pga", "eur", "liv"), "women": ("lpga",)}
+MODEL_VERSION = 2            # 6 Nov 2026: Korn Ferry rounds in the men's walk, partial rounds out (models/promotion.json)
+STREAMS = {"men": ("pga", "eur", "liv", "ntw"), "women": ("lpga",)}
 CENTRE = {"men": "pga", "women": "lpga"}
 STREAM_OF = {t: s for s, ts in STREAMS.items() for t in ts}
 RANK_MIN_WEIGHT = 10.0        # decayed rounds behind a rating before it is ranked
@@ -123,6 +124,13 @@ def _cut_rule(e: dict, tour: str, field: int) -> tuple[int, int]:
     return (cr, cc) if cr and field > NO_CUT_FIELD else (0, 0)
 
 
+def _course_id(e: dict) -> str | None:
+    cs = e.get("courses") or []
+    if len(cs) != 1:
+        return None
+    return str(cs[0].get("id") or "") or None
+
+
 def _course(e: dict) -> dict | None:
     cs = e.get("courses") or []
     host = next((c for c in cs if c.get("host")), cs[0] if cs else None)
@@ -186,7 +194,7 @@ def _live(players: list[dict], ratings: np.ndarray, sd: float, e: dict, tour: st
 
 
 def event_page(e: dict, tour: str, season: int, st: Stream, res: pd.DataFrame, rnd: pd.DataFrame, holes: pd.DataFrame,
-               players_meta: dict, now: datetime) -> dict | None:
+               players_meta: dict, now: datetime, D=None) -> dict | None:
     eid = e["id"]
     status = e.get("status")
     r = res[res["event"] == eid]
@@ -256,10 +264,33 @@ def event_page(e: dict, tour: str, season: int, st: Stream, res: pd.DataFrame, r
         par_by_round.append({"round": k, "avg_tp": _r(np.mean(tps), 2) if tps else None, "n": len(tps),
                              "field_par": _r(fpv, 2) if fpv is not None else None})
     hh = holes[holes["event"] == eid] if len(holes) else holes
+    cs = e.get("courses") or []
+    host = next((c for c in cs if c.get("host")), cs[0] if cs else None) or {}
+    course_id = str(host.get("id") or "") or None if len(cs) == 1 else None
+    course_guess = False
+    if D is not None and status != "final" and not cs:
+        # an upcoming event has no course until its leaderboard opens: the course of the last final edition of the
+        # same event (by name, on the same tour), flagged as a guess on the page
+        course_id = D.last_course(STREAM_OF[tour], tour, e.get("name"), start)
+        course_guess = bool(course_id)
+    if D is not None and status != "final" and course_id:
+        try:
+            fit = D.course_fit(STREAM_OF[tour], [p["pid"] for p in rows], course_id, start)
+        except Exception:          # noqa: BLE001 - the course history is a garnish; the forecast must still publish
+            logger.exception("course fit for %s", eid)
+            fit = {}
+        for p in rows:
+            if p["pid"] in fit:
+                p["ch"] = fit[p["pid"]]
+    # who beat our forecast: finish against the mean simulated finish
+    if status == "final":
+        for p in rows:
+            if p.get("pos") and p["st"] == "finish" and p.get("xr"):
+                p["beat"] = _r(p["xr"] - p["pos"], 1)
     return {
         "id": eid, "tour": tour, "tour_name": canon.TOURS[tour]["name"], "stream": STREAM_OF[tour], "season": season,
         "name": e.get("name"), "start": e.get("start"), "end": e.get("end"), "status": status, "major": bool(e.get("major")),
-        "purse": _int(e.get("purse")), "course": _course(e),
+        "purse": _int(e.get("purse")), "course": _course(e), "course_id": course_id, "course_guess": course_guess,
         "courses": [{"name": c.get("name"), "par": c.get("par"), "yards": c.get("yards"), "host": bool(c.get("host"))}
                     for c in e.get("courses") or []],
         "rounds": nr, "cut": {"round": cr, "count": cc, "score": _int(e.get("cut_score"))} if cr else None,
@@ -276,7 +307,7 @@ def _summary(page: dict) -> dict:
     fav = next(p for p in pl if p["pid"] == page["fav"])
     out = {"id": page["id"], "name": page["name"], "start": page["start"], "end": page["end"], "status": page["status"],
            "major": page["major"], "purse": page["purse"], "course": (page.get("course") or {}).get("name"),
-           "field": len(pl), "fav": {"pid": fav["pid"], "name": fav["name"], "win": fav["win"]}}
+           "field": len(pl), "fav": {"pid": fav["pid"], "name": fav["name"], "win": fav["win"]}, "course_id": page.get("course_id")}
     if win:
         out["winner"] = {"pid": win["pid"], "name": win["name"], "tp": win.get("tp"), "win": win.get("win"),
                          "xr": win.get("xr")}
@@ -312,6 +343,11 @@ def build(out: Path, today: date | None = None, full: bool = False, seasons_back
     players_meta = store.load_players()
     streams = {k: Stream(k) for k in STREAMS}
     counts = {"events": 0, "events_built": 0, "players": 0}
+    try:
+        D = DP.Depth(streams, STREAMS, players_meta, today)
+    except Exception:              # noqa: BLE001 - the depth payloads are optional; the forecasts must still publish
+        logger.exception("depth analytics failed: the Scouting Room, Lab and courses are not rebuilt this run")
+        D = None
     summaries: dict[str, dict[int, list]] = {}
     pages_index: dict[str, dict] = {}          # event id -> small facts the player pages and calibration read
     results_by_pid: dict[str, list] = {}
@@ -328,7 +364,7 @@ def build(out: Path, today: date | None = None, full: bool = False, seasons_back
                     continue
                 base = {"id": e["id"], "name": e.get("name"), "start": e.get("start"), "end": e.get("end"),
                         "status": e.get("status"), "major": bool(e.get("major")), "purse": _int(e.get("purse")),
-                        "course": (_course(e) or {}).get("name"), "team": bool(e.get("team"))}
+                        "course": (_course(e) or {}).get("name"), "course_id": _course_id(e), "team": bool(e.get("team"))}
                 if e.get("team"):
                     sched.append(base)
                     continue
@@ -337,7 +373,7 @@ def build(out: Path, today: date | None = None, full: bool = False, seasons_back
                 if page and page.get("model") == MODEL_VERSION and page.get("status") == "final":
                     pass
                 else:
-                    page = event_page(e, tour, season, st, res, rnd, hol, players_meta, now)
+                    page = event_page(e, tour, season, st, res, rnd, hol, players_meta, now, D)
                     if page is None:
                         sched.append(base)
                         continue
@@ -358,43 +394,107 @@ def build(out: Path, today: date | None = None, full: bool = False, seasons_back
             summaries.setdefault(tour, {})[season] = sched
             _write(out / "schedule" / tour / f"{season}.json", {"tour": tour, "tour_name": canon.TOURS[tour]["name"],
                                                                "season": season, "events": sched})
-    rankings = _rankings(streams, players_meta, results_by_pid, today)
+    rankings = _rankings(streams, players_meta, results_by_pid, today, D)
     _write(out / "rankings.json", rankings)
-    counts["players"] = _player_pages(out, streams, players_meta, results_by_pid, rankings, pages_index, today)
-    _write(out / "model.json", _model(out, streams, pages_index, now))
-    _write(out / "index.json", _index(out, summaries, rankings, streams, now, today, counts))
-    _write(out / "search.json", _search(out, players_meta, pages_index))
+    counts["players"] = _player_pages(out, streams, players_meta, results_by_pid, rankings, pages_index, today, D)
+    courses_index = {}
+    if D is not None:
+        courses_index = _depth_payloads(out, D, rankings, pages_index, results_by_pid, counts)
+    _write(out / "model.json", _model(out, streams, pages_index, now, D))
+    idx = _index(out, summaries, rankings, streams, now, today, counts)
+    _write(out / "index.json", idx)
+    if D is not None:
+        try:
+            _write(out / "overview.json", _overview(out, D, idx, rankings, summaries, pages_index, results_by_pid, today, now))
+        except Exception:          # noqa: BLE001
+            logger.exception("overview payload failed")
+    _write(out / "search.json", _search(out, players_meta, pages_index, courses_index))
     return counts
 
 
-def _rankings(streams: dict, meta: dict, results: dict, today: date) -> dict:
+def _depth_payloads(out: Path, D, rankings: dict, pages_index: dict, results_by_pid: dict, counts: dict) -> dict:
+    """The Scouting Room boards, courses, Lab, records and points ranking. Each part fails alone."""
+    cindex: dict = {}
+    for key in STREAMS:
+        try:
+            _write(out / "scout" / f"{key}.json", D.scout(key, {r["pid"]: r for r in rankings[key]}))
+        except Exception:          # noqa: BLE001
+            logger.exception("scout %s", key)
+        try:
+            lst, cp = D.courses(key, pages_index)
+            for cid, page in cp.items():
+                _write(out / "courses" / f"{cid}.json", page)
+            for c in lst:
+                c["stream"] = key
+                cindex[c["id"]] = c
+            counts[f"courses_{key}"] = len(cp)
+        except Exception:          # noqa: BLE001
+            logger.exception("courses %s", key)
+    _write(out / "courses.json", {"courses": list(cindex.values())})
+    # the kit's metric catalogue (QK.spec: board heads, units, tips), served from data/spec/ (core.js sets the base)
+    m = {k: [v[0], v[4], v[3], "h", i, 0, DP.A.TIPS.get(k, ""), v[1], ""] for i, (k, v) in enumerate(DP.A.METRICS.items())}
+    _write(out / "spec" / "golf.labels.json", {"sport": "golf", "generated": date.today().isoformat(),
+                                             "ours": {"models": {"sg": {"name": "Strokes gained", "about": "Strokes a round better than an average field, from every round against the field that played it."}},
+                                                      "metrics": {"sg": "sg", "rt": "sg", "form": "sg"}},
+                                             "m": {"player": m}, "groups": {}})
+    for name, fn in (("lab", lambda: D.lab()), ("records", lambda: D.records(pages_index, results_by_pid)),
+                     ("points", lambda: {k: D.points(k) for k in STREAMS})):
+        try:
+            _write(out / f"{name}.json", fn())
+        except Exception:          # noqa: BLE001
+            logger.exception("%s payload", name)
+    return cindex
+
+
+def _rankings(streams: dict, meta: dict, results: dict, today: date, D=None) -> dict:
     t = pd.Timestamp(today)
     out = {"updated_at": today.isoformat(), "min_weight": RANK_MIN_WEIGHT, "active_days": RANK_ACTIVE_DAYS}
     for key, st in streams.items():
         off = st.off.at(t)
-        off90 = st.off.at(t - pd.Timedelta(days=90))
         cur = R.current(st.book, today, min_rounds=PLAYER_MIN_ROUNDS, active_days=RANK_ACTIVE_DAYS, offset=off)
         cur = cur[cur["weight"] >= RANK_MIN_WEIGHT].head(500)
-        pre = st.pre[st.pre["pid"].isin(set(cur["pid"])) & (st.pre["start"] <= t - pd.Timedelta(days=90))]
-        then = pre.sort_values("start").groupby("pid").tail(1).set_index("pid")["pre"].to_dict()
+        pre = st.pre[st.pre["pid"].isin(set(cur["pid"]))].sort_values("start")
+        then = {}
+        for days in (30, 90, 365):
+            cut = t - pd.Timedelta(days=days)
+            p0 = pre[pre["start"] <= cut].groupby("pid").tail(1).set_index("pid")["pre"].to_dict()
+            o0 = st.off.at(cut)
+            then[days] = {k: v - o0 for k, v in p0.items()}
         tour_last = st.rounds.sort_values("date").groupby("pid")["tour"].last().to_dict()
+        whatif = {}
+        if D is not None:
+            try:
+                whatif = D.what_if(key, list(cur["pid"]), D.outcomes_table(key))
+            except Exception:      # noqa: BLE001
+                logger.exception("what-if %s", key)
         rows = []
         cutoff = (today - timedelta(days=365)).isoformat()
         for i, x in enumerate(cur.itertuples(index=False)):
             m = meta.get(x.pid) or {}
-            yr = [r for r in results.get(x.pid, []) if (r[2] or "") >= cutoff]
+            allr = sorted(results.get(x.pid, []), key=lambda r: r[2] or "")
+            yr = [r for r in allr if (r[2] or "") >= cutoff]
+            last5 = [[r[0], r[3], r[4], r[5]] for r in allr[-5:]]
             rows.append({"rank": i + 1, "pid": x.pid, "name": m.get("name") or x.pid, "cc": m.get("country"),
                          "rt": _r(x.rating, 2), "wt": _r(x.weight, 1), "n": int(x.rounds), "last": str(x.last.date()),
-                         "tour": tour_last.get(x.pid), "d90": _r((x.rating) - (then[x.pid] - off90), 2) if x.pid in then else None,
+                         "tour": tour_last.get(x.pid),
+                         "d30": _r(x.rating - then[30][x.pid], 2) if x.pid in then[30] else None,
+                         "d90": _r(x.rating - then[90][x.pid], 2) if x.pid in then[90] else None,
+                         "d365": _r(x.rating - then[365][x.pid], 2) if x.pid in then[365] else None,
                          "starts": len(yr), "wins": sum(1 for r in yr if r[3] == 1 and r[5] == "finish"),
                          "top10": sum(1 for r in yr if r[3] is not None and r[3] <= 10 and r[5] == "finish"),
                          "cuts": sum(1 for r in yr if r[5] == "finish"), "earn": sum(r[7] or 0 for r in yr),
-                         "sg12": _r(np.mean([r[8] for r in yr if r[8] is not None]), 2) if any(r[8] is not None for r in yr) else None})
+                         "sg12": _r(np.mean([r[8] for r in yr if r[8] is not None]), 2) if any(r[8] is not None for r in yr) else None,
+                         "l5": last5, "wi": whatif.get(x.pid)})
         out[key] = rows
+        if D is not None:
+            try:
+                out[f"{key}_whatif"] = D.outcomes_table(key)
+            except Exception:      # noqa: BLE001
+                pass
     return out
 
 
-def _player_pages(out: Path, streams: dict, meta: dict, results: dict, rankings: dict, pages_index: dict, today: date) -> int:
+def _player_pages(out: Path, streams: dict, meta: dict, results: dict, rankings: dict, pages_index: dict, today: date, D=None) -> int:
     rank = {k: {r["pid"]: r for r in rankings[k]} for k in streams}
     n = 0
     for key, st in streams.items():
@@ -436,6 +536,11 @@ def _player_pages(out: Path, streams: dict, meta: dict, results: dict, rankings:
                     "last": str(st.book.t[pid].date()) if pid in st.book.t else None, "ranked": bool(rk),
                     "history": hist, "events": rows[::-1], "seasons": lines[::-1],
                     "summary": rk}
+            if D is not None:
+                try:
+                    page.update(D.player_extra(key, pid))
+                except Exception:  # noqa: BLE001
+                    logger.exception("player depth %s", pid)
             _write(out / "players" / f"{pid}.json", page)
             n += 1
     return n
@@ -451,7 +556,10 @@ def _calibration(ps: np.ndarray, ys: np.ndarray, edges: list[float]) -> list[dic
     return out
 
 
-def _model(out: Path, streams: dict, pages_index: dict, now: datetime) -> dict:
+PROMOTION = Path(__file__).resolve().parent / "models" / "promotion.json"
+
+
+def _model(out: Path, streams: dict, pages_index: dict, now: datetime, D=None) -> dict:
     men = streams["men"]
     d = men.sg.merge(men.pre[["event", "pid", "weight"]], on=["event", "pid"])
     rounds = {}
@@ -517,6 +625,8 @@ def _model(out: Path, streams: dict, pages_index: dict, now: datetime) -> dict:
             "sd": {"men": _r(streams["men"].sd, 3), "women": _r(streams["women"].sd, 3)},
             "sims": {"archive": SIMS_ARCHIVE, "now": SIMS_NOW}, "rounds": rounds, "events": events,
             "calibration": cal, "grid": grid,
+            "promotion": (_load(PROMOTION) or {}),
+            "cats": (D.lab() or {}).get("cats") if D is not None and D.cats else None,
             "coverage": {t: {"name": v["name"], "seasons": store.seasons(t), "holes": v["holes"]} for t, v in canon.TOURS.items()}}
 
 
@@ -549,11 +659,119 @@ def _index(out: Path, summaries: dict, rankings: dict, streams: dict, now: datet
             "counts": counts}
 
 
-def _search(out: Path, meta: dict, pages_index: dict) -> dict:
+def _search(out: Path, meta: dict, pages_index: dict, courses: dict | None = None) -> dict:
     players = []
     for p in sorted((out / "players").glob("*.json")):
         m = meta.get(p.stem) or {}
         players.append([p.stem, m.get("name") or p.stem, m.get("country")])
     events = [[eid, pi["name"], pi["season"], pi["tour"]] for eid, pi in pages_index.items()]
     events.sort(key=lambda x: (-int(x[2]), x[1] or ""))
-    return {"players": players, "events": events}
+    cs = [[c["id"], c["name"], c.get("tour")] for c in (courses or {}).values() if c.get("name")]
+    return {"players": players, "events": events, "courses": cs}
+
+
+def _overview(out: Path, D, idx: dict, rankings: dict, summaries: dict, pages_index: dict, results: dict, today: date,
+              now: datetime) -> dict:
+    """The landing page: the featured event, the week's digest, the power board, stories, leaders, who's for real."""
+    t = pd.Timestamp(today)
+    week = idx.get("week") or []
+    feat = None
+    for w in sorted(week, key=lambda w: (w["status"] != "live", not w.get("major"), w.get("tour") != "pga", -(w.get("purse") or 0))):
+        feat = w
+        break
+    # digest: final events that ended in the last 8 days (else the latest week)
+    finals = []
+    for tour, by in summaries.items():
+        for season in by:
+            for s0 in by[season]:
+                if s0.get("status") == "final" and s0.get("winner") and not s0.get("team"):
+                    finals.append({**s0, "tour": tour})
+    finals.sort(key=lambda s0: s0.get("end") or "", reverse=True)
+    recent = [f for f in finals if (f.get("end") or "") >= (today - timedelta(days=8)).isoformat()] or finals[:4]
+    low = None
+    for f in recent:
+        page = _load(out / "events" / f"{f['id']}.json") or {}
+        stn = page.get("stream")
+        if not stn or stn not in D.S:
+            continue
+        rf = D.S[stn]["rf"]
+        x = rf[(rf["event"] == f["id"]) & (rf["out"] + rf["in"] == rf["strokes"])]
+        if len(x):
+            r = x.loc[x["sg"].idxmax()]
+            if low is None or r["sg"] > low["sg"]:
+                low = {"pid": r["pid"], "name": (D.meta_p.get(r["pid"]) or {}).get("name"), "event": f["id"], "ev": f["name"],
+                       "round": int(r["round"]), "strokes": _int(r["strokes"]), "sg": _r(r["sg"], 2), "field": _r(r["field_par"], 2)}
+    long = min((f for f in recent if (f.get("winner") or {}).get("win") is not None), key=lambda f: f["winner"]["win"], default=None)
+    digest = {"from": min((f.get("start") or "") for f in recent) if recent else None, "to": max((f.get("end") or "") for f in recent) if recent else None,
+              "events": [{"id": f["id"], "name": f["name"], "tour": f["tour"], "major": f.get("major"), "winner": f.get("winner"),
+                          "fav": f.get("fav")} for f in recent[:8]],
+              "fav_won": sum(1 for f in recent if (f.get("winner") or {}).get("pid") == (f.get("fav") or {}).get("pid")),
+              "low": low, "longshot": {"id": long["id"], "name": long["name"], "winner": long["winner"]} if long else None}
+    # power board: the top 16 men and 8 women with the category parts where we have them
+    power = {}
+    for key in STREAMS:
+        W = D.S[key]["W"]
+        rows = []
+        for r in rankings[key][: 16 if key == "men" else 12]:
+            pid = r["pid"]
+            parts = {}
+            if pid in W.index:
+                w = W.loc[pid]
+                if all(c in W.columns and np.isfinite(w.get(c, np.nan)) for c in ("c_ott", "c_app", "c_arg", "c_putt")):
+                    parts = {"ott": _r(w["c_ott"], 2), "app": _r(w["c_app"], 2), "sg": _r(w["c_arg"] + w["c_putt"], 2)}
+                    parts["other"] = _r(r["rt"] - sum(parts.values()), 2)
+            rows.append({**{k: r.get(k) for k in ("rank", "pid", "name", "cc", "rt", "d30", "d90", "tour", "wins", "top10", "starts", "l5")}, "parts": parts or None})
+        power[key] = rows
+    # stories: risers and fallers over 90 days, hottest form against rating, the longest made-cut run
+    stories = []
+    for key in STREAMS:
+        rk = [r for r in rankings[key][:150] if r.get("d90") is not None]
+        if rk:
+            up = max(rk, key=lambda r: r["d90"])
+            dn = min(rk, key=lambda r: r["d90"])
+            for kind, r in (("riser", up), ("faller", dn)):
+                st = D.S[key]["st"]
+                g = st.pre[(st.pre["pid"] == r["pid"]) & (st.pre["start"] >= t - pd.Timedelta(days=365))].sort_values("start")
+                spark = [_r(v - st.off.at(d0), 2) for d0, v in zip(g["start"], g["pre"])][-20:]
+                stories.append({"kind": kind, "stream": key, "pid": r["pid"], "name": r["name"], "d": r["d90"], "rt": r["rt"], "spark": spark})
+        W = D.S[key]["W"]
+        if "form" in W.columns:
+            q = W[W["q"] & W["form"].notna()]
+            if len(q):
+                hot = (q["form"] - q["rt"]).idxmax()
+                stories.append({"kind": "hot", "stream": key, "pid": hot, "name": (D.meta_p.get(hot) or {}).get("name"),
+                                "form": _r(q.loc[hot, "form"], 2), "rt": _r(q.loc[hot, "rt"], 2)})
+        best = None
+        for r in rankings[key][:200]:
+            rs = sorted(results.get(r["pid"], []), key=lambda x: x[2] or "")
+            n = 0
+            for x in reversed(rs):
+                if x[5] == "finish":
+                    n += 1
+                elif x[5] == "cut":
+                    break
+            if best is None or n > best[1]:
+                best = (r, n)
+        if best and best[1] >= 8:
+            stories.append({"kind": "cuts", "stream": key, "pid": best[0]["pid"], "name": best[0]["name"], "n": best[1]})
+    # leaders on the key metrics (the board's qualified players)
+    stars = []
+    for key in STREAMS:
+        W = D.S[key]["W"]
+        q = W[W["q"]]
+        for m in ("sg", "form", "dist", "acc", "gir", "ppg", "h5", "bird", "bog", "sd"):
+            if m not in q.columns or q[m].notna().sum() < 10:
+                continue
+            lower = DP.A.METRICS[m][3] == "lower"
+            o = q[m].dropna().sort_values(ascending=lower)
+            a, b = o.index[0], o.index[1]
+            stars.append({"stream": key, "m": m, "label": DP.A.METRICS[m][0], "pid": a, "name": (D.meta_p.get(a) or {}).get("name"),
+                          "v": _r(o.iloc[0], 4), "next": {"pid": b, "name": (D.meta_p.get(b) or {}).get("name"), "v": _r(o.iloc[1], 4)},
+                          "tour": W.loc[a, "tour"]})
+    # who's for real: rating against the top-10 rate over 12 months
+    real = {}
+    for key in STREAMS:
+        real[key] = [{"pid": r["pid"], "name": r["name"], "x": r["rt"], "y": _r(r["top10"] / r["starts"], 3), "n": r["starts"]}
+                     for r in rankings[key][:60] if r.get("starts", 0) >= 8]
+    return {"updated_at": now.isoformat(timespec="minutes"), "featured": feat, "digest": digest, "power": power,
+            "stories": stories, "stars": stars, "real": real}

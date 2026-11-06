@@ -9,6 +9,12 @@ current season's scoreboard is fetched every run. A spent call budget stops clea
     python scripts/golf_fetch.py                              # every tour, its current season
     python scripts/golf_fetch.py --tours pga --seasons 2001-2026
     python scripts/golf_fetch.py --tours pga eur liv lpga --backfill
+    python scripts/golf_fetch.py --stats --bios --budget 6000  # season statistics and bios still missing (6 Nov 2026)
+
+Season statistics (--stats): one ESPN core call per player and season for the tours in canon.STATS_TOURS from
+canon.STATS_FROM, for every player with STATS_MIN_ROUNDS rounds in the season; a past season's answer (or its 404) is
+kept for good, the current season's is re-read after STATS_MAX_AGE_D days. Bios (--bios): one call per player with
+BIO_MIN_ROUNDS rounds, kept for good. Both write under data/golf (stats/<tour>/<season>.json, bios.json).
 """
 from __future__ import annotations
 
@@ -127,6 +133,83 @@ def fetch_season(c, tour: str, season: int, today: date, max_age_h: float = 0.0)
     return {"events": len(sb["events"]), "fetched": len(done)}
 
 
+STATS_MIN_ROUNDS = 8
+STATS_MAX_AGE_D = 7
+BIO_MIN_ROUNDS = 20
+
+
+def fetch_stats(c, tour: str, season: int, today: date) -> int:
+    """Season statistics of the season's regulars still missing (or stale in the current season). Returns calls made."""
+    rnd = store.load_table(tour, season, "rounds")
+    if not len(rnd):
+        return 0
+    cnt = rnd.groupby("pid").size()
+    pids = sorted(cnt[cnt >= STATS_MIN_ROUNDS].index.astype(str))
+    have = store.load_stats(tour, season)
+    now = datetime.now(timezone.utc)
+
+    def due(pid: str) -> bool:
+        x = have.get(pid)
+        if x is None:
+            return True
+        if season < today.year:
+            return False
+        try:
+            return (now - datetime.fromisoformat(x.get("_at"))).days >= STATS_MAX_AGE_D
+        except (TypeError, ValueError):
+            return True
+    todo = [p for p in pids if due(p)]
+    n = 0
+    try:
+        for pid in todo:
+            row = espn.parse_stats(espn.season_stats(c, tour, season, pid))
+            row["_at"] = now.isoformat(timespec="seconds")
+            have[pid] = row
+            n += 1
+            if n % 50 == 0:
+                store.save_stats(tour, season, have)
+    finally:
+        if n:
+            store.save_stats(tour, season, have)
+            logger.info("%s %s stats: %d fetched, %d of %d regulars on file", tour, season, n, len(have), len(pids))
+    return n
+
+
+def fetch_bios(c, today: date) -> int:
+    """Bios of every player with BIO_MIN_ROUNDS rounds, not yet on file (a 404 is kept as {} and not asked again)."""
+    from collections import Counter
+    rounds: Counter = Counter()
+    tour_of: dict = {}
+    for tour in canon.TOURS:
+        for season in store.seasons(tour):
+            r = store.load_table(tour, season, "rounds")
+            if len(r):
+                vc = r["pid"].astype(str).value_counts()
+                for pid, k in vc.items():
+                    rounds[pid] += int(k)
+                    tour_of.setdefault(pid, Counter())[tour] += int(k)
+    bios = store.load_bios()
+    todo = sorted((p for p, k in rounds.items() if k >= BIO_MIN_ROUNDS and p not in bios), key=lambda p: -rounds[p])
+    n = 0
+    try:
+        for pid in todo:
+            tours = [t for t, _ in tour_of[pid].most_common()]
+            row: dict = {}
+            for t in tours[:2]:
+                row = espn.parse_athlete(espn.athlete(c, t, pid))
+                n += 1
+                if row:
+                    break
+            bios[pid] = row
+            if n % 50 == 0:
+                store.save_bios(bios)
+    finally:
+        if n:
+            store.save_bios(bios)
+            logger.info("bios: %d calls, %d players on file", n, len(bios))
+    return n
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--tours", nargs="*", default=list(canon.TOURS), choices=list(canon.TOURS))
@@ -137,14 +220,24 @@ def main(argv=None) -> int:
     ap.add_argument("--max-age-h", type=float, default=0.0,
                     help="re-read the current season's full scoreboard only when the last read is older than this; "
                          "between, this week's scoreboard only (0: always the full season)")
+    ap.add_argument("--stats", action="store_true", help="season statistics still missing (canon.STATS_TOURS)")
+    ap.add_argument("--bios", action="store_true", help="player bios still missing")
+    ap.add_argument("--only-extras", action="store_true", help="with --stats/--bios: skip the scoreboards")
     a = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
     today = date.fromisoformat(a.today) if a.today else date.today()
     c = espn.client(budget=a.budget)
     try:
-        for tour in a.tours:
-            for season in _seasons(a.seasons, tour, a.backfill, today):
-                fetch_season(c, tour, season, today, a.max_age_h)
+        if not a.only_extras:
+            for tour in a.tours:
+                for season in _seasons(a.seasons, tour, a.backfill, today):
+                    fetch_season(c, tour, season, today, a.max_age_h)
+        if a.stats:
+            for tour in canon.STATS_TOURS:
+                for season in range(today.year, canon.STATS_FROM - 1, -1):
+                    fetch_stats(c, tour, season, today)
+        if a.bios:
+            fetch_bios(c, today)
     except espn.BudgetExhausted as exc:
         logger.warning("%s; the next run resumes", exc)
     logger.info("calls: %s", c.report())

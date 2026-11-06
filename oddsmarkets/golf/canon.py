@@ -6,6 +6,12 @@ Coverage measured on 4 Nov 2026 (one leaderboard per tour and year):
   eur   round scores from about 2019 (an empty 2018 leaderboard); no hole-by-hole in the scoreboard
   liv   2022 on: three rounds, 54 players
   lpga  patchy: 2015 and 2019 leaderboards carry no rounds
+  ntw   the Korn Ferry Tour (ESPN slug ntw), added 6 Nov 2026: the PGA Tour's feeder, round scores from 2019
+
+Season statistics (sports.core.api.espn.com .../athletes/<id>/statistics, one call per player and season), probed on
+6 Nov 2026: the PGA Tour carries driving distance and accuracy, greens in regulation, putts per green hit and sand
+saves from 2017 (2015 and 2016 are empty); the LPGA's carry scoring and results only; the DP World Tour, LIV and the
+Korn Ferry Tour answer 404. STATS_TOURS and STATS_FROM say which seasons are fetched.
 """
 from __future__ import annotations
 
@@ -14,7 +20,10 @@ TOURS: dict[str, dict] = {
     "eur": {"name": "DP World Tour", "short": "DPWT", "from": 2019, "holes": False},
     "liv": {"name": "LIV Golf", "short": "LIV", "from": 2022, "holes": False},
     "lpga": {"name": "LPGA Tour", "short": "LPGA", "from": 2021, "holes": False},
+    "ntw": {"name": "Korn Ferry Tour", "short": "KFT", "from": 2019, "holes": True},
 }
+STATS_TOURS = ("pga",)
+STATS_FROM = 2017
 
 # a player's finish at an event (leaderboard competitor status)
 STATUS = {"STATUS_FINISH": "finish", "STATUS_CUT": "cut", "STATUS_WD": "wd", "STATUS_WITHDRAWN": "wd",

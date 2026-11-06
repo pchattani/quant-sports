@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>The Quant Green</title>
-<meta name="description" content="Golf by the numbers: our chances for every PGA Tour, DP World Tour, LIV and LPGA event from simulated tournaments, player ratings in strokes gained per round, leaderboards, hole-by-hole scoring and how our forecasts have done.">
+<meta name="description" content="Golf by the numbers: our chances for every PGA Tour, DP World Tour, LIV, Korn Ferry and LPGA event from simulated tournaments, ratings in strokes gained per round, a Scouting Room of player percentiles, course fit, a Lab, records and how our forecasts have done.">
 <meta property="og:site_name" content="The Quant Green">
 <meta property="og:title" content="The Quant Green">
 <meta property="og:description" content="Our golf forecasts and ratings: win, top 10 and cut chances for every event, strokes gained per round, leaderboards and hole scoring.">
@@ -27,7 +27,7 @@
 
 <template id="disclaimer-template"><div class="qk-legal">
   <h3>Disclaimer and terms of use</h3>
-  <p class="qk-sub">Last updated 4 November 2026</p>
+  <p class="qk-sub">Last updated 6 November 2026</p>
   <p>The Quant Green is an independent, non-commercial hobby project that applies statistical models to publicly
   available golf results. By using this site you agree to the terms below. If you do not agree, please do not use the site.</p>
   <h4>1. Not betting, financial or professional advice</h4>
@@ -63,10 +63,12 @@
   marks belong to their owners and appear only to identify the events and competitors discussed and to report factual
   sporting statistics. No logos are used. This site does not use the PGA TOUR&rsquo;s ShotLink data.</p>
   <h4>6. Data sources</h4>
-  <p>Schedules, leaderboards, round and hole-by-hole scores, courses and prize money come from ESPN&rsquo;s public golf
-  scoreboards and leaderboards. ESPN owns its data and is not responsible for this site or its models. Statistics shown
-  here are derived and transformed (strokes gained against the field, ratings, simulations) and may differ from official
-  records.</p>
+  <p>Schedules, leaderboards, round and hole-by-hole scores, courses, prize money, PGA Tour season statistics (driving,
+  greens, putting, sand saves) and player bios come from ESPN&rsquo;s public golf feeds. ESPN owns its data and is not
+  responsible for this site or its models. Statistics shown here are derived and transformed (strokes gained against the
+  field, ratings, percentiles, our estimate of strokes gained by category, simulations, a points ranking of our own) and
+  may differ from official records. The PGA TOUR&rsquo;s ShotLink data, Data Golf&rsquo;s data and the Official World
+  Golf Ranking&rsquo;s data are not used.</p>
   <h4>7. Rights holders and corrections</h4>
   <p>If you own rights in any material on this site and object to its use, or you spot an error, contact the author
   through <a href="https://github.com/pchattani" target="_blank" rel="noopener">GitHub (@pchattani)</a>. Material will be
@@ -93,9 +95,17 @@
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js" defer></script>
 <script src="assets/qk/quant.js" defer></script>
 <script src="assets/qk/quant-charts.js" defer></script>
+<script src="assets/qk/scout.js" defer></script>
+<script src="assets/qk/league.js" defer></script>
 <script src="assets/app/core.js" defer></script>
+<script src="assets/app/overview.js" defer></script>
 <script src="assets/app/pages.js" defer></script>
 <script src="assets/app/event.js" defer></script>
+<script src="assets/app/rankings.js" defer></script>
+<script src="assets/app/scout.js" defer></script>
+<script src="assets/app/player.js" defer></script>
+<script src="assets/app/lab.js" defer></script>
+<script src="assets/app/model.js" defer></script>
 <script src="assets/app/boot.js" defer></script>
 </body>
 </html>

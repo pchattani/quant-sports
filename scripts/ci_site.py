@@ -257,13 +257,20 @@ def guard_green(ctx: dict) -> list[str]:
     base = ROOT / "data/golf"
     year = ctx["today"].year
     out = []
-    first = {"pga": 2001, "eur": 2020, "liv": 2022, "lpga": 2021}
+    first = {"pga": 2001, "eur": 2020, "liv": 2022, "lpga": 2021, "ntw": 2019}
     for tour in canon.TOURS:
         missing = [y for y in range(first[tour], year + 1) if not (base / tour / str(y) / "events.json").exists()]
         if missing:
             out.append(f"{tour} season stores missing for {len(missing)} seasons ({missing[0]}..{missing[-1]})")
     if not (base / "players.json").exists():
         out.append("golf players file missing")
+    # the Scouting Room's ball striking and the Lab's category fit read every PGA Tour season's statistics (6 Nov 2026)
+    for tour in canon.STATS_TOURS:
+        miss = [y for y in range(canon.STATS_FROM, year) if not (base / "stats" / tour / f"{y}.json").exists()]
+        if miss:
+            out.append(f"{tour} season statistics missing for {len(miss)} seasons ({miss[0]}..{miss[-1]})")
+    if not (base / "bios.json").exists():
+        out.append("golf bios file missing")
     return out
 
 
