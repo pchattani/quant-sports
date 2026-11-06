@@ -4,6 +4,7 @@
   font: 500 var(--fs-sm)/1.45 var(--font-ui); color: var(--ink-2); max-width: 980px; margin: 0 auto; }
 .gr-notice a { color: var(--ink-1); }
 @media (max-width: 640px) { .gr-notice { flex-direction: column; align-items: stretch; } }
+.gr-notice[hidden] { display: none; }   /* the flex rule above would otherwise beat the hidden attribute */
 
 .gr-controls { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; margin: 0 0 var(--sp-4); }
 .gr-controls label { font: 700 12px/1 var(--font-cond); text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); }
