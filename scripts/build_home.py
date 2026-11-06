@@ -107,7 +107,7 @@ PENDING = [
     ("golf", "green", "green", "Golf", "The Quant Green"),
     ("powerlifting", "iron", "iron", "Powerlifting", "The Quant Iron"),
 ]
-LAUNCHED: set[str] = {"college", "rugby"}   # Campus 21 Oct 2026; Scrum 2 Nov 2026. Tennis, golf, powerlifting stay off the hub.
+LAUNCHED: set[str] = {"college", "rugby", "golf", "powerlifting"}   # Campus 21 Oct; Scrum 2 Nov; Green and Iron 6 Nov 2026. Tennis stays off the hub.
 STALE_HOURS = 6   # a sport whose input is older than this is flagged stale in home.json
 
 # Football competitions in rough order of how many fans care; used to pick which fixtures

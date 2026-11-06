@@ -170,10 +170,12 @@ def test_follow_card_registry_matches_the_published_scopes():
     sites = dict((m.group(1), re.findall(r"'([a-z]+)'", m.group(2))) for m in re.finditer(r"(\w+): \[([^\]]*)\]", reg))
     assert sites == {"bullpen": ["mlb", "aaa"], "site": ["club"], "rink": ["team"], "gridiron": ["team"], "hardwood": ["nba", "wnba"],
                      "campus": ["cfb", "mbb", "wbb", "mch", "wch"], "ace": ["atp", "wta"], "paddock": ["driver", "team"],
-                     "scrum": ["men", "women"]}
-    assert set(sites) == set(design_kit.SITE_SPORT)
+                     "scrum": ["men", "women"], "iron": ["lifter"]}
+    # Iron writes its own metric catalogue into data/ (powerlifting/pages.py _labels), so it has no kit metrics file
+    assert set(sites) - {"iron"} == set(design_kit.SITE_SPORT)
     src = lambda f: (ROOT / "scripts" / f).read_text(encoding="utf-8")
     pkg = lambda f: (ROOT / "oddsmarkets" / f).read_text(encoding="utf-8")
+    assert 'FL.write_cards(out / "follow", "lifter", cards)' in pkg("powerlifting/pages.py")
     b = src("build_bullpen.py")
     assert 'for lvl in ("mlb", "aaa"):' in b and "FLB.build(data, lvl" in b
     assert "football_follow.build(DATA_DIR)" in src("build_site_all.py")

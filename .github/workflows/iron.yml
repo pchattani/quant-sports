@@ -35,7 +35,7 @@ env:
 jobs:
   update:
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 70
     steps:
       - name: 'Checkout'
         uses: actions/checkout@v5
@@ -91,7 +91,7 @@ jobs:
 
       - name: 'Build'
         id: build
-        timeout-minutes: 25
+        timeout-minutes: 40
         run: |
           uv run --frozen python scripts/build_iron.py
 

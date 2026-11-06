@@ -31,7 +31,8 @@ def main(argv=None) -> int:
     stamp = store.load_stamp()
     zip_path = store.root() / "openpowerlifting-latest.zip"
     info = opl.download(zip_path, etag=None if a.force else stamp.get("etag"))
-    if not info["changed"] and store.entries_path().exists() and not a.force:
+    # a store from an older parse (schema 1 had no attempts) is re-parsed from the cached zip, without a download
+    if not info["changed"] and store.entries_path().exists() and not a.force and stamp.get("schema", 1) >= opl.SCHEMA:
         logger.info("zip unchanged (%s bytes)", info["bytes"])
         return 0
     counts = opl.ingest(zip_path)

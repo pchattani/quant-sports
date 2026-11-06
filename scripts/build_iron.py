@@ -49,6 +49,7 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--today", help="YYYY-MM-DD (default: today)")
     ap.add_argument("--no-kit", action="store_true")
+    ap.add_argument("--force", action="store_true", help="rebuild even if the dump, code and day are unchanged")
     a = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="[build_iron] %(levelname)s %(message)s")
     t0 = time.perf_counter()
@@ -59,8 +60,18 @@ def main(argv=None) -> int:
         step("kit", lambda: __import__("design_kit").copy_kit(SITE), report)
 
     def payloads():
-        from oddsmarkets.powerlifting import pages
-        return pages.build(data, today=date.fromisoformat(a.today) if a.today else None)
+        import json
+        from oddsmarkets.powerlifting import pages, store
+        today = date.fromisoformat(a.today) if a.today else date.today()
+        # the dump changes weekly and the build is hourly: skip when the last build saw the same dump, code and day
+        prev = data / "build.json"
+        if prev.exists() and not a.force:
+            b = json.loads(prev.read_text(encoding="utf-8"))
+            if (b.get("model") == pages.MODEL_VERSION and b.get("today") == today.isoformat()
+                    and b.get("stamp") == store.load_stamp().get("etag") and (data / "index.json").exists()):
+                log.info("payloads: unchanged dump, code and day since %s: skipped (--force rebuilds)", b.get("updated_at"))
+                return {"skipped": True}
+        return pages.build(data, today=today)
     counts = step("payloads", payloads, report)
     if counts:
         log.info("payloads: %s", counts)

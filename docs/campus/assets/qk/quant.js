@@ -319,10 +319,10 @@ QK.ALL_SPORTS = [
   { key: 'college',    label: 'College',    site: 'The Quant Campus',     repo: 'the-quant-campus',     folder: 'campus',   leagues: 'CFB · Men’s and women’s college basketball' },
   /* The Quant Scrum (international rugby union), launched 2 Nov 2026 */
   { key: 'rugby',      label: 'Rugby',      site: 'The Quant Scrum',      repo: 'the-quant-scrum',      folder: 'scrum',    leagues: 'Men’s tests · Six Nations, Rugby Championship, World Cup' },
-  /* The Quant Green (golf: PGA Tour, DP World Tour, LIV, LPGA), built 4 Nov 2026 */
-  { key: 'golf',       label: 'Golf',       site: 'The Quant Green',      repo: 'the-quant-green',      folder: 'green',    leagues: 'PGA Tour · DP World Tour · LIV · LPGA', pending: true },
-  /* The Quant Iron (powerlifting), built 4 Nov 2026 */
-  { key: 'powerlifting', label: 'Powerlifting', site: 'The Quant Iron', repo: 'the-quant-iron', folder: 'iron', leagues: 'Raw · Wraps · Equipped · OpenPowerlifting archive', pending: true }
+  /* The Quant Green (golf: PGA Tour, DP World Tour, LIV, LPGA), built 4 Nov 2026, on the hub 6 Nov */
+  { key: 'golf',       label: 'Golf',       site: 'The Quant Green',      repo: 'the-quant-green',      folder: 'green',    leagues: 'PGA Tour · DP World Tour · LIV · LPGA' },
+  /* The Quant Iron (powerlifting), built 4 Nov 2026, on the hub 6 Nov */
+  { key: 'powerlifting', label: 'Powerlifting', site: 'The Quant Iron', repo: 'the-quant-iron', folder: 'iron', leagues: 'Raw · Wraps · Equipped · OpenPowerlifting archive' }
 ];
 QK.ALL_SPORTS.forEach(function (s) { s.url = PUB + s.repo + '/'; s.data = s.url + 'data/'; s.accent = 'var(--a-' + s.key + ')'; });
 QK.sport = function (key) { for (var i = 0; i < QK.ALL_SPORTS.length; i++) if (QK.ALL_SPORTS[i].key === key) return QK.ALL_SPORTS[i]; return null; };
@@ -2714,11 +2714,11 @@ var FOLLOW_KEY = 'qk-follow-v1', FOLLOW_MAX = 30;
 var FOLLOW_K = /^[a-z]+:[a-z0-9_]+:[A-Za-z0-9_.\-]+$/;
 /* the sites and scopes that publish follow cards (docs/<site>/data/follow/<scope>/<id>.json) */
 QK.FOLLOW_CARDS = { bullpen: ['mlb', 'aaa'], site: ['club'], rink: ['team'], gridiron: ['team'], hardwood: ['nba', 'wnba'],
-  campus: ['cfb', 'mbb', 'wbb', 'mch', 'wch'], ace: ['atp', 'wta'], paddock: ['driver', 'team'], scrum: ['men', 'women'] };
+  campus: ['cfb', 'mbb', 'wbb', 'mch', 'wch'], ace: ['atp', 'wta'], paddock: ['driver', 'team'], scrum: ['men', 'women'], iron: ['lifter'] };
 /* what each scope is called, for chips, notes and the picker */
 QK.FOLLOW_SCOPES = { mlb: 'MLB', aaa: 'Triple-A', nba: 'NBA', wnba: 'WNBA', club: 'Football', team: 'Team', cfb: 'College football',
   mbb: 'Men’s college basketball', wbb: 'Women’s college basketball', mch: 'Men’s college hockey', wch: 'Women’s college hockey',
-  atp: 'ATP', wta: 'WTA', driver: 'Driver', men: 'Men’s rugby', women: 'Women’s rugby' };
+  atp: 'ATP', wta: 'WTA', driver: 'Driver', men: 'Men’s rugby', women: 'Women’s rugby', lifter: 'Lifter' };
 var followFns = [], followCache = {};
 function folderSport(folder) { for (var i = 0; i < QK.ALL_SPORTS.length; i++) if (QK.ALL_SPORTS[i].folder === folder) return QK.ALL_SPORTS[i]; return null; }
 function fClean(x) {

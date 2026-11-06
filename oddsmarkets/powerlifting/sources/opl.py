@@ -14,6 +14,7 @@ from pathlib import Path
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
+import numpy as np
 import pandas as pd
 
 from .. import canon, store
@@ -30,7 +31,13 @@ KEEP = [
     "Best3SquatKg", "Best3BenchKg", "Best3DeadliftKg", "TotalKg", "Place", "Dots", "Goodlift",
     "Tested", "Country", "Federation", "ParentFederation", "Date", "MeetCountry", "MeetState",
     "MeetName", "Sanctioned",
+    # schema 2 (6 Nov 2026): attempts (negative = missed), Wilks, the age class and the birth-year class
+    "Squat1Kg", "Squat2Kg", "Squat3Kg", "Bench1Kg", "Bench2Kg", "Bench3Kg",
+    "Deadlift1Kg", "Deadlift2Kg", "Deadlift3Kg", "Wilks", "AgeClass", "BirthYearClass",
 ]
+SCHEMA = 2
+ATTEMPTS = {"s1": "Squat1Kg", "s2": "Squat2Kg", "s3": "Squat3Kg", "b1": "Bench1Kg", "b2": "Bench2Kg", "b3": "Bench3Kg",
+            "d1": "Deadlift1Kg", "d2": "Deadlift2Kg", "d3": "Deadlift3Kg"}
 
 
 def _open(url: str, method: str = "GET", etag: str | None = None, timeout: int = 180):
@@ -97,7 +104,8 @@ def parse_zip(path: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
         df = df[df["Sanctioned"].fillna("Yes").isin(["Yes", ""])]
     df["eq"] = df["Equipment"].map(canon.EQ_GROUP)
     df = df[df["eq"].notna()]
-    for c in ("BodyweightKg", "Best3SquatKg", "Best3BenchKg", "Best3DeadliftKg", "TotalKg", "Dots", "Goodlift", "Age"):
+    for c in ("BodyweightKg", "Best3SquatKg", "Best3BenchKg", "Best3DeadliftKg", "TotalKg", "Dots", "Goodlift", "Age",
+              "Wilks", *ATTEMPTS.values()):
         if c in df.columns:
             df[c] = pd.to_numeric(df[c], errors="coerce")
     df["tested"] = df["Tested"].fillna("").eq("Yes") if "Tested" in df.columns else False
@@ -133,7 +141,12 @@ def parse_zip(path: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
         "meet_country": df["MeetCountry"],
         "meet_state": df["MeetState"] if "MeetState" in df.columns else "",
         "division": df["Division"] if "Division" in df.columns else "",
+        "wilks": df["Wilks"] if "Wilks" in df.columns else pd.NA,
+        "age_class": df["AgeClass"] if "AgeClass" in df.columns else "",
+        "byc": df["BirthYearClass"] if "BirthYearClass" in df.columns else "",
     })
+    for k, col in ATTEMPTS.items():
+        entries[k] = (df[col] if col in df.columns else pd.Series(np.nan, index=df.index)).astype("float32")
     meets = (
         entries.groupby("meet_id", as_index=False)
         .agg(date=("date", "first"), name=("meet_name", "first"), fed=("fed", "first"),
@@ -150,5 +163,5 @@ def ingest(zip_path: Path) -> dict:
     entries, meets = parse_zip(zip_path)
     store.save_table(store.entries_path(), entries)
     store.save_table(store.meets_path(), meets)
-    return {"entries": len(entries), "meets": len(meets), "from": str(entries["date"].min()) if len(entries) else None,
+    return {"schema": SCHEMA, "entries": len(entries), "meets": len(meets), "from": str(entries["date"].min()) if len(entries) else None,
             "to": str(entries["date"].max()) if len(entries) else None}

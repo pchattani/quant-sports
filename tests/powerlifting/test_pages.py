@@ -54,7 +54,14 @@ def test_build_writes_index_rankings_meet_and_lifter(tmp_path, monkeypatch):
     player_files = list((out / "players").glob("*.json"))
     assert player_files
     pl = json.loads(player_files[0].read_text(encoding="utf-8"))
-    assert pl["hist"] and "pre" in pl["hist"][0]
+    assert pl["log"] and "exp" in pl["log"][0] and len(pl["log"][0]["a"]) == 9
+    for f in ("lab.json", "records.json", "glossary.json", "search.json", "build.json"):
+        assert (out / f).exists(), f
+    scout = json.loads((out / "scout" / "men_raw.json").read_text(encoding="utf-8"))
+    assert scout["cols"][:2] == ["id", "n"] and {m["id"] for m in scout["metrics"]} >= {"rt", "dots", "make"}
+    assert list((out / "follow" / "lifter").glob("*.json"))
+    rows = rk["streams"]["men_raw"]["rows"]
+    assert all("pg" in r for r in rows) and rows[0]["rank"] == 1
     years = json.loads((out / "schedule" / "years.json").read_text(encoding="utf-8"))
     sched = json.loads((out / "schedule" / f"{years['years'][-1]}.json").read_text(encoding="utf-8"))
     assert sched["meets"][0]["page"] is True

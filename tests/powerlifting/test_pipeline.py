@@ -35,10 +35,11 @@ def test_export_allowlist():
     assert c("tests/powerlifting/test_dots.py") == "public"
 
 
-def test_kit_powerlifting_entry_is_pending_until_the_hub_launch():
+def test_kit_powerlifting_entry_is_launched():
     js = (ROOT / "docs" / "_design" / "quant.js").read_text(encoding="utf-8")
     line = [ln for ln in js.splitlines() if "key: 'powerlifting'" in ln][0]
-    assert "site: 'The Quant Iron'" in line and "repo: 'the-quant-iron'" in line and "pending: true" in line
+    assert "site: 'The Quant Iron'" in line and "repo: 'the-quant-iron'" in line
+    assert "pending: true" not in line
     assert "powerlifting: { fixtures: 'Meets'" in js and "  powerlifting: '<svg" in js
     css = (ROOT / "docs" / "_design" / "tokens.css").read_text(encoding="utf-8")
     assert css.count("--a-powerlifting:") == 1
@@ -47,8 +48,9 @@ def test_kit_powerlifting_entry_is_pending_until_the_hub_launch():
     spec = importlib.util.spec_from_file_location("build_home", ROOT / "scripts" / "build_home.py")
     bh = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(bh)
-    assert "powerlifting" in [s[0] for s in bh.PENDING] and "powerlifting" not in bh.LAUNCHED
+    assert "powerlifting" in [s[0] for s in bh.PENDING] and "powerlifting" in bh.LAUNCHED
     assert "powerlifting" in bh.BUILDERS
+    assert "iron: ['lifter']" in js and "lifter: 'Lifter'" in js
 
 
 def test_front_end_has_no_optional_chaining():

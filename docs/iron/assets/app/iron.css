@@ -28,3 +28,73 @@
 .ir-delta.down { color: var(--ink-3); }
 .ir-credit { margin: 8px 0 0; font: 400 var(--fs-xs, 0.75rem)/1.45 var(--font-ui); color: var(--ink-3); max-width: 720px; }
 .ir-credit a { color: var(--ink-2); }
+
+/* 6 Nov 2026: the rebuild to the sister sites' depth (the Scrum's scrum.css is the pattern). Tokens only. */
+body.qk { font-size: var(--fs-md); }
+#app, .ir-page { min-width: 0; }
+.ir-page a:not([class]) { color: var(--signal); }
+.ir-page a:not([class]):hover { text-decoration: underline; text-underline-offset: 3px; }
+.ir-sh { margin-bottom: var(--sp-4); }
+.ir-sec { margin-bottom: var(--sp-6); }
+.ir-card, .ir-page > .qk-card { margin-bottom: var(--sp-4); }
+.ir-gap { margin-bottom: var(--sp-4); align-items: start; }
+.ir-gap > * { min-width: 0; }
+.qk-g2 > .ir-card, .qk-g75 > div > .ir-card { margin-bottom: 0; }
+.qk-g2 > div > .ir-card + .ir-card, .qk-g75 > div > .ir-card + .ir-card { margin-top: var(--sp-4); }
+.ir-note { color: var(--ink-3); font-size: var(--fs-xs); margin: var(--sp-2) 0 var(--sp-3); max-width: 900px; line-height: 1.5; }
+.ir-note b { color: var(--ink-2); }
+.ir-crumb { color: var(--ink-3); font: 600 var(--fs-xs)/1.4 var(--font-cond); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: var(--sp-3); }
+.ir-crumb a { color: var(--signal); }
+.ir-tabs { margin-bottom: var(--sp-5); overflow-x: auto; }
+.ir-tabs a.qk-tab { display: inline-flex; align-items: center; }
+.ir-h2 { font: 400 1.8rem/1 var(--font-display); text-transform: uppercase; color: var(--ink-1); margin: var(--sp-6) 0 var(--sp-3); }
+.ir-flight { font: 700 var(--fs-sm)/1.3 var(--font-cond); text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-2); margin: var(--sp-4) 0 var(--sp-2); }
+.ir-flight small { color: var(--ink-3); font-weight: 500; margin-left: 6px; }
+.pos { color: var(--up); }
+.neg { color: var(--down); }
+.ir-pr { display: inline-block; padding: 0 4px; font: 700 10px/1.5 var(--font-cond); letter-spacing: 0.04em; color: var(--volt-ink, #000); background: var(--volt); vertical-align: 1px; }
+.ir-list li .v { font: 700 var(--fs-sm)/1.2 var(--font-num); color: var(--ink-1); text-align: right; }
+.ir-list li .v.pos { color: var(--up); }
+.ir-list li .v.neg { color: var(--down); }
+.ir-bul li { grid-template-columns: 1fr; }
+
+/* attempts: three groups of three chips */
+.ir-atts { display: inline-flex; gap: 6px; flex-wrap: nowrap; white-space: nowrap; }
+.ir-att { display: inline-flex; gap: 2px; }
+.ir-att i { font: 600 11px/1.6 var(--font-num); font-style: normal; padding: 0 3px; min-width: 26px; text-align: center; background: var(--s-3); color: var(--ink-1); }
+.ir-att i.x { color: var(--ink-3); text-decoration: line-through; background: transparent; outline: 1px solid var(--line-2); outline-offset: -1px; }
+.ir-att i.na { color: var(--ink-4); background: transparent; }
+
+/* overview */
+.ir-meets { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--sp-3); }
+.ir-meetcard { text-decoration: none; color: inherit; display: block; }
+.ir-mc-k { font: 700 11px/1.3 var(--font-cond); text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); }
+.ir-mc-n { font: 700 var(--fs-md)/1.25 var(--font-ui); color: var(--ink-1); margin: 4px 0 10px; }
+.ir-mc-row { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 2px 8px; margin: 6px 0; font-size: var(--fs-sm); }
+.ir-mc-row span { color: var(--ink-3); font-size: var(--fs-xs); }
+.ir-mc-row b { color: var(--ink-1); font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.ir-mc-row em { grid-column: 2; font-style: normal; color: var(--ink-2); font-size: var(--fs-xs); }
+.ir-mc-foot { margin-top: 10px; color: var(--ink-3); font-size: var(--fs-xs); }
+.ir-pw-tabs { margin: 0 0 var(--sp-3); overflow-x: auto; max-width: 100%; }
+.ir-pw-tabs .qk-seg { flex-wrap: wrap; }
+
+/* scouting room */
+.ir-floor { color: var(--ink-3); font-size: var(--fs-xs); margin: 0 0 var(--sp-3); }
+.ir-min { display: inline-flex; align-items: center; gap: 8px; }
+.ir-min input { width: 120px; }
+.ir-top { margin: var(--sp-4) 0; }
+.ir-view { margin-top: var(--sp-3); min-width: 0; }
+.ir-chart-t { font: 700 var(--fs-md)/1.3 var(--font-cond); text-transform: uppercase; color: var(--ink-1); margin: var(--sp-4) 0 var(--sp-2); }
+.ir-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: var(--fs-xs); color: var(--ink-2); }
+.ir-legend i { display: inline-block; width: 10px; height: 10px; margin-right: 5px; vertical-align: -1px; }
+.ir-lead-head { margin-bottom: var(--sp-3); }
+
+/* glossary */
+.ir-gloss { max-width: 860px; }
+.ir-gloss dt { font: 700 var(--fs-md)/1.3 var(--font-cond); text-transform: uppercase; color: var(--ink-1); margin-top: var(--sp-4); }
+.ir-gloss dd { margin: 4px 0 0; color: var(--ink-2); line-height: 1.55; }
+@media (max-width: 720px) {
+  .ir-meets { grid-template-columns: 1fr; }
+  .ir-controls > * { max-width: 100%; }
+  .ir-controls .qk-seg { flex-wrap: wrap; }
+}
