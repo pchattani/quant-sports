@@ -837,7 +837,23 @@ def plan(site: str, clone: Path, ctx: dict) -> dict:
     changed = sorted(r for r in s if r in d and (s[r] != d[r] or not filecmp.cmp(src / r, clone / r, shallow=False)))
     removed = sorted(r for r in d if r not in s)
     return {"src": src, "added": added, "changed": changed, "removed": removed, "n_files": len(s), "n_dest": len(d),
-            "bytes": sum(s.values()), "pruned": pruned}
+            "bytes": sum(s.values()), "pruned": pruned, "sizes": s, "dest_sizes": d}
+
+
+def size_kinds(sizes: dict) -> dict:
+    """Bytes by kind of payload: data/<comp>/<kind>/... folds every competition's <kind> into data/*/<kind>, so the
+    report shows which kind of page fills the site rather than 70 competitions one by one."""
+    out: dict[str, int] = {}
+    for r, n in sizes.items():
+        parts = PurePosixPath(r).parts
+        if len(parts) >= 4 and parts[0] == "data":
+            k = "data/*/" + parts[2]
+        elif len(parts) >= 3 and parts[0] == "data":
+            k = "data/" + parts[1] + "/"
+        else:
+            k = "/".join(parts[:2])
+        out[k] = out.get(k, 0) + n
+    return out
 
 
 def git(args, cwd: Path, check=True):
@@ -951,6 +967,11 @@ def cmd_deploy(site: str, clone: Path, shadow: Path | None, allow_mass_delete: b
     delete_n = len(p["removed"])
     print(f"deploy plan: {p['n_files']} files, {p['bytes'] / 1e6:.0f} MB, {len(p['added'])} added, "
           f"{len(p['changed'])} changed, {delete_n} removed (of {p['n_dest']} live), {p['pruned']} pruned")
+    if p["bytes"] > PAGES_WARN:
+        now, live = size_kinds(p["sizes"]), size_kinds(p["dest_sizes"])
+        print("largest kinds of payload (MB now, change against live):")
+        for k in sorted(now, key=lambda k: -now[k])[:20]:
+            print(f"  {now[k] / 1e6:8.1f}  {(now[k] - live.get(k, 0)) / 1e6:+7.1f}  {k}")
     moji, suspect, moji_files = mojibake_gate(p["src"], p["added"] + p["changed"], fix=shadow is None)
     if moji:
         print(f"::warning::mojibake {'repaired' if shadow is None else 'found'}: {moji} strings in {len(moji_files)} "
