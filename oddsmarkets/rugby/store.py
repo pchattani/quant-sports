@@ -94,13 +94,14 @@ def bios() -> dict:
 
 
 def load_all(scope: str, upto: int | None = None, tests_only: bool = True, with_bios: bool = True,
-             with_wiki: bool = True) -> tuple[list[dict], dict]:
+             with_wiki: bool = True, with_sofa: bool = True) -> tuple[list[dict], dict]:
     """Every match of a scope (sorted by date) and the merged athlete table. For the international scopes,
     tests_only drops tour matches against club and provincial sides (a Lions tour's midweek games) and shows each
     nation under one name (nations.canonical). with_bios fills a player's missing bio fields from the core-API
     bios store (a field the match summaries gave wins). with_wiki adds the Wikipedia-only tests (every test before
     ESPN's coverage, the small nations) and the referee and attendance of ESPN's tests (wiki.merge; off with
-    SOURCE_WIKIPEDIA_RUGBY_ENABLED=0)."""
+    SOURCE_WIKIPEDIA_RUGBY_ENABLED=0). with_sofa then merges the Sofascore side store (sofa.merge: statistics for
+    tests ESPN carries without them, and the tests only Sofascore has; off with SOURCE_SOFASCORE_RUGBY_ENABLED=0)."""
     from . import nations
     matches, athletes = [], {}
     for y in years(scope):
@@ -128,6 +129,10 @@ def load_all(scope: str, upto: int | None = None, tests_only: bool = True, with_
     if with_wiki and tests_only and scope in ("men", "women"):
         from . import wiki
         matches, rep = wiki.merge(scope, matches)
+        if with_sofa:
+            from . import sofa
+            matches, srep = sofa.merge(scope, matches, athletes)
+            rep = dict(rep, sofascore=srep)
         if upto is not None:
             matches = [m for m in matches if int(str(m.get("date") or "0")[:4] or 0) <= upto]
         MERGE_REPORT[scope] = rep

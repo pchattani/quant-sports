@@ -15,6 +15,8 @@ from __future__ import annotations
 
 import json
 import logging
+from collections import Counter
+from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
@@ -254,7 +256,27 @@ def iter_matches(
             torneo=raw.get("torneo"),
             zone=raw.get("zone") or _derive_zone(zones, home, away),
             status=status,
+            stage=raw.get("stage"),
         )
+
+
+PLAYOFF_SIZES = {"r16": 8, "qf": 4, "sf": 2, "final": 1}
+
+
+def label_playoff_rounds(matches: list[LigaMatch]) -> list[LigaMatch]:
+    """Playoff ties without a round name get one from the bracket's shape: in kickoff order, each fills the earliest
+    round that still has a tie to come (8 round-of-16 ties, then 4 quarter-finals, 2 semi-finals, the final)."""
+    counts = Counter(m.round_name for m in matches if m.round_name in PLAYOFF_SIZES)
+    unlabelled = sorted((m for m in matches if m.stage == "playoff" and m.round_name not in PLAYOFF_SIZES),
+                        key=lambda m: (m.date or datetime.max.replace(tzinfo=timezone.utc), m.game_id))
+    fixed = {}
+    for m in unlabelled:
+        for r in PLAYOFF_SIZES:          # r16, qf, sf, final: the bracket order
+            if counts[r] < PLAYOFF_SIZES.get(r, 0):
+                counts[r] += 1
+                fixed[m.game_id] = replace(m, round_name=r)
+                break
+    return [fixed.get(m.game_id, m) for m in matches]
 
 
 def zones_from_store(
@@ -300,7 +322,7 @@ def torneo_from_store(
     playoff_results: dict[str, str] = {}
 
     playoffs_by_round: dict[str, list[LigaMatch]] = {}
-    for match in iter_matches(store, torneo, zones=zones):
+    for match in label_playoff_rounds(list(iter_matches(store, torneo, zones=zones))):
         if match.is_finished:
             finished.append(match)
             if match.is_playoff:

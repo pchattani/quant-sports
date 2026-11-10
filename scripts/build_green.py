@@ -66,6 +66,15 @@ def main(argv=None) -> int:
     counts = step("payloads", payloads, report)
     if counts:
         log.info("payloads: %s", counts)
+
+    def follow():
+        # My Teams: one card per golfer (data/follow/golfm|golfw/<pid>.json) from the payloads just written
+        from oddsmarkets.golf import follow_build as FLB
+        return FLB.build(data)
+    if counts:
+        fl = step("follow", follow, report)
+        if fl:
+            log.info("follow cards: %s", fl)
     mb = size_mb(SITE)
     print(f"size {mb} MB")
     bad = {k: v for k, v in report.items() if not v.get("ok")}

@@ -454,7 +454,10 @@ function loadYear(file, T, Y) { return load(ypath(file, T, Y)); }
 /* Names for a tour and the events of a year; resolves when both have loaded (or failed). */
 function ensureTour(T, Y) {
   const t = isTour(T) ? T : state.tour;
-  return loadAll([tpath('players_index.json', t), ypath('events.json', t, Y || currentYear(t))]);
+  /* the draws in play this week (events_now) load with the tour: a player only in a draw is "this week" for the
+     follow star (overview.js flWeek), as for the follow-card builder (tennis follow_build.select) */
+  return loadAll([tpath('players_index.json', t), ypath('events.json', t, Y || currentYear(t))]).then(r =>
+    loadAll((tourInfo(t).events_now || []).filter(e => e && e.event).map(e => eventPath(t, e.event))).then(() => r));
 }
 
 /* players_index.json and <Y>/events.json come flat ({pid: [...]}, {event_id: {...}}) per PAYLOADS.md, or wrapped

@@ -389,8 +389,6 @@ function hero(C) {
   if (doc.national) meta.push('<span>National team</span>');
   if (home) meta.push('<span>' + FB.compLink(home.slug) + '</span>');
   if (doc.country && !doc.national) meta.push('<span>' + esc(doc.country) + '</span>');
-  /* round 12 (My Teams): follow the club; it then leads Home and this site's overview */
-  if (QK.followButton) meta.push(QK.followButton(FB.followItem(doc.id), { cls: 'fb-cl-follow' }));
   if (nmv) meta.push('<span>Squad value <b>' + FB.money(mv) + '</b></span>');
   if (ages.length) meta.push('<span>Average age <b>' + num(ages.reduce(function (a, b) { return a + b; }, 0) / ages.length, 1) + '</b></span>');
   var live = Array.from(new Set(C.live.map(function (s) { return s.comp; })));
@@ -412,7 +410,9 @@ function hero(C) {
      in Bebas, chips), the black strip of its numbers, and "The short version" as the explain strip */
   return FB.crumb([['#/clubs', doc.national ? 'National teams' : 'Clubs'], home ? [FB.href.comp(home.slug), home.name] : null, doc.name].filter(Boolean)) + QK.playerHeader({ name: doc.name, face: FB.clubCode(doc.name), colour: FB.clubColour(doc.id), alt: FB.clubAlt(doc.id),
     kicker: (doc.national ? 'National team' : 'Club') + (live.length ? ' · this season in ' + live.map(function (s) { return FB.compName(s, true); }).join(', ') : ''),
-    meta: meta, strip: tiles, short: short || null });
+    meta: meta, strip: tiles, short: short || null,
+    /* round 12 (My Teams): follow the club from the hero (its own row under the chips, at every width) */
+    follow: FB.followItem(doc.id) });
 }
 function filterBar(C, q, tab) {
   if (tab === 'squad' || tab === 'transfers') return '';

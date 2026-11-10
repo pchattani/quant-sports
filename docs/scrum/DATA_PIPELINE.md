@@ -80,6 +80,24 @@ pages with this and next year's pages re-read daily and national-team articles w
 for the women's Six Nations, qualifiers or regional championships (the league ids exist with no events); kick distance
 and ruck timing.
 
+**Sofascore (added 10 Nov 2026, approved by the user 2 Nov; unclear terms, credited, switch
+`SOURCE_SOFASCORE_RUGBY_ENABLED`):** `scripts/scrum_sofascore.py` on the PC only, run hourly by
+`refresh_sofascore_all.ps1` after the side-store refresh. Its own budget: at most 30 calls in any rolling hour (a ledger in
+`data/rugby/sofascore_state.json`), one call every 5 s, one host (`api.sofascore.com`, no fail-over), stop at the first
+403, no call within 6 hours of any 403 (its own `blocked_at`, the football season tables' `blocked_at`, or a "fetch
+failed" line in `scripts/refresh_sofascore.log`), skipped while the shared Sofascore lock (`data/deploy/locks/sofascore.lock`)
+is held. Each run: the last three days' event lists until settled; the detail queue (statistics and line-ups, two calls a
+test) for tests ESPN has without statistics (the 2026 Nations Championship first), then Sofascore-only tests; then a
+discovery walk of `/sport/rugby/scheduled-events/<day>` (one call a day), the days ESPN has stat-less tests first, then
+newest first back to 2024-01-01. Only senior 15-a-side union internationals between national sides are kept (league,
+sevens, age-grade, A and XV sides filtered out). Store: `data/rugby/stores/side/sofascore.json.gz` (`events`, `detail`,
+`days`), carried to CI with the other side stores. Merge (`oddsmarkets/rugby/sofa.py`, inside `store.load_all`): a test
+ESPN or Wikipedia has (same day +-1, same sides, same score) gets Sofascore's team statistics when it has none and its
+players' statistics in the ESPN line-up's empty slots (by shirt number, surname checked), marked `stat_src`; a test only
+Sofascore has is added (`id "s<event>"`, `source: "sofascore"`) only when both Sofascore team ids are proven union sides
+(matched an ESPN or Wikipedia test). The statistic-name maps (`TEAM_MAP`, `PLAYER_MAP`) keep unknown items out rather
+than zero-filling. `--status` prints the store, queue, ledger and back-off without a call.
+
 ## Stores (private)
 
 `scripts/scrum_fetch.py` caches raw answers under `data/rugby/raw` (gzipped; never published) and writes one store per
@@ -129,7 +147,7 @@ freezes it; it travels with the stores.
 
 `docs/scrum/index.html` and `assets/js/sc-*.js` on kit v4 (`assets/qk`, copied by `scripts/design_kit.py`). Routes:
 `#/<S>` overview, `/fixtures`, `/match/<id>`, `/standings?tab=nc|six|trc|rwc&view=`, `/rankings?tab=wr|ours`,
-`/teams`, `/team/<id>`, `/scout?view=board|chart|leaders&grp=all|fwd|back|<group>&min=&team=&tier=&age=&q=&p=&cmp=` (sc-scout.js), `/player/<id>`, `/model?tab=method|doing|lab|refs|records|glossary|terms` (`refs&ref=<key>` highlights a referee).
+`/teams`, `/team/<id>`, `/scout?view=board|chart|leaders&grp=all|fwd|back|<group>&min=&team=&tier=&age=&q=&p=&cmp=` (sc-scout.js), `/player/<id>`, `/compare?t=<a>,<b>` and `?p=<a>,<b>[,<c>]` (team v team, player v player), `/progression?t=..&m=rating|wr&r=2000|1987|all&f=win|perf|pf` and `?p=..&m=&x=&y=` (sc-compare.js; team pages carry `years`, form by year with our pre-match expected wins and margin; `progression_ref.json` has each year's qualified-peer quantiles per position group), `/model?tab=method|doing|lab|refs|records|glossary|terms` (`refs&ref=<key>` highlights a referee).
 
 ## Running and publishing
 

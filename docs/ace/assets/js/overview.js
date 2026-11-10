@@ -139,6 +139,11 @@ const FL_ID = /^[A-Za-z0-9]+$/;
 function flWeek(T) {
   const info = TA.tourInfo(T) || {}, out = {};
   ['today', 'upcoming', 'live'].forEach(k => (info[k] || []).forEach(c => { [c.p1, c.p2].forEach(p => { if (p) out[String(p)] = 1; }); }));
+  /* and every main-draw entry of a tournament in play (TA.ensureTour loads those draws with the tour) */
+  (info.events_now || []).forEach(e => {
+    const ev = e && e.event ? TA.cached(TA.eventPath(T, e.event)) : null;
+    (((ev && ev.draw) || {}).slots || []).forEach(s => { if (Array.isArray(s) && s.length > 1 && s[1]) out[String(s[1])] = 1; });
+  });
   return out;
 }
 /* a player as a follow item ('ace:<T>:<pid>', the site route, the country as the mark) */

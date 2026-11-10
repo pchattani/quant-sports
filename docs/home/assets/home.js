@@ -60,11 +60,20 @@ function whenTag(g) {
 /* live, or not yet started (a "pre" game more than 30 min past its start is a lagging status, not the game to lead with) */
 function stillOn(g) { return !!g && (g.status === 'live' || (g.status === 'pre' && (new Date(g.start) - QK.now()) / 36e5 > -0.5)); }
 
+/* accuracy guard: hours after the start by which a game of the sport is surely over (overtime, extra time, a long
+   rain delay allowed for). A game still marked live or upcoming past that is a stale snapshot (home.json is rebuilt
+   every few hours and a site's payload drops a game once it is over), never shown as live: Portland at Hawai'i read
+   "Live 52-48" the morning after (10 Nov 2026). */
+var MAX_HOURS = { football: 3, basketball: 3.5, college: 4.5, nfl: 4.5, hockey: 4, baseball: 6, rugby: 3, tennis: 6, f1: 3 };
+function overdue(g) {
+  if (!g || g.status === 'final' || !g.start || g.event) return false;
+  return (QK.now() - new Date(g.start)) / 36e5 > (MAX_HOURS[g.sport] || 6);
+}
+
 /* ───────────────────────────── load */
 QK.fetchJSON('data/home.json', { cache: 'no-cache' }).then(function (j) {
   D = j;
-  /* accuracy guard: a game still marked live or upcoming 12 hours after its start is a stale snapshot, not a fact */
-  D.games = (D.games || []).filter(function (g) { return g.status === 'final' || !g.start || (QK.now() - new Date(g.start)) / 36e5 < 12; });
+  D.games = (D.games || []).filter(function (g) { return !overdue(g); });
   D.games.forEach(prep);
   renderAll();
   startLive();
@@ -604,6 +613,9 @@ function needsLive(sport) {
 }
 function refreshLive() {
   if (document.hidden || QK.asof() !== null) return;
+  var n0 = D.games.length;
+  D.games = D.games.filter(function (g) { return !overdue(g); });
+  if (D.games.length !== n0) { renderTicker(); renderSportNav(); renderFeature(); renderWatch(); renderGames(); if (yours) yours.render(); }
   Object.keys(ADAPT).forEach(function (sport) {
     if (!needsLive(sport)) return;
     var s = QK.sport(sport), a = ADAPT[sport];

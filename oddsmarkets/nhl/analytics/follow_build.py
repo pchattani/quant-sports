@@ -13,6 +13,8 @@ already written this run (no new fetching):
     <S>/skaters.json, goalies.json   the top players: GAR per 60 for skaters, GSAx for goalies, ranked in the league
     <S-1>/season.json, teams.json    last season's records, and "at this point last season"
     race_log.json              our playoff, division and Cup chances by day (the 7-day change)
+    <S>/rating_history.json    the team rating's league rank going into each week (rating_history.py): the
+                               "rating move" fact, against the published rating's rank today
     history.json               the Cup winner of a finished season
 
     build(data_root, now=None) -> {"n", "bytes", "max", "ids"}        (python -m oddsmarkets.nhl.analytics.follow_build)
@@ -282,6 +284,16 @@ def build(data: Path, now: datetime | None = None, out_dir: Path | None = None) 
     race = L.get("race") or {}
     notes = L.get("notes") or {}
     rlog = (_read(data / "race_log.json") or {}).get(str(season)) or {}
+    # the weekly rating ranks (each Monday's refit on the games before it), then today's published rank
+    rh = _read(sdir / "rating_history.json") or {}
+    rank_hist = {t: [] for t in teams}
+    if rh.get("ok") and int(rh.get("season") or 0) == season:
+        wk = list(rh.get("weeks") or [])
+        for t in teams:
+            rank_hist[t] = [[w, r] for w, r in zip(wk, (rh.get("ranks") or {}).get(t) or []) if r is not None and FL._dt(w) is not None and FL._dt(w) <= asof]
+    for t in teams:
+        if rating_rank.get(t) is not None:
+            rank_hist[t].append([asof.isoformat(), rating_rank[t]])
     # last season: records, and "at this point" from its schedule (read only when needed)
     prev_s = season - 10001                                         # NHL season ids: 20252026 before 20262027
     prev_rows = {str(r.get("team")): r for r in (((_read(data / str(prev_s) / "season.json") or {}).get("standings") or {}).get("rows") or [])}
@@ -381,7 +393,8 @@ def build(data: Path, now: datetime | None = None, out_dir: Path | None = None) 
         profile = {"strong": prow[:3], "weak": sorted(prow[3:], key=lambda x: x["pct"])[:2]} if len(prow) >= 5 else None
         players, top = _players(t, sk, gk)
         # ── the facts
-        ctx = {"name": name, "short": short, "the": True, "phase": phase, "final": final, "league_name": "the NHL", "results": res[t]}
+        ctx = {"name": name, "short": short, "the": True, "phase": phase, "final": final, "league_name": "the NHL", "results": res[t],
+               "rating_ranks": rank_hist.get(t) or []}
         pr = []
         for m in spec:
             if m["id"] == "rating":

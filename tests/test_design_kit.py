@@ -170,12 +170,16 @@ def test_follow_card_registry_matches_the_published_scopes():
     sites = dict((m.group(1), re.findall(r"'([a-z]+)'", m.group(2))) for m in re.finditer(r"(\w+): \[([^\]]*)\]", reg))
     assert sites == {"bullpen": ["mlb", "aaa"], "site": ["club"], "rink": ["team"], "gridiron": ["team"], "hardwood": ["nba", "wnba"],
                      "campus": ["cfb", "mbb", "wbb", "mch", "wch"], "ace": ["atp", "wta"], "paddock": ["driver", "team"],
-                     "scrum": ["men", "women"], "iron": ["lifter"]}
-    # Iron writes its own metric catalogue into data/ (powerlifting/pages.py _labels), so it has no kit metrics file
-    assert set(sites) - {"iron"} == set(design_kit.SITE_SPORT)
+                     "scrum": ["men", "women"], "iron": ["lifter"], "green": ["golfm", "golfw"]}
+    # Iron and Green write their own metric catalogues into data/ (powerlifting/pages.py _labels, golf/pages.py
+    # spec/golf.labels.json), so they have no kit metrics file
+    assert set(sites) - {"iron", "green"} == set(design_kit.SITE_SPORT)
     src = lambda f: (ROOT / "scripts" / f).read_text(encoding="utf-8")
     pkg = lambda f: (ROOT / "oddsmarkets" / f).read_text(encoding="utf-8")
     assert 'FL.write_cards(out / "follow", "lifter", cards)' in pkg("powerlifting/pages.py")
+    # golf (10 Nov 2026): one card per golfer with a page, men and women as two scopes, a step of the Green build
+    assert 'SCOPE = {"men": "golfm", "women": "golfw"}' in pkg("golf/follow_build.py")
+    assert "from oddsmarkets.golf import follow_build as FLB" in src("build_green.py") and "FLB.build(data)" in src("build_green.py")
     b = src("build_bullpen.py")
     assert 'for lvl in ("mlb", "aaa"):' in b and "FLB.build(data, lvl" in b
     assert "football_follow.build(DATA_DIR)" in src("build_site_all.py")

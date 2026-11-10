@@ -77,7 +77,8 @@ function hkTable(node, L, S, season) {
         crec: CC.recW({ w: r.conf_w, l: r.conf_l, t: r.conf_t }), rec: CC.recW(r), gd: (r.gf || 0) - (r.ga || 0), goals: (r.gf || 0) + '–' + (r.ga || 0),
         rating: rt.rating, rating_rank: r.rating_rank, streak: r.streak || '—', pc: s0.p_conf_reg };
     });
-    var cols = [{ key: 'conf_rank', label: '#', num: true },
+    /* round 12 (My Teams): the row's follow star beside the place, as on the other Campus standings (current season) */
+    var cols = [{ key: 'conf_rank', label: '#', num: true, fmt: function (v, r) { return esc(isNum(v) ? String(v) : '—') + (cur ? CC.followStar(L, r.team) : ''); } },
       { key: 'name', label: 'Team', type: 'entity', sub: 'sub', mark: function (r) { return U.mark(L, r.team); }, href: function (r) { return CC.teamHref(L, r.team, S); } }];
     if (c !== 'ind') cols.push({ key: 'cpts', label: 'Pts', num: true, tip: 'Conference points' }, { key: 'cgp', label: 'GP', num: true, tip: 'Conference games' }, { key: 'crec', label: 'Conf', tip: 'Conference W–L–T' });
     cols.push({ key: 'rec', label: 'Overall', tip: 'Overall W–L–T (NCAA record: shootouts are ties)' }, { key: 'gd', label: 'GD', num: true, fmt: function (v, r) { return '<span title="' + esc(r.goals) + '">' + CC.signed(v, 0) + '</span>'; }, tip: 'Goal difference' },

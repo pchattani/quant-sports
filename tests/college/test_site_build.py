@@ -208,4 +208,9 @@ def test_parse_takes_a_trailing_year_as_the_season_only_where_a_season_goes():
 def test_routes_cover_the_nine_sections():
     src = "".join(p.read_text(encoding="utf-8") for p in (FRONT / "assets" / "js").glob("*.js"))
     routes = set(re.findall(r"CC\.route\('([a-z]+)'", src))
-    assert routes >= {"overview", "games", "game", "standings", "teams", "team", "players", "player", "value", "fantasy", "lab", "model"}
+    # round 9 merged Players and the Lab into the Scouting Room (#/<L>/scout, with #/<L>/compare); the old routes
+    # redirect there (cc-core.js CC.redirect), so they are no longer routes of their own
+    assert routes >= {"overview", "games", "game", "standings", "teams", "team", "scout", "compare", "player", "value", "fantasy", "model"}
+    assert not routes & {"players", "lab"}
+    core = (FRONT / "assets" / "js" / "cc-core.js").read_text(encoding="utf-8")
+    assert "if (r.sec !== 'players' && r.sec !== 'lab') return null;" in core

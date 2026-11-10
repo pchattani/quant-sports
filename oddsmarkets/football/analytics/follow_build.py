@@ -160,8 +160,10 @@ class _Comp:
         self.strength = {}
         self.stats = {}
         self.metrics = {}
-        self.series = {"title": {}, "band": {}, "relegation": {}}
+        self.series = {"title": {}, "band": {}, "relegation": {}, "alt": {}}
         self.band_key = None
+        self.alt = None          # a second title the history logs (Argentina: the Tabla Anual), from table.json
+        self.decided = None      # {"tid", "event"}: the league's table title already won (decided_title)
         if not self.is_league:
             br = _read(d / "bracket.json") or {}
             self.p_cup = {self.tid.get(k): v for k, v in (br.get("p_cup") or {}).items() if self.tid.get(k)}
@@ -171,6 +173,12 @@ class _Comp:
             return
         self.p_cup = {}
         tb = _read(d / "table.json") or {}
+        hk = (tb.get("hist_keys") or {}).get("title") or "title"
+        if hk != "title":
+            done = bool(tb.get("total_games")) and tb.get("games_played") == tb.get("total_games")
+            self.alt = {"hist": hk, "key": tb.get("title_key") or "p_" + hk,
+                        "label": tb.get("title_label") or tb.get("label") or hk.title(),
+                        "name": tb.get("label") or hk.title(), "season": tb.get("season"), "done": done}
         self.bands = tb.get("bands") or []
         self.fixtures = tb.get("fixtures") or []
         self.mpt = tb.get("matches_per_team")
@@ -185,20 +193,33 @@ class _Comp:
                 t = self.tid.get(r.get("team"))
                 if t and t not in self.table:
                     self.table[t] = dict(r, _group=g, _of=len(rs))
+        self.decided = decided_title(self, tb)
         st = _read(d / "strength.json") or {}
         self.strength = {self.tid.get(r.get("team")): r for r in st.get("rows") or [] if self.tid.get(r.get("team"))}
         ts = _read(d / "team_stats.json") or {}
         self.metrics = {m["key"]: m for m in ts.get("metrics") or [] if m.get("key")}
         self.stats = {self.tid.get(nm): (v or {}).get("season") or {} for nm, v in (ts.get("teams") or {}).items() if self.tid.get(nm)}
         hist = _read(d / "history.json") or {}
-        for snap in (hist.get("daily") or []) + (hist.get("snapshots") or []):
+        daily = hist.get("daily") or []
+        for snap in daily + (hist.get("snapshots") or []):
             ts_ = snap.get("ts") or snap.get("d")
             if not ts_:
                 continue
             if snap.get("band_key"):
                 self.band_key = self.band_key or snap["band_key"]
-            for key in ("title", "band", "relegation"):
-                block = snap.get(key)
+            is_daily = "d" in snap
+            for key in ("title", "band", "relegation", "alt"):
+                src = key
+                if self.alt:
+                    # the daily race log names the second title "title"; the hourly snapshots keep both under their
+                    # own names. Merging them read Boca's Clausura 24% against last week's Tabla Anual 71% (-47).
+                    if key == "title" and is_daily:
+                        continue
+                    if key == "alt":
+                        src = "title" if is_daily else self.alt["hist"]
+                elif key == "alt":
+                    continue
+                block = snap.get(src)
                 if not isinstance(block, dict):
                     continue
                 for nm, t in self.tid.items():
@@ -214,6 +235,39 @@ def _cup_full(comp: _Comp, league_of: dict) -> bool:
     if comp.scope == "international" or comp.c.get("family") != "domestic":
         return True
     return sum(float(p or 0) for t, p in comp.p_cup.items() if league_of.get(t)) >= 0.5
+
+
+def clinched_first(rows: list[dict], mpt, complete: bool) -> dict | None:
+    """The table's leader once first place is certain: every match played, or more points than any other side can
+    still reach (3 a match left). Arithmetic only: a simulated 100% is not a clinch."""
+    rows = [r for r in rows or [] if r.get("pts") is not None]
+    if len(rows) < 2:
+        return None
+    rows = sorted(rows, key=lambda r: (r.get("pos") or 999))
+    lead = rows[0]
+    if complete:
+        return lead if lead.get("pos") == 1 else None
+    if not mpt:
+        return None
+    best_other = max(int(r["pts"]) + 3 * max(int(mpt) - int(r.get("played") or 0), 0) for r in rows[1:])
+    return lead if int(lead["pts"]) > best_other else None
+
+
+def decided_title(comp, tb: dict) -> dict | None:
+    """A table title already won: a straight league's title (clinched or finished) and MLS's Supporters' Shield
+    (the overall table once the regular season is played). Leagues whose title is a play-off, a final or a stage
+    (Liga MX, the torneo leagues, Argentina's Clausura) never count their table here."""
+    complete = bool(tb.get("total_games")) and tb.get("games_played") == tb.get("total_games")
+    if comp.kind == "league":
+        lead = clinched_first(tb.get("standings"), tb.get("matches_per_team"), complete)
+        event = comp.name
+    elif comp.kind == "conference":
+        lead = clinched_first(tb.get("overall"), tb.get("matches_per_team"), complete)
+        event = "Supporters' Shield" if comp.slug == "mls" else (tb.get("overall_label") or comp.name)
+    else:
+        return None
+    tid = comp.tid.get((lead or {}).get("team"))
+    return {"tid": tid, "event": event} if tid else None
 
 
 def yr_won(d: dict, comps: dict) -> list[str]:
@@ -397,12 +451,19 @@ def build(data: Path, now: datetime | None = None, out_dir: Path | None = None) 
                 p_dn = _num(pr.get("p_relegation"))
                 dn = [{"label": "Relegation"}] if p_dn is not None else []
             rows_c = []
+            if p_title is not None and title_key == "p_title" and L.kind == "league" and (L.decided or {}).get("tid") == t:
+                p_title = None           # won already: the card carries the title, not a 100% chance
             if p_title is not None:
                 ser = L.series["title"].get(t) if title_key == "p_title" else None
                 rows_c.append({"key": "p_title", "label": "Title" if fav in ("Title", "Winner") else fav, "p": round(p_title, 4),
                                "d7": FL.change_since(ser, asof, 7) if ser else None, "_imp": 3 if p_title >= 0.03 else 0})
                 if ser:
                     ctx_ch.append({"label": "title", "series": ser})
+            alt_p = _num(pr.get(L.alt["key"])) if L.alt else None
+            if alt_p is not None and 0.0005 < alt_p and not (L.alt["done"] and alt_p >= 0.9995):
+                ser = L.series["alt"].get(t)
+                rows_c.append({"key": L.alt["key"], "label": L.alt["label"], "p": round(alt_p, 4),
+                               "d7": FL.change_since(ser, asof, 7) if ser else None, "_imp": 2.8 if alt_p >= 0.03 else 0})
             if up and p_up is not None and 0.0005 < p_up:
                 ser = L.series["band"].get(t) if L.band_key == up["key"] else None
                 rows_c.append({"key": "p_" + up["key"], "label": up.get("label") or "Top", "p": round(p_up, 4),
@@ -505,6 +566,21 @@ def build(data: Path, now: datetime | None = None, out_dir: Path | None = None) 
             cs = comps.get(w) or {}
             sname = (cs.get("current_season") or {}).get("season") or yr.get("era")
             champion = {"event": cs.get("name") or w, "season": yr.get("era") or sname, "text": f"Won the {yr.get('era')} {cs.get('name') or w}."}
+        if champion is None:
+            for s in cur:
+                c = C.get(s.get("comp"))
+                if c and c.is_league and (c.decided or {}).get("tid") == t:
+                    season = (comps.get(c.slug, {}).get("current_season") or {}).get("season") or yr.get("era")
+                    champion = {"event": c.decided["event"], "season": season, "text": f"Won the {season} {c.decided['event']}."}
+                    break
+        if champion is None:
+            # a second title decided before the season ends (every Tabla Anual match played, first place certain)
+            for s in cur:
+                c = C.get(s.get("comp"))
+                if c and c.is_league and c.alt and c.alt["done"] and (_num((c.probs.get(t) or {}).get(c.alt["key"])) or 0) >= 0.9995:
+                    season = c.alt.get("season") or yr.get("era")
+                    champion = {"event": c.alt["name"], "season": season, "text": f"Won the {season} {c.alt['name']}."}
+                    break
         note = None
         if not nxt:
             note = "No fixtures scheduled yet." if not national else "No fixtures until the next international window."

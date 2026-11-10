@@ -82,6 +82,10 @@ def match_page(S, w, rep, m, ana) -> dict:
         out["weather"] = {k: wx.get(k) for k in ("temp", "rh", "wind", "gust", "rain", "kind", "issued") if wx.get(k) is not None}
     if m.get("source") == "wikipedia":
         out["source"] = {"name": "Wikipedia", "page": m.get("page") or "", "licence": "CC BY-SA 4.0"}
+    elif m.get("source") == "sofascore":
+        out["source"] = {"name": "Sofascore", "page": m.get("note") or "", "licence": ""}
+    if m.get("stat_src") == "sofascore":
+        out["stat_src"] = "Sofascore"
     if m.get("ro"):
         out["ro"] = 1
     hh, ah = m.get("hh"), m.get("ah")       # [half-time, full-time] for each side
@@ -411,7 +415,70 @@ def team_page(S, w, rep, ana, prof, tid, comps_out, ratings: dict | None = None)
             "top_points": top_pts, "top_tries": top_tries, "profile": profile,
             "rating_hist": monthly(hist), "wr_hist": wr_hist, "chances": chances,
             "career_caps": (CAPS.get("most") or {}).get(tid), "caps_asof": CAPS.get("asof"),
-            "xw": xw, "combos": combos(S, ana, tid), "grades": (GRADES.get(S.scope) or {}).get(tid)}
+            "xw": xw, "combos": combos(S, ana, tid), "grades": (GRADES.get(S.scope) or {}).get(tid),
+            "years": form_years(S, w, tid)}
+
+
+def form_years(S, w, tid) -> list:
+    """Form year by year for the progression page: [year, tests, won, drawn, lost, points for, against, expected wins,
+    tests with a forecast, margin over our forecast per test]. Expected wins and the forecast margin are our pre-match
+    numbers (the walk-forward forecast made before each test: no look-ahead); a draw counts half a win. Tests before
+    1891 carry the result only, so their points are left out."""
+    rows = {}
+    for m in B.team_results(S, tid):
+        y = int(m["date"][:4])
+        r = rows.setdefault(y, [y, 0, 0, 0, 0, 0, 0, 0.0, 0, 0.0])
+        home = m["home"]["id"] == tid
+        us, th = (m["hs"], m["as"]) if home else (m["as"], m["hs"])
+        r[1] += 1
+        r[2 if us > th else (3 if us == th else 4)] += 1
+        if not m.get("ro"):
+            r[5] += us
+            r[6] += th
+        f = w["fc"].get(m["id"]) or {}
+        p = f.get("p_home") if home else f.get("p_away")
+        if p is not None and not m.get("ro") and f.get("margin") is not None:
+            r[7] += p + 0.5 * (f.get("p_draw") or 0.0)
+            r[8] += 1
+            r[9] += (us - th) - (f["margin"] if home else -f["margin"])
+    out = []
+    for y in sorted(rows):
+        r = rows[y]
+        out.append(r[:7] + [round(r[7], 2), r[8], round(r[9] / r[8], 1) if r[8] else None])
+    return out
+
+
+def progression_ref(S, ana) -> dict:
+    """Each season's qualified players per position group: the 10th, 25th, 50th, 75th and 90th percentile of every
+    per-80 rate (the kit's progression_ref.json shape: the peer band on the progression chart)."""
+    by = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+    for rec in ana["players"].values():
+        g = rec.get("grp")
+        if not g:
+            continue
+        for y, s in (rec.get("seasons") or {}).items():
+            if not s.get("qual"):
+                continue
+            for k in AN.PM_IDS:
+                v = (s.get("rates") or {}).get(k)
+                if isinstance(v, (int, float)) and not math.isnan(v):
+                    by[str(y)][g][k].append(v)
+
+    def q(vs, p):
+        vs = sorted(vs)
+        i = (len(vs) - 1) * p
+        lo = int(math.floor(i))
+        hi = min(lo + 1, len(vs) - 1)
+        return vs[lo] + (vs[hi] - vs[lo]) * (i - lo)
+    seasons = {}
+    for y, groups in by.items():
+        for g, mets in groups.items():
+            n = max((len(v) for v in mets.values()), default=0)
+            if n < 5:
+                continue
+            seasons.setdefault(y, {})[g] = {"n": n, "m": {k: [r1(q(v, p), 3) for p in (0.1, 0.25, 0.5, 0.75, 0.9)]
+                                                           for k, v in mets.items() if len(v) >= 5}}
+    return {"ok": True, "q": [10, 25, 50, 75, 90], "seasons": seasons}
 
 
 # the pairings that decide a test: the half-backs (9 and 10), the centres (12 and 13), the locks (4 and 5)
@@ -1120,6 +1187,7 @@ def build_scope(scope: str, data_root: Path, sims: int = 20000, now: datetime | 
     for aid in ana["players"]:
         sizes["player_pages"] += B.write(data / "players" / f"{aid}.json", player_page(S, ana, aid, w))
     sizes["board"] += B.write(data / "players.json", board_payload(S, ana))
+    sizes["progression_ref"] += B.write(data / "progression_ref.json", progression_ref(S, ana))
     if game_pages:
         for m in S.finals + S.upcoming + S.live:
             if m["status"] == "final" and not (m.get("hstat") or m.get("lh") or m.get("events")) and m["date"][:4] < "2004":

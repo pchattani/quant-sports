@@ -102,6 +102,11 @@ SC.route('player', function (page, P) {
         { label: Pp.wcaps && isNum(Pp.wcaps.caps) ? 'Career caps' : 'Tests', value: String(Pp.wcaps && isNum(Pp.wcaps.caps) ? Pp.wcaps.caps : Pp.caps), sub: Pp.wcaps && isNum(Pp.wcaps.caps) ? Pp.caps + ' in our data, ' + Pp.starts + ' starts' : Pp.starts + ' starts' }, { label: 'Points', value: String(Pp.pts), sub: Pp.tries + ' tries' },
         { label: 'Won', value: Pp.wdl ? Pp.wdl[0] + ' of ' + Pp.caps : '—', sub: Pp.wdl ? Pp.wdl.join('–') : '' }, { label: 'Span', value: SC.year(Pp.first) + '–' + SC.year(Pp.last).slice(2), sub: fmt.num(Pp.min) + ' minutes' }],
       short: short });
+    if (SC.cmpHref) {
+      var simId = (Pp.similar || [])[0] ? String(Pp.similar[0].id) : null;
+      html += '<div class="qk-chips sc-gap sc-jump"><a class="qk-chip" href="' + esc(SC.cmpHref(S, 'p', simId ? [String(Pp.id), simId] : [String(Pp.id)])) + '">Compare' + (simId ? ' with ' + esc(Pp.similar[0].n) : '') + ' →</a>' +
+        '<a class="qk-chip" href="' + esc(SC.progHref(S, 'p', [String(Pp.id)])) + '">Career year by year →</a></div>';
+    }
     if ((isNum(ph.ht_pct) || isNum(ph.wt_pct)) && Pp.phys_med) {
       html += U.note('Physical profile against ' + esc(gname.toLowerCase()) + ' capped in the last four years (' + Pp.phys_med.n + ' with a bio): ' +
         [isNum(ph.ht_pct) ? QK.ordinal(ph.ht_pct) + ' percentile for height (the middle ' + gname.toLowerCase().replace(/s$/, '') + ' is ' + Pp.phys_med.ht + ' cm)' : '', isNum(ph.wt_pct) ? QK.ordinal(ph.wt_pct) + ' for weight (' + Pp.phys_med.wt + ' kg)' : ''].filter(Boolean).join(', ') + '. Heights and weights are ESPN’s, as listed.');

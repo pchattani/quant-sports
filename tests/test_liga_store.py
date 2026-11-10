@@ -235,3 +235,30 @@ def test_unknown_status_counts_as_scheduled() -> None:
     store["matches"][first]["status"] = "Postponed"
     torneo = torneo_from_store(store, APERTURA, CFG)
     assert all(m.game_id != first for m in torneo.finished)
+
+
+def test_unlabelled_playoff_ties_are_playoffs_and_the_finished_tabla_anual_is_decided() -> None:
+    """Sofascore listed the 2026 Clausura round of 16 with no round name (stage "playoff" only). They are playoff ties
+    (labelled r16 by the bracket's shape), the zone phase is complete, and the Tabla Anual is counted once, in full,
+    with nothing left to simulate (10 Nov 2026: Boca read 72% to top it instead of certain)."""
+    from oddsmarkets.football.competitions.liga.simulator import LigaSimulator
+    from tests.test_liga_simulator import _FixedModel
+
+    store = _build_store(clausura_played=10_000)          # every Clausura zone match played
+    teams = [t for z in ZONES for t in FALLBACK_ZONES_2026[z]]
+    for k in range(8):
+        store["matches"][f"po{k}"] = {"home": teams[k], "away": teams[-1 - k], "round": None, "stage": "playoff",
+                                      "status": "notstarted", "hs": None, "as": None, "torneo": CLAUSURA, "zone": None,
+                                      "date": (BASE + timedelta(days=130)).strftime("%Y-%m-%dT%H:%M:%SZ")}
+    cl = torneo_from_store(store, CLAUSURA, CFG)
+    assert len(cl.remaining) == 8 and all(m.is_playoff and m.round_name == "r16" for m in cl.remaining)
+    assert cl.league_complete and cl.games_played == cl.total_league_games == 210
+    state = season_state_from_store(store, CFG, apertura_champion="Belgrano")
+    assert state.live_torneo().key == CLAUSURA
+    assert sum(r.played for r in state.anual_base().values()) == 210 * 2          # the Apertura only: never doubled
+    res = LigaSimulator(_FixedModel(home_bias=0.2), state, cfg=CFG).run()
+    # nothing left to play: only the clubs level at the top (this synthetic table has two, drawn by lot) can top it
+    table = state.anual_standings()
+    top = [t for t, r in table if (r.points, r.gd, r.gf) == (table[0][1].points, table[0][1].gd, table[0][1].gf)]
+    assert sum(res.p_anual_champion[t] for t in top) == pytest.approx(1.0)
+    assert all(res.p_anual_champion.get(t, 0.0) == 0.0 for t, _ in table[len(top):])

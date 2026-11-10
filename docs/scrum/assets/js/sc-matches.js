@@ -182,7 +182,9 @@ function conditions(S, M) {
   var out = items.length ? QK.stats(items) : '';
   var notes = [];
   if (M.ro) notes.push('<b>' + esc(c.hs > c.as ? SC.tname(S, c.home) + ' won.' : c.hs < c.as ? SC.tname(S, c.away) + ' won.' : 'A draw.') + '</b> Before 1891 the four home unions counted goals and tries with no common points system, so this test carries the result only.');
-  if (M.source) notes.push('Result from Wikipedia (“' + esc(M.source.page) + '”, ' + esc(M.source.licence) + '); our main source has no record of this test, so there are no line-ups or statistics.');
+  if (M.source && M.source.name === 'Sofascore') notes.push('Result' + (M.stats ? ' and team statistics' : '') + ' from Sofascore' + (M.source.page ? ' (' + esc(M.source.page) + ')' : '') + '; our main source has no record of this test, so there are no line-ups.');
+  else if (M.source) notes.push('Result from Wikipedia (“' + esc(M.source.page) + '”, ' + esc(M.source.licence) + '); our main source has no record of this test, so there are no line-ups or statistics.');
+  if (M.stat_src && !(M.source && M.source.name === 'Sofascore')) notes.push('Statistics for this test from ' + esc(M.stat_src) + ': our main source has the result and line-ups but no statistics.');
   if (W.temp !== undefined) notes.push('<a href="https://open-meteo.com/" target="_blank" rel="noopener">Weather data by Open-Meteo.com</a> (CC BY 4.0)' + (W.kind === 'forecast' ? '' : ': the hours of the match from the ERA5 reanalysis. It is known only after the match, so it never enters our pre-match numbers.'));
   return out + (notes.length ? U.note(notes.join(' ')) : '');
 }

@@ -30,7 +30,7 @@
 <template id="disclaimer-template">
   <div class="qk-card sc-prose legal qk-legal">
     <h3>Disclaimer &amp; terms of use</h3>
-    <p class="qk-muted">Last updated 2 November 2026 (sources widened)</p>
+    <p class="qk-muted">Last updated 10 November 2026 (Sofascore added)</p>
     <p>The Quant Scrum is an independent, non-commercial hobby project that applies statistical models to publicly
     available international rugby union data. By using this site you agree to the terms below. If you do not agree,
     please do not use the site.</p>
@@ -89,7 +89,12 @@
     the facts are re-used under that licence, and our tables built from them are shared alike. Match weather and venue
     elevation: <a href="https://open-meteo.com/" target="_blank" rel="noopener">Weather data by Open-Meteo.com</a>
     (<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>; reanalysis
-    generated using Copernicus Climate Change Service information). World Rugby&rsquo;s own websites and data feeds,
+    generated using Copernicus Climate Change Service information).<span data-src="sofascore"> Team and player match
+    statistics for tests our main source carries without them (the 2026 Nations Championship among them) and the results
+    of smaller nations&rsquo; tests it does not carry come from
+    <a href="https://www.sofascore.com/" target="_blank" rel="noopener">Sofascore</a>, credited with thanks; its terms
+    do not clearly cover reuse, so only derived statistics are shown, the source can be switched off, and it is removed
+    on request.</span> World Rugby&rsquo;s own websites and data feeds,
     RugbyPass, Rugby Europe&rsquo;s site and ESPN&rsquo;s Statsguru pages are not used: their terms limit the content to
     personal use or forbid reuse. Statistics shown here are derived and transformed and may differ from official
     statistics.</p>
@@ -116,7 +121,7 @@
 
 <div class="sc-legal">
   <div class="sc-legal-in">
-    <p>Fixtures, results, line-ups, match statistics and player bios from ESPN&rsquo;s public site data. Historic and small-nation results, referees, crowds, career caps, the Women&rsquo;s Six Nations and WXV, published ranking points and tournament formats from Wikipedia (CC BY-SA 4.0). <a href="https://open-meteo.com/" target="_blank" rel="noopener">Weather data by Open-Meteo.com</a> (CC BY 4.0). World Rugby&rsquo;s own feeds are not used.</p>
+    <p>Fixtures, results, line-ups, match statistics and player bios from ESPN&rsquo;s public site data. Historic and small-nation results, referees, crowds, career caps, the Women&rsquo;s Six Nations and WXV, published ranking points and tournament formats from Wikipedia (CC BY-SA 4.0). <a href="https://open-meteo.com/" target="_blank" rel="noopener">Weather data by Open-Meteo.com</a> (CC BY 4.0).<span data-src="sofascore"> Statistics our main source lacks and smaller nations&rsquo; tests from <a href="https://www.sofascore.com/" target="_blank" rel="noopener">Sofascore</a>.</span> World Rugby&rsquo;s own feeds are not used.</p>
     <p>For information and entertainment only &mdash; not betting, financial or professional advice. Probabilities are model estimates and can be wrong; no bets are offered. Unofficial: not affiliated with or endorsed by World Rugby, any competition, union, team, player, ESPN or bookmaker; no logos are used and names belong to their owners. 18+. Gamble responsibly. <a href="#/disclaimer">Disclaimer &amp; terms</a></p>
   </div>
 </div>
@@ -156,6 +161,8 @@
 <script src="assets/js/sc-teams.js" defer></script>
 <script src="assets/js/sc-players.js" defer></script>
 <script src="assets/js/sc-scout.js" defer></script>
+<script src="assets/qk/progression.js" defer></script>
+<script src="assets/js/sc-compare.js" defer></script>
 <script src="assets/js/sc-model.js" defer></script>
 </body>
 </html>

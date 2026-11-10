@@ -170,3 +170,72 @@ def test_national_teams_cups_and_the_friendly_flag(tmp_path):
     assert low["next_note"] == "No fixtures scheduled yet."
     # a club with no current season has no card
     assert not (d / "follow" / "club" / "99.json").exists()
+
+
+def test_a_second_title_keeps_its_own_series_and_shows_as_won(tmp_path):
+    """Argentina: probs p_title is the Clausura, the daily race log's "title" is the Tabla Anual (table.json
+    hist_keys). The Clausura's weekly change never reads the Tabla Anual's history, and a finished Tabla Anual with a
+    certain leader is a title won (Boca, 10 Nov 2026: Clausura 24% read against the Tabla Anual's 71% as -47)."""
+    d = tree(tmp_path)
+    cj = json.loads((d / "competitions.json").read_text(encoding="utf-8"))
+    cj["competitions"][0]["kind"] = "liga"                  # Argentina's kind: its table is not the Clausura's title
+    write(d / "competitions.json", cj)
+    tb = json.loads((d / "lg" / "table.json").read_text(encoding="utf-8"))
+    tb.update({"hist_keys": {"title": "anual", "band": "ucl", "relegation": "relegation"}, "title_key": "p_anual",
+               "title_label": "Top of the Tabla Anual", "label": "Tabla Anual", "season": "2026", "games_played": 24, "total_games": 24})
+    write(d / "lg" / "table.json", tb)
+    pr = json.loads((d / "lg" / "probs.json").read_text(encoding="utf-8"))
+    for r in pr["teams"]:
+        r["p_title"] = 0.24 if r["team"] == "Alpha FC" else 0.1
+        r["p_anual"] = 1.0 if r["team"] == "Alpha FC" else 0.0
+    write(d / "lg" / "probs.json", pr)
+    daily = [{"d": (NOW - timedelta(days=8)).date().isoformat(), "ts": iso(NOW - timedelta(days=8)), "title": {"Alpha FC": 0.71}},
+             {"d": (NOW - timedelta(days=1)).date().isoformat(), "ts": iso(NOW - timedelta(days=1)), "title": {"Alpha FC": 1.0}}]
+    snaps = [{"ts": iso(NOW - timedelta(hours=5)), "title": {"Alpha FC": 0.23}, "anual": {"Alpha FC": 1.0}}]
+    write(d / "lg" / "history.json", {"daily": daily, "snapshots": snaps})
+    (d / "clubs" / "1.json").write_text((d / "clubs" / "1.json").read_text(encoding="utf-8").replace('"won": ["shield"]', '"won": []'),
+                                        encoding="utf-8")
+    B.build(d, NOW)
+    c = card(d, "1")
+    title = next(x for x in c["chances"] if x["key"] == "p_title")
+    assert title["p"] == 0.24 and title.get("d7") is None           # no Clausura point a week back: no change, never -0.47
+    assert not [x for x in c["chances"] if x["key"] == "p_anual"]  # decided: shown as won, not as a 100% chance
+    assert c["champion"]["event"] == "Tabla Anual" and c["champion"]["season"] == "2026"
+    # still open: the Tabla Anual row carries its own weekly change
+    tb["games_played"] = 20
+    write(d / "lg" / "table.json", tb)
+    for r in pr["teams"]:
+        r["p_anual"] = 0.9 if r["team"] == "Alpha FC" else 0.02
+    write(d / "lg" / "probs.json", pr)
+    B.build(d, NOW)
+    c = card(d, "1")
+    an = next(x for x in c["chances"] if x["key"] == "p_anual")
+    assert an["label"] == "Top of the Tabla Anual" and an["p"] == 0.9 and abs(an.get("d7", 9) - (1.0 - 0.71)) < 1e-6
+    assert c.get("champion") is None
+
+
+def test_a_clinched_league_title_is_a_title_won(tmp_path):
+    """First place certain by arithmetic (more points than any other side can still reach) is a title won; a
+    simulated 100% alone is not. MLS: the overall table of a finished regular season is the Supporters' Shield."""
+    assert B.clinched_first([{"pos": 1, "team": "A", "pts": 80, "played": 34}, {"pos": 2, "team": "B", "pts": 67, "played": 34}], 38, False)["team"] == "A"
+    assert B.clinched_first([{"pos": 1, "team": "A", "pts": 80, "played": 34}, {"pos": 2, "team": "B", "pts": 69, "played": 33}], 38, False) is None
+    assert B.clinched_first([{"pos": 1, "team": "A", "pts": 70, "played": 38}, {"pos": 2, "team": "B", "pts": 70, "played": 38}], 38, True)["team"] == "A"
+    d = tree(tmp_path)
+    tb = json.loads((d / "lg" / "table.json").read_text(encoding="utf-8"))
+    tb["matches_per_team"] = 10                              # Alpha 21 pts with 2 left; Beta can reach 18 + 6 = 24: open
+    write(d / "lg" / "table.json", tb)
+    (d / "clubs" / "1.json").write_text((d / "clubs" / "1.json").read_text(encoding="utf-8").replace('"won": ["shield"]', '"won": []'),
+                                        encoding="utf-8")
+    B.build(d, NOW)
+    assert card(d, "1").get("champion") is None
+    tb["matches_per_team"] = 9                               # Beta's best is now 18 + 3 = 21, not above 21... still open
+    write(d / "lg" / "table.json", tb)
+    B.build(d, NOW)
+    assert card(d, "1").get("champion") is None
+    tb["matches_per_team"] = 8                               # nothing left for anyone: Alpha 21 > Beta 18
+    write(d / "lg" / "table.json", tb)
+    B.build(d, NOW)
+    c = card(d, "1")
+    assert c["champion"]["event"] == "Test League" and c["champion"]["season"] == "26/27"
+    assert not [x for x in c["chances"] if x["key"] == "p_title"]
+    assert card(d, "2").get("champion") is None

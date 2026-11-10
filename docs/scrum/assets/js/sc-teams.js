@@ -43,7 +43,8 @@ SC.route('teams', function (page, P) {
     var opts = prows.map(function (r) { return '<option value="' + esc(r.id) + '">' + esc(SC.tname(S, r.id)) + '</option>'; }).join('');
     var a = q.a || (prows[0] || {}).id, b = q.b || (prows[1] || {}).id;
     html += U.sec('Head to head', 'Tale of the tape', 'Two sides on the profile percentiles, the gap under each measure.', QK.scoutBar([{ label: 'Team', html: '<select class="qk-select" id="tm-a">' + opts + '</select>' },
-      { label: 'v', html: '<select class="qk-select" id="tm-b">' + opts + '</select>' }]) + '<div id="tm-tape"></div>');
+      { label: 'v', html: '<select class="qk-select" id="tm-b">' + opts + '</select>' }]) + '<div id="tm-tape"></div>' +
+      (SC.cmpHref ? '<div class="qk-chips sc-jump"><a class="qk-chip" id="tm-full" href="' + esc(SC.cmpHref(S, 't', [a, b])) + '">The full comparison: ratings, head to head, over time →</a></div>' : ''));
     html += U.sec('Strengths and weaknesses', 'Best and worst, side by side', 'Each side’s three best and three weakest measures (percentile among these sides).', '<div class="sc-sws">' + prows.slice(0, 12).map(function (r) {
       var t = SC.team(S, r.id) || {};
       var list = Object.keys(r.m || {}).filter(function (k) { return M[k] && !M[k].style && isNum(r.m[k][1]); }).map(function (k) { return { label: M[k].label, pctl: r.m[k][1], text: mfmt(M[k], r.m[k][0]) }; });
@@ -73,6 +74,8 @@ SC.route('teams', function (page, P) {
     function tape() {
       var A = prows.filter(function (r) { return r.id === sa.value; })[0], B = prows.filter(function (r) { return r.id === sb.value; })[0];
       if (!A || !B) return;
+      var full = QK.$('#tm-full', body);
+      if (full && SC.cmpHref) full.setAttribute('href', SC.cmpHref(S, 't', [A.id, B.id]));
       var ta = SC.team(S, A.id) || {}, tb = SC.team(S, B.id) || {};
       QK.$('#tm-tape', body).innerHTML = QK.tape({ left: { name: ta.name, short: ta.abbr, sub: SC.signed(A.rating, 1), colour: ta.colour, alt: ta.alt, href: SC.teamHref(S, A.id) },
         right: { name: tb.name, short: tb.abbr, sub: SC.signed(B.rating, 1), colour: tb.colour, alt: tb.alt, href: SC.teamHref(S, B.id) }, gap: true,
@@ -227,6 +230,11 @@ SC.route('team', function (page, P) {
         { label: 'Attack', value: SC.signed(T.att, 1), sub: 'points scored v average' }, { label: 'Defence', value: SC.signed(T.dfn, 1), sub: 'points kept out v average' },
         { label: 'World Rugby', value: isNum(T.wr) ? SC.f(T.wr, 2) : '—', sub: T.wr_rank ? QK.ordinal(T.wr_rank) + ', points in our rebuild' : 'points, our rebuild' }, { label: 'Last 12 months', value: y12.join('–'), sub: 'won, drawn, lost' }],
       short: short });
+    if (SC.cmpHref) {
+      var nopp = (T.next || [])[0] ? (String(T.next[0].home) === String(tid) ? T.next[0].away : T.next[0].home) : null;
+      html += '<div class="qk-chips sc-gap sc-jump"><a class="qk-chip" href="' + esc(SC.cmpHref(S, 't', nopp ? [tid, String(nopp)] : [tid])) + '">Compare' + (nopp ? ' with ' + esc(SC.tname(S, nopp)) : '') + ' →</a>' +
+        '<a class="qk-chip" href="' + esc(SC.progHref(S, 't', [tid])) + '">Rating and form over time →</a></div>';
+    }
     var nxt = (T.next || [])[0];
     html += '<div class="qk-g2 sc-gap"><div>' + (nxt ? U.card('Next test', SC.compName(nxt.comp) + (nxt.venue ? ' · ' + esc(nxt.venue) : ''), QK.previewCard(SC.game(S, nxt), { layout: 'bug', homeFirst: true, noun: 'test' }) +
       (isNum(nxt.m) ? U.note('We expect ' + esc(SC.margin(S, nxt)) + (isNum(nxt.t) ? ', about ' + Math.round(nxt.t) + ' points in all' : '') + '.') : '')) : U.card('Next test', '', QK.empty('No test scheduled', 'The next fixture appears here once it is announced.'))) +

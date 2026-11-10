@@ -621,6 +621,11 @@ a.qk-stat:hover .qk-stat-label { color: var(--volt); }
 .qk-ph-meta b { color: #fff; font-weight: 700; }
 .qk-ph-tags { margin-top: 8px; }
 .qk-ph-tags .qk-tag { background: rgba(0, 0, 0, 0.38); color: #fff; }
+/* the follow button in the hero (QK.playerHeader({ follow })): white on the team colour, volt once followed */
+.qk-ph-fl { display: flex; margin-top: 14px; }
+.qk-ph .qk-fbtn.qk-ph-fbtn { border-color: rgba(255, 255, 255, 0.55); background: rgba(0, 0, 0, 0.38); color: #fff; }
+.qk-ph .qk-fbtn.qk-ph-fbtn:hover { border-color: #fff; }
+.qk-ph .qk-fbtn.qk-ph-fbtn.on { background: var(--volt); border-color: var(--volt); color: var(--volt-ink); }
 .qk-ph-num { font: 400 clamp(9.375rem, 22vw, 18.75rem)/0.75 var(--font-display); --ow: 3px; --oc: rgba(255, 255, 255, 0.85); letter-spacing: 0; }
 .qk-ph-num.txt { font-size: clamp(6rem, 13vw, 11rem); }
 /* v3 names kept for old markup */
@@ -638,7 +643,7 @@ a.qk-stat:hover .qk-stat-label { color: var(--volt); }
   .qk-ph-kicker { grid-column: 1; grid-row: 1; align-self: start; justify-self: start; }
   .qk-ph-num { grid-column: 2; grid-row: 1; align-self: start; font-size: 88px; line-height: 0.75; margin-top: 2px; }
   .qk-ph-num.txt { font-size: 60px; }
-  .qk-ph-name, .qk-ph-meta, .qk-ph-tags { grid-column: 1 / -1; }
+  .qk-ph-name, .qk-ph-meta, .qk-ph-tags, .qk-ph-fl { grid-column: 1 / -1; }
   .qk-ph-bg::after, .qk-ph-bg::before { width: 30%; }
   .qk .qk-ph-name { font-size: clamp(3.25rem, 15vw, 4.5rem) !important; }
   .qk .qk-ph-name.qk-long { font-size: clamp(2.25rem, 10vw, 3rem) !important; }

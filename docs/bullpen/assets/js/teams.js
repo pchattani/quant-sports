@@ -173,11 +173,12 @@ function renderTeam(el, params, state) {
     const hero = QK.playerHeader({ name: k.teamName(tid), split: false, face: k.teamAbbr(tid), pos: [info.league, info.division].filter(Boolean).join(' · '), kicker: k.LN(L) + ' · ' + S + (k.isNum(r.div_rank) ? ' · ' + k.ordinal(r.div_rank) + ' in the division' : ''),
       team: { name: k.teamAbbr(tid), abbr: k.teamAbbr(tid), colour: U.raw(tid), alt: U.alt(tid) },
       meta: [vid ? ['Home park', k.parkName(vid)] : null, k.isNum(pw) ? ['Pythagorean', k.num(pw, 0) + ' wins'] : null],
-      strip: [{ label: 'Record', value: k.isNum(w) ? w + '-' + l : '—', sub: k.isNum(rd) ? 'run differential ' + k.signed(rd, 0) : '' }].concat(tiles).slice(0, 5) });
+      strip: [{ label: 'Record', value: k.isNum(w) ? w + '-' + l : '—', sub: k.isNum(rd) ? 'run differential ' + k.signed(rd, 0) : '' }].concat(tiles).slice(0, 5),
+      /* round 12 (My Teams): follow the club from the hero; it then leads Home and this site's overview */
+      follow: U.followItem(tid, L) });
     const stages = [['p_playoffs', 'Postseason'], ['p_division', 'Win the division'], ['p_bye', 'A first-round bye'], ['p_pennant', 'Win the pennant'], ['p_ws', 'Win the World Series']].filter(x => k.isNum(od[x[0]]));
     const tGroups = U.pctGroups({ values: v, pct_role: pc, n: { g: v.g } }, 'team', 'TEAM', gl, 'head');
-    /* round 12 (My Teams): follow the club; it then leads Home and this site's overview */
-    const links = (QK.followButton ? QK.followButton(U.followItem(tid, L)) : '') + '<a class="qk-btn" href="' + k.compareHref('t' + tid, '') + '?view=classic">Compare</a>' + (vid ? '<a class="qk-btn" href="' + k.parkHref(vid) + '">' + k.esc(k.parkName(vid)) + '</a>' : '') + '<a class="qk-btn" href="' + k.href(L, 'teams', S) + '">All teams</a>';
+    const links = '<a class="qk-btn" href="' + k.compareHref('t' + tid, '') + '?view=classic">Compare</a>' + (vid ? '<a class="qk-btn" href="' + k.parkHref(vid) + '">' + k.esc(k.parkName(vid)) + '</a>' : '') + '<a class="qk-btn" href="' + k.href(L, 'teams', S) + '">All teams</a>';
     /* the section bar above already links back to every team */
     let h = hero + '<div class="bp-flexrow" style="justify-content:flex-end;margin-top:var(--sp-4)">' + links + '</div>';
     h += '<div class="qk-grid"><div class="qk-span-5"><div class="bp-stack">' +

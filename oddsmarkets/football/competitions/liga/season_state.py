@@ -46,6 +46,7 @@ class LigaMatch:
     torneo: str | None = None
     zone: str | None = None            # None for interzone fixtures
     status: str = "scheduled"          # scheduled | live | finished
+    stage: str | None = None           # the store's "league" | "playoff" (set even when the round name is missing)
 
     @property
     def is_finished(self) -> bool:
@@ -59,7 +60,9 @@ class LigaMatch:
 
     @property
     def is_playoff(self) -> bool:
-        return self.round_name in PLAYOFF_ROUNDS
+        # Sofascore listed the 2026 Clausura round of 16 with no round name at all; read by the round name alone they
+        # were 8 more league games, so the finished Tabla Anual was simulated again (Boca 72% instead of champion).
+        return self.round_name in PLAYOFF_ROUNDS or self.stage == "playoff"
 
 
 @dataclass
@@ -141,7 +144,8 @@ class TorneoState:
 
     @property
     def league_complete(self) -> bool:
-        return not self.remaining
+        # the zone phase: playoff ties still to play do not keep it open
+        return not any(not m.is_playoff for m in self.remaining)
 
     @property
     def playoffs_complete(self) -> bool:
@@ -192,8 +196,10 @@ class SeasonState:
         excluded here and supplied by the simulation instead.
         """
         base = {team: TeamRecord() for team in self.teams}
+        live = self.live_torneo()
         for torneo in (self.apertura, self.clausura):
-            if not torneo.league_complete:
+            # the tournament being simulated is seeded from its own records; counting it here as well would double it
+            if not torneo.league_complete or torneo is live:
                 continue
             for team, rec in torneo.records().items():
                 if team not in base:

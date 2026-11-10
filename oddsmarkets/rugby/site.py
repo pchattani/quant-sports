@@ -76,12 +76,24 @@ GLOSSARY = [
 
 def build_index(data: Path, scopes: dict, now: datetime | None = None) -> dict:
     now = now or B.now_utc()
+    sofa_on = sofascore_used()
     idx = {"ok": True, "site": config.SITE, "updated_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"), "scopes": scopes,
            "credit": "Results, line-ups, match statistics and bios from ESPN's public site data; historic results, referees "
-                     "and caps from Wikipedia (CC BY-SA 4.0); weather data by Open-Meteo.com (CC BY 4.0).",
-           "default": "men"}
+                     "and caps from Wikipedia (CC BY-SA 4.0); weather data by Open-Meteo.com (CC BY 4.0)" +
+                     ("; statistics ESPN lacks and smaller nations' tests from Sofascore." if sofa_on else "."),
+           "sources": {"sofascore": sofa_on}, "default": "men"}
     B.write(data / "index.json", idx)
     return idx
+
+
+def sofascore_used() -> bool:
+    """Sofascore is credited while its switch is on and its side store has tests (SOURCE_SOFASCORE_RUGBY_ENABLED=0 drops
+    the data from the merge and the credit from the pages: index.json "sources", read by sc-core.js)."""
+    try:
+        from . import sofa
+        return bool(sofa.enabled() and (sofa.load().get("events") or {}))
+    except Exception:                       # noqa: BLE001 - the credit never breaks the build
+        return False
 
 
 def build_search(data: Path, rows: list) -> int:

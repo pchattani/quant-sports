@@ -202,6 +202,12 @@ def build_season(b: Build, season: int, full: bool, cfg: dict, shared: dict) -> 
     cards = (sched or {}).get("games") or []
     sim = b.step(f"season sim {season}", ctx.sim, None) if full and current else None
     tms = b.write_or_fail(d + "teams.json", f"teams {season}", lambda: TM.build(ctx, sk, gk, sim, cards), season=season)
+    if full and current and ctx.use_models:
+        # the weekly team-rating history (each Monday's refit on the games before it; the follow cards' rating move)
+        def rating_history():
+            from oddsmarkets.nhl.analytics import rating_history as RH
+            return b.write(d + "rating_history.json", RH.build(season, ctx.today, ctx.model("team_strength")))
+        b.step(f"rating history {season}", rating_history)
     spl = b.write_or_fail(d + "season.json", f"season {season}",
                           lambda: with_league(b, season, SN.build(ctx, tms, sim), tms, cards, cfg) if full and current else SN.build(ctx, tms, sim),
                           season=season)

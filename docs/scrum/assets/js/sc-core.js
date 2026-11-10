@@ -7,6 +7,7 @@
  *   #/<S>/rankings?tab=wr|ours                                           (the Rankings section: World Rugby replica, ours)
  *   #/<S>/teams   #/<S>/team/<id>   #/<S>/scout?view=board|leaders&grp=  #/<S>/player/<id>
  *   #/<S>/model?tab=method|doing|lab|records|glossary|terms              #/disclaimer
+ *   #/<S>/compare?t=<a>,<b> | ?p=<a>,<b>[,<c>]                           #/<S>/progression?t=..|?p=.. (sc-compare.js)
  * Data: data/index.json, data/<S>/... (oddsmarkets/rugby/pages.py). Older-browser rule: no optional chaining, no
  * nullish coalescing. */
 (function (root) {
@@ -205,7 +206,7 @@ var ROUTES = {};
 SC.route = function (name, fn) { ROUTES[name] = fn; };
 SC.state = { S: null, sec: 'overview' };
 var SEC_OF = { overview: 'overview', fixtures: 'fixtures', match: 'fixtures', standings: 'standings', teams: 'teams', team: 'teams',
-  scout: 'scout', player: 'scout', rankings: 'value', model: 'model', disclaimer: 'model' };
+  scout: 'scout', player: 'scout', rankings: 'value', model: 'model', disclaimer: 'model', compare: 'teams', progression: 'teams' };
 var LEAVE = [];
 SC.onLeave = function (fn) { if (typeof fn === 'function') LEAVE.push(fn); };
 var shell = null;
@@ -252,7 +253,9 @@ function render() {
   QK.store('qs-scope', S);
   document.documentElement.setAttribute('data-scope', S);
   sectionHrefs(S); paintCtx(S);
-  shell.setSection(SEC_OF[r.sec] || 'overview');
+  /* compare and progression sit under Teams, or under the Scouting Room when they show players (?p= / view=players) */
+  var pl = (r.sec === 'compare' || r.sec === 'progression') && ((r.query.p !== undefined && r.query.t === undefined) || r.query.view === 'players');
+  shell.setSection(pl ? 'scout' : (SEC_OF[r.sec] || 'overview'));
   var el = QK.$('#app');
   el.innerHTML = '<div class="sc-page"></div>';
   var page = el.firstChild;
@@ -285,7 +288,7 @@ function boot() {
   });
   QK.seg(QK.$('#sc-scope'), function (S) {
     var st = SC.state, sec = st.sec;
-    var keep = { overview: 1, fixtures: 1, standings: 1, teams: 1, scout: 1, rankings: 1, model: 1 };
+    var keep = { overview: 1, fixtures: 1, standings: 1, teams: 1, scout: 1, rankings: 1, model: 1, compare: 1, progression: 1 };
     var to = { match: 'fixtures', team: 'teams', player: 'scout' }[sec] || (keep[sec] ? sec : 'overview');
     SC.go('#/' + S + (to !== 'overview' ? '/' + to : ''));
   });
@@ -296,6 +299,8 @@ function boot() {
       return;
     }
     SC.index = idx;
+    /* a source switched off at build time (index.json "sources") takes its credit off the footer and the terms */
+    Object.keys(idx.sources || {}).forEach(function (k) { if (idx.sources[k] === false) document.documentElement.setAttribute('data-nosrc-' + k, ''); });
     var meta = QK.$('#meta-line');
     if (meta) meta.textContent = 'Data built ' + fmt.ago(idx.updated_at) + ' (' + fmt.date(idx.updated_at) + ' ' + fmt.time(idx.updated_at) + '). ' + (idx.credit || '');
     root.addEventListener('hashchange', render);

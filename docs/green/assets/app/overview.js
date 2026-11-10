@@ -174,7 +174,8 @@ GR.page('overview', function (el) {
       { label: 'Cut skill', value: GR.pct(ev.cut.skill), sub: 'than the field’s cut rate', signal: true }]), '<a class="qk-more" href="#/model?tab=doing">The full test</a>');
     el.innerHTML = html;
     var fl = el.querySelector('#gr-follow');
-    if (fl && QK.followSection) QK.followSection(fl, { site: 'green', full: false, feed: false, title: 'Your players', noun: 'player',
+    if (fl && QK.followSection) QK.followSection(fl, { site: 'green', full: true, feed: false, title: 'Your players', noun: 'player',
+      sub: 'The players you follow, first: this week’s event with our chances, our rating and rank, form (W a top 10, D another made cut, L a missed cut) and the facts that stand out.',
       picker: { sport: 'golf', rows: ((rk && rk.men) || []).slice(0, 150).concat(((rk && rk.women) || []).slice(0, 60)).map(function (x, i) {
         var s = i < Math.min(150, ((rk && rk.men) || []).length) ? 'men' : 'women';
         var it = GR.followItem(x.pid, x.name, s);

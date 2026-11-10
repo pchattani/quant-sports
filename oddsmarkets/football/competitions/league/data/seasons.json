@@ -1,5 +1,5 @@
 {
-  "discovered_at": "2026-11-03T16:59:46Z",
+  "discovered_at": "2026-11-10T13:33:01Z",
   "leagues": {
     "premier-league": {
       "tournament_id": 17,
@@ -3584,6 +3584,48 @@
         "Europa League Qualification",
         "Relegation"
       ]
+    },
+    "turkish-cup": {
+      "tournament_id": 96,
+      "seasons": [
+        {
+          "season_id": 102204,
+          "name": "Turkiye Kupasi 26/27",
+          "year": "26/27",
+          "tournament_id": 96
+        },
+        {
+          "season_id": 81187,
+          "name": "Turkiye Kupasi 25/26",
+          "year": "25/26",
+          "tournament_id": 96
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "domestic"
+    },
+    "turkish-super-cup": {
+      "tournament_id": 505,
+      "seasons": [
+        {
+          "season_id": 86690,
+          "name": "Super Kupa 2026",
+          "year": "25/26",
+          "tournament_id": 505
+        },
+        {
+          "season_id": 63861,
+          "name": "Super Kupa 2024",
+          "year": "24/25",
+          "tournament_id": 505
+        }
+      ],
+      "teams": [],
+      "conferences": {},
+      "previous_rank": {},
+      "family": "super"
     }
   }
 }

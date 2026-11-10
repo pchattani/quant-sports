@@ -149,3 +149,20 @@ body.qk { font-size: var(--fs-md); }
 .sc-sn li { align-items: flex-start; flex-wrap: nowrap; }
 .sc-sn li > span:last-child { min-width: 0; }
 @media (max-width: 600px) { .sc-grades { grid-template-columns: minmax(0, 1fr); } }
+
+/* a credit for a source switched off at build time (index.json "sources", sc-core.js) */
+html[data-nosrc-sofascore] [data-src="sofascore"]{display:none}
+
+/* Compare and Progression (sc-compare.js, 10 Nov 2026) */
+.sc-cmp-pick { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between; }
+.sc-cmp-pick .qk-select { max-width: min(260px, 100%); min-width: 0; }
+.sc-cmp-slots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.sc-cmp-slot { display: flex; flex-direction: column; gap: 6px; min-width: 0; border-top: 3px solid var(--ec, var(--line-2)); padding-top: 8px; }
+.sc-cmp-slot .qk-input { width: 100%; min-width: 0; }
+@media (max-width: 720px) { .sc-cmp-slots { grid-template-columns: minmax(0, 1fr); } }
+.sc-cmp-add { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin-top: 14px; }
+.sc-cmp-add label { display: inline-flex; flex-wrap: wrap; gap: 8px; align-items: center; min-width: 0; max-width: 100%; font: 700 var(--fs-2xs)/1 var(--font-cond); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); }
+.sc-cmp-add .qk-input, .sc-cmp-add .qk-select { min-width: 0; width: min(260px, 70vw); }
+.sc-ctl { display: flex; flex-wrap: wrap; gap: 10px 14px; margin: 0 0 12px; }
+.sc-ctl .qk-seg { max-width: 100%; overflow-x: auto; }
+.sc-jump { margin-top: var(--sp-3); }

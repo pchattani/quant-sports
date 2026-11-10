@@ -119,7 +119,7 @@ IR.page('player', function (el, params) {
           { label: 'Best DOTS', value: IR.dots(P.best), pctl: C && C.pc ? C.pc.dots : null },
           { label: 'A year', value: IR.signed(P.d365), sub: 'rating change' },
           { label: 'To No. 1', value: isNum(P.need1) ? IR.kg(P.need1) : (P.rank === 1 ? 'No. 1' : '–'), sub: isNum(P.need_up) ? IR.kg(P.need_up) + ' to go up one' : '' }],
-        short: short, tags: [IR.followStar(P.pid, P.name, P.cc, { compact: false })] });
+        short: short, follow: IR.followItem(P.pid, P.name, P.cc) });
       var prev = P.prev && P.prev.pc ? P.prev : null;
       if (C && C.v) {
         var groups = FAMILY.map(function (f) {

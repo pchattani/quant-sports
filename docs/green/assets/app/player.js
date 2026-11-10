@@ -86,8 +86,7 @@ GR.page('player', function (el, params) {
         { label: 'Wins', value: String(wins2), sub: 'last two years, ' + two.length + ' starts' },
         { label: 'Top 10s', value: String(top10), sub: two.length ? Math.round(100 * top10 / two.length) + '% of starts' : '' },
         { label: 'Form', value: C && isNum(C.v.form) ? GR.signed(C.v.form, 2) : GR.rating(P.rt), sub: 'last eight events', pctl: C && C.q ? C.pc.form : null }],
-      short: short });
-    html += '<div class="gr-follow-line">' + GR.followStar(P.pid, P.name, stream) + ' <span class="gr-muted">Follow ' + esc(P.name) + ' to see them first on the overview.</span></div>';
+      short: short, follow: GR.followItem(P.pid, P.name, stream) });
     if (isNum(P.wt) && P.wt < GR.THIN) html += QK.note('Thin record: only ' + Math.round(P.wt) + ' recent rounds sit behind this rating, so it can swing a long way on a few results.');
     // percentiles
     var prev = P.prev || null;

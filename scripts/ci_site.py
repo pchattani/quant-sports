@@ -1003,6 +1003,16 @@ def mojibake_gate(src: Path, rels, fix: bool) -> tuple[int, int, list[str]]:
     return rep, sus, files
 
 
+def onto_remote_head(clone: Path) -> None:
+    """After a rejected push: move onto the site repo's new head keeping this deploy's files in the working tree.
+    The repo's own .github (its Publish workflow) is taken from that head, so a clone taken before it changed does
+    not stage its deletion."""
+    git(["fetch", "--depth", "1", "origin", "main"], clone)
+    git(["reset", "--mixed", "-q", "origin/main"], clone)
+    if git(["ls-tree", "-d", "HEAD", ".github"], clone, check=False).stdout.strip():
+        git(["checkout", "HEAD", "--", ".github"], clone, check=False)
+
+
 def cmd_deploy(site: str, clone: Path, shadow: Path | None, allow_mass_delete: bool) -> int:
     cfg = SITES[site]
     ctx = ctx_for(site)
@@ -1081,8 +1091,7 @@ def cmd_deploy(site: str, clone: Path, shadow: Path | None, allow_mass_delete: b
             return 0
         print(f"push rejected (attempt {attempt}); refetching", file=sys.stderr)
         time.sleep(10)
-        git(["fetch", "--depth", "1", "origin", "main"], clone)
-        git(["reset", "--mixed", "-q", "origin/main"], clone)
+        onto_remote_head(clone)
     print("push failed after 3 attempts", file=sys.stderr)
     return 1
 

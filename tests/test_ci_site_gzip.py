@@ -70,3 +70,31 @@ def test_the_site_repos_publish_workflow_is_never_deployed_over():
     assert ci.is_excluded(P(".github/workflows/pages.yml"), ())
     assert ci.is_excluded(P(".git/config"), ())
     assert not ci.is_excluded(P("data/index.json"), ())
+
+
+def test_a_rejected_push_keeps_the_publish_workflow(tmp_path):
+    """A deploy cloned before the site repo gained .github/workflows/publish.yml is rejected on push; the retry moves
+    onto the new head and must not stage the workflow's deletion."""
+    import subprocess
+
+    def g(*a, cwd):
+        r = subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", *a], cwd=cwd, capture_output=True, text=True)
+        assert r.returncode == 0, r.stderr
+        return r.stdout
+
+    bare, seed, deploy, other = (tmp_path / n for n in ("bare.git", "seed", "deploy", "other"))
+    g("init", "-q", "--bare", "-b", "main", str(bare), cwd=tmp_path)
+    g("clone", "-q", str(bare), str(seed), cwd=tmp_path)
+    (seed / "index.html").write_text("v1")
+    g("add", "-A", cwd=seed); g("commit", "-q", "-m", "v1", cwd=seed); g("push", "-q", "origin", "HEAD:main", cwd=seed)
+    g("clone", "-q", "--depth", "1", f"file://{bare.as_posix()}", str(deploy), cwd=tmp_path)    # the deploy's clone
+    g("clone", "-q", str(bare), str(other), cwd=tmp_path)
+    (other / ".github" / "workflows").mkdir(parents=True)
+    (other / ".github" / "workflows" / "publish.yml").write_text("name: Publish")
+    g("add", "-A", cwd=other); g("commit", "-q", "-m", "wf", cwd=other); g("push", "-q", "origin", "HEAD:main", cwd=other)
+    (deploy / "index.html").write_text("v2")
+    g("add", "-A", cwd=deploy); g("commit", "-q", "-m", "deploy", cwd=deploy)
+    ci.onto_remote_head(deploy)
+    g("add", "-A", ".", cwd=deploy)
+    staged = g("diff", "--cached", "--name-status", cwd=deploy)
+    assert "publish.yml" not in staged and "index.html" in staged

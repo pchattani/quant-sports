@@ -1528,7 +1528,8 @@ QK.statStrip = function (list, o) {
  * >= 4.5:1 through QK.color.block; a pale kit becomes slate with a rule in its colour), the alternate colour on a
  * diagonal at the right behind a volt stripe, the jersey number huge and outlined (initials when there is none), the
  * name in Bebas on two lines (Barlow Condensed when it is long), chips. "The short version" follows as the explain
- * strip. Tennis and other no-team pages: the cobalt block (no colour given). */
+ * strip. Tennis and other no-team pages: the cobalt block (no colour given). follow: a follow item (QK.follow) puts the
+ * "Follow" / "Following" button in the hero, under the chips, at every width (My Teams). */
 QK.playerHeader = function (o) {
   o = o || {};
   var t = o.team || {};
@@ -1554,7 +1555,8 @@ QK.playerHeader = function (o) {
   return '<section class="qk-ph' + (o.bleed === false ? '' : ' qk-bleed') + '" style="--tb:' + esc(bk.bg) + ';--ta:' + esc(alt) + (bk.edge ? ';--te:' + esc(bk.edge) : '') + '">' +
     '<div class="qk-ph-bg" aria-hidden="true"></div><div class="qk-ph-in"><div class="qk-ph-main">' +
     (o.kicker ? '<div class="qk-ph-kicker">' + esc(o.kicker) + '</div>' : '') + '<h1 class="qk-ph-name' + long + '">' + nameH + '</h1>' +
-    (chips.length ? '<div class="qk-ph-meta">' + chips.join('') + '</div>' : '') + ((o.tags || []).length ? '<div class="qk-ph-tags">' + o.tags.join('') + '</div>' : '') + '</div>' +
+    (chips.length ? '<div class="qk-ph-meta">' + chips.join('') + '</div>' : '') + ((o.tags || []).length ? '<div class="qk-ph-tags">' + o.tags.join('') + '</div>' : '') +
+    (o.follow && QK.followButton ? '<div class="qk-ph-fl">' + QK.followButton(o.follow, { cls: 'qk-ph-fbtn' }) + '</div>' : '') + '</div>' +
     '<div class="qk-ph-num qk-outline num' + (num.length > 2 ? ' txt' : '') + '" aria-hidden="true">' + esc(num) + '</div></div></section>' +
     (strip.length ? QK.statStrip(strip, { bleed: o.bleed !== false }) : '') +
     (o.short ? '<div class="qk-ph-short">' + QK.shortVersion(o.short) + '</div>' : '');
@@ -2696,8 +2698,9 @@ QK.within = {
  * https://pchattani.github.io/, so a team followed on the Rink shows on Home). No account, nothing leaves the
  * browser. A local preview (127.0.0.1) is its own origin and starts with no follows: that is expected.
  *
- *   key        '<site>:<scope>:<id>': the site folder (site, bullpen, hardwood, rink, gridiron, campus, ace, paddock, scrum),
- *              a scope inside it (mlb, aaa, nba, wnba, club, team, cfb, atp, driver ...) and the site's own id
+ *   key        '<site>:<scope>:<id>': the site folder (site, bullpen, hardwood, rink, gridiron, campus, ace, paddock, scrum,
+ *              iron, green), a scope inside it (mlb, aaa, nba, wnba, club, team, cfb, atp, driver, lifter, golfm ...) and the
+ *              site's own id
  *   item       { k, name, abbr, colour, alt, href (the site route '#/mlb/team/158' or a full URL), added (YYYY-MM-DD) }
  *   QK.follow  list() has(k) add(item) remove(k) toggle(item) update(k, fields) forSite(site, scope) parse(k)
  *              cardUrl(k) siteUrl(k, route) fromHref(href, sport) onChange(fn) paint() hasCards(k)
@@ -2714,11 +2717,12 @@ var FOLLOW_KEY = 'qk-follow-v1', FOLLOW_MAX = 30;
 var FOLLOW_K = /^[a-z]+:[a-z0-9_]+:[A-Za-z0-9_.\-]+$/;
 /* the sites and scopes that publish follow cards (docs/<site>/data/follow/<scope>/<id>.json) */
 QK.FOLLOW_CARDS = { bullpen: ['mlb', 'aaa'], site: ['club'], rink: ['team'], gridiron: ['team'], hardwood: ['nba', 'wnba'],
-  campus: ['cfb', 'mbb', 'wbb', 'mch', 'wch'], ace: ['atp', 'wta'], paddock: ['driver', 'team'], scrum: ['men', 'women'], iron: ['lifter'] };
+  campus: ['cfb', 'mbb', 'wbb', 'mch', 'wch'], ace: ['atp', 'wta'], paddock: ['driver', 'team'], scrum: ['men', 'women'], iron: ['lifter'],
+  green: ['golfm', 'golfw'] };
 /* what each scope is called, for chips, notes and the picker */
 QK.FOLLOW_SCOPES = { mlb: 'MLB', aaa: 'Triple-A', nba: 'NBA', wnba: 'WNBA', club: 'Football', team: 'Team', cfb: 'College football',
   mbb: 'Men’s college basketball', wbb: 'Women’s college basketball', mch: 'Men’s college hockey', wch: 'Women’s college hockey',
-  atp: 'ATP', wta: 'WTA', driver: 'Driver', men: 'Men’s rugby', women: 'Women’s rugby', lifter: 'Lifter' };
+  atp: 'ATP', wta: 'WTA', driver: 'Driver', men: 'Men’s rugby', women: 'Women’s rugby', lifter: 'Lifter', golfm: 'Men’s golf', golfw: 'Women’s golf' };
 var followFns = [], followCache = {};
 function folderSport(folder) { for (var i = 0; i < QK.ALL_SPORTS.length; i++) if (QK.ALL_SPORTS[i].folder === folder) return QK.ALL_SPORTS[i]; return null; }
 function fClean(x) {
@@ -3087,7 +3091,7 @@ QK.followPicker = function (o) {
 var FACT_KICKER = { champion: 'Champions', franchise: 'Franchise history', streak: 'On a run', form_xp: 'Form', rating_move: 'Our ratings',
   vs_last: 'On last season', split: 'Home and away', best_start: 'Best start', pctl: 'Against the league', best_record: 'Best record',
   sos: 'Schedule', luck: 'Luck', swing: 'Big swing', clinch: 'The race', big_game: 'Big game', rivalry: 'Rivalry',
-  player_rank: 'Star player', player_run: 'Hot streak', call: 'Our call', rating: 'Our ratings', teammate: 'Team-mate' };
+  player_rank: 'Star player', player_run: 'Hot streak', call: 'Our call', rating: 'Our ratings', teammate: 'Team-mate', year: 'The last 12 months' };
 QK.FACT_KICKER = FACT_KICKER;
 function fcWhen(n) {
   if (!n || !n.start) return '';
@@ -3105,7 +3109,7 @@ function fcLast(card, x) {
   if (!x) return '';
   var op = x.opp || {}, sc = x.score && isNum(x.score[0]) ? x.score[0] + '–' + x.score[1] : '';
   return '<div class="qk-fc-last"><small>Last</small><span class="qk-fc-res ' + (x.res === 'W' ? 'w' : x.res === 'D' ? 'd' : 'l') + '">' + esc(x.res || '') + '</span>' +
-    '<span>' + esc(sc) + ' ' + (x.home ? 'v' : 'at') + ' ' + esc(op.name || '') + (x.comp ? ' · ' + esc(x.comp) : '') + (x.upset ? ' · <b class="qk-fc-up">upset</b>' : '') +
+    '<span>' + esc(sc) + (op.name ? ' ' + (x.home ? 'v' : 'at') + ' ' + esc(op.name) + (x.comp ? ' · ' : '') : ' ') + (x.comp ? esc(x.comp) : '') + (x.upset ? ' · <b class="qk-fc-up">upset</b>' : '') +
     (isNum(x.p) ? ' <span class="qk-fl-q">(we gave them ' + fmt.pct(x.p) + ')</span>' : '') + '</span></div>';
 }
 /* a card's facts as the page shows them: a champion card already says the title in its line, so the champion fact

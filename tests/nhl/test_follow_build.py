@@ -170,3 +170,56 @@ def test_prune_removes_a_team_that_left(tmp_path):
     (data / "follow" / "team" / "OLD.json").write_text("{}", encoding="utf-8")
     B.build(data, NOW)
     assert not (data / "follow" / "team" / "OLD.json").exists()
+
+
+def test_rating_move_from_the_weekly_history(tmp_path):
+    """<S>/rating_history.json (rating_history.py): the weekly ranks feed the "rating move" fact, against today's
+    published rank; a week dated after the build clock is never read."""
+    data = tree(tmp_path)
+    weeks = [(NOW - timedelta(days=d)).date().isoformat() for d in (40, 33, 26, 19, 12, 5)] + [(NOW + timedelta(days=2)).date().isoformat()]
+    ranks = {t: [6 if t == "FFF" else 1 if t == "AAA" else 3] * 6 + [1] for t in TEAMS}
+    write(data / str(S) / "rating_history.json", {"ok": True, "season": S, "weeks": weeks, "ranks": ranks, "teams": {}})
+    B.build(data, NOW)
+    cs = cards(data)
+    mv = [f["text"] for f in cs["FFF"]["facts"] if f["kind"] == "rating_move"]
+    # FFF: 6th a month ago, 2nd on today's published rating (units.rating 0.25, behind AAA's 0.6)
+    assert mv == ["The Kraken are up 4 places in our ratings this month, to 2nd."]
+    assert not [f for f in cs["AAA"]["facts"] if f["kind"] == "rating_move"]
+    # without the file: no rating move anywhere
+    (data / str(S) / "rating_history.json").unlink()
+    B.build(data, NOW)
+    assert not [f for c in cards(data).values() for f in c["facts"] if f["kind"] == "rating_move"]
+
+
+def test_rating_history_fits_each_monday_on_the_games_before_it(monkeypatch):
+    """rating_history.build refits the team ratings at every Monday after the first game day, through today, passing
+    the Monday as the fit's exclusive `through` (no game on or after it), and ranks the clubs at each."""
+    from datetime import date
+
+    import pandas as pd
+
+    from oddsmarkets.nhl.analytics import rating_history as RH
+    from oddsmarkets.nhl.models import _cdata as D
+    from oddsmarkets.nhl.models import team_strength as TS
+    assert RH.mondays(date(2026, 10, 7), date(2026, 10, 26)) == [date(2026, 10, 12), date(2026, 10, 19), date(2026, 10, 26)]
+    assert RH.mondays(date(2026, 10, 5), date(2026, 10, 11)) == []           # a Monday start: its own day is not a point
+    seen = []
+
+    class R:
+        def __init__(self, through):
+            self.through = through
+
+        def as_dict(self):
+            k = len(seen)
+            return {"teams": {"AAA": {"net": 0.15 * k}, "BBB": {"net": 0.2}, "CCC": {"net": -0.1}}}
+
+    def fit(tg, season, through, prior, p, teams=None, goalie_ext=None):
+        seen.append((through, goalie_ext))
+        return R(through)
+    monkeypatch.setattr(D, "team_games", lambda s: pd.DataFrame({"date": ["2026-10-07", "2026-10-20"], "season": [s, s]}))
+    monkeypatch.setattr(D, "teams_for", lambda s: ["AAA", "BBB", "CCC"])
+    monkeypatch.setattr(TS, "fit", fit)
+    out = RH.build(S, date(2026, 10, 26), rd={"prior": {"teams": {}, "goalies": {}}})
+    assert out["ok"] and out["weeks"] == ["2026-10-12", "2026-10-19", "2026-10-26"]
+    assert [x[0] for x in seen] == out["weeks"] and all(x[1] is None for x in seen)
+    assert out["ranks"]["BBB"] == [1, 2, 2] and out["ranks"]["AAA"] == [2, 1, 1] and out["ranks"]["CCC"] == [3, 3, 3]
