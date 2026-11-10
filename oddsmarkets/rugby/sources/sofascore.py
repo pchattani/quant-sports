@@ -258,6 +258,7 @@ class Client:
         self.last_status = status
         if status == 403:
             self.state["blocked_at"] = stamp()
+            self.state["blocked_path"] = path
             log.error("sofascore answered 403 on %s: stopping; no call for %.0f hours", path, BACKOFF_HOURS)
             raise Blocked(path)
         if status != 200:

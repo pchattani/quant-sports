@@ -86,10 +86,14 @@ and ruck timing.
 `data/rugby/sofascore_state.json`), one call every 5 s, one host (`api.sofascore.com`, no fail-over), stop at the first
 403, no call within 6 hours of any 403 (its own `blocked_at`, the football season tables' `blocked_at`, or a "fetch
 failed" line in `scripts/refresh_sofascore.log`), skipped while the shared Sofascore lock (`data/deploy/locks/sofascore.lock`)
-is held. Each run: the last three days' event lists until settled; the detail queue (statistics and line-ups, two calls a
-test) for tests ESPN has without statistics (the 2026 Nations Championship first), then Sofascore-only tests; then a
-discovery walk of `/sport/rugby/scheduled-events/<day>` (one call a day), the days ESPN has stat-less tests first, then
-newest first back to 2024-01-01. Only senior 15-a-side union internationals between national sides are kept (league,
+is held. Each run: the detail queue (statistics and line-ups, two calls a test) for tests ESPN has without
+statistics (the 2026 Nations Championship first), then Sofascore-only tests; then discovery one rung a call through the
+endpoints the football fetchers use every hour (the rugby categories once, each international category's tournaments,
+each tournament's seasons weekly, every page of each season's finished events from 2024, the current season's first
+page again daily). Search and the scheduled-events lists are not used: both answered 403 on 10 Nov 2026 (13:33 and
+20:13 UTC) while football's tournament and event calls kept working, and football's search-based discovery has logged
+"Discovery incomplete" every hour since 29 Sep; the state records `blocked_path`, and a 403 on the category list is
+retried weekly. Only senior 15-a-side union internationals between national sides are kept (league,
 sevens, age-grade, A and XV sides filtered out). Store: `data/rugby/stores/side/sofascore.json.gz` (`events`, `detail`,
 `days`), carried to CI with the other side stores. Merge (`oddsmarkets/rugby/sofa.py`, inside `store.load_all`): a test
 ESPN or Wikipedia has (same day +-1, same sides, same score) gets Sofascore's team statistics when it has none and its

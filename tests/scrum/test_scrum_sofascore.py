@@ -111,7 +111,10 @@ def test_run_skips_inside_the_backoff_and_records_a_403(iso, monkeypatch):
 
     def fake(url):
         n["c"] += 1
-        return (403, None) if n["c"] == 3 else (200, {"events": []})
+        if n["c"] == 3:
+            return 403, None
+        return 200, ({"categories": [{"id": 5, "name": "International"}]} if n["c"] == 1 else
+                     {"groups": [{"uniqueTournaments": [{"id": 77, "name": "Test matches"}]}]})
     cl = sf.Client(budget=30, interval=0, state=sf.load_state(), get=fake)
     rep = job.run(30, 0, "2026-11-01", client=cl)
     assert rep["stop"] == "403" and rep["calls"] == 3      # stopped at the first 403, nothing after it
@@ -119,24 +122,59 @@ def test_run_skips_inside_the_backoff_and_records_a_403(iso, monkeypatch):
     assert saved["blocked_at"] and not sf.lock_path().exists()
 
 
-def test_run_walks_days_then_details_within_the_budget(iso, monkeypatch):
-    job = pytest.importorskip("scrum_sofascore")      # a PC-only script: not in the public build repo
-    monkeypatch.setattr(job, "espn_index", lambda: {})
-    days = {"2026-11-07": [_ev(1, "2026-11-07", "Portugal", "Georgia", 20, 25), _ev(2, "2026-11-07", "England", "Samoa", 30, 10,
-                                                                                  ut="Rugby League International")]}
+def _ladder(events, stats_ok=True, cats_status=200):
+    """A fake Sofascore for the discovery ladder: one international category, a union and a league tournament."""
+    calls = []
 
     def fake(url):
-        if "/scheduled-events/" in url:
-            return 200, {"events": days.get(url.rsplit("/", 1)[1], [])}
-        if url.endswith("/statistics"):
+        path = url.split("/api/v1", 1)[1]
+        calls.append(path)
+        if path == "/sport/rugby/categories":
+            return (cats_status, {"categories": [{"id": 5, "name": "International"}, {"id": 6, "name": "England"}]} if cats_status == 200 else None)
+        if path == "/category/5/unique-tournaments":
+            return 200, {"groups": [{"uniqueTournaments": [{"id": 77, "name": "International Friendlies"},
+                                                           {"id": 78, "name": "Rugby League International"}]}]}
+        if path == "/unique-tournament/77/seasons":
+            return 200, {"seasons": [{"id": 900, "year": "2026"}, {"id": 800, "year": "2019"}]}
+        if path.startswith("/unique-tournament/77/season/900/events/last/"):
+            page = int(path.rsplit("/", 1)[1])
+            return 200, {"events": events[page * 2:page * 2 + 2], "hasNextPage": page * 2 + 2 < len(events)}
+        if path.endswith("/statistics") and stats_ok:
             return 200, {"statistics": [{"period": "ALL", "groups": [{"statisticsItems": [{"name": "Tries", "home": "2", "away": "3"}]}]}]}
         return 404, None
+    return fake, calls
+
+
+def test_run_climbs_the_discovery_ladder_then_fetches_details_within_the_budget(iso, monkeypatch):
+    job = pytest.importorskip("scrum_sofascore")      # a PC-only script: not in the public build repo
+    monkeypatch.setattr(job, "espn_index", lambda: {})
+    evs = [_ev(1, "2026-11-07", "Portugal", "Georgia", 20, 25), _ev(2, "2026-11-07", "England", "Samoa", 30, 10, ut="Rugby League International"),
+           _ev(3, "2026-07-04", "Spain", "Chile", 30, 12)]
+    fake, calls = _ladder(evs)
     cl = sf.Client(budget=12, interval=0, state=sf.load_state(), get=fake)
-    rep = job.run(12, 0, "2026-11-01", today=datetime(2026, 11, 10).date(), client=cl)
+    rep = job.run(12, 0, "2024-01-01", today=datetime(2026, 11, 10).date(), client=cl)
     s = job.load_store()
-    assert list(s["events"]) == ["1"]                      # the rugby league test is not kept
-    assert rep["calls"] <= 12 and s["detail"]["1"]["done"] == 1
-    assert s["detail"]["1"]["stats"]["Tries"][:2] == [2.0, 3.0]
+    assert sorted(s["events"]) == ["1", "3"]                     # the league test is not kept
+    assert "78" not in s["disc"]["tours"]                        # nor the league tournament
+    assert not any("/season/800/" in c for c in calls)           # 2019 is before the floor
+    assert not any("scheduled-events" in c or "/search" in c for c in calls)
+    assert rep["calls"] <= 12 and s["detail"]["1"]["done"] == 1 and s["detail"]["1"]["stats"]["Tries"][:2] == [2.0, 3.0]
+    se = s["disc"]["tours"]["77"]["seasons"]["900"]
+    assert se["complete"] == 1
+    # the next run re-reads nothing until a day has passed (the current season) and the tournament until a week
+    assert job.next_rung(s, "2024-01-01", datetime(2026, 11, 10).date()) is None
+
+
+def test_a_403_on_the_category_list_is_retried_weekly_not_every_six_hours(iso, monkeypatch):
+    job = pytest.importorskip("scrum_sofascore")      # a PC-only script: not in the public build repo
+    monkeypatch.setattr(job, "espn_index", lambda: {})
+    fake, calls = _ladder([], cats_status=403)
+    cl = sf.Client(budget=12, interval=0, state=sf.load_state(), get=fake)
+    rep = job.run(12, 0, "2024-01-01", client=cl)
+    assert rep["stop"] == "403" and calls == ["/sport/rugby/categories"]
+    s = job.load_store()
+    assert s["disc"]["cats_403"] and job.next_rung(s, "2024-01-01", datetime(2026, 11, 10).date()) is None
+    assert json.loads((iso / "state.json").read_text())["blocked_path"] == "/sport/rugby/categories"
 
 
 # ── parsing and merging ─────────────────────────────────────────────────────────────────────────────────────────
