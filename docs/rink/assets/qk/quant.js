@@ -2764,7 +2764,8 @@ var FOLLOW_ROUTES = {
   ace: function (r) { var m = /^\/(atp|wta)\/player\/([A-Za-z0-9]+)/.exec(r); return m ? [m[1], m[2]] : null; },
   paddock: function (r) { var m = /^\/(driver|team)\/([A-Za-z0-9_\-]+)/.exec(r); return m ? [m[1], m[2]] : null; },
   site: function (r) { var m = /^\/club\/(\d+)/.exec(r); return m ? ['club', m[1]] : null; },
-  scrum: function (r) { var m = /^\/(men|women)\/team\/([A-Za-z0-9]+)/.exec(r); return m ? [m[1], m[2]] : null; }
+  scrum: function (r) { var m = /^\/(men|women)\/team\/([A-Za-z0-9]+)/.exec(r); return m ? [m[1], m[2]] : null; },
+  iron: function (r) { var m = /^\/player\/([A-Za-z0-9_\-]+)/.exec(r); return m ? ['lifter', m[1]] : null; }
 };
 QK.follow = {
   KEY: FOLLOW_KEY, MAX: FOLLOW_MAX,
@@ -2962,8 +2963,13 @@ bindFollowButtons();
 var fpRows = null;
 function fpLoadDefault() {
   return QK.fetchJSON(QK.homeUrl() + 'data/search.json').then(function (j) {
-    var f = j.fields || [], gi = f.indexOf('go');
-    return (j.rows || []).map(function (r) { var x = { sport: r[0], t: r[1], s: r[2], href: r[3] }; if (gi >= 0 && isNum(r[gi])) x.go = r[gi]; return x; });
+    var f = j.fields || [], gi = f.indexOf('go'), ki = f.indexOf('k');
+    return (j.rows || []).map(function (r) {
+      var x = { sport: r[0], t: r[1], s: r[2], href: r[3] };
+      if (gi >= 0 && isNum(r[gi])) x.go = r[gi];
+      if (ki >= 0 && typeof r[ki] === 'string' && r[ki]) x.k = r[ki];   /* golfers: the href alone cannot name the tour */
+      return x;
+    });
   });
 }
 function fpGroup(r) {

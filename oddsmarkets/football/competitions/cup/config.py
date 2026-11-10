@@ -369,6 +369,15 @@ SUPERCOPA_DE_CHILE = _domestic("supercopa-de-chile", "Supercopa de Chile", "Supe
 # Acumulada and a place in the new 2027 super cup; no CONMEBOL place.
 COPA_DE_LA_LIGA_PERU = _domestic("copa-de-la-liga-peru", "Copa de la Liga (Peru)", "Copa de la Liga", "Peru", "Copa de la Liga", "Peru",
                                  (("r16", 1), ("qf", 1), ("sf", 2), ("final", 1)), sofascore_id=35067)
+# Turkey (2 Nov 2026). Ziraat Türkiye Kupası 2026-27: the group stage of 2024-26 was dropped (TFF board, 4 Mar 2026);
+# five qualifying rounds, then a single-match Round of 16 and quarter-finals, two-legged semi-finals and a single-match
+# final (29 May 2027). Turkcell Süper Kupa: four clubs since 2024-25 (champion, runner-up, cup winner and finalist),
+# single-match semi-finals and final. Sofascore ids pinned (10 Nov 2026): search finds "Türkiye Kupası" 96 and "TFF Süper
+# Kupa" 505 under Turkey, but not under the English names.
+TURKISH_CUP = _domestic("turkish-cup", "Türkiye Kupası", "Türkiye Kupası", "Turkey", "Turkish Cup", "Turkey",
+                        (("r16", 1), ("qf", 1), ("sf", 2), ("final", 1)), sofascore_id=96)
+TURKISH_SUPER_CUP = _domestic("turkish-super-cup", "Turkish Super Cup", "Süper Kupa", "Turkey", "Super Cup", "Turkey",
+                              _FOUR, family="super", sofascore_id=505)
 KINGS_CUP = _domestic("kings-cup", "Saudi King's Cup", "King's Cup", "Saudi Arabia", "King Cup", "Saudi Arabia",
                       (("r32", 1), ("r16", 1), ("qf", 1), ("sf", 1), ("final", 1)), sofascore_id=2058)
 SAUDI_SUPER_CUP = _domestic("saudi-super-cup", "Saudi Super Cup", "Saudi Super Cup", "Saudi Arabia", "Saudi Super Cup", "Saudi Arabia", _FOUR, family="super")
@@ -437,7 +446,7 @@ CUPS: dict[str, CupConfig] = {
         COPA_DO_BRASIL, SUPERCOPA_DO_BRASIL, COPA_ARGENTINA, SUPERCOPA_ARGENTINA, TROFEO_DE_CAMPEONES,
         KINGS_CUP, SAUDI_SUPER_CUP, US_OPEN_CUP, CAMPEON_DE_CAMPEONES,
         COPA_COLOMBIA, SUPERLIGA_COLOMBIA, SUPERCOPA_URUGUAYA, COPA_CHILE, COPA_DE_LA_LIGA_CHILE, SUPERCOPA_DE_CHILE,
-        COPA_DE_LA_LIGA_PERU,
+        COPA_DE_LA_LIGA_PERU, TURKISH_CUP, TURKISH_SUPER_CUP,
         WORLD_CUP, EURO, COPA_AMERICA, NATIONS_LEAGUE, EURO_QUALIFIERS,
         WC_QUAL_UEFA, WC_QUAL_CONMEBOL, WC_QUAL_CONCACAF, WC_QUAL_CAF, WC_QUAL_AFC,
         AFCON, AFCON_QUALIFIERS, ASIAN_CUP, GOLD_CUP, CONCACAF_NATIONS_LEAGUE, FRIENDLIES,
@@ -457,4 +466,5 @@ COUNTRY_LEAGUE: dict[str, str] = {
     "ARG": "liga-argentina", "MEX": "liga-mx", "BEL": "belgian-pro-league",
     "COL": "primera-a-colombia", "URY": "primera-division-uruguay", "URU": "primera-division-uruguay",
     "CHL": "liga-de-primera", "CHI": "liga-de-primera", "PER": "liga-1-peru",
+    "TUR": "super-lig",
 }

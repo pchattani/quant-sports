@@ -422,9 +422,9 @@ What is known, from operating history (`HANDOFF.md`, fetcher docstrings):
 
 ## 4. Competition registry
 
-There are 81 competitions: 16 leagues (`LEAGUES`: 13 single tables or
+There are 84 competitions: 17 leagues (`LEAGUES`: 14 single tables or
 conference/playoff/split formats, and since 2 November 2026 Colombia, Uruguay and
-Peru, whose seasons are several tournaments and an aggregate table, §4.4), 64 cups
+Peru, whose seasons are several tournaments and an aggregate table, §4.4), 66 cups
 and national-team competitions (`CUPS`), and the Argentine Liga Profesional, which
 has its own package.
 
@@ -610,6 +610,29 @@ Copa de la Liga champion) starts in 2027.
   v Liverpool awarded to Liverpool, two unlisted Clausura results, Peñarol −1 in the Clausura; Colombia: three
   unlisted Apertura results). With them our tables equal Sofascore's. An unlisted result is skipped once Sofascore
   lists the match. Re-check after each discovery (RUNBOOK §7).
+
+### 4.5 Turkey (coded 2 November 2026, live 10 November 2026)
+
+| Competition | Slug | Sofascore id | Kind | Notes |
+|---|---|---|---|---|
+| Süper Lig | `super-lig` | 52 | league | 18 clubs, double round robin; 16th-18th relegated, no playoff |
+| Türkiye Kupası | `turkish-cup` | 96 | knockout | 2026-27: five qualifying rounds, single-match Round of 16 and quarter-finals, two-legged semi-finals, final 29 May 2027 |
+| Turkish Super Cup (TFF Süper Kupa) | `turkish-super-cup` | 505 | super | four clubs since 2024-25, single-match semi-finals and final |
+
+- **Ids.** The cups' ids are pinned: Sofascore's search finds nothing for the English names ("Turkish Cup" returns
+  basketball and snooker, "Super Cup" other countries'), but finds "Türkiye Kupası" (96) and "TFF Süper Kupa" (505)
+  under the Turkey category (10 Nov 2026). The league was held back on 2 Nov because the Sofascore block left
+  discovery with no data.
+- **Format** (`league/config.py` `SUPER_LIG`; the TFF's 2026-27 statute could not be retrieved, so it is from the
+  Turkish press quoting it): 1st Champions League league phase, 2nd Champions League qualifying, 3rd Europa League
+  qualifying, 4th Conference League qualifying (the 2024-27 access list assumed to carry over: unconfirmed); the
+  cup winner's Europa League place is not modelled. The real tiebreak is head-to-head; the simulation ranks on goal
+  difference and the methodology tab says so (`h2h_tiebreak=True`).
+- **Registries.** `teams.py` `SUPER_LIG_ALIASES` (empty: the canonical names are Sofascore's, as the UEFA stores
+  already held them) and `COUNTRY_REGISTRY` / `COUNTRY_LEAGUE` map TUR, so Turkish clubs' European matches join the
+  pooled fit under the league's prefix. Rivalries: the Intercontinental derby plus Beşiktaş's two. Home search sorts
+  Turkish clubs with the European leagues, after Belgium. Wikidata ids for the champions roll: Q485568, Q752145,
+  Q718298.
 
 ### 4.3 `oddsmarkets/football/competitions/liga/config.py`: Argentina
 

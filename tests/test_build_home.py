@@ -269,3 +269,16 @@ def test_champion_row():
     c = out["champions"][0]
     assert c["name"] == "Milwaukee Brewers" and c["short"] == "Brewers" and c["opp"]["short"] == "Rays"
     assert c["result"] == [4, 1] and c["how"] == "in the World Series" and c["decided"] == "2026-10-28" and c["pre_p"] == 0.2283
+
+
+def test_golfer_search_rows_carry_their_follow_key():
+    """Men's and women's golfer ids are separate spaces, so Home's search names the follow card itself (column "k");
+    other rows keep their old shape."""
+    rows = bh.search_rows([["golf", "Nelly Korda", "Golfer · USA", "https://x/the-quant-green/#/player/7", "green:golfw:7"],
+                           ["golf", "Scottie Scheffler", "Golfer · USA", "https://x/the-quant-green/#/player/9"]])
+    assert rows[0][3].endswith("#/player/7") and rows[0][5] == "green:golfw:7"
+    assert len(rows[1]) in (4, 5)
+    js = (ROOT / "docs" / "_design" / "quant.js").read_text(encoding="utf-8")
+    assert "ki = f.indexOf('k')" in js and "iron: function (r)" in js
+    for site in ("home", "green", "iron"):
+        assert "iron: function (r)" in (ROOT / "docs" / site / "assets" / "qk" / "quant.js").read_text(encoding="utf-8")

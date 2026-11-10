@@ -75,9 +75,11 @@ def test_search_rows_carry_the_picker_group_order():
                            ["college", "Minnesota", "Women’s college hockey", "C/#/wch/team/135"],
                            ["basketball", "Valkyries", "WNBA team", "H/#/wnba/team/129689"], ["tennis", "Jannik Sinner", "ATP player", "A/#/atp/player/3623"],
                            ["f1", "Mercedes", "Constructor", "P/#/team/mercedes"], ["nfl", "", "NFL team", "x"]])
-    assert [r[4] if len(r) > 4 else None for r in rows] == [0, None, None, 0, 4, 1, 0, 1]
+    assert [r[4] if len(r) > 4 else None for r in rows] == [0, 6, None, 0, 4, 1, 0, 1]
     # the South American leagues' clubs follow the big five, Colombia, Uruguay, Chile and Peru after Brazil and Argentina
     sa = bh.search_rows([["football", c, "Club · " + k, "F/#/club/1"] for c, k in
                          (("Flamengo", "BRA"), ("Boca Juniors", "ARG"), ("Atlético Nacional", "COL"), ("Nacional", "URY"),
                           ("Colo-Colo", "CHL"), ("Alianza Lima", "PER"))])
-    assert [r[4] for r in sa] == [5, 6, 7, 8, 9, 10]
+    assert [r[4] for r in sa] == [9, 10, 11, 12, 13, 14]
+    tur = bh.search_rows([["football", "Galatasaray", "Club · TUR", "F/#/club/3061"], ["football", "Gent", "Club · BEL", "F/#/club/1"]])
+    assert [r[4] for r in tur] == [8, 7]                 # Turkey with the European leagues, after Belgium

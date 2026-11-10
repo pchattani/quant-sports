@@ -656,6 +656,12 @@ calibrated, below 1 over-confident):
 Colombia is well calibrated; Uruguay and Chile are over-confident on few matches (a slope near 0.8), which more seasons
 in the store (the archive's past results) should test before any shrinkage is fitted.
 
+**Süper Lig (10 Nov 2026).** `tune_league_models.py --league super-lig --no-pooled` (the global set reused from the
+file), walk-forward on six folds of the 405 finished matches of 2025-26 and 2026-27 (206 scored). Log-loss: uniform
+1.0986, home-only prior 1.0726, default 0.9773, global 0.9784, **per-league 0.9721** (chosen: xi 0.008, ridge 0.5,
+Elo home advantage 70, K 15, Dixon-Coles weight 0.8). Only this entry was added to `model_params.json`. The league
+runs on the league simulator (8.2): head-to-head is not simulated (goal difference instead).
+
 **Tests:** `tests/test_torneo_leagues.py`: golden runs under a model in which the stronger club always wins 1-0 (every
 stage, playoff, berth and relegation known: Colombia's cuadrangulares, knockout, berths, Copa BetPlay place and promedio;
 Uruguay's semi-final and outright champions; Peru's double winner and bye), invariants under a fair model (four

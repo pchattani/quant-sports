@@ -118,7 +118,7 @@ FOOTBALL_PRIORITY = [
     "club-world-cup", "conference-league", "mls", "brasileirao", "eredivisie", "primeira-liga",
     "liga-mx", "saudi-pro-league", "liga-argentina", "sudamericana", "fa-cup", "copa-del-rey",
     "coppa-italia", "dfb-pokal", "coupe-de-france", "efl-cup", "belgian-pro-league",
-    "primera-a-colombia", "liga-de-primera", "primera-division-uruguay", "liga-1-peru",
+    "primera-a-colombia", "liga-de-primera", "primera-division-uruguay", "liga-1-peru", "super-lig",
 ]
 TITLE_LEAGUES = ["premier-league", "la-liga", "serie-a", "bundesliga", "ligue-1", "mls",
                  "brasileirao", "eredivisie", "primeira-liga", "liga-mx", "saudi-pro-league"]
@@ -1366,8 +1366,11 @@ def build_golf(ctx: Ctx, base: str, out: dict):
     srch = load(d / "search.json") or {}
     for p in (srch.get("players") or [])[:SEARCH_TOP_PLAYERS]:
         if p and p[0] and p[1]:
-            out["search"].append(["golf", p[1], "Golfer" + (" · " + p[2] if len(p) > 2 and p[2] else ""),
-                                  base + "#/player/" + str(p[0])])
+            stream = p[3] if len(p) > 3 else None
+            row = ["golf", p[1], "Golfer" + (" · " + p[2] if len(p) > 2 and p[2] else ""), base + "#/player/" + str(p[0])]
+            if stream in ("men", "women"):
+                row.append("green:" + ("golfw" if stream == "women" else "golfm") + ":" + str(p[0]))   # the follow key
+            out["search"].append(row)
     for e in week:
         if e.get("id") and e.get("name") and e.get("page"):
             out["search"].append(["golf", e["name"], e.get("tour_name") or "Event",
@@ -1744,10 +1747,11 @@ SEARCH_GO_SUB = {
     "baseball": {"MLB team": 0},
     "f1": {"Driver": 0, "Constructor": 1},
 }
-# football: the big five's clubs first, then the South American leagues' together (Brazil, Argentina, then Colombia,
-# Uruguay, Chile and Peru, added 2 Nov 2026); every other country sorts by size after
-SEARCH_GO_COUNTRY = {"ENG": 0, "ESP": 1, "ITA": 2, "DEU": 3, "FRA": 4,
-                     "BRA": 5, "ARG": 6, "COL": 7, "URY": 8, "CHL": 9, "PER": 10}
+# football: the big five's clubs first, then the other European leagues (Portugal, the Netherlands, Belgium, Turkey),
+# then the South American ones together (Brazil, Argentina, then Colombia, Uruguay, Chile and Peru; 2 Nov 2026); every
+# other country sorts by size after
+SEARCH_GO_COUNTRY = {"ENG": 0, "ESP": 1, "ITA": 2, "DEU": 3, "FRA": 4, "PRT": 5, "NLD": 6, "BEL": 7, "TUR": 8,
+                     "BRA": 9, "ARG": 10, "COL": 11, "URY": 12, "CHL": 13, "PER": 14}
 SEARCH_GO_LEVEL = {"cfb": 0, "mbb": 1, "wbb": 2, "mch": 3, "wch": 4}       # college: the Campus's own level order
 SEARCH_GO_RUGBY = {"Men's national team": 0, "Women's national team": 1}   # rugby: men's sides, then women's
 
@@ -1771,13 +1775,19 @@ def search_go(row: list) -> int | None:
 
 
 def search_rows(search: list) -> list:
-    """search.json's rows: [sport, name, sub, href] plus the group order (a fifth column) where it has one."""
+    """search.json's rows: [sport, name, sub, href] plus the group order (a fifth column) where it has one, and the
+    follow key (a sixth column, the group order then null when it has none) where the href cannot name it: golfers,
+    whose men's and women's ids are separate spaces."""
     out = []
     for r in search:
         if not r[1]:
             continue
         go = search_go(r)
-        out.append(list(r[:4]) + ([go] if go is not None else []))
+        k = r[4] if len(r) > 4 and isinstance(r[4], str) else None
+        if k:
+            out.append(list(r[:4]) + [go, k])
+        else:
+            out.append(list(r[:4]) + ([go] if go is not None else []))
     return out
 
 
@@ -1896,7 +1906,7 @@ def main(argv=None):
     with open(OUT / "data" / "home.json", "w", encoding="utf-8") as fh:
         json.dump(home, fh, ensure_ascii=False, separators=(",", ":"))
     with open(OUT / "data" / "search.json", "w", encoding="utf-8") as fh:
-        json.dump({"fields": ["sport", "name", "sub", "href", "go"], "rows": search_rows(search)},
+        json.dump({"fields": ["sport", "name", "sub", "href", "go", "k"], "rows": search_rows(search)},
                   fh, ensure_ascii=False, separators=(",", ":"))
     if not a.no_kit:
         copy_kit()

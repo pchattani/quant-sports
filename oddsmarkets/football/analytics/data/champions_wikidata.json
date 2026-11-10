@@ -1,7 +1,7 @@
 {
 "source":"Wikidata (www.wikidata.org Special:EntityData): season items (P3450) and their winners (P1346)",
 "licence":"CC0 1.0",
-"fetched_at":"2026-11-03T15:30:24Z",
+"fetched_at":"2026-11-10T14:32:22Z",
 "competitions":{
 "premier-league":{
 "qid":"Q9448",
@@ -17286,6 +17286,378 @@
 "year":2017,
 "winner":"Club Alianza Lima",
 "winner_qid":"Q572957"
+}
+]
+},
+"super-lig":{
+"qid":"Q485568",
+"label":"Süper Lig",
+"editions":[
+{
+"season":"1959 Milli Lig",
+"year":1959,
+"winner":"Fenerbahçe Istanbul",
+"winner_qid":"Q6601875"
+},
+{
+"season":"1959–60 Milli Lig",
+"year":1959,
+"winner":"Beşiktaş J.K.",
+"winner_qid":"Q172567"
+},
+{
+"season":"1960–61 Milli Lig",
+"year":1960,
+"winner":"Fenerbahçe Istanbul",
+"winner_qid":"Q6601875"
+},
+{
+"season":"1961–62 Milli Lig",
+"year":1961,
+"winner":"Galatasaray S.K.",
+"winner_qid":"Q495299"
+},
+{
+"season":"1962–63 Milli Lig",
+"year":1962,
+"winner":"Galatasaray S.K.",
+"winner_qid":"Q495299"
+},
+{
+"season":"1963–64 1.Lig",
+"year":1963,
+"winner":"Fenerbahçe Istanbul",
+"winner_qid":"Q6601875"
+},
+{
+"season":"1964–65 1.Lig",
+"year":1964,
+"winner":"Fenerbahçe Istanbul",
+"winner_qid":"Q6601875"
+},
+{
+"season":"1965–66 1.Lig",
+"year":1965,
+"winner":"Beşiktaş J.K.",
+"winner_qid":"Q172567"
+},
+{
+"season":"1966–67 1.Lig",
+"year":1966,
+"winner":"Beşiktaş J.K.",
+"winner_qid":"Q172567"
+},
+{
+"season":"1967–68 1.Lig",
+"year":1967,
+"winner":"Fenerbahçe Istanbul",
+"winner_qid":"Q6601875"
+},
+{
+"season":"1968–69 1.Lig",
+"year":1968,
+"winner":"Galatasaray S.K.",
+"winner_qid":"Q495299"
+},
+{
+"season":"1969–70 1.Lig",
+"year":1969,
+"winner":"Fenerbahçe Istanbul",
+"winner_qid":"Q6601875"
+},
+{
+"season":"1970–71 1.Lig",
+"year":1970,
+"winner":"Galatasaray S.K.",
+"winner_qid":"Q495299"
+},
+{
+"season":"1971–72 1.Lig",
+"year":1971,
+"winner":"Galatasaray S.K.",
+"winner_qid":"Q495299"
+},
+{
+"season":"1972–73 1.Lig",
+"year":1972,
+"winner":"Galatasaray S.K.",
+"winner_qid":"Q495299"
+},
+{
+"season":"1973–74 1.Lig",
+"year":1973,
+"winner":"Fenerbahçe Istanbul",
+"winner_qid":"Q6601875"
+},
+{
+"season":"1974–75 1.Lig",
+"year":1974,
+"winner":"Fenerbahçe Istanbul",
+"winner_qid":"Q6601875"
+},
+{
+"season":"1975–76 1.Lig",
+"year":1975,
+"winner":"Trabzonspor",
+"winner_qid":"Q192641"
+},
+{
+"season":"1976–77 1.Lig",
+"year":1976,
+"winner":"Trabzonspor",
+"winner_qid":"Q192641"
+},
+{
+"season":"1977–78 1.Lig",
+"year":1977,
+"winner":"Fenerbahçe Istanbul",
+"winner_qid":"Q6601875"
+},
+{
+"season":"1978–79 1.Lig",
+"year":1978,
+"winner":"Trabzonspor",
+"winner_qid":"Q192641"
+},
+{
+"season":"1979–80 1.Lig",
+"year":1979,
+"winner":"Trabzonspor",
+"winner_qid":"Q192641"
+},
+{
+"season":"1980–81 1.Lig",
+"year":1980,
+"winner":"Trabzonspor",
+"winner_qid":"Q192641"
+},
+{
+"season":"1981–82 1.Lig",
+"year":1981,
+"winner":"Beşiktaş J.K.",
+"winner_qid":"Q172567"
+},
+{
+"season":"1982–83 1.Lig",
+"year":1982,
+"winner":"Fenerbahçe Istanbul",
+"winner_qid":"Q6601875"
+},
+{
+"season":"1983–84 1.Lig",
+"year":1983,
+"winner":"Trabzonspor",
+"winner_qid":"Q192641"
+},
+{
+"season":"1984–85 1.Lig",
+"year":1984,
+"winner":"Fenerbahçe Istanbul",
+"winner_qid":"Q6601875"
+},
+{
+"season":"1985–86 1.Lig",
+"year":1985,
+"winner":"Beşiktaş J.K.",
+"winner_qid":"Q172567"
+},
+{
+"season":"1986–87 1.Lig",
+"year":1986,
+"winner":"Galatasaray S.K.",
+"winner_qid":"Q495299"
+},
+{
+"season":"1987–88 1.Lig",
+"year":1987,
+"winner":"Galatasaray S.K.",
+"winner_qid":"Q495299"
+},
+{
+"season":"1988–89 1.Lig",
+"year":1988,
+"winner":"Fenerbahçe Istanbul",
+"winner_qid":"Q6601875"
+},
+{
+"season":"1989–90 1.Lig",
+"year":1989,
+"winner":"Beşiktaş J.K.",
+"winner_qid":"Q172567"
+},
+{
+"season":"1990–91 1.Lig",
+"year":1990,
+"winner":"Beşiktaş J.K.",
+"winner_qid":"Q172567"
+},
+{
+"season":"1991–92 1.Lig",
+"year":1991,
+"winner":"Beşiktaş J.K.",
+"winner_qid":"Q172567"
+},
+{
+"season":"1992–93 1.Lig",
+"year":1992,
+"winner":"Galatasaray S.K.",
+"winner_qid":"Q495299"
+},
+{
+"season":"1993–94 1.Lig",
+"year":1993,
+"winner":"Galatasaray S.K.",
+"winner_qid":"Q495299"
+},
+{
+"season":"1994–95 1.Lig",
+"year":1994,
+"winner":"Beşiktaş J.K.",
+"winner_qid":"Q172567"
+},
+{
+"season":"1995–96 1.Lig",
+"year":1995,
+"winner":"Fenerbahçe Istanbul",
+"winner_qid":"Q6601875"
+},
+{
+"season":"1996–97 1.Lig",
+"year":1996,
+"winner":"Galatasaray S.K.",
+"winner_qid":"Q495299"
+},
+{
+"season":"1997–98 1.Lig",
+"year":1997,
+"winner":"Galatasaray S.K.",
+"winner_qid":"Q495299"
+},
+{
+"season":"1998–99 1.Lig",
+"year":1998,
+"winner":"Galatasaray S.K.",
+"winner_qid":"Q495299"
+},
+{
+"season":"1999–2000 1.Lig",
+"year":1999,
+"winner":"Galatasaray S.K.",
+"winner_qid":"Q495299"
+},
+{
+"season":"2000–01 1.Lig",
+"year":2000,
+"winner":"Fenerbahçe Istanbul",
+"winner_qid":"Q6601875"
+},
+{
+"season":"2001–02 Süper Lig",
+"year":2001,
+"winner":"Galatasaray S.K.",
+"winner_qid":"Q495299"
+},
+{
+"season":"2002–03 Süper Lig",
+"year":2002,
+"winner":"Beşiktaş J.K.",
+"winner_qid":"Q172567"
+},
+{
+"season":"2003–04 Süper Lig",
+"year":2003,
+"winner":"Fenerbahçe Istanbul",
+"winner_qid":"Q6601875"
+},
+{
+"season":"2004–05 Süper Lig",
+"year":2004,
+"winner":"Fenerbahçe Istanbul",
+"winner_qid":"Q6601875"
+},
+{
+"season":"2005–06 Süper Lig",
+"year":2005,
+"winner":"Galatasaray S.K.",
+"winner_qid":"Q495299"
+},
+{
+"season":"2006–07 Süper Lig",
+"year":2006,
+"winner":"Fenerbahçe Istanbul",
+"winner_qid":"Q6601875"
+},
+{
+"season":"2007–08 Süper Lig",
+"year":2007,
+"winner":"Galatasaray S.K.",
+"winner_qid":"Q495299"
+},
+{
+"season":"2008–09 Süper Lig",
+"year":2008,
+"winner":"Beşiktaş J.K.",
+"winner_qid":"Q172567"
+},
+{
+"season":"2009–10 Süper Lig",
+"year":2009,
+"winner":"Bursaspor",
+"winner_qid":"Q6096484"
+},
+{
+"season":"2010–11 Süper Lig",
+"year":2010,
+"winner":"Fenerbahçe Istanbul",
+"winner_qid":"Q6601875"
+},
+{
+"season":"2011–12 Süper Lig",
+"year":2011,
+"winner":"Galatasaray S.K.",
+"winner_qid":"Q495299"
+},
+{
+"season":"2012–13 Süper Lig",
+"year":2012,
+"winner":"Galatasaray S.K.",
+"winner_qid":"Q495299"
+},
+{
+"season":"2013–14 Süper Lig",
+"year":2013,
+"winner":"Fenerbahçe Istanbul",
+"winner_qid":"Q6601875"
+},
+{
+"season":"2014–15 Süper Lig",
+"year":2014,
+"winner":"Galatasaray S.K.",
+"winner_qid":"Q495299"
+},
+{
+"season":"2015–16 Süper Lig",
+"year":2015,
+"winner":"Beşiktaş J.K.",
+"winner_qid":"Q172567"
+},
+{
+"season":"2016–17 Süper Lig",
+"year":2016,
+"winner":"Beşiktaş J.K.",
+"winner_qid":"Q172567"
+},
+{
+"season":"2017-18 Süper Lig",
+"year":2017,
+"winner":"Galatasaray S.K.",
+"winner_qid":"Q495299"
+},
+{
+"season":"2018-19 Süper Lig",
+"year":2018,
+"winner":"Galatasaray S.K.",
+"winner_qid":"Q495299"
 }
 ]
 }

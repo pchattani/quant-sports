@@ -579,12 +579,34 @@ LIGA_1_PERU = LeagueConfig(
     unlisted_results=(("clausura", "Cienciano", "Deportivo Garcilaso", 0, 0),),
 )
 
+# Turkey (added 2 Nov 2026, at the user's request). The TFF's 2026-27 statute could not be retrieved; the format is
+# from the Turkish press quoting it (beinsports.com.tr, aspor.com.tr), the 2026-27 season articles and kassiesa.net's
+# association ranking:
+#   18 clubs, a double round robin of 34 rounds (14 Aug 2026 - 23 May 2027); 16th, 17th and 18th go down, no playoff.
+#   Level on points: head-to-head points, head-to-head goal difference, then overall goal difference and goals (the
+#   simulation ranks on goal difference: h2h_tiebreak says so on the methodology tab); a title tie is a play-off match.
+#   2027-28 places from Turkey's 9th place in the five-year ranking (the 2024-27 access list assumed to carry over to
+#   the 2027-30 cycle: unconfirmed): 1st Champions League league phase, 2nd Champions League third qualifying round,
+#   3rd Europa League second qualifying round, 4th Conference League second qualifying round; the Türkiye Kupası
+#   winner Europa League play-off round (a cup winner already in passes its place down the table, not modelled here).
+SUPER_LIG = LeagueConfig(
+    slug="super-lig", name="Süper Lig", short_name="Süper Lig", country="Turkey",
+    sofascore_id=52, n_teams=18, h2h_tiebreak=True,
+    bands=(
+        Band("ucl", "Champions League", 1, 1),
+        Band("ucl_q", "Champions League qualifying", 2, 2),
+        Band("uel_q", "Europa League qualifying", 3, 3),
+        Band("uecl_q", "Conference League qualifying", 4, 4),
+        Band("rel", "Relegation", 16, 18, kind="down"),
+    ),
+)
+
 LEAGUES: dict[str, LeagueConfig] = {
     cfg.slug: cfg for cfg in (
         PREMIER_LEAGUE, LA_LIGA, SERIE_A, BUNDESLIGA, LIGUE_1,
         EREDIVISIE, PRIMEIRA_LIGA, BRASILEIRAO, MLS, SAUDI_PRO_LEAGUE,
         LIGA_MX, BELGIAN_PRO_LEAGUE,
-        PRIMERA_A_COLOMBIA, PRIMERA_DIVISION_URUGUAY, LIGA_DE_PRIMERA, LIGA_1_PERU,
+        PRIMERA_A_COLOMBIA, PRIMERA_DIVISION_URUGUAY, LIGA_DE_PRIMERA, LIGA_1_PERU, SUPER_LIG,
     )
 }
 # The four South American leagues added on 2 Nov 2026, in the order the site lists them.

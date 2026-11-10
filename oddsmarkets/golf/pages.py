@@ -663,7 +663,12 @@ def _search(out: Path, meta: dict, pages_index: dict, courses: dict | None = Non
     players = []
     for p in sorted((out / "players").glob("*.json")):
         m = meta.get(p.stem) or {}
-        players.append([p.stem, m.get("name") or p.stem, m.get("country")])
+        try:
+            stream = json.loads(p.read_text(encoding="utf-8")).get("stream")
+        except (OSError, ValueError):
+            stream = None
+        # the stream (men / women) names the follow card: men's and women's player ids are separate id spaces
+        players.append([p.stem, m.get("name") or p.stem, m.get("country"), stream])
     events = [[eid, pi["name"], pi["season"], pi["tour"]] for eid, pi in pages_index.items()]
     events.sort(key=lambda x: (-int(x[2]), x[1] or ""))
     cs = [[c["id"], c["name"], c.get("tour")] for c in (courses or {}).values() if c.get("name")]

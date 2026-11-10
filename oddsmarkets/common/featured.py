@@ -96,7 +96,7 @@ TIERS: dict[str, dict[str, float]] = {
         "saudi-pro-league": 20, "liga-argentina": 20, "uefa-super-cup": 24, "community-shield": 16,
         "supercopa-espana": 20, "wc-qual-caf": 18, "wc-qual-afc": 18, "wc-qual-concacaf": 18,
         "euro-qualifiers": 24, "friendlies": 6,
-        "primera-a-colombia": 18, "primera-division-uruguay": 16, "liga-de-primera": 16, "liga-1-peru": 14, "*": 14,
+        "primera-a-colombia": 18, "primera-division-uruguay": 16, "liga-de-primera": 16, "liga-1-peru": 14, "super-lig": 22, "*": 14,
     },
 }
 PRESEASON_FACTOR = 0.4
@@ -126,6 +126,8 @@ RIVALRIES = {
     frozenset(("Boca Juniors", "River Plate")): "Superclásico",
     frozenset(("Flamengo", "Fluminense")): "Fla-Flu",
     frozenset(("Galatasaray", "Fenerbahçe")): "Intercontinental derby",
+    frozenset(("Beşiktaş JK", "Galatasaray")): "Beşiktaş v Galatasaray",
+    frozenset(("Beşiktaş JK", "Fenerbahçe")): "Beşiktaş v Fenerbahçe",
     frozenset(("América", "Guadalajara")): "El Súper Clásico",
     frozenset(("Nacional", "Club Atlético Peñarol")): "Clásico del fútbol uruguayo",
     frozenset(("Alianza Lima", "Universitario de Deportes")): "Clásico del fútbol peruano",

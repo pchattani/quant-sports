@@ -437,6 +437,8 @@ PRIMERA_A_COLOMBIA_ALIASES: dict[str, str] = {}
 PRIMERA_DIVISION_URUGUAY_ALIASES: dict[str, str] = {}
 LIGA_DE_PRIMERA_ALIASES: dict[str, str] = {}
 LIGA_1_PERU_ALIASES: dict[str, str] = {}
+# Turkey (2 Nov 2026): Sofascore's spelling, as the UEFA cup stores already hold it ("Beşiktaş JK", "Başakşehir FK").
+SUPER_LIG_ALIASES: dict[str, str] = {}
 
 REGISTRIES: dict[str, dict[str, str]] = {
     "international": INTERNATIONAL_ALIASES,
@@ -457,6 +459,7 @@ REGISTRIES: dict[str, dict[str, str]] = {
     "primera_division_uruguay": PRIMERA_DIVISION_URUGUAY_ALIASES,
     "liga_de_primera": LIGA_DE_PRIMERA_ALIASES,
     "liga_1_peru": LIGA_1_PERU_ALIASES,
+    "super_lig": SUPER_LIG_ALIASES,
 }
 
 # Country (alpha-3) -> registry, for cup entrants: a club is canonicalised through
@@ -471,6 +474,7 @@ COUNTRY_REGISTRY: dict[str, str] = {
     "ARG": "liga_argentina", "MEX": "liga_mx", "BEL": "belgian_pro_league",
     "COL": "primera_a_colombia", "URY": "primera_division_uruguay", "URU": "primera_division_uruguay",
     "CHL": "liga_de_primera", "CHI": "liga_de_primera", "PER": "liga_1_peru",
+    "TUR": "super_lig",
 }
 
 

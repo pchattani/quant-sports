@@ -680,6 +680,31 @@
         "dc_weight": 0.8
       },
       "added": "2 Nov 2026: scripts/tune_league_models.py over every league (the pooled fit on all 16), walk-forward on the Sofascore store (2025-2026; Colombia 2024-2026); only this league's entry was taken from the run"
+    },
+    "super-lig": {
+      "method": "per-league",
+      "params": {
+        "xi": 0.008,
+        "ridge": 0.5,
+        "elo_home_advantage": 70.0,
+        "k_league": 15,
+        "dc_weight": 0.8
+      },
+      "log_loss": 0.97208,
+      "baseline_log_loss": 1.07264,
+      "scores": {
+        "default": 0.97727,
+        "global": 0.97835,
+        "per-league": 0.97208
+      },
+      "n_eval": 206,
+      "per_league_params": {
+        "xi": 0.008,
+        "ridge": 0.5,
+        "elo_home_advantage": 70.0,
+        "k_league": 15,
+        "dc_weight": 0.8
+      }
     }
   }
 }
