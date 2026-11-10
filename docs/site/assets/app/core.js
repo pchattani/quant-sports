@@ -257,13 +257,37 @@ function alive(el) { return !!el && el.isConnected; }
 
 // ── loading ───────────────────────────────────────────────────────────────
 
+/* The bulky kinds are published as <file>.json.gz (the site outgrew GitHub Pages' 1 GB); mirrors gz_football in
+   scripts/ci_site.py. A local preview has the plain files, so a missing .gz falls back to the plain path. */
+var GZ_TOP = { people: 1, clubs: 1, careers: 1, value: 1, lab: 1 };
+var GZ_KINDS = { matches: 1, s: 1, players: 1 };
+function gzPath(p) {
+  var a = p.split('/');
+  if (a.length < 2 || !/\.json$/.test(p)) return false;
+  if (GZ_TOP[a[0]]) return true;
+  return a.length >= 3 && !!GZ_KINDS[a[1]] && a[0] !== 'follow' && a[0] !== 'history' && a[0] !== 'archive';
+}
+function getJson(url) {
+  return fetch(url, { cache: 'no-cache' }).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); });
+}
+function getGz(url) {
+  return fetch(url, { cache: 'no-cache' }).then(function (r) {
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.arrayBuffer();
+  }).then(function (buf) {
+    var b = new Uint8Array(buf);
+    // a server that already decoded it (Content-Encoding) hands back the JSON text itself
+    if (!(b.length > 1 && b[0] === 0x1f && b[1] === 0x8b)) return JSON.parse(new TextDecoder('utf-8').decode(b));
+    if (typeof DecompressionStream === 'undefined') throw new Error('this browser cannot decompress gzip');
+    return new Response(new Blob([b]).stream().pipeThrough(new DecompressionStream('gzip'))).text().then(JSON.parse);
+  });
+}
 /* data/<path> as JSON, cached for the session; null when missing or broken (never throws). */
 function load(path) {
   var p = String(path).replace(/^\/+/, '').replace(/^data\//, '');
   if (Object.prototype.hasOwnProperty.call(CACHE, p)) return Promise.resolve(CACHE[p]);
   if (PENDING[p]) return PENDING[p];
-  PENDING[p] = fetch('data/' + p, { cache: 'no-cache' })
-    .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+  PENDING[p] = (gzPath(p) ? getGz('data/' + p + '.gz').catch(function () { return getJson('data/' + p); }) : getJson('data/' + p))
     .catch(function (e) { if (window.console) console.warn('payload missing:', p, e && e.message); return null; })
     .then(function (d) { CACHE[p] = d; delete PENDING[p]; return d; });
   return PENDING[p];

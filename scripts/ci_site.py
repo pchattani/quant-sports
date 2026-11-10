@@ -39,6 +39,7 @@ from __future__ import annotations
 
 import argparse
 import filecmp
+import gzip
 import json
 import os
 import re
@@ -157,6 +158,52 @@ def prune_rink(rel: PurePosixPath, ctx: dict) -> bool:
         cut = (int(ctx["season"]) // 10000 - 2) * 10001 + 1
         return int(p[1]) <= cut
     return False
+
+
+# ── gzipped payloads (applied to the CI deploy copy only) ───────────────────────────────────────────
+
+# The Footballer outgrew GitHub Pages' 1 GB (1,156 MB on 10 Nov 2026: every match page of the last 365 days, 40k people
+# pages, past seasons, player logs). Its bulky kinds are published as <file>.json.gz, 3-10x smaller; FB.load in
+# docs/site/assets/app/core.js mirrors this rule (gzPath) and decodes them. Top-level files other sites read (hub.json,
+# competitions.json, clubs_index.json), each competition's own files, the persistent logs, market_odds.json (restored
+# into the next build) and the follow cards stay plain JSON.
+FOOTBALL_GZ_TOP = ("people", "clubs", "careers", "value", "lab")
+FOOTBALL_GZ_KINDS = ("matches", "s", "players")
+
+
+def gz_football(rel: PurePosixPath) -> bool:
+    p = rel.parts
+    if len(p) < 3 or p[0] != "data" or not p[-1].endswith(".json"):
+        return False
+    a = p[1:]
+    if a[0] in FOOTBALL_GZ_TOP:
+        return True
+    return len(a) >= 3 and a[1] in FOOTBALL_GZ_KINDS and a[0] not in ("follow", "history", "archive")
+
+
+def gzip_payloads(src: Path, rule) -> tuple[int, int, int]:
+    """Replace each payload the rule picks with <name>.gz (deterministic: mtime 0, so an unchanged payload compresses
+    to the same bytes and the deploy plan sees no change). Returns (files, bytes before, bytes after)."""
+    n = before = after = 0
+    for dirpath, _dirs, files in os.walk(src / "data"):
+        for f in files:
+            path = Path(dirpath) / f
+            if not rule(PurePosixPath(path.relative_to(src).as_posix())):
+                continue
+            body = path.read_bytes()
+            packed = gzip.compress(body, compresslevel=6, mtime=0)
+            path.with_name(f + ".gz").write_bytes(packed)
+            path.unlink()
+            n += 1
+            before += len(body)
+            after += len(packed)
+    return n, before, after
+
+
+def renamed_to_gz(p: dict) -> int:
+    """Removed plain files whose .gz replaces them (a format change, not a deletion, for the mass-delete guard)."""
+    added = set(p["added"])
+    return sum(1 for r in p["removed"] if r + ".gz" in added)
 
 
 # ── completeness guards ──────────────────────────────────────────────────────────────────────────
@@ -640,7 +687,7 @@ def repair_logs(site: str, clone: Path, now: datetime | None = None) -> list[str
 
 
 SITES = {
-    "football": {"docs": "site", "repo": "the-quant-footballer", "prune": prune_football, "excluded": (),
+    "football": {"docs": "site", "repo": "the-quant-footballer", "prune": prune_football, "excluded": (), "gzip": gz_football,
                  "restore": "logs", "restore_also": ("data/*/market_odds.json",),
                  "guard": guard_payload_floor("site", 2000)},
     "paddock": {"docs": "paddock", "repo": "the-quant-paddock", "prune": None, "excluded": (),
@@ -963,8 +1010,12 @@ def cmd_deploy(site: str, clone: Path, shadow: Path | None, allow_mass_delete: b
         return 1
     for line in repair_logs(site, clone):
         print(f"::warning::persistent log repaired: {line}")
+    if cfg.get("gzip") and os.environ.get("GITHUB_ACTIONS") == "true":
+        # only on the runner: its working set is thrown away; the PC's docs/ keeps plain JSON for local previews
+        n, b0, b1 = gzip_payloads(ROOT / "docs" / cfg["docs"], cfg["gzip"])
+        print(f"gzipped {n} payloads: {b0 / 1e6:.0f} MB -> {b1 / 1e6:.0f} MB")
     p = plan(site, clone, ctx)
-    delete_n = len(p["removed"])
+    delete_n = len(p["removed"]) - renamed_to_gz(p)
     print(f"deploy plan: {p['n_files']} files, {p['bytes'] / 1e6:.0f} MB, {len(p['added'])} added, "
           f"{len(p['changed'])} changed, {delete_n} removed (of {p['n_dest']} live), {p['pruned']} pruned")
     if p["bytes"] > PAGES_WARN:
