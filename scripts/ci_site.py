@@ -838,7 +838,8 @@ def cmd_restore(site: str, prev: Path) -> int:
 
 def is_excluded(rel: PurePosixPath, excluded: tuple) -> bool:
     parts = rel.parts
-    if not parts or parts[0] == ".git":
+    # .github: the site repo's own Publish workflow (Pages deploys from Actions since 10 Nov 2026), never the build's
+    if not parts or parts[0] in (".git", ".github"):
         return True
     if any(p in STANDARD_EXCLUDED_DIRS for p in parts[:-1]):
         return True

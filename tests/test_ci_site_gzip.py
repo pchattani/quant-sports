@@ -63,3 +63,10 @@ def test_front_end_mirrors_the_rule():
     assert keys("GZ_KINDS") == set(ci.FOOTBALL_GZ_KINDS)
     assert "a[0] !== 'follow' && a[0] !== 'history' && a[0] !== 'archive'" in js
     assert "getGz('data/' + p + '.gz')" in js
+
+
+def test_the_site_repos_publish_workflow_is_never_deployed_over():
+    from pathlib import PurePosixPath as P
+    assert ci.is_excluded(P(".github/workflows/pages.yml"), ())
+    assert ci.is_excluded(P(".git/config"), ())
+    assert not ci.is_excluded(P("data/index.json"), ())
