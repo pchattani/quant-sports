@@ -44,7 +44,13 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: uv sync --frozen
+        run: |
+          for i in 1 2 3; do
+            uv sync --frozen && exit 0
+            echo "uv sync failed (attempt $i of 3); retrying in 60 seconds"
+            sleep 60
+          done
+          exit 1
 
       # build_home.py reads each sport's built summaries from docs/<site>/data; in CI they come from the live sites
       - name: Fetch the sites' published summaries
