@@ -1,4 +1,5 @@
-/* The Quant Sports home (kit v4 "Broadcast"). Reads data/home.json (scripts/build_home.py) and refreshes live scores in the
+/* The Quant Sports home (kit v4 "Broadcast"). Reads data/home.json (scripts/build_home.py) and refreshes live scores (the
+ * live feed every 20 seconds through QK.live, the same feed every sport page reads; the sites' hourly payloads as the fallback) in the
  * browser from each sport's published index.json on GitHub Pages (CORS: Access-Control-Allow-Origin *).
  *
  * Page, top to bottom: the black ticker; a small intro (what The Quant Sports is, three pillars, "How it works", the
@@ -90,7 +91,7 @@ function prep(g) {
 function renderAll() {
   var jobs = [renderYours, renderTicker, renderSportNav, renderFeature, renderToplines, renderAround, renderWatch, renderHot, renderSurprises, renderStats, renderReal, renderRoll, renderRaces, renderChips, renderGames, renderCharts, renderHow];
   jobs.forEach(function (f) { try { f(); } catch (e) { if (window.console) console.error(e); } });
-  $('#updated').textContent = 'Data built ' + fmt.ago(D.updated_at) + ' (' + fmt.date(D.updated_at) + ' ' + fmt.time(D.updated_at) + '). Live scores refresh every minute while games are on.';
+  $('#updated').textContent = 'Data built ' + fmt.ago(D.updated_at) + ' (' + fmt.date(D.updated_at) + ' ' + fmt.time(D.updated_at) + '). Live scores come from the live feed, every 20 seconds while games are on.';
   QK.seg($('#when'), function (v) { state.when = v; state.shown = PAGE; renderChips(); renderGames(); });
 }
 
@@ -585,7 +586,18 @@ function renderHow() {
     '<p class="hm-doing"><b>How we’re doing:</b> ' + QK.SPORTS.map(function (q) { return '<a class="qk-link" href="' + esc(QK.sportUrl(q.key) + (DOING[q.key] || '#/model')) + '">' + esc(q.label) + '</a>'; }).join(' · ') + '. Our record and calibration, on each site’s Model page.</p>';
 }
 
-/* ───────────────────────────── live scores (browser-side, cross-origin) */
+/* ───────────────────────────── live scores */
+/* Two layers. First the live feed (QK.live: one small file rewritten every 30 to 60 seconds, read by this page and
+   by every sport page, so a score is the same everywhere). Under it, as before, each site's hourly payload: the
+   fallback when the feed is down, and the only source for the sports the feed does not carry (football, tennis).
+   A game the feed has moved is never set back by the older payload. */
+function rerenderGames() { renderTicker(); renderSportNav(); renderFeature(); renderWatch(); renderGames(); if (yours) yours.render(); }
+function applyFeed() {
+  var changed = false;
+  D.games.forEach(function (g) { if (QK.live.apply(g.sport, g)) { prep(g); changed = true; } });
+  if (changed) rerenderGames();
+}
+function feedHas(g) { var e = QK.live.entry(g.sport, g.id); return !!e && e.s !== 'pre'; }
 function norm(s) {
   s = String(s || '').toLowerCase();
   if (/^(finished|final|post|done|closed|ft|complete|completed)$/.test(s)) return 'final';
@@ -615,7 +627,7 @@ function refreshLive() {
   if (document.hidden || QK.asof() !== null) return;
   var n0 = D.games.length;
   D.games = D.games.filter(function (g) { return !overdue(g); });
-  if (D.games.length !== n0) { renderTicker(); renderSportNav(); renderFeature(); renderWatch(); renderGames(); if (yours) yours.render(); }
+  if (D.games.length !== n0) rerenderGames();
   Object.keys(ADAPT).forEach(function (sport) {
     if (!needsLive(sport)) return;
     var s = QK.sport(sport), a = ADAPT[sport];
@@ -625,6 +637,10 @@ function refreshLive() {
       D.games.forEach(function (g) {
         var x = g.sport === sport ? map[g.id] : null;
         if (!x) return;
+        if (feedHas(g)) {          /* the feed is ahead of the payload: only a live chance for the same score is taken */
+          if (isNum(x.wp_home) && x.hs === g.hs && x.as === g.as && g.status === 'live' && x.wp_home !== g.wp_home) { g.wp_home = x.wp_home; prep(g); changed = true; }
+          return;
+        }
         var st = norm(x.status);
         if (st !== g.status || x.hs !== g.hs || x.as !== g.as || x.period !== g.period || x.wp_home !== g.wp_home) {
           g.status = st; if (x.hs !== null && x.hs !== undefined) g.hs = x.hs; if (x.as !== null && x.as !== undefined) g.as = x.as;
@@ -632,9 +648,12 @@ function refreshLive() {
           prep(g); changed = true;
         }
       });
-      if (changed) { renderTicker(); renderSportNav(); renderFeature(); renderWatch(); renderGames(); if (yours) yours.render(); }
+      if (changed) rerenderGames();
     }, function () { /* offline or blocked: keep the built snapshot */ });
   });
 }
-function startLive() { refreshLive(); setInterval(refreshLive, 60000); document.addEventListener('visibilitychange', refreshLive); }
+function startLive() {
+  QK.live.onChange(applyFeed); QK.live.start();
+  refreshLive(); setInterval(refreshLive, 60000); document.addEventListener('visibilitychange', refreshLive);
+}
 })();

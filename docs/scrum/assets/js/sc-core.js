@@ -38,6 +38,9 @@ SC.load = function (path) {
   if (CACHE[path]) return CACHE[path];
   var p = QK.fetchJSON(SC.DATA + path, { timeout: 20000 }).then(function (j) {
     if (j && typeof j === 'object' && !Array.isArray(j) && j.ok === undefined) j.ok = true;
+    /* the live feed (QK.live, the same file the home page reads) laid over every payload: scores and finals do
+       not wait for the hourly build */
+    try { if (QK.live) QK.live.watch(path, 'rugby', j, { id: 'id', need: ['home', 'away'], period: 'period', clock: 'clock' }); } catch (e) { /* the built payload stands */ }
     return j;
   }, function (e) { delete CACHE[path]; return { ok: false, reason: String((e && e.message) || e), missing: true }; });
   CACHE[path] = p;
@@ -304,6 +307,7 @@ function boot() {
     var meta = QK.$('#meta-line');
     if (meta) meta.textContent = 'Data built ' + fmt.ago(idx.updated_at) + ' (' + fmt.date(idx.updated_at) + ' ' + fmt.time(idx.updated_at) + '). ' + (idx.credit || '');
     root.addEventListener('hashchange', render);
+    if (QK.live) QK.live.attach(function () { if (!document.hidden && /^(overview|fixtures|match)$/.test((SC.state && SC.state.sec) || 'overview')) render(); });
     render();
   });
 }

@@ -1150,6 +1150,144 @@ QK.fetchJSON = function (url, o) {
   });
 };
 
+/* ─────────────────────────────────────── live scores (QK.live) */
+/* The live-score feed: one small file (the-quant-live/live.json, scripts/live_feed.py) rewritten every 30 to 60
+ * seconds while games are on, with the score, period, clock and status of every game on today's boards, keyed by the
+ * ids the sites use. The home page and every sport page lay it over the hourly-built payloads through this one
+ * object, so a score is the same everywhere and does not wait for a site build.
+ *
+ *   QK.live.start()                      begin polling (every 20 s while the tab is visible); safe to call twice
+ *   QK.live.onChange(fn)                 fn() after a poll that changed something
+ *   QK.live.entry(sport, id)             -> { s: 'pre'|'live'|'final', hs, as, p, c, d, st } or null
+ *   QK.live.apply(sport, g)              lay the feed over one game in the kit's shape (status pre|live|final, hs, as,
+ *                                        period, clock, wp_home); true when it changed
+ *   QK.live.watch(key, sport, json, map) overlay now and again after every poll (key: the payload's path; a payload
+ *                                        loaded again replaces the one watched under the same key)
+ *   QK.live.attach(fn)                   start polling; fn(n) after a poll that changed n watched games
+ *   QK.live.overlay(sport, json, map)    the same for a site's own payload: every object in `json` that has
+ *                                        map.id and a status is patched in the site's words. map: { id: 'game_id',
+ *                                        live: 'live', final: 'final', period: 'period', clock: 'clock',
+ *                                        clear: ['wp_home', ...], need: ['home', 'away'] (keys an object must
+ *                                        also have to count as a game), same(o, e) / set(o, e) (a sport whose
+ *                                        games are not a score, tennis: the map compares and writes the entry
+ *                                        itself) }; returns the number of games changed
+ *
+ * Rules: the feed only moves a game forward (pre -> live -> final), never back, and never touches a game the build
+ * already calls final. A feed older than 15 minutes, or a live entry whose board has not answered for 10, is
+ * ignored: the page then shows what the build says, as before. When the feed moves a score, a live win chance from
+ * the build is dropped (it was computed for the old score). Pages opened with ?asof= never read the feed.
+ * ?live=<url> reads another feed (local previews and tests). */
+QK.LIVE_URL = PUB + 'the-quant-live/live.json';
+QK.live = (function () {
+  var doc = null, timer = null, subs = [], hooks = [], watched = {}, seen = '', RANK = { pre: 0, live: 1, final: 2 };
+  var POLL = 20000, MAX_AGE = 900, MAX_BOARD_AGE = 600, fails = 0, holdUntil = 0;
+  function feedUrl() {
+    try { var m = /[?&]live=([^&#]+)/.exec((root.location && root.location.search) || ''); if (m) return decodeURIComponent(m[1]); } catch (e) { /* default */ }
+    return QK.LIVE_URL;
+  }
+  function ok() { return !!doc && ASOF === null && (Date.now() / 1000 - doc.at) < MAX_AGE; }
+  function entry(sport, id) {
+    if (!ok()) return null;
+    var s = doc.sports && doc.sports[sport], e = s && s.g ? s.g[String(id)] : null;
+    if (!e || !RANK.hasOwnProperty(e.s)) return null;
+    if (e.s === 'live' && doc.at - (s.t || 0) > MAX_BOARD_AGE) return null;
+    return e;
+  }
+  function poll() {
+    if (ASOF !== null || (root.document && document.hidden) || Date.now() < holdUntil) return;
+    var u = feedUrl();
+    /* one cache key per 10 s, shared by every reader, so the CDN is asked for the file a few times a minute at most */
+    QK.fetchJSON(u + (u.indexOf('?') < 0 ? '?' : '&') + 't=' + Math.floor(Date.now() / 10000), { cache: 'no-store', timeout: 8000 }).then(function (j) {
+      fails = 0; holdUntil = 0;
+      if (!j || j.v !== 1 || !j.sports) return;
+      if (doc && j.at < doc.at) return;                       /* an older copy from a slow edge: keep the newer one */
+      doc = j;
+      var g = {}; Object.keys(j.sports).forEach(function (k) { g[k] = j.sports[k].g; });
+      var now = JSON.stringify(g);
+      if (now === seen) return;
+      seen = now;
+      subs.forEach(function (fn) { try { fn(); } catch (e) { /* one reader never stops the others */ } });
+      var n = 0;
+      Object.keys(watched).forEach(function (k) { var w = watched[k]; try { n += overlay(w[0], w[1], w[2]); } catch (e) { /* the built payload stands */ } });
+      if (n) hooks.forEach(function (fn) { try { fn(n); } catch (e) { /* a page that cannot redraw keeps what it shows */ } });
+    }, function () {
+      /* no feed: the pages keep the built snapshot, and the feed is asked less often (40 s, 80 s ... 5 minutes) */
+      fails += 1; holdUntil = Date.now() + Math.min(300000, 20000 * Math.pow(2, fails));
+    });
+  }
+  function start() {
+    if (timer || ASOF !== null || !root.document) return;
+    poll();
+    timer = setInterval(poll, POLL);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) poll(); });
+  }
+  function norm(s) {
+    s = String(s || '').toLowerCase();
+    if (/^(final|post|finished|done|closed|ft|complete|completed|off|ret|wo|def)$/.test(s)) return 'final';
+    if (/^(live|in|crit|inprogress|in_progress|in progress|running|halftime|end_period)$/.test(s)) return 'live';
+    return 'pre';
+  }
+  /* what to do with entry e for a game whose own status reads `cur` (pre|live|final): null = leave it alone */
+  function step(cur, e) {
+    if (!e || cur === 'final' || e.s === 'pre' || RANK[e.s] < RANK[cur]) return null;
+    return e;
+  }
+  function apply(sport, g) {
+    if (!g) return false;
+    var e = step(norm(g.status), entry(sport, g.id));
+    if (!e) return false;
+    var per = e.s === 'live' ? e.p : null, clk = e.s === 'live' ? e.c : null;
+    if (g.status === e.s && g.hs === e.hs && g.as === e.as && (g.period || null) === (per || null) && (g.clock || null) === (clk || null)) return false;
+    if (g.hs !== e.hs || g.as !== e.as || g.status !== e.s) { if (isNum(g.wp_home)) g.wp_home = null; }
+    g.status = e.s; g.hs = e.hs; g.as = e.as; g.period = per; g.clock = clk;
+    return true;
+  }
+  function overlay(sport, json, map) {
+    if (!ok() || !json || typeof json !== 'object') return 0;
+    var S = doc.sports && doc.sports[sport];
+    if (!S || !S.g) return 0;
+    map = map || {};
+    var idK = map.id || 'id', perK = map.period || 'period', clkK = map.clock || 'clock', n = 0;
+    var words = { live: map.live || 'live', final: map.final || 'final' }, need = map.need || [];
+    function isGame(x) {
+      if (!x.hasOwnProperty(idK) || !x.hasOwnProperty('status') || (typeof x[idK] !== 'string' && typeof x[idK] !== 'number')) return false;
+      for (var i = 0; i < need.length; i++) if (!x.hasOwnProperty(need[i])) return false;
+      return true;
+    }
+    function patch(o) {
+      var e = step(norm(o.status), entry(sport, o[idK]));
+      if (!e) return;
+      if (map.set) { if (map.same && map.same(o, e)) return; map.set(o, e); o.live_feed = true; n += 1; return; }
+      var per = e.s === 'live' ? e.p : null, clk = e.s === 'live' ? e.c : null;
+      var moved = norm(o.status) !== e.s || o.hs !== e.hs || o.as !== e.as;
+      if (!moved && (o[perK] || null) === (per || null) && (o[clkK] || null) === (clk || null)) return;
+      if (moved) (map.clear || ['wp_home']).forEach(function (k) { if (o.hasOwnProperty(k)) o[k] = null; });
+      if (norm(o.status) !== e.s) o.status = words[e.s];
+      o.hs = e.hs; o.as = e.as; o[perK] = per; o[clkK] = clk;
+      if (map.detail) o[map.detail] = e.d || null;
+      o.live_feed = true;
+      n += 1;
+    }
+    (function walk(x, depth) {
+      if (!x || typeof x !== 'object' || depth > 7) return;
+      if (Array.isArray(x)) { for (var i = 0; i < x.length; i++) walk(x[i], depth + 1); return; }
+      if (isGame(x)) { patch(x); return; }
+      for (var k in x) if (x.hasOwnProperty(k) && x[k] && typeof x[k] === 'object') walk(x[k], depth + 1);
+    })(json, 0);
+    return n;
+  }
+  function watch(key, sport, json, map) {
+    if (!json || typeof json !== 'object') return json;
+    watched[String(key)] = [sport, json, map];
+    try { overlay(sport, json, map); } catch (e) { /* the built payload stands */ }
+    return json;
+  }
+  return { start: start, poll: poll, onChange: function (fn) { subs.push(fn); }, entry: entry, apply: apply, overlay: overlay,
+    watch: watch, attach: function (fn) { if (fn) hooks.push(fn); start(); },
+    ok: ok, age: function () { return doc ? Math.round(Date.now() / 1000 - doc.at) : null; }, norm: norm,
+    _set: function (j) { doc = j; } };
+})();
+
 /* ═══════════════════════════════════════ v2 "Signal" builders (Design System 2.0; STYLE_GUIDE.md) ═══ */
 
 /* The v4 faces: Bebas Neue (scores, big numbers, short headlines), Barlow (UI, body, tabular figures) and Barlow

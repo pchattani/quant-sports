@@ -398,6 +398,10 @@ function go(hash) {
 
 // ── loading ────────────────────────────────────────────────────────────────
 
+/* The live feed (QK.live, the same file the home page reads): laid over every payload as it loads and again after
+   each poll, so scores, clocks and finals do not wait for the hourly build. */
+const LIVE_MAP = { id: 'game_id', period: 'period', clock: 'clock', clear: ['wp_home', 'intermission'] };
+function liveWatch(p, d) { try { if (window.QK && QK.live && d) QK.live.watch(p, 'hockey', d, LIVE_MAP); } catch (e) { /* the built payload stands */ } }
 /* Cached fetch of data/<path>. Resolves to the parsed JSON, or null when the file is missing or
  * broken. A payload written with "ok": false resolves as written: test with RK.ok(d). */
 function load(p0) {
@@ -406,7 +410,7 @@ function load(p0) {
   if (PENDING[p]) return PENDING[p];
   PENDING[p] = fetch('data/' + p, { cache: 'no-cache' })
     .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-    .then(d => { lateMetrics(p, d); copyFix(p, d); learn(p, d); return d; })
+    .then(d => { lateMetrics(p, d); copyFix(p, d); learn(p, d); liveWatch(p, d); return d; })
     .catch(err => { console.warn('payload missing:', p, err.message); return null; })
     .then(d => { if (d !== null) CACHE[p] = d; delete PENDING[p]; return d; });
   return PENDING[p];
@@ -1572,6 +1576,7 @@ function init() {
     if (ov) ov.style.display = 'none';
     booted = true;
     window.addEventListener('hashchange', render);
+    if (window.QK && QK.live) QK.live.attach(() => { if (document.visibilityState === 'visible' && /^(hub|overview|games|game)$/.test(state.route || '')) render({ keep: true }); });
     render();
   });
 }

@@ -162,6 +162,8 @@ FB.route('overview', function (el) {
     if (!soon) return;
     FB.reload('hub.json').then(function (h) { if (!FB.alive(el) || !h) return; HUB = h; FB.hubLive(h); drawCards(el, HUB); drawTicker(el, HUB); });
   }, 60000);
+  /* the live feed moved a score: the cards and the ticker are redrawn from the same (patched) scoreboard */
+  FB.onLive(function () { if (FB.alive(el) && HUB) { drawCards(el, HUB); drawTicker(el, HUB); } });
   return p;
 });
 

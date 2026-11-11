@@ -63,6 +63,8 @@ FB.route('matches', function (el, p) {
     if (!soon) return;
     FB.reload('hub.json').then(function (h) { if (!h || !FB.alive(el)) return; HUB = h; FB.hubLive(h); draw(); });
   }, 60000);
+  /* the live feed moved a score: redrawn from the same (patched) scoreboard */
+  FB.onLive(function () { if (HUB) draw(); });
   return FB.load('hub.json').then(function (h) { HUB = h || { days: {} }; draw(); });
 });
 

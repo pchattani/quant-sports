@@ -67,6 +67,9 @@ CC.load = function (path) {
   var p = QK.fetchJSON(CC.DATA + path, { timeout: 20000 }).then(function (j) {
     j = CC.unpack(j);
     if (j && typeof j === 'object' && !Array.isArray(j) && j.ok === undefined) j.ok = true;
+    /* the live feed (QK.live, the same file the home page reads) laid over every payload: scores, clocks and
+       finals do not wait for the hourly build */
+    try { if (QK.live) QK.live.watch(path, 'college', j, { id: 'id', need: ['home', 'away'], live: 'in', final: 'post', period: 'period', clock: 'clock' }); } catch (e) { /* the built payload stands */ }
     return j;
   }, function (e) { delete CACHE[path]; return { ok: false, reason: String((e && e.message) || e), missing: true }; });
   CACHE[path] = p;
@@ -658,6 +661,7 @@ function boot() {
     var meta = QK.$('#meta-line');
     if (meta) meta.textContent = 'Data built ' + fmt.ago(idx.updated_at) + ' (' + fmt.date(idx.updated_at) + ' ' + fmt.time(idx.updated_at) + ').';
     root.addEventListener('hashchange', render);
+    if (QK.live) QK.live.attach(function () { if (!document.hidden && /^(overview|games|game)$/.test((CC.state && CC.state.sec) || 'overview')) render(); });
     render();
   });
 }

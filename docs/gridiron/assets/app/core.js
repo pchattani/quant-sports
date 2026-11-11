@@ -281,6 +281,10 @@ function parseHash(hash) {
 function route(name, fn) { HANDLERS[name] = fn; if (booted && state.route === name) render(); }
 function onLeave(fn) { if (typeof fn === 'function') CLEANUPS.push(fn); }
 function interval(fn, ms) { const id = setInterval(fn, ms); onLeave(() => clearInterval(id)); return id; }
+/* The live feed (QK.live, the same file the home page reads): laid over every payload as it loads and again after
+   each poll, so scores, clocks and finals do not wait for the hourly build. */
+const LIVE_MAP = { id: 'game_id', period: 'qtr', clock: 'clock', clear: ['wp_home', 'possession', 'down', 'dist', 'yl100'] };
+function liveWatch(p, d) { try { if (window.QK && QK.live && d) QK.live.watch(p, 'nfl', d, LIVE_MAP); } catch (e) { /* the built payload stands */ } }
 function runCleanups() {
   const list = CLEANUPS; CLEANUPS = [];
   list.forEach(fn => { try { fn(); } catch (e) { if (window.console) console.warn('cleanup failed', e); } });
@@ -350,7 +354,7 @@ function load(p0) {
   if (PENDING[p]) return PENDING[p];
   PENDING[p] = fetch('data/' + p, { cache: 'no-cache' })
     .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-    .then(d => { learn(p, d); return d; })
+    .then(d => { learn(p, d); liveWatch(p, d); return d; })
     .catch(() => null)
     .then(d => { if (d !== null) CACHE[p] = d; delete PENDING[p]; return d; });
   return PENDING[p];
@@ -1272,6 +1276,7 @@ function init() {
     bootShell();
     booted = true;
     window.addEventListener('hashchange', () => render());
+    if (window.QK && QK.live) QK.live.attach(() => { if (document.visibilityState === 'visible' && /^(hub|overview|games|game)$/.test(state.route || '')) render({ keep: true }); });
     render();
   });
 }

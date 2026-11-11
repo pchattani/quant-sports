@@ -1414,3 +1414,34 @@ Season rollover:
 - For Argentina, run `discover_sofascore_liga.py --verify`, check the ids, then
   run it without `--verify` and commit.
 - Re-verify the bands and formats in the configs.
+
+## Live scores (separate from the site builds)
+
+A site build takes up to an hour, so a score that only changes when a site rebuilds is 20 to 110 minutes old, and the
+home page (its own build) and a sport page (another build) disagree. Since 11 Nov 2026 live play has its own path:
+
+    scripts/live_feed.py  ->  https://pchattani.github.io/the-quant-live/live.json  ->  QK.live (docs/_design/quant.js)
+
+- **The feed** (`scripts/live_feed.py`, standard library only): the score, period, clock and status of every game on
+  today's boards, keyed by the ids the sites use. Sources, all already used by the builds: ESPN's scoreboards (NBA,
+  WNBA, NFL as nflverse ids, college football, basketball and hockey, rugby tests, tennis, football), the NHL web
+  API, the MLB Stats API. Football: the Footballer's fixtures (its published hub.json, Sofascore ids) are matched
+  to ESPN's all-soccer board by kickoff time (within 15 minutes) and both team names, only when the match is clear
+  (84 of 94 fixtures on 8 to 10 Nov 2026, every final equal to the build's); a fixture with no clear match is left
+  to the hourly build. Tennis: the Ace's match cards (its index.json) are matched by the pair of players, and the
+  entry carries the sets and the game score. Each board is read only as often as it needs: every 30 s with a game on, every 60 s with a start inside 15
+  minutes, every 10 minutes inside three hours, otherwise every 30 minutes.
+- **The loop** (`live_repo/.github/workflows/live.yml`, in the public repo `pchattani/the-quant-live`): one long job
+  that runs a tick every 30 to 60 s and deploys the file to GitHub Pages when something changed (a heartbeat every
+  five minutes otherwise). It hands over to a successor every five and a half hours, or within three minutes of a
+  push; `watchdog.yml` restarts it. Nothing in it can fail a run.
+- **The readers**: the home page (`QK.live.apply`) and each sport site's loader (`QK.live.watch` on every payload,
+  `QK.live.attach` to redraw the overview, games and game pages) poll the file every 20 s. The feed only moves a game
+  forward (pre, live, final), never touches a game the build calls final, and is ignored when older than 15 minutes:
+  the pages then show the build, as before. A live win chance from the build is dropped when the feed moves the
+  score (it belonged to the old score).
+- **Not in the feed**: golf and F1 (their pages read the hourly build), and the football fixtures ESPN does not
+  carry. Box scores, play-by-play and live win chances on every site also still come from the build.
+- **Running it**: `python scripts/setup_live_repo.py --create` once (creates the public repo, turns on Pages, starts
+  the loop); the hourly task then runs `setup_live_repo.py` (pushes changed files, restarts a stopped loop);
+  `--status` prints the feed's age and the loop's runs. Tests: `tests/test_live_feed.py`.

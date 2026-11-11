@@ -405,6 +405,10 @@ function handlerFor(name) {
 
 /* Register cleanup work (timers, listeners) run when the viewer leaves the page. */
 function onLeave(fn) { if (typeof fn === 'function') CLEANUPS.push(fn); }
+/* The live feed (QK.live, the same file the home page reads): laid over every payload as it loads and again after
+   each poll, so scores, clocks and finals do not wait for the hourly build. */
+const LIVE_MAP = { id: 'gpk', period: 'inning', clock: 'half', clear: ['wp_home', 'outs'] };
+function liveWatch(p, d) { try { if (window.QK && QK.live && d) QK.live.watch(p, 'baseball', d, LIVE_MAP); } catch (e) { /* the built payload stands */ } }
 /* setInterval that is cleared on navigation. */
 function interval(fn, ms) { const id = setInterval(fn, ms); onLeave(() => clearInterval(id)); return id; }
 function runCleanups() {
@@ -583,7 +587,7 @@ function load(p0) {
   if (PENDING[p]) return PENDING[p];
   PENDING[p] = fetch('data/' + p, { cache: 'no-cache' })
     .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-    .then(d => { relabel(d); learn(p, d); return d; })
+    .then(d => { relabel(d); learn(p, d); liveWatch(p, d); return d; })
     .catch(err => { console.warn('payload missing:', p, err.message); return null; })
     .then(d => { if (d !== null) CACHE[p] = d; delete PENDING[p]; return d; });
   return PENDING[p];
@@ -1499,6 +1503,7 @@ function init() {
     if (SHELL) SHELL.setLive({ baseball: liveAny() });
     booted = true;
     window.addEventListener('hashchange', render);
+    if (window.QK && QK.live) QK.live.attach(() => { if (document.visibilityState === 'visible' && /^(hub|overview|games|game)$/.test(state.route || '')) render({ keep: true }); });
     render();
   });
 }

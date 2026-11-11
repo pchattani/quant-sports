@@ -197,6 +197,14 @@ function parseHash(hash) {
 function route(name, fn) { HANDLERS[name] = fn; if (booted && state.route === name) render(); }
 function onLeave(fn) { if (typeof fn === 'function') CLEANUPS.push(fn); }
 function interval(fn, ms) { var id = setInterval(fn, ms); onLeave(function () { clearInterval(id); }); return id; }
+/* The live feed (QK.live, the same file the home page reads): laid over every payload as it loads and again after
+   each poll, so a score or a full-time does not wait for the hourly build. The feed carries the fixtures that
+   could be matched to ESPN's board (scripts/live_feed.py); the others keep the build. A page that shows scores
+   registers FB.onLive(fn) to redraw them (cleared on navigation). */
+var LIVE_MAP = { id: 'id', need: ['home', 'away'], live: 'live', final: 'finished', period: 'period', clock: 'clock' };
+var LIVE_SUBS = [];
+function liveWatch(p, d) { try { if (window.QK && QK.live && d) QK.live.watch(p, 'football', d, LIVE_MAP); } catch (e) { /* the built payload stands */ } }
+function onLive(fn) { LIVE_SUBS.push(fn); onLeave(function () { var i = LIVE_SUBS.indexOf(fn); if (i >= 0) LIVE_SUBS.splice(i, 1); }); }
 function runCleanups() {
   var list = CLEANUPS; CLEANUPS = [];
   list.forEach(function (fn) { try { fn(); } catch (e) { if (window.console) console.warn('cleanup failed', e); } });
@@ -289,7 +297,7 @@ function load(path) {
   if (PENDING[p]) return PENDING[p];
   PENDING[p] = (gzPath(p) ? getGz('data/' + p + '.gz').catch(function () { return getJson('data/' + p); }) : getJson('data/' + p))
     .catch(function (e) { if (window.console) console.warn('payload missing:', p, e && e.message); return null; })
-    .then(function (d) { CACHE[p] = d; delete PENDING[p]; return d; });
+    .then(function (d) { liveWatch(p, d); CACHE[p] = d; delete PENDING[p]; return d; });
   return PENDING[p];
 }
 /* Re-read a payload (live scores). */
@@ -1359,6 +1367,10 @@ function init() {
     INDEX.comps.forEach(function (c) { INDEX.bySlug[c.slug] = c; });
     bootShell();
     load('hub.json').then(hubLive);
+    if (window.QK && QK.live) QK.live.attach(function () {
+      if (CACHE['hub.json']) hubLive(CACHE['hub.json']);
+      if (document.visibilityState === 'visible') LIVE_SUBS.slice().forEach(function (fn) { try { fn(); } catch (e) { /* that page keeps what it shows */ } });
+    });
     booted = true;
     window.addEventListener('hashchange', render);
     render();
@@ -1367,7 +1379,7 @@ function init() {
 
 return {
   state: state, INDEX: INDEX, route: route, go: go, render: render, parseHash: parseHash, legacyRedirect: legacyRedirect, fixLinks: fixLinks,
-  ROUTES: ROUTES, COMP_TABS: COMP_TABS, COMP_TAB_MAP: COMP_TAB_MAP, onLeave: onLeave, interval: interval, setHashQuiet: setHashQuiet, setQuery: setQuery,
+  ROUTES: ROUTES, COMP_TABS: COMP_TABS, COMP_TAB_MAP: COMP_TAB_MAP, onLeave: onLeave, onLive: onLive, interval: interval, setHashQuiet: setHashQuiet, setQuery: setQuery,
   alive: alive, init: init, qs: qs, enc: enc, merge: merge,
   load: load, reload: reload, loadAll: loadAll, rows: rows, FILES: FILES, KIND_FILES: KIND_FILES, FAMILIES: FAMILIES,
   comps: comps, comp: comp, familyOf: familyOf, compName: compName, hasFile: hasFile, compFile: compFile, compFiles: compFiles,

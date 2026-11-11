@@ -302,6 +302,14 @@ function handlerFor(name) {
 
 /* Register cleanup work (timers, listeners) run when the viewer leaves the page. */
 function onLeave(fn) { if (typeof fn === 'function') CLEANUPS.push(fn); }
+/* The live feed (QK.live, the same file the home page reads): laid over every payload as it loads and again after
+   each poll, so sets, games and results do not wait for the hourly build. A match card is matched in the feed by its
+   pair of players (scripts/live_feed.py). A live chance from the build is dropped when the feed moves the score. */
+const LIVE_WORD = e => (e.s === 'final' ? (e.d || 'done') : 'live');
+const LIVE_MAP = { id: 'id', need: ['p1', 'p2'],
+  same: (o, e) => o.status === LIVE_WORD(e) && JSON.stringify(o.sets || []) === JSON.stringify(e.sets || []) && JSON.stringify(o.live || null) === JSON.stringify(e.s === 'live' ? (e.live || null) : null),
+  set: (o, e) => { o.status = LIVE_WORD(e); o.sets = e.sets || []; o.live = e.s === 'live' ? (e.live || null) : null; if (e.s === 'final' && e.w) o.winner = e.w; if (Object.prototype.hasOwnProperty.call(o, 'wp_now')) o.wp_now = null; } };
+function liveWatch(p, d) { try { if (window.QK && QK.live && d) QK.live.watch(p, 'tennis', d, LIVE_MAP); } catch (e) { /* the built payload stands */ } }
 /* setInterval that is cleared on navigation. */
 function interval(fn, ms) { const id = setInterval(fn, ms); onLeave(() => clearInterval(id)); return id; }
 function runCleanups() {
@@ -429,7 +437,7 @@ function load(p0) {
   if (PENDING[p]) return PENDING[p];
   PENDING[p] = fetch('data/' + p, { cache: 'no-cache' })
     .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-    .then(d => { learn(p, d); return d; })
+    .then(d => { learn(p, d); liveWatch(p, d); return d; })
     .catch(err => { console.warn('payload missing:', p, err.message); return null; })
     .then(d => { if (d !== null) CACHE[p] = d; delete PENDING[p]; return d; });
   return PENDING[p];
@@ -1256,6 +1264,7 @@ function init() {
     if (SHELL) SHELL.setLive({ tennis: liveAny() });
     booted = true;
     window.addEventListener('hashchange', render);
+    if (window.QK && QK.live) QK.live.attach(() => { if (document.visibilityState === 'visible' && /^(hub|event|match)$/.test(state.route || '')) render(); });
     render();
   });
 }
