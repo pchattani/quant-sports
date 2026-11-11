@@ -1434,7 +1434,10 @@ home page (its own build) and a sport page (another build) disagree. Since 11 No
 - **The loop** (`live_repo/.github/workflows/live.yml`, in the public repo `pchattani/the-quant-live`): one long job
   that runs a tick every 30 to 60 s and deploys the file to GitHub Pages when something changed (a heartbeat every
   five minutes otherwise). It hands over to a successor every five and a half hours, or within three minutes of a
-  push; `watchdog.yml` restarts it. Nothing in it can fail a run.
+  push; `watchdog.yml` restarts it. Nothing in it can fail a run. Each deploy is an artifact upload and one call
+  to the Pages deployments API with the commit id as its version (any other version answers 404); the same commit
+  deployed again replaces the content in about three seconds. Measured on 11 Nov 2026: a reader gets a file a
+  median of 25 s old, 55 s at worst.
 - **The readers**: the home page (`QK.live.apply`) and each sport site's loader (`QK.live.watch` on every payload,
   `QK.live.attach` to redraw the overview, games and game pages) poll the file every 20 s. The feed only moves a game
   forward (pre, live, final), never touches a game the build calls final, and is ignored when older than 15 minutes:
