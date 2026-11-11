@@ -443,7 +443,17 @@ def card(ctx: SeasonContext, g: dict, live: dict | None = None) -> dict:
             "model": {"p_home": m.get("p_home"), "margin": an.rnd(m.get("margin"), 2), "total": an.rnd(m.get("total"), 1),
                       **_av_card(m)} if m else None,
             "market": {k: mk.get(k) for k in ("p_home", "spread_home", "total", "sources")} if mk else None,
-            "wp_home": (live or {}).get("wp_home"), "espn_wp": (live or {}).get("espn_wp"), "series": _series(ctx, g)}
+            "wp_home": (live or {}).get("wp_home"), "espn_wp": (live or {}).get("espn_wp"), "series": _series(ctx, g),
+            # the pregame expected home margin the live model starts from (the stored line, else home court): the
+            # live feed recomputes the live chance between builds from exactly this number
+            "wp_s": _safe(lambda: _wp_s(ctx, g))}
+
+
+def _wp_s(ctx: SeasonContext, g: dict) -> float | None:
+    if g.get("status") == "post":
+        return None
+    from oddsmarkets.basketball.models import winprob as W
+    return float(W.exp_margin(g, ctx.league))
 
 
 def _series(ctx: SeasonContext, g: dict) -> dict | None:
@@ -460,16 +470,10 @@ def live_state(ctx: SeasonContext, g: dict) -> dict | None:
     if g.get("status") != "in" or not ctx.wp_model:
         return None
     raw = bst.load_pbp(ctx.league, ctx.season, str(g.get("id")))
-    if not raw:
+    r = W.live_now(ctx.wp_model, raw, g, ctx.league)      # the same function the live feed runs between builds
+    if not r:
         return None
-    st = W.states_from_pbp(raw, g, None, ctx.league)
-    if st.empty:
-        return None
-    last = st.iloc[-1]
-    wp = float(W.wp(ctx.wp_model, st.iloc[[-1]])[0])
-    e = last.get("espn_wp")
-    m, s = divmod(int(float(last["clock_s"])), 60)
-    return {"wp_home": round(wp, 4), "espn_wp": an.rnd(e, 4) if e is not None and e == e else None, "clock": f"{m}:{s:02d}"}
+    return {"wp_home": r["wp_home"], "espn_wp": an.rnd(r["espn_wp"], 4) if r["espn_wp"] is not None else None, "clock": r["clock"]}
 
 
 def cards(ctx: SeasonContext, today: date) -> dict:

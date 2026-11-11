@@ -1440,6 +1440,16 @@ home page (its own build) and a sport page (another build) disagree. Since 11 No
   forward (pre, live, final), never touches a game the build calls final, and is ignored when older than 15 minutes:
   the pages then show the build, as before. A live win chance from the build is dropped when the feed moves the
   score (it belonged to the old score).
+- **Live win chances** (`scripts/live_chances.py`, run by the loop after a tick with a game on, from a checkout of
+  the public build repo): each site's OWN live model on the games in progress, so a live card shows a chance for
+  the score it shows. One site at a time. **Hardwood (NBA, WNBA), 12 Nov 2026:** the ESPN summary of each live
+  game (at most one per game every 45 s, twelve a tick) goes through the same `compact_pbp` / `compact_game` the
+  build stores and the same function the build calls (`winprob.live_now`), with the model the last build
+  published (`index.json` `leagues.<L>.wp_model`: K and beta) and the pregame margin it published on the card
+  (`wp_s`). Nothing else is ever used: the public build refits the model on the seasons it has on disk, so the
+  committed fitted file is about one point of chance away from it. The entry gets `wp`; the readers show it,
+  and drop a chance older than four minutes. The other sites keep the rule above (the build's chance is dropped
+  when the feed moves the score) until theirs is added: Gridiron, Rink, Bullpen, then tennis.
 - **Not in the feed**: golf and F1 (their pages read the hourly build), and the football fixtures ESPN does not
   carry. Box scores, play-by-play and live win chances on every site also still come from the build.
 - **Running it**: `python scripts/setup_live_repo.py --create` once (creates the public repo, turns on Pages, starts

@@ -1174,8 +1174,9 @@ QK.fetchJSON = function (url, o) {
  *
  * Rules: the feed only moves a game forward (pre -> live -> final), never back, and never touches a game the build
  * already calls final. A feed older than 15 minutes, or a live entry whose board has not answered for 10, is
- * ignored: the page then shows what the build says, as before. When the feed moves a score, a live win chance from
- * the build is dropped (it was computed for the old score). Pages opened with ?asof= never read the feed.
+ * ignored: the page then shows what the build says, as before. A live win chance: the feed's own when it has one
+ * ("wp", the site's live model run on the latest play, scripts/live_chances.py); otherwise, when the feed moves a
+ * score, the build's chance is dropped (it was computed for the old score). Pages opened with ?asof= never read the feed.
  * ?live=<url> reads another feed (local previews and tests). */
 QK.LIVE_URL = PUB + 'the-quant-live/live.json';
 QK.live = (function () {
@@ -1236,9 +1237,10 @@ QK.live = (function () {
     if (!g) return false;
     var e = step(norm(g.status), entry(sport, g.id));
     if (!e) return false;
-    var per = e.s === 'live' ? e.p : null, clk = e.s === 'live' ? e.c : null;
-    if (g.status === e.s && g.hs === e.hs && g.as === e.as && (g.period || null) === (per || null) && (g.clock || null) === (clk || null)) return false;
-    if (g.hs !== e.hs || g.as !== e.as || g.status !== e.s) { if (isNum(g.wp_home)) g.wp_home = null; }
+    var per = e.s === 'live' ? e.p : null, clk = e.s === 'live' ? e.c : null, wp = e.s === 'live' && isNum(e.wp) ? e.wp : null;
+    if (g.status === e.s && g.hs === e.hs && g.as === e.as && (g.period || null) === (per || null) && (g.clock || null) === (clk || null) && (wp === null || g.wp_home === wp)) return false;
+    if (wp !== null) g.wp_home = wp;
+    else if (g.hs !== e.hs || g.as !== e.as || g.status !== e.s) { if (isNum(g.wp_home)) g.wp_home = null; }
     g.status = e.s; g.hs = e.hs; g.as = e.as; g.period = per; g.clock = clk;
     return true;
   }
@@ -1260,8 +1262,10 @@ QK.live = (function () {
       if (map.set) { if (map.same && map.same(o, e)) return; map.set(o, e); o.live_feed = true; n += 1; return; }
       var per = e.s === 'live' ? e.p : null, clk = e.s === 'live' ? e.c : null;
       var moved = norm(o.status) !== e.s || o.hs !== e.hs || o.as !== e.as;
-      if (!moved && (o[perK] || null) === (per || null) && (o[clkK] || null) === (clk || null)) return;
+      var wp = e.s === 'live' && isNum(e.wp) ? e.wp : null, wpK = map.wp || 'wp_home';
+      if (!moved && (o[perK] || null) === (per || null) && (o[clkK] || null) === (clk || null) && (wp === null || o[wpK] === wp)) return;
       if (moved) (map.clear || ['wp_home']).forEach(function (k) { if (o.hasOwnProperty(k)) o[k] = null; });
+      if (wp !== null) o[wpK] = wp;
       if (norm(o.status) !== e.s) o.status = words[e.s];
       o.hs = e.hs; o.as = e.as; o[perK] = per; o[clkK] = clk;
       if (map.detail) o[map.detail] = e.d || null;

@@ -863,6 +863,11 @@ def main(argv: list[str] | None = None) -> int:
             out["leagues"][lg] = SN.league_index(lg, r.get("ctx"), r["seasons"], r.get("history"), today)
             if r.get("ctx") is not None:
                 out["leagues"][lg]["digest"] = b.step(f"{lg} digest", lambda: league_digest(b, lg, r["ctx"].season, today), {}) or {}
+                # the live win-probability model this build used (a refit on the seasons on disk, or the committed
+                # one): the live feed recomputes the live chance between builds with exactly these numbers
+                # (scripts/live_chances.py), so the two can never be different models
+                m = r["ctx"].wp_model
+                out["leagues"][lg]["wp_model"] = {"version": m.get("version"), "K": m["K"], "beta": m["beta"]} if m else None
         return out
     b.write_or_fail("index.json", "index", index)
     # My Teams: one small follow card per team (data/follow/<L>/<tid>.json; oddsmarkets/basketball/analytics/

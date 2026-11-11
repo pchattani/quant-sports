@@ -18,7 +18,8 @@ League `L` is `nba` or `wnba`; season `S` is the ESPN year (NBA 2026-27 = 2027).
 ```
 GAME_CARD = `{"id","season","date","status","stype","home","away","hs","as","period","clock",
  "model": {"p_home","margin","total","av"?}, "market": {"p_home","spread_home","total","sources":[...]} | null,
- "wp_home": live model WP | null, "espn_wp": | null, "series": {...} | null}`
+ "wp_home": live model WP | null, "espn_wp": | null, "series": {...} | null,
+ "wp_s": pregame expected home margin the live model starts from (null once final)}`
 
 GAME_CARD notes: `period` = periods played (final) or the current period (live), `clock` "m:ss" (live only); `model` is the
 pregame model (ratings fitted on games before the game day for played games); `market` is the prediction-market price where

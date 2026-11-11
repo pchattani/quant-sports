@@ -399,6 +399,28 @@ def states_from_pbp(pbp: dict, game: dict, possessions: Any = None, league: str 
                          "home_win": hw, "espn_wp": [wpmap.get(str(p[0]), wpmap.get(p[0])) for p in plays]})
 
 
+def live_now(model: dict | None, pbp: dict | None, game: dict, league: str = "nba", exp_margin_: float | None = None) -> dict | None:
+    """The model's chance for the home side at the latest play of a game in progress, with possession inferred from
+    the play text. One function for both readers, so they cannot differ: the site build (analytics/games.live_state,
+    hourly) and the live feed between builds (scripts/live_chances.py, every minute or so). `exp_margin_` overrides
+    the pregame expected margin read from `game` (the live feed passes the one the build published, "wp_s": a
+    summary fetched mid-game can lack the line the store kept)."""
+    if not model or not model.get("ok") or not pbp:
+        return None
+    st = states_from_pbp(pbp, game, None, league)
+    if st.empty:
+        return None
+    if exp_margin_ is not None:
+        st = st.assign(exp_margin=float(exp_margin_))
+    last = st.iloc[-1]
+    p = float(wp(model, st.iloc[[-1]])[0])
+    e = last.get("espn_wp")
+    m, s = divmod(int(float(last["clock_s"])), 60)
+    return {"wp_home": round(p, 4), "espn_wp": float(e) if e is not None and e == e else None, "clock": f"{m}:{s:02d}",
+            "period": int(last["period"]), "margin": float(last["margin"]), "poss": float(last["poss"]),
+            "exp_margin": float(last["exp_margin"])}
+
+
 # ============================================================================ WPA
 
 def _credit(parts: list[str], act_team: str | None, home: str, away: str, team_of: dict, lineup: dict | None,
