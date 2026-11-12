@@ -1239,6 +1239,9 @@ QK.live = (function () {
     if (!e) return false;
     var per = e.s === 'live' ? e.p : null, clk = e.s === 'live' ? e.c : null, wp = e.s === 'live' && isNum(e.wp) ? e.wp : null;
     if (g.status === e.s && g.hs === e.hs && g.as === e.as && (g.period || null) === (per || null) && (g.clock || null) === (clk || null) && (wp === null || g.wp_home === wp)) return false;
+    /* the build's sentence under the chance was written for the state the build saw (12 Nov 2026: "The Celtics are
+     * slight favourites at 63%" under a live card whose bars had the Raptors at 63%): the card writes its own */
+    if (g.why && (g.status !== e.s || g.hs !== e.hs || g.as !== e.as || (wp !== null && g.wp_home !== wp))) g.why = null;
     if (wp !== null) g.wp_home = wp;
     else if (g.hs !== e.hs || g.as !== e.as || g.status !== e.s) { if (isNum(g.wp_home)) g.wp_home = null; }
     g.status = e.s; g.hs = e.hs; g.as = e.as; g.period = per; g.clock = clk;
