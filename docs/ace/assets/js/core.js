@@ -498,7 +498,14 @@ function learn(p, d) {
     if (/\/schedule\.json$/.test(p)) cardNames(T, d.matches);
     if (/\/players_index\.json$/.test(p)) {
       const P = playersOf(d);
-      Object.keys(P).forEach(id => { const r = P[id]; if (Array.isArray(r)) put(id, { name: r[0], short: r[1], country: r[2], rank: r[3], last: r.length > 4 ? r[4] : undefined, off: r[5] === 1 }); });
+      // the index keeps the last rank a player held: it counts only with a match in the last 400 days (12 Nov 2026)
+      const cut = Date.now() - 400 * 86400000;
+      Object.keys(P).forEach(id => {
+        const r = P[id];
+        if (!Array.isArray(r)) return;
+        const last = r.length > 4 && r[4] ? Date.parse(r[4]) : NaN;
+        put(id, { name: r[0], short: r[1], country: r[2], rank: isNaN(last) || last >= cut ? r[3] : null, last: r.length > 4 ? r[4] : undefined, off: r[5] === 1 });
+      });
     }
     const ym = /^(atp|wta)\/(\d{4})\/events\.json$/.exec(p);
     if (ym) EVENTS[T][ym[2]] = Object.assign(EVENTS[T][ym[2]] || {}, eventsOf(d));

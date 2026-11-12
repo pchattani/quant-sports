@@ -5,10 +5,14 @@
  * Two or three players side by side (QK.compareView) on the headline metric set of METRICS_SPEC.md (TA.v2), ranked
  * against the tour or, with a surface picked, the players with enough matches on it; where each one sits in the peer
  * distribution; Elo and serve/return paths; the whole catalogue as the classic view (first two players); the
- * charting style side by side; the head-to-head tally. With nobody picked the top two by ranking open; with one, the
+ * charting style side by side; the head-to-head tally. With nobody picked the top two on our Elo among the currently
+ * ranked open (12 Nov: was the names index's ranking, stale for retired players); with one, the
  * most similar player (the spec's weighted distance). *
  * Data: data/<T>/players.json (catalogue), data/<T>/players/<a>.json and <b>.json (careers),
  * data/<T>/elo.json (current ratings), data/<T>/style.json (tour medians for the style tables).
+ * Peer groups first (12 Nov): tennis has no positions, so the chips are the tours (ATP, WTA: each opens its top two by
+ * ranking) and the surface stays the side-by-side card's peer-group switch; a line under the chips names the tour set's
+ * headline metrics, and a tour pool under ten qualified players (early in a season) says so and offers last season.
  * Uses TA.fk from players.js. */
 (function (TA) {
 'use strict';
@@ -61,6 +65,15 @@ function verdictAndTables(metrics, A, B, nameA, nameB, scopeNote) {
 }
 
 const ECOL = ['var(--wp-a)', 'var(--wp-b)', 'var(--plum)'];
+/* the tour chips and the line naming the tour set (V.set, all surfaces); pool: the qualified players in the tour's peer
+   group this season (the peer block's pool, else the catalogue's), null when unknown */
+function groupStrip(T, Y, pool) {
+  const k = K(), V = TA.v2;
+  const ws = V.set(T, '').map(x => { const l = String(V.label(x)).replace(/ \(inferred\)/, ''); return /^[A-Z][a-z]/.test(l) && !/^Elo/.test(l) ? l.charAt(0).toLowerCase() + l.slice(1) : l; });
+  return '<div class="cmp-groups"><div class="qk-chips scroll" role="group" aria-label="Tour">' + [['atp', 'ATP'], ['wta', 'WTA']].map(x => '<button type="button" class="qk-chip" data-cmp-go="' + k.esc(k.href(x[0], 'compare')) + '" aria-pressed="' + (x[0] === T ? 'true' : 'false') + '">' + x[1] + '</button>').join('') + '</div>' +
+    '<p class="cmp-gline"><b>' + k.TN(T) + ', all surfaces:</b> ' + k.esc(ws.length > 1 ? ws.slice(0, -1).join(', ') + ' and ' + ws[ws.length - 1] : ws.join('')) + ' — the metrics that best describe and predict a player’s tennis. Rank them on hard, clay or grass with the switch in the side-by-side card.</p>' +
+    (isNum(pool) && pool < 10 ? '<p class="cmp-thin">Early in the season: only ' + pool + ' qualified ' + k.TN(T) + ' players so far; percentiles settle as matches are played. <a href="' + k.esc(k.href(T, 'compare') + '?y=' + (Number(Y) - 1)) + '">Last season (' + (Number(Y) - 1) + ')</a></p>' : '') + '</div>';
+}
 
 /* Players' own peer blocks (players/<pid>.json "peer", PAYLOADS.md) give the side-by-side card without the 1.5 MB season
    catalogue; the catalogue then loads only for the distribution and the classic every-metric table. Without the blocks
@@ -76,8 +89,16 @@ function render(el, params, state) {
   return k.ready().then(() => k.loadNames(T)).then(() => {
     if (!k.alive(el)) return null;
     const N = k.NAMES[T] || {};
-    if (!ids.length) ids = Object.keys(N).filter(id => isNum(N[id].rank)).sort((x, y) => N[x].rank - N[y].rank).slice(0, 2);
-    return loadC(ids[0]).then(c0 => {
+    /* nobody picked: the top two on our Elo among the players holding a current ranking (rankings.json; a stale
+       ranking in the names index can belong to a retired player), else the names index */
+    const pick = ids.length ? Promise.resolve(ids) : TA.load(T + '/rankings.json').then(rj => {
+      const off = {}; (((rj || {}).official) || []).forEach(r => { off[String(r[1])] = r[0]; });
+      const byElo = (((rj || {}).elo) || []).map(r => String(r[1])).filter(id => off[id]);
+      const byRank = Object.keys(off).sort((x, y) => off[x] - off[y]);
+      const top = byElo.length >= 2 ? byElo : byRank;
+      return top.length >= 2 ? top.slice(0, 2) : Object.keys(N).filter(id => isNum(N[id].rank)).sort((x, y) => N[x].rank - N[y].rank).slice(0, 2);
+    }, () => Object.keys(N).filter(id => isNum(N[id].rank)).sort((x, y) => N[x].rank - N[y].rank).slice(0, 2));
+    return pick.then(list => { ids = list; return loadC(ids[0]); }).then(c0 => {
       if (ids.length === 1) { const s1 = ((peerOf(c0) || {}).similar || [])[0]; if (s1) ids.push(String(s1.id)); }
       return Promise.all(ids.map((id, i) => (i === 0 ? Promise.resolve(c0) : loadC(id)))).then(cs => {
         const peers = cs.map(peerOf);
@@ -96,12 +117,15 @@ function render(el, params, state) {
           }
           return draw(cat);
           function draw(catX) {
-            el.innerHTML = '<div class="ta-cmp-pick">' + [0, 1, 2].map(i => '<div class="ta-cmp-slot" style="--ec:' + ECOL[i] + '"><span class="qk-kicker">' + (i === 2 ? 'Third player (optional)' : 'Player ' + (i + 1)) + '</span><span id="cmp-p' + i + '"></span></div>').join('') + '</div>' + (ids.length ? '<div class="ta-pl-links"><a class="qk-btn" href="#/' + T + '/compare/progression/' + ids.map(encodeURIComponent).join('/') + '">Compare the careers year by year</a></div>' : '') + '<div id="cmp-body"></div>';
+            const pool = ((((peers[0] || {}).groups || {}).all) || {}).pool;
+            const poolN = isNum(pool) ? Number(pool) : (catX && !catX._peerCat && catX.players ? Object.keys(catX.players).filter(id => catX.players[id] && catX.players[id].qualified === true).length : null);
+            el.innerHTML = groupStrip(T, Y, poolN) + '<div class="ta-cmp-pick">' + [0, 1, 2].map(i => '<div class="ta-cmp-slot" style="--ec:' + ECOL[i] + '"><span class="qk-kicker">' + (i === 2 ? 'Third player (optional)' : 'Player ' + (i + 1)) + '</span><span id="cmp-p' + i + '"></span></div>').join('') + '</div>' + (ids.length ? '<div class="ta-pl-links"><a class="qk-btn" href="#/' + T + '/compare/progression/' + ids.map(encodeURIComponent).join('/') + '">Compare the careers year by year</a></div>' : '') + '<div id="cmp-body"></div>';
+            el.onclick = ev => { const t = ev.target.closest ? ev.target.closest('[data-cmp-go]') : null; if (t) location.hash = t.getAttribute('data-cmp-go'); };
             const cur = ids.slice();
             const go = () => { const list = cur.filter(Boolean); if (list.length >= 2) location.hash = k.href(T, 'compare/' + list.map(encodeURIComponent).join('/')); };
             [0, 1, 2].forEach(i => k.picker(document.getElementById('cmp-p' + i), { T: T, value: ids[i], placeholder: i === 2 ? 'Add a third…' : 'Type a player…', onPick: id => { cur[i] = id; go(); } }));
             const body = document.getElementById('cmp-body');
-            if (ids.length < 2) { body.innerHTML = V.card('Pick players', '', QK.empty('Pick at least two players', 'Type a name in each box.')); return null; }
+            if (ids.length < 2) { body.innerHTML = V.card('Pick players', '', QK.empty('Pick at least two players', 'Type a name in each box: the list starts with the highest ranked.')); return null; }
             let fullP = null;
             const full = () => (catX._peerCat ? (fullP || (fullP = TA.load(T + '/players.json').then(d => (k.ok(d) && d.players ? d : catX)))) : Promise.resolve(catX));
             build(T, ids, catX, ids.map((_, i) => (k.ok(cs[i]) ? cs[i] : null)), body, full);

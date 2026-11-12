@@ -220,7 +220,7 @@ function hashNow() {
   if (SC.view === 'chart') ['x', 'y', 'color', 'size', 'preset'].forEach(function (k) { if (SC[k] !== '' && SC[k] !== null && SC[k] !== undefined) q[k] = SC[k]; });
   return '#/scout' + FB.qs(q);
 }
-function writeQuery() { FB.setHashQuiet(hashNow()); }
+function writeQuery() { FB.setHashQuiet(hashNow()); paintCompareTab(); }
 
 /* ── names, links, marks ─────────────────────────────────────────────────── */
 function personQ() { return single() ? { c: SC.c } : SC.c === 'club' ? { scope: 'club' } : SC.c === 'intl' ? { scope: 'intl' } : null; }
@@ -244,13 +244,14 @@ FB.route('scout', function (el, p) {
     '<section class="sc-top" id="sc-top" aria-label="Top of the group"></section>' +
     '<div class="qk-tabs sc-tabs" role="tablist" aria-label="Scouting Room views">' +
     [['board', 'Board'], ['chart', 'Chart'], ['leaders', 'Leaders']].map(function (t) { return '<button type="button" class="qk-tab" role="tab" id="sc-tab-' + t[0] + '" data-view="' + t[0] + '" aria-selected="' + (SC.view === t[0]) + '" tabindex="' + (SC.view === t[0] ? 0 : -1) + '">' + t[1] + '</button>'; }).join('') +
+    '<a class="qk-tab sc-tab-cmp" id="sc-tab-compare" href="' + esc(compareHref()) + '" title="The full compare page: the tray\'s players, or the top two of a position">Compare</a>' +
     '</div><div id="sc-view" class="sc-view" role="tabpanel" aria-labelledby="sc-tab-' + SC.view + '"></div></div>';
   FB.onLeave(function () { if (QK.drawer && QK.drawer.isOpen()) QK.drawer.close(true); if (TRAY) { TRAY.destroy(); TRAY = null; } ROOT = null; BOARD = null; });
   el.addEventListener('click', pickClick);
   return load().then(function () {
     if (!FB.alive(el)) return;
     if (!V) { FB.set('sc-view', FB.empty('Not built yet', 'The player views (data/lab/) are written by the next build.')); FB.set('sc-ctl', ''); return; }
-    controls(); tabs(); tray(); refresh();
+    controls(); tabs(); tray(); paintCompareTab(); refresh();
     if (SC.p) openProfile(SC.p);
   });
 });
@@ -547,6 +548,16 @@ function openProfile(id) {
     ev.preventDefault(); openProfile(a.getAttribute('data-pick'));
   }); });
 }
+
+/* The Compare tab (12 Nov 2026): the tray's players when two or more are pinned, one pinned player against his most
+   similar, else the top two of the position on screen (Position mode) or of the main group, in the room's scope. */
+function compareHref() {
+  var ids = SC.cmp || [], sc = SC.c && SC.c !== 'all' ? SC.c : null;
+  if (ids.length >= 2) return '#/compare/players/' + FB.enc(ids[0]) + '/' + FB.enc(ids[1]) + FB.qs({ p3: ids[2] || null, scope: sc });
+  if (ids.length === 1) return '#/compare/players/' + FB.enc(ids[0]) + FB.qs({ scope: sc });
+  return '#/compare/players' + FB.qs({ g: SC.within === 'pos' ? role(SC.pg).id : null, scope: sc });
+}
+function paintCompareTab() { var a = ROOT ? ROOT.querySelector('#sc-tab-compare') : null; if (a) a.setAttribute('href', compareHref()); }
 
 /* ── the compare tray ───────────────────────────────────────────────────── */
 function pin(r) {

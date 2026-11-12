@@ -155,6 +155,9 @@ function render(page, P) {
     '<section class="sc-top" id="sr-top" aria-label="Top of the group"></section>' +
     '<div class="qk-tabs sc-tabs" role="tablist" aria-label="Scouting Room views">' +
     [['board', 'Board'], ['chart', 'Chart'], ['leaders', 'Leaders']].map(function (t) { return '<button type="button" class="qk-tab" role="tab" id="sr-tab-' + t[0] + '" data-view="' + t[0] + '" aria-selected="' + (ST.view === t[0]) + '" tabindex="' + (ST.view === t[0] ? 0 : -1) + '">' + t[1] + '</button>'; }).join('') +
+    /* the full player compare page (sc-compare.js): the tray's players when two or more are pinned, else its defaults */
+    '<a class="qk-tab" id="sr-tab-compare" href="' + esc(SC.href(ST.S, 'compare', null, 'view=players')) + '" aria-selected="false">Compare</a>' +
+    '<a class="qk-tab" href="' + esc(SC.href(ST.S, 'progression', null, 'view=players')) + '" aria-selected="false">Progression</a>' +
     '</div><div id="sr-view" class="sc-view" role="tabpanel" aria-labelledby="sr-tab-' + ST.view + '"></div></div>';
   SC.onLeave(function () { if (QK.drawer && QK.drawer.isOpen()) QK.drawer.close(true); if (TRAY) { TRAY.destroy(); TRAY = null; } ROOT = null; BOARD = null; });
   page.addEventListener('click', pickClick);
@@ -163,7 +166,7 @@ function render(page, P) {
     CAT = res[1];
     if (!SC.ok(res[0])) { QK.$('#sr-ctl', page).innerHTML = ''; QK.$('#sr-view', page).innerHTML = U.missing('The Scouting Room', res[0]); return; }
     if (DK !== ST.S) { D = prep(res[0]); DK = ST.S; clearPct(); }
-    controls(); tabs(); tray(); refresh();
+    controls(); tabs(); tray(); cmpTab(); refresh();
     if (ST.p) { var r = findRow(ST.p); if (r) openProfile(r.id); }
   });
 }
@@ -425,10 +428,17 @@ function tray() {
   TRAY = QK.tray({
     max: 4, ids: ST.cmp.filter(function (id) { return findRow(id); }), label: 'Compare tray',
     item: function (id) { var r = findRow(id); return r ? { name: r.n, short: QK.surname(r.n), sub: SC.posName(r.pos) + ' · ' + SC.tabbr(ST.S, r.team), colour: teamOf(r).colour } : { name: id }; },
-    onChange: function (ids) { ST.cmp = ids; writeQuery(); },
-    href: function () { return null; },
+    onChange: function (ids) { ST.cmp = ids; writeQuery(); cmpTab(); },
+    href: function (ids) { return ids.length >= 2 ? SC.cmpHref(ST.S, 'p', ids.slice(0, 3)) : null; },
     body: trayBody
   });
+}
+/* the Compare tab opens the pinned players (two or three) when there are any, else the compare page's defaults */
+function cmpTab() {
+  var a = document.getElementById('sr-tab-compare');
+  if (!a) return;
+  var ids = ST.cmp.filter(function (id) { return findRow(id); }).slice(0, 3);
+  a.setAttribute('href', ids.length ? SC.cmpHref(ST.S, 'p', ids) : SC.href(ST.S, 'compare', null, 'view=players'));
 }
 function trayBody(ids) {
   var rs = ids.map(findRow).filter(Boolean);

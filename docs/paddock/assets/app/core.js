@@ -8,12 +8,13 @@
  *   #/race/<y>/<r>[/laps|strategy|quali|telemetry]   race centre       [races]
  *   #/standings[/<y>][?tab=championship|odds|pace]                     [standings]
  *   #/constructors[/<y>] (the Teams page, pd-teams.js)  #/team/<id>[/<y>]   [constructors]
- *   #/scout (the Scouting Room, pd-scout.js)  #/driver/<id>[/<y>]  #/compare/drivers/<a>/<b>   [scouting room]
+ *   #/scout (the Scouting Room, pd-scout.js)  #/driver/<id>[/<y>]  #/compare[/drivers|teams[/<a>[/<b>]]]   [scouting room]
  *   #/value[/<y>][?tab=drivers|swap|needs&x=&w=]                       [value & moves]
  *   #/fantasy                                                          [fantasy]
  * Round 9: the Drivers list and the Lab are the Scouting Room (#/drivers[/<y>] -> #/scout?s=<y>, #/lab?x=&y=&q= ->
- * #/scout?view=chart&x=&y=&q=, bare #/compare[/drivers[/<a>]] -> the room's compare tray), and Compare teams is the
- * Teams page's head to head (#/compare/teams/<a>/<b> -> #/constructors?a=&b=&sec=h2h).
+ * #/scout?view=chart&x=&y=&q=). 12 Nov: Compare is a tab of the room again (PD.scoutNav): bare #/compare and
+ * #/compare/drivers[/<a>] open the compare page with defaults, and #/compare/teams[/<a>/<b>] is its Constructors chip
+ * (the Teams page keeps its own head to head).
  *   #/model = #/methodology[/<sec>] (How it works)  #/calibration (How we're doing)  #/versus (Our forecasts v the
  *   market; #/markets lands here)  #/glossary[/<key>]  #/disclaimer   [model]
  * Old routes are redirected through ROUTE_MAP (see below) so every link ever shared still lands.
@@ -62,6 +63,9 @@ addRoute('driver/:id/:year', 'driver', 'scout');
 addRoute('value', 'value', 'value');
 addRoute('value/:year', 'value', 'value');
 addRoute('fantasy', 'fantasy', 'fantasy');
+addRoute('compare', 'compare', 'scout');
+addRoute('compare/:kind', 'compare', 'scout');
+addRoute('compare/:kind/:a', 'compare', 'scout');
 addRoute('compare/:kind/:a/:b', 'compare', 'scout');
 addRoute('model', 'model', 'model');
 addRoute('methodology', 'methodology', 'model');
@@ -87,9 +91,7 @@ var ROUTE_MAP = [
   ['race/:year/:round/results', 'race/:year/:round'],
   ['compare/drivers/:a/:b/:rest', 'compare/drivers/:a/:b'],
   ['drivers', 'scout'], ['drivers/:year', 'scout', { s: ':year' }], ['players', 'scout'], ['leaders', 'scout', { view: 'leaders' }],
-  ['lab', 'scout', { view: 'chart' }], ['compare', 'scout'], ['compare/drivers', 'scout'], ['compare/drivers/:a', 'scout', { cmp: ':a' }],
-  ['compare/teams', 'constructors', { sec: 'h2h' }], ['compare/teams/:a', 'constructors', { a: ':a', sec: 'h2h' }],
-  ['compare/teams/:a/:b', 'constructors', { a: ':a', b: ':b', sec: 'h2h' }],
+  ['lab', 'scout', { view: 'chart' }],
   ['glossary/g', 'glossary']
 ];
 
@@ -506,6 +508,8 @@ function subnav(items, active, label) {
     return '<a class="qk-tab" role="tab" href="' + esc(i[0]) + '" aria-selected="' + (i[2] === active ? 'true' : 'false') + '"' + (i[2] === active ? ' aria-current="page"' : '') + '>' + esc(i[1]) + '</a>';
   }).join('') + '</div></nav>';
 }
+/* The Scouting Room's own tabs (the room, Compare): under the page head of both pages. */
+function scoutNav(active) { return subnav([['#/scout', 'Scouting Room', 'scout'], ['#/compare', 'Compare', 'compare']], active, 'Scouting Room pages'); }
 /* Segmented control. opts: [[value, label]]. Wire with wireSeg(root, id, cb). */
 function seg(id, opts, cur, label) {
   return '<div class="qk-seg" id="' + esc(id) + '" role="group" aria-label="' + esc(label || 'View') + '">' + opts.map(function (o) {
@@ -678,7 +682,7 @@ return {
   teamColour: teamColour, teamColourRaw: teamColourRaw, teamAlt: teamAlt, tc: tc, driverTeam: driverTeam, driverColour: driverColour, compoundColour: compoundColour, COMPOUNDS: COMPOUNDS, PALETTE: PALETTE,
   teamDot: teamDot, driverLink: driverLink, teamLink: teamLink, circuitLink: circuitLink, raceLink: raceLink, raceHref: raceHref, driverHref: driverHref, teamHref: teamHref, mark: mark,
   card: card, grid: grid, chartBox: chartBox, kpi: kpi, kpis: kpis, chip: chip, muted: muted, empty: empty, note: note, aside: aside, notBuilt: notBuilt, col: col,
-  pageHead: pageHead, secHead: secHead, subnav: subnav, seg: seg, wireSeg: wireSeg, yearPager: yearPager, table: table, set: set, alive: alive, pctl: pctl,
+  pageHead: pageHead, secHead: secHead, subnav: subnav, scoutNav: scoutNav, seg: seg, wireSeg: wireSeg, yearPager: yearPager, table: table, set: set, alive: alive, pctl: pctl,
   probBar: probBar, deltaHTML: deltaHTML, posHTML: posHTML, heatTable: heatTable
 };
 })();

@@ -258,6 +258,14 @@ a.cc-bt:hover .nm { color: var(--signal); }
 .cc-cmp-slot { display: grid; gap: 6px; padding-left: 10px; border-left: 3px solid var(--ec); min-width: 0; }
 .cc-cmp-slot .qk-input { width: 100%; min-width: 0; }
 @media (max-width: 720px) { .cc-cmp-pick { grid-template-columns: 1fr; } }
+/* compare page, round 13: the position strip, its key-metrics line, the early-season and different-positions lines */
+.cc-cmp-chips { margin-bottom: var(--sp-3); }
+.cc-cmp-chips .qk-chip[disabled] { opacity: 0.45; cursor: not-allowed; }
+.cc-cmp-key, .cc-cmp-thin, .cc-cmp-instead { margin: 0 0 var(--sp-3); font-size: var(--fs-sm); color: var(--ink-2); max-width: 900px; overflow-wrap: anywhere; }
+.cc-cmp-key b, .cc-cmp-instead b { color: var(--ink-1); }
+.cc-cmp-thin { color: var(--ink-1); padding-left: 10px; border-left: 3px solid var(--volt); }
+.cc-cmp-instead { padding-left: 10px; border-left: 3px solid var(--line-2); }
+.sc-tabs a.sc-tab-cmp { display: inline-flex; align-items: center; }
 .qk-pcard-peer .qk-tag { white-space: normal; text-align: left; }
 
 /* ═════════════════════════════════ kit v3 (Matchday) pages: game hero, player page, overview */

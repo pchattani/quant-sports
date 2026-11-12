@@ -721,7 +721,7 @@ K.roleOf = p => {
 
 // ── player picker (typeahead over players_index.json and the catalogues) ───
 
-/* host: element; opts {value (pid), placeholder, onPick(pid), filter(pid, info)}. */
+/* host: element; opts {value (pid), placeholder, onPick(pid), filter(pid, info), rank(pid) (lower is suggested first)}. */
 K.picker = (host, opts) => {
   const o = opts || {};
   host.classList.add('gq-picker');
@@ -732,7 +732,7 @@ K.picker = (host, opts) => {
   const build = () => {
     const N = Object.assign({}, K.NAMES, o.extra || {});
     items = Object.keys(N).filter(id => !o.filter || o.filter(id, N[id])).map(id => ({ id: id, n: N[id].name || id, s: [N[id].pos, N[id].team ? K.teamAbbr(N[id].team) : ''].filter(Boolean).join(' · '), f: K.fold(N[id].name || id) }));
-    items.sort((a, b) => a.n.localeCompare(b.n));
+    items.sort((a, b) => (o.rank ? o.rank(a.id) - o.rank(b.id) : 0) || a.n.localeCompare(b.n));   /* o.rank(pid): lower first (the compare page's active group) */
   };
   const close = () => { list.innerHTML = ''; list.style.display = 'none'; };
   const show = () => {

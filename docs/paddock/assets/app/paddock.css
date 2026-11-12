@@ -183,7 +183,11 @@
 .pd-pick-top { display: flex; justify-content: space-between; gap: 8px; align-items: center; flex-wrap: wrap; }
 .pd-why { margin: 4px 0 0; padding-left: 16px; color: var(--ink-3); font-size: var(--fs-xs); line-height: 1.45; }
 .pd-lab-ctl { padding: 0 0 var(--sp-3); }
+.pd-cmp-groups { margin: var(--sp-3) 0; min-width: 0; }
+.pd-cmp-gline { margin: 8px 0 0; font-size: var(--fs-sm); color: var(--ink-2); max-width: 90ch; }
+.pd-cmp-thin { margin: var(--sp-3) 0 0; padding: 8px 12px; border-left: 3px solid var(--ink-3); background: var(--bg-2, transparent); font-size: var(--fs-sm); color: var(--ink-2); }
 .pd-cmp-pick { padding: 0; }
+.pd-cmp-pick .pd-cmp-y { min-width: 0; }
 .pd-cmp-pick .qk-select { min-width: 220px; max-width: 100%; }
 .pd-cmp-ids { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-4); margin-top: var(--sp-4); }
 .pd-cmp-id { padding: 14px; border-top: 3px solid var(--tc); display: grid; gap: 12px; }

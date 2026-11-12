@@ -401,7 +401,7 @@ function renderLab(el, params, state) {
     const ids = [params.a, params.b].concat(params.rest || []).filter(Boolean).map(String);
     const team = r === 'compare-teams';
     const cb = U.section(el, { title: 'Compare', kicker: U.kicker(L, S), sub: team ? 'Two teams side by side: every catalogue metric with league percentiles, rating paths, four factors, shot profiles and lineups.' : 'Every catalogue metric for two players, with the gaps, radar, shot charts and careers.',
-      tabs: HW.compareTabs(L, S, team ? 'teams' : 'all', team ? [] : ids), active: team ? 'teams' : 'all' });
+      tabs: HW.compareTabs(L, S, team ? 'teams' : 'all', team ? [] : ids), active: 'compare' });
     return U.legacy(team ? 'compare-teams' : (r === 'compare-players' ? 'compare-players' : 'compare'), cb, params);
   }
   const body = U.section(el, { title: 'Lab', kicker: U.kicker(L, S), sub: 'Build your own chart from any two player metrics, or put two players or two teams side by side.',

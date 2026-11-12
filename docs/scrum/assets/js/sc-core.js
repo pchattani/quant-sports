@@ -7,7 +7,7 @@
  *   #/<S>/rankings?tab=wr|ours                                           (the Rankings section: World Rugby replica, ours)
  *   #/<S>/teams   #/<S>/team/<id>   #/<S>/scout?view=board|leaders&grp=  #/<S>/player/<id>
  *   #/<S>/model?tab=method|doing|lab|records|glossary|terms              #/disclaimer
- *   #/<S>/compare?t=<a>,<b> | ?p=<a>,<b>[,<c>]                           #/<S>/progression?t=..|?p=.. (sc-compare.js)
+ *   #/<S>/compare?t=<a>,<b> | ?p=<a>,<b>[,<c>] | #/<S>/compare/players (player compare with defaults)                         #/<S>/progression?t=..|?p=.. (sc-compare.js)
  * Data: data/index.json, data/<S>/... (oddsmarkets/rugby/pages.py). Older-browser rule: no optional chaining, no
  * nullish coalescing. */
 (function (root) {
@@ -256,8 +256,9 @@ function render() {
   QK.store('qs-scope', S);
   document.documentElement.setAttribute('data-scope', S);
   sectionHrefs(S); paintCtx(S);
-  /* compare and progression sit under Teams, or under the Scouting Room when they show players (?p= / view=players) */
-  var pl = (r.sec === 'compare' || r.sec === 'progression') && ((r.query.p !== undefined && r.query.t === undefined) || r.query.view === 'players');
+  /* compare and progression sit under Teams, or under the Scouting Room when they show players (?p= / view=players /
+     #/<S>/compare/players) */
+  var pl = (r.sec === 'compare' || r.sec === 'progression') && ((r.query.p !== undefined && r.query.t === undefined) || r.query.view === 'players' || r.id === 'players');
   shell.setSection(pl ? 'scout' : (SEC_OF[r.sec] || 'overview'));
   var el = QK.$('#app');
   el.innerHTML = '<div class="sc-page"></div>';
@@ -293,7 +294,9 @@ function boot() {
     var st = SC.state, sec = st.sec;
     var keep = { overview: 1, fixtures: 1, standings: 1, teams: 1, scout: 1, rankings: 1, model: 1, compare: 1, progression: 1 };
     var to = { match: 'fixtures', team: 'teams', player: 'scout' }[sec] || (keep[sec] ? sec : 'overview');
-    SC.go('#/' + S + (to !== 'overview' ? '/' + to : ''));
+    /* a player compare or progression stays on players (the ids are per scope, so the defaults fill in) */
+    var q0 = st.query || {}, plv = (to === 'compare' || to === 'progression') && ((q0.p !== undefined && q0.t === undefined) || q0.view === 'players' || st.id === 'players');
+    SC.go('#/' + S + (to !== 'overview' ? '/' + to : '') + (plv ? '?view=players' : ''));
   });
   QK.$('#app').innerHTML = QK.skeleton('lines', 6);
   SC.load('index.json').then(function (idx) {

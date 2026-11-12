@@ -565,3 +565,12 @@ tr.cut td, .qk-table tr.cut td { border-top: 2px dashed color-mix(in srgb, var(-
 .ta-pk-ch .qk-select { max-width: 100%; }
 .ta-pk-note { color: var(--ink-2); font-size: var(--fs-sm); margin: 8px 0; }
 @media (max-width: 420px) { .ta-pk-list { grid-template-columns: minmax(0, 1fr); } }
+
+/* compare: position chips, the group line, thin-season and cross-group notes (12 Nov) */
+.cmp-groups { margin: var(--sp-3) 0 var(--sp-4); min-width: 0; max-width: 100%; }
+.cmp-groups .qk-chips { align-items: center; }
+.cmp-glab { font: 700 var(--fs-xs) var(--font-num, inherit); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); padding: 0 2px 0 6px; white-space: nowrap; }
+.cmp-glab:first-child { padding-left: 0; }
+.cmp-gline { margin: 8px 0 0; font-size: var(--fs-sm); color: var(--ink-2); max-width: 95ch; }
+.cmp-thin, .cmp-instead { margin: 8px 0 var(--sp-3); padding: 8px 12px; border-left: 3px solid var(--ink-3); font-size: var(--fs-sm); color: var(--ink-2); }
+.cmp-instead a, .cmp-thin a { font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }

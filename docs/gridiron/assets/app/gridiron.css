@@ -514,3 +514,12 @@ td.gi-ours-cell { text-align: left; }
 .gi-tech[open] > summary b::after { content: ' \2212'; }
 .gi-gl-search { margin: var(--sp-4) 0 var(--sp-3); }
 .gi-gl-search .qk-input { width: 100%; font-size: 1.05rem; padding: 14px 16px; }
+
+/* compare: position chips, the group line, thin-season and cross-group notes (12 Nov) */
+.cmp-groups { margin: var(--sp-3) 0 var(--sp-4); min-width: 0; max-width: 100%; }
+.cmp-groups .qk-chips { align-items: center; }
+.cmp-glab { font: 700 var(--fs-xs) var(--font-num, inherit); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); padding: 0 2px 0 6px; white-space: nowrap; }
+.cmp-glab:first-child { padding-left: 0; }
+.cmp-gline { margin: 8px 0 0; font-size: var(--fs-sm); color: var(--ink-2); max-width: 95ch; }
+.cmp-thin, .cmp-instead { margin: 8px 0 var(--sp-3); padding: 8px 12px; border-left: 3px solid var(--ink-3); font-size: var(--fs-sm); color: var(--ink-2); }
+.cmp-instead a, .cmp-thin a { font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }

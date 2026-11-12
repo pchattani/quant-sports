@@ -7,7 +7,12 @@
  * others are his most similar players. The title asks the question ("Purdy, Prescott or Goff?") and a verdict under it
  * names what each player does best. Round 9: in the Scouting Room section; the classic tabs retired (teams: the Teams
  * page's head to head, where #/compare/t:KC/t:BUF now lands; quick reads of up to four: the room's compare tray).
- * Reads <S>/players.json and <S>/value.json. Exports GI.picker. */
+ * Position first (12 Nov): a chip per peer group of the spec (GI.SP.PLAYER) loads that group's top two qualified players
+ * on its first headline metric (#/compare?g=<group>); the active chip is the group on screen and a line under the chips
+ * names its headline metrics. Nobody picked: the top two quarterbacks. Players from different groups get "Compare <A>
+ * with a <group> instead" links (his nearest in his own group); a group with fewer than ten qualified players says so and
+ * offers last season. The name boxes suggest the active group first.
+ * Reads <S>/players.json and <S>/value.json. Exports GI.picker (o.rank(id): lower is suggested first). */
 (function (GI) {
 'use strict';
 
@@ -16,13 +21,13 @@ const esc = GI.esc, isNum = GI.isNum;
 let MODE = 'player';
 const TEAM_HEAD = ['rating', 'off_rating', 'def_rating', 'off_epa', 'def_epa', 'off_pass_epa', 'off_rush_epa', 'def_pass_epa', 'def_rush_epa', 'st_epa_g', 'go_rate_rec', 'fd_wp_lost'];
 
-/* A typeahead. host: element; o {items: {id: {name, sub}}, value, label, placeholder, min, onPick(id)} */
+/* A typeahead. host: element; o {items: {id: {name, sub}}, value, label, placeholder, min, onPick(id), rank(id)} */
 GI.picker = function (host, o) {
   host.classList.add('gi-picker');
   host.innerHTML = '<input type="search" class="qk-input" autocomplete="off" spellcheck="false" aria-label="' + esc(o.placeholder || 'Search') + '" placeholder="' + esc(o.placeholder || 'Type a name…') + '"><div class="gi-pick-list" role="listbox"></div>';
   const input = host.querySelector('input'), list = host.querySelector('.gi-pick-list');
   if (o.value) input.value = o.label || '';
-  const items = Object.keys(o.items).map(id => ({ id: id, n: o.items[id].name || id, s: o.items[id].sub || '', f: GI.fold((o.items[id].name || id) + ' ' + (o.items[id].sub || '')) })).sort((a, b) => a.n.localeCompare(b.n));
+  const items = Object.keys(o.items).map(id => ({ id: id, n: o.items[id].name || id, s: o.items[id].sub || '', f: GI.fold((o.items[id].name || id) + ' ' + (o.items[id].sub || '')) })).sort((a, b) => (o.rank ? o.rank(a.id) - o.rank(b.id) : 0) || a.n.localeCompare(b.n));
   const close = () => { list.style.display = 'none'; list.innerHTML = ''; };
   const show = () => {
     const q = GI.fold(input.value.trim());
@@ -66,6 +71,46 @@ function nearest(A, cat, tc) {
   return best;
 }
 const ECOL = ['var(--wp-a)', 'var(--wp-b)', 'var(--c-5)'];
+/* ── peer groups (12 Nov): chips, defaults, the group line, thin seasons ─────────────────────────────── */
+const SING = { qb: 'quarterback', rb: 'running back', wr: 'wide receiver', te: 'tight end', edge: 'outside pass rusher', idl: 'interior lineman', lb: 'linebacker', cb: 'cornerback', s: 'safety', k: 'kicker', p: 'punter' };
+const CHIP = { qb: 'QB', rb: 'RB', wr: 'WR', te: 'TE', edge: 'Edge', idl: 'Interior DL', lb: 'LB', cb: 'CB', s: 'Safety', k: 'K', p: 'P' };
+/* the group's qualified players, best first on its first headline metric */
+function ranked(cat, gid) {
+  const cx = cat._spv || cat._sp || GI.SP.ctx(cat, null), g = GI.SP.BY[gid], P = cat.players;
+  if (!g || !cx) return [];
+  const m = GI.SP.headline(g)[0];
+  const sgn = m && m[3] ? -1 : 1;
+  return GI.SP.members(cx, gid).filter(id => P[id].qualified !== false && m && isNum(GI.SP.value(P[id], id, m, cx)))
+    .sort((a, b) => sgn * (GI.SP.value(P[b], b, m, cx) - GI.SP.value(P[a], a, m, cx)));
+}
+/* his nearest qualified player in his own spec group, on the group's headline percentiles */
+function nearestIn(cat, id, gid) {
+  const cx = cat._spv || cat._sp || GI.SP.ctx(cat, null), g = GI.SP.BY[gid], P = cat.players;
+  if (!g || !cx || !P[id]) return null;
+  const hl = GI.SP.headline(g);
+  const me = hl.map(m => GI.SP.pct(P[id], id, g, m, cx));
+  let best = null, bd = 1e9;
+  GI.SP.members(cx, gid).forEach(j => {
+    if (j === id || P[j].qualified === false) return;
+    let d = 0, n = 0;
+    hl.forEach((m, k) => { const y = GI.SP.pct(P[j], j, g, m, cx); if (isNum(me[k]) && isNum(y)) { d += (me[k] - y) * (me[k] - y); n++; } });
+    if (n >= 3 && d / n < bd) { bd = d / n; best = j; }
+  });
+  return best || (ranked(cat, gid).filter(j => j !== id)[0] || null);
+}
+function words(g) {
+  const ws = GI.SP.headline(g).map(m => (/^[A-Z][a-z]/.test(m[1]) ? m[1].charAt(0).toLowerCase() + m[1].slice(1) : m[1]));
+  return ws.length > 1 ? ws.slice(0, -1).join(', ') + ' and ' + ws[ws.length - 1] : ws.join('');
+}
+function groupStrip(cat, S, active, cross) {
+  const sq = GI.sq(S), g = active ? GI.SP.BY[active] : null;
+  const chips = GI.SP.PLAYER.map(x => '<button type="button" class="qk-chip" data-cmp-go="' + esc('#/compare?g=' + x.id + (sq ? '&' + sq.slice(1) : '')) + '" aria-pressed="' + (x.id === active ? 'true' : 'false') + '" title="' + esc(x.name) + '">' + esc(CHIP[x.id] || x.code) + '</button>').join('');
+  const n = g ? ranked(cat, g.id).length : null;
+  const thin = g && n < 10 ? '<p class="cmp-thin">Early in the season: only ' + n + ' qualified ' + esc(g.name.toLowerCase()) + ' so far; percentiles settle as games are played.' +
+    (Number(S) > 2000 ? ' <a href="' + esc('#/compare?g=' + g.id + '&s=' + (Number(S) - 1)) + '">Last season (' + (Number(S) - 1) + ')</a>' : '') + '</p>' : '';
+  return '<div class="cmp-groups"><div class="qk-chips scroll" role="group" aria-label="Position">' + chips + '</div>' +
+    (g ? '<p class="cmp-gline"><b>' + esc(g.name) + ':</b> ' + esc(words(g)) + ' — the metrics that best describe and predict ' + (/^[aeiou]/.test(SING[g.id] || '') ? 'an ' : 'a ') + esc(SING[g.id] || g.name.toLowerCase()) + '.</p>' : cross ? '<p class="cmp-gline">' + esc(cross) + '</p>' : '') + thin + '</div>';
+}
 const DSEL = { key: null };
 /* The type a player's best metric suggests (verdicts), by the spec's metric id. */
 const ARCHETYPE = { composite: 'The all-round passer', epa_db: 'The efficient passer', cpoe: 'The accurate passer', sack_rate: 'The sack-dodger', int_rate: 'The ball-protector', pressure_rate: 'The quick processor',
@@ -74,7 +119,7 @@ const ARCHETYPE = { composite: 'The all-round passer', epa_db: 'The efficient pa
   ff_pg: 'The strip specialist', pd_pg: 'The ball hawk', ints_pg: 'The ball hawk', splash_pg: 'The playmaker', fg_oe: 'The accurate kicker', fg_50_pct: 'The big leg', xp_pct: 'The steady kicker', fg_50: 'The big leg',
   epa_punt: 'The field flipper', net: 'The field flipper', gross: 'The big leg', inside20: 'The pin-it-deep punter', touchback_rate: 'The precise punter' };
 /* The v2 player comparison: two or three players on the player card's metric set. */
-function compareV2(el, S, ids0, cat) {
+function compareV2(el, S, ids0, cat, g0) {
   const sq = GI.sq(S);
   /* round 9: the classic tabs retired: teams are on the Teams page's head to head, and quick side-by-side reads (up to
      four players, every view metric) are the Scouting Room's compare tray */
@@ -92,8 +137,9 @@ function compareV2(el, S, ids0, cat) {
     });
   }
   if (!ids.length) {
-    const qb = Object.keys(P).filter(id => GI.groupOf(P[id].pos, P[id].group) === 'QB' && P[id].qualified !== false && isNum((P[id].values || {}).epa_db)).sort((a, b) => P[b].values.epa_db - P[a].values.epa_db);
-    ids = qb.slice(0, 2);
+    const gid = g0 && GI.SP.BY[g0] && ranked(cat, g0).length >= 2 ? g0 : 'qb';
+    ids = ranked(cat, gid).slice(0, 2);
+    if (ids.length < 2) ids = GI.SP.members(cat._spv || cat._sp || GI.SP.ctx(cat, null), gid).slice(0, 2);
   }
   drawV2(el, h, S, ids, cat);
 }
@@ -104,13 +150,16 @@ function drawV2(el, h, S, ids, cat) {
   Object.keys(P).forEach(id => { const p = P[id]; items[id] = { name: p.name || GI.playerName(id), sub: [GI.posLabel(p.pos), p.team].filter(Boolean).join(' · ') }; });
   const pick = '<div class="gi-cmp-pick">' + [0, 1, 2].map(i => '<div class="gi-cmp-slot" style="--ec:' + ECOL[i] + '"><span class="qk-kicker">' + (i === 2 ? 'Third player (optional)' : 'Player ' + (i + 1)) + '</span><div id="cmp-p' + i + '"></div></div>').join('') + '</div>';
   const noGroup = E.filter(e => !e.g);
+  const act = E.length && E[0].g ? E[0].g.id : null;
   if (E.length < 2 || noGroup.length) {
-    el.innerHTML = h + GI.card('Pick players', 'Choose two or three players to compare', pick + (noGroup.length ? QK.empty('No comparison group', esc(noGroup.map(e => e.p.name).join(', ')) + ': percentiles are kept for QB, RB, WR, TE, the five defensive roles, K and P (not offensive linemen).') : QK.empty('Pick at least two players', 'Type a name in each box.')));
-    wireV2(el, S, E, items);
+    el.innerHTML = h + groupStrip(cat, S, act, '') + GI.card('Pick players', 'Choose two or three players to compare', pick + (noGroup.length ? QK.empty('No comparison group', esc(noGroup.map(e => e.p.name).join(', ')) + ': percentiles are kept for QB, RB, WR, TE, the five defensive roles, K and P (not offensive linemen).') : QK.empty('Pick at least two players', 'Type a name in each box.')));
+    wireV2(el, S, E, items, cat, act);
     return;
   }
   const g0 = E[0].g;
   const same = E.every(e => e.g.id === g0.id);
+  /* players from different groups: each one's own-group comparison, one click away */
+  const instead = same ? '' : '<p class="cmp-instead">' + E.map(e => { const n = nearestIn(cat, e.id, e.g.id); return n ? '<a href="' + esc(GI.compareHref(e.id, n) + GI.sq(S)) + '">Compare ' + esc(GI.surnameOf(e.p.name || '') || e.p.name) + ' with ' + (/^[aeiou]/.test(SING[e.g.id] || '') ? 'an ' : 'a ') + esc(SING[e.g.id] || e.g.name.toLowerCase()) + ' instead</a>' : ''; }).filter(Boolean).join('<span aria-hidden="true"> · </span>') + '</p>';
   const hl = GI.SP.headline(g0), sty = GI.SP.style(g0);
   const groups = [{ label: 'The ' + g0.name.toLowerCase() + ' set', rows: hl.filter(m => E.some(e => isNum(GI.SP.value(e.p, e.id, m, cx)))).map(m => {
     const pctFmt = GI.SP.fmtOf(m, cx) === 'pct';
@@ -138,7 +187,7 @@ function drawV2(el, h, S, ids, cat) {
   const styleRows = sty.filter(m => E.some(e => isNum(GI.SP.value(e.p, e.id, m, cx))));
   const styleTbl = styleRows.length ? GI.card('Playing style', 'How they play, not how well: no better or worse', GI.tableHTML([{ label: 'Metric', sortable: false }].concat(E.map(e => ({ label: GI.surnameOf(e.p.name || ''), align: 'right', sortable: false }))),
     styleRows.map(m => [{ html: '<span data-tip="' + esc(m[5]) + '" tabindex="0">' + esc(m[1]) + '</span>' }].concat(E.map(e => ({ html: GI.SP.fmt(m, GI.SP.value(e.p, e.id, m, cx), cx) })))))) : '';
-  el.innerHTML = h + GI.card('Players', 'Ranked against ' + esc(peerTxt) + ' this season (' + S + ')', pick) +
+  el.innerHTML = h + groupStrip(cat, S, same ? g0.id : null, same ? '' : 'Different positions: each player is ranked against his own group, on the ' + g0.name.toLowerCase() + ' set.') + (instead.length > 30 ? instead : '') + GI.card('Players', (same ? 'Ranked against ' : 'Ranked ') + esc(peerTxt) + ' this season (' + S + ')', pick) +
     '<section class="qk-section" style="margin-top:var(--sp-8)">' + QK.sectionHead({ kicker: 'Side by side', title: esc(q), html: true,
       sub: E.length === 2 ? 'Bar length = percentile against the group, qualified players (100 = best). The better number in each row is solid.' : 'Value and percentile against the group, qualified players (100 = best). The best in each row is highlighted.' }) +
       GI.card(E.length + ' players, one metric set', 'The headline set for the role from our metrics spec: stable and predictive rates first',
@@ -147,7 +196,7 @@ function drawV2(el, h, S, ids, cat) {
       (!same ? '<p class="qk-caption">Different groups: the rows are the ' + esc(g0.name.toLowerCase()) + ' set, and each percentile is against the player’s own group.</p>' : '') +
       (GI.SP.NOTE[g0.id] ? '<p class="qk-caption">' + esc(GI.SP.NOTE[g0.id]) + '</p>' : '')) + '</section>' + styleTbl +
     '<section class="qk-section">' + GI.card('Among peers', 'The qualified ' + esc(g0.peer.replace(/^NFL /, '')) + ' this season, with each player marked', '<div class="qk-seg" id="cmp-dist-m" role="group" aria-label="Metric" style="margin-bottom:10px"></div>' + GI.chartBox('cmp-dist', 260, 'Peer distribution with the players marked')) + '</section>';
-  wireV2(el, S, E, items);
+  wireV2(el, S, E, items, cat, g0.id);
   const keys = hl.filter(m => E.every(e => isNum(GI.SP.value(e.p, e.id, m, cx)))).slice(0, 4);
   const seg = el.querySelector('#cmp-dist-m');
   if (!keys.length) { GI.ch.none('cmp-dist', 'No metric all of them have.'); return; }
@@ -170,11 +219,15 @@ function drawV2(el, h, S, ids, cat) {
   dd(DSEL.key);
   QK.seg(seg, dd);
 }
-function wireV2(el, S, E, items) {
+function wireV2(el, S, E, items, cat, act) {
+  const cx = cat._spv || cat._sp || GI.SP.ctx(cat, null);
+  const mine = act ? GI.SP.members(cx, act) : [];
+  const rank = id => (mine.indexOf(id) >= 0 ? 0 : 1);
+  el.addEventListener('click', ev => { const t = ev.target.closest ? ev.target.closest('[data-cmp-go]') : null; if (t) location.hash = t.getAttribute('data-cmp-go'); });
   [0, 1, 2].forEach(i => {
     const host = document.getElementById('cmp-p' + i);
     if (!host) return;
-    GI.picker(host, { items: items, value: E[i] ? E[i].id : null, label: E[i] ? (E[i].p.name || '') : '', placeholder: i === 2 ? 'Add a third player' : 'Type a name', min: 2,
+    GI.picker(host, { items: items, value: E[i] ? E[i].id : null, label: E[i] ? (E[i].p.name || '') : '', placeholder: i === 2 ? 'Add a third player' : 'Type a name', min: 2, rank: rank,
       onPick: id => { const ids = E.map(e => e.id); ids[i] = id; location.hash = GI.compareHref(ids[0], ids[1], ids[2]) + GI.sq(S); } });
   });
 }
@@ -186,7 +239,8 @@ GI.route('compare', function (el, params) {
     MODE = 'player';
     const cat0 = GI.catOf(res0[0]);
     if (cat0) GI.SP.ctx(cat0, GI.ok(res0[1]) ? res0[1] : null);
-    compareV2(el, S, [params.a, params.b, params.c].filter(Boolean).map(String), cat0);
+    const gq = String((params.query || {}).g || '').toLowerCase();
+    compareV2(el, S, [params.a, params.b, params.c].filter(Boolean).map(String), cat0, GI.SP.BY[gq] && GI.SP.BY[gq].entity === 'player' ? gq : null);
   });
 });
 

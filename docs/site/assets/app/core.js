@@ -17,6 +17,8 @@
  *                                                metric, the profile drawer and the compare tray        [scout]
  *   #/player/<pid>[?c=<slug>&scope=club|intl&e=<era>&tab=…]  ONE player page across every competition [scout]
  *   #/compare/players/<a>/<b>[?p3=<c>]           the full compare page (the tray's "Full compare")      [scout]
+ *   #/compare, #/compare/players[?g=<group>]     the compare page on a group's top two (Scouting Room ▸ Compare)
+ *   #/compare/players/<a>                        <a> against his most similar player in his own group
  *   #/value[/<tab>][?…]                          value, best by position, transfers, simulator, budgets [value]
  *   #/fantasy[?…]                                fantasy projections, picks, squad                      [fantasy]
  * Round 9 (28 Oct 2026): #/players, #/players/leaders and #/lab[/<scope>/<pos>] redirect into the Scouting Room with
@@ -63,6 +65,8 @@ addRoute('player/:pid', 'player', 'scout');
 addRoute('value', 'value', 'value');
 addRoute('value/:tab', 'value', 'value');
 addRoute('fantasy', 'fantasy', 'fantasy');
+addRoute('compare', 'compare', 'scout');                // 12 Nov 2026: the bare addresses open the compare page
+addRoute('compare/players', 'compare', 'scout');        // (the main group's top two, or ?g=<group>), never the tray
 addRoute('compare/players/:a', 'compare', 'scout');
 addRoute('compare/players/:a/:b', 'compare', 'scout');
 addRoute('model', 'model', 'model');

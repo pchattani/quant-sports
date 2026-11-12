@@ -18,10 +18,10 @@
  * Selecting a driver anywhere (a name, a point, a card) opens the profile drawer (?p=<id>): percentile meters for the
  * view's sets, headline numbers, "Most like" and links to the driver page, progression and Compare. Pin up to four (the +
  * on a row, or the drawer's button) to the compare tray (?cmp=<id>,<id>): side by side on percentile bars; "Full compare"
- * opens #/compare/drivers/<a>/<b>.
+ * opens #/compare/drivers/<a>/<b>; the Compare tab (PD.scoutNav) opens the compare page with its defaults.
  * Address: ?view, within=pos, s (season), min, team, age (u23|23-27|28-32|33p), q, cols, add, sort, dir, all, p, cmp, x,
- * y, color (the chart's axes): links share. Old routes (#/drivers[/<y>], #/lab?x=&y=&q=, #/compare[/drivers[/<a>]])
- * redirect here (core.js ROUTE_MAP).
+ * y, color (the chart's axes): links share. Old routes (#/drivers[/<y>], #/lab?x=&y=&q=) redirect here (core.js
+ * ROUTE_MAP).
  * Data: lab.json (every driver-season since 2018 with every catalogue metric, loaded once and shared by the views),
  * <s>/season.json (rounds done, for the floor), elo.json (the All-time view).
  * Older-browser rule: no optional chaining, no nullish coalescing. */
@@ -164,7 +164,7 @@ function render(el, params) {
   ROOT = el;
   readQuery(params.query || {});
   var tabs = [['board', 'Board'], ['chart', 'Chart'], ['leaders', 'Leaders'], ['alltime', 'All-time']];
-  el.innerHTML = PD.pageHead('Scouting Room', 'Every driver, every number', '<span id="sc-meta">Loading…</span>') +
+  el.innerHTML = PD.pageHead('Scouting Room', 'Every driver, every number', '<span id="sc-meta">Loading…</span>') + PD.scoutNav('scout') +
     '<div class="sc qk-room"><section class="qk-card sc-ctl"><div class="qk-card-body" id="sc-ctl">' + QK.skeleton('lines', 2) + '</div></section>' +
     '<section class="sc-top" id="sc-top" aria-label="Top of the grid"></section>' +
     '<div class="qk-tabs sc-tabs" role="tablist" aria-label="Scouting Room views">' +

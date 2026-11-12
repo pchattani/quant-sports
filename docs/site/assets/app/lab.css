@@ -26,6 +26,17 @@
 .fb-lb-dot { display: inline-block; width: 9px; height: 9px; margin-right: 6px; vertical-align: 0; flex: none; }
 .fb-lb-dot.a { background: var(--c-1); } .fb-lb-dot.b { background: var(--c-2); } .fb-lb-dot.c { background: var(--c-3); }
 
+/* position first (12 Nov 2026): the peer-group chips, the group's key metrics, the early-season and "instead" lines */
+.fb-lb-groups { margin: 0 0 var(--sp-4); min-width: 0; }
+.fb-lb-groups .qk-chip { text-decoration: none; }
+.fb-lb-groups .qk-chip[aria-current="true"] { background: color-mix(in srgb, var(--ca) 16%, transparent); border-color: var(--ink-1); color: var(--ink-1); }
+.fb-lb-groups p { margin: var(--sp-2) 0 0; max-width: 90ch; font-size: var(--fs-sm); line-height: 1.5; color: var(--ink-2); overflow-wrap: anywhere; }
+.fb-lb-groups p b { color: var(--ink-1); }
+.fb-lb-groups .fb-lb-gnote { color: var(--ink-3); }
+.fb-lb-groups .fb-lb-instead a { font-weight: 600; white-space: nowrap; }
+@media (max-width: 600px) { .fb-lb-groups .fb-lb-instead a { white-space: normal; } }
+.sc-tabs a.qk-tab { text-decoration: none; }
+
 /* pickers */
 .fb-lb-pick .fb-toolbar { align-items: flex-end; }
 .fb-lb-picker { position: relative; display: inline-flex; align-items: center; }

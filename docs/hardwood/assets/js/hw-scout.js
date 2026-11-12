@@ -183,7 +183,7 @@ function render(el, params) {
   SC.L = U().L(params);
   ROOT = el;
   readQuery(params.query || {});
-  el.innerHTML = U().secHead('Scouting Room', 'Every player and every metric, judged against the same role: sort the board, chart any two numbers, scan the leaders, open a profile, pin up to four to compare.', null, null, U().kicker(SC.L, U().S(params))) +
+  el.innerHTML = U().secHead('Scouting Room', 'Every player and every metric, judged against the same role: sort the board, chart any two numbers, scan the leaders, open a profile, pin up to four to compare.', HW.compareTabs ? HW.compareTabs(SC.L, U().S(params), 'scout') : null, 'scout', U().kicker(SC.L, U().S(params))) +
     '<div class="sc qk-room"><section class="qk-card sc-ctl"><div class="qk-card-body" id="sc-ctl">' + QK.skeleton('lines', 2) + '</div></section>' +
     '<section class="sc-top" id="sc-top" aria-label="Top of the group"></section>' +
     '<div class="qk-tabs sc-tabs" role="tablist" aria-label="Scouting Room views">' +

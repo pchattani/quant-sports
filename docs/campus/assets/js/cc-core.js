@@ -641,7 +641,7 @@ function boot() {
   QK.seg(QK.$('#cc-level'), function (L) {
     var st = CC.state, sec = st.sec;
     var keep = { overview: 1, games: 1, standings: 1, teams: 1, scout: 1, value: 1, fantasy: 1, model: 1 };
-    var to = { game: 'games', team: 'teams', player: 'scout', compare: 'scout' }[sec] || (keep[sec] ? sec : 'overview');
+    var to = { game: 'games', team: 'teams', player: 'scout' }[sec] || (sec === 'compare' && !st.id ? 'compare' : sec === 'compare' ? 'scout' : keep[sec] ? sec : 'overview');
     CC.go('#/' + L + (to !== 'overview' ? '/' + to : ''));
   });
   QK.$('#cc-season').addEventListener('change', function (e) {

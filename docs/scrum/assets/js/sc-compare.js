@@ -3,9 +3,12 @@
  *   #/<S>/compare?t=<a>,<b>                 team v team: the tale of the tape on our ratings, form and the two-year
  *                                           profile (opponent-adjusted, percentiles among test sides), the head-to-head
  *                                           record and the meetings, the two ratings over time
- *   #/<S>/compare?p=<a>,<b>[,<c>]           player v player: the per-80 set of the Scouting Room (percentiles within
- *                                           each player's position group), what each does best, careers side by side,
- *                                           where they sit among the position
+ *   #/<S>/compare?p=<a>,<b>[,<c>]           player v player (the Scouting Room's Compare tab; ?view=players or
+ *   #/<S>/compare/players                   #/<S>/compare/players open its defaults, ?grp=<group> a group's top two):
+ *                                           position chips (each loads the group's top two by Scrum value), the
+ *                                           group's key metrics from the spec first, then the rest by family
+ *                                           (percentiles within each player's position group), "instead" links when
+ *                                           the positions differ, what each does best, careers, where they sit
  *   #/<S>/progression?t=<a>,<b>..&m=&r=     two to four sides over time: our rating or World Rugby points month by
  *                                           month, and form year by year (win share, margin over our forecast, points)
  *   #/<S>/progression?p=<a>,<b>..           two to four careers year by year (kit QK.compareProgression) against each
@@ -211,58 +214,147 @@ function boardIndex(bd) {
   (bd.rows || []).forEach(function (r) { by[String(r[ix.id])] = r; });
   return { ix: ix, by: by };
 }
+/* the six position groups of the spec (docs/_design/metrics/rugby.json `groups`), their key metrics when the spec
+   catalogue does not load (the same headline sets), and the Scouting Room's sub-navigation for the player pages */
+var GROUPS = ['front_row', 'lock', 'back_row', 'halves', 'centres', 'back_three'];
+var HEAD = { front_row: ['val80', 'tk', 'tkpct', 'car', 'lopct', 'rk', 'inv', 'pc'], lock: ['val80', 'tk', 'tkpct', 'car', 'm', 'rk', 'ml', 'pc'],
+  back_row: ['val80', 'tk', 'car', 'm', 'db', 'tkpct', 'inv', 'pc'], halves: ['val80', 'pts', 'pas', 'kfh', 'kpct', 'gkp', 'ta', 'tk'],
+  centres: ['val80', 'm', 'cb', 'db', 'car', 'off', 'ta', 'tk'], back_three: ['val80', 'm', 'cb', 'db', 'tries', 'mpc', 'kfh', 'tk'] };
+var THIN = 10;
+function scoutTabs(S, active) {
+  return U.tabs([{ key: 'board', label: 'Board', href: SC.href(S, 'scout') }, { key: 'chart', label: 'Chart', href: SC.href(S, 'scout', null, 'view=chart') },
+    { key: 'leaders', label: 'Leaders', href: SC.href(S, 'scout', null, 'view=leaders') }, { key: 'compare', label: 'Compare', href: SC.href(S, 'compare', null, 'view=players') },
+    { key: 'progression', label: 'Progression', href: SC.href(S, 'progression', null, 'view=players') }], active);
+}
+function headOf(cat, g) { var h = cat && cat.headline ? cat.headline(g) : []; return h.length ? h : (HEAD[g] || HEAD.back_three); }
+/* a group's players, best first: the qualified by Scrum value, then (only when the group is short) the rest by minutes */
+function groupRows(bd, B, g) {
+  var ix = B.ix, rows = (bd.rows || []).filter(function (r) { return r[ix.grp] === g; });
+  var q = rows.filter(function (r) { return r[ix.q]; }).sort(function (a, b) { return (isNum(b[ix.val80]) ? b[ix.val80] : -99) - (isNum(a[ix.val80]) ? a[ix.val80] : -99); });
+  var rest = rows.filter(function (r) { return !r[ix.q]; }).sort(function (a, b) { return (b[ix.min] || 0) - (a[ix.min] || 0); });
+  return q.concat(rest);
+}
+function topOf(bd, B, g, n, not) {
+  not = not || [];
+  return groupRows(bd, B, g).map(function (r) { return String(r[B.ix.id]); }).filter(function (id) { return not.indexOf(id) < 0; }).slice(0, n);
+}
+function nQual(bd, B, g) { var ix = B.ix; return (bd.rows || []).filter(function (r) { return r[ix.grp] === g && r[ix.q]; }).length; }
+/* the main group: the one with the most qualified players */
+function mainGroup(bd, B) {
+  var best = GROUPS[0], bn = -1;
+  GROUPS.forEach(function (g) { var n = nQual(bd, B, g); if (n > bn) { bn = n; best = g; } });
+  return best;
+}
+/* his partner in his own group: the most similar player of the group, else the group's best */
+function partnerOf(bd, B, id, pf) {
+  var ix = B.ix, r = B.by[String(id)];
+  if (!r) return null;
+  var g = r[ix.grp];
+  var sim = ((pf && pf.similar) || []).filter(function (x) { var o = B.by[String(x.id)]; return o && o[ix.grp] === g && String(x.id) !== String(id); })[0];
+  return sim ? String(sim.id) : (topOf(bd, B, g, 1, [String(id)])[0] || null);
+}
+function lc1(s) { s = String(s || ''); return /^Scrum /.test(s) ? s : s.charAt(0).toLowerCase() + s.slice(1); }
+
 function comparePlayers(page, P) {
   var S = P.S, q = P.query || {};
-  page.innerHTML = U.head('Compare', 'Two or three players side by side on the Scouting Room’s numbers: rates per 80 minutes over the last two years, shrunk toward the position, with each player’s percentile within his position group.', SC.SNAME[S]) +
-    tabs(S, 'compare', 'p') + '<div id="cm-body">' + QK.skeleton('card', 2) + '</div>';
+  page.innerHTML = U.head('Compare players', 'Two or three players side by side, position first: each group’s key metrics lead, rates per 80 minutes over the last two years, shrunk toward the position, with each player’s percentile within his position group.', 'Scouting Room · ' + SC.SNAME[S]) +
+    scoutTabs(S, 'compare') + '<div id="cm-body">' + QK.skeleton('card', 2) + '</div>';
   var body = QK.$('#cm-body', page);
-  return SC.load(S + '/players.json').then(function (bd) {
+  return Promise.all([SC.load(S + '/players.json'), QK.spec && QK.spec.load ? QK.spec.load('rugby') : Promise.resolve(null)]).then(function (res0) {
     if (!U.alive(body)) return;
+    var bd = res0[0], cat = res0[1];
     if (!SC.ok(bd) || !(bd.rows || []).length) { body.innerHTML = U.missing('The player board', bd); return; }
-    var B = boardIndex(bd), ix = B.ix;
+    var B = boardIndex(bd);
     var list = ids(q, 'p').filter(function (id) { return B.by[id]; }).slice(0, 3);
     var fill = Promise.resolve(list);
     if (!list.length) {
-      var top = (bd.rows || []).filter(function (r) { return r[ix.q]; }).sort(function (a, b) { return (b[ix.val80] || -99) - (a[ix.val80] || -99); });
-      fill = Promise.resolve(top.slice(0, 2).map(function (r) { return String(r[ix.id]); }));
+      /* nobody picked: the top two of the asked group, else of the main group (the most qualified players) */
+      var g0 = GROUPS.indexOf(q.grp) >= 0 ? q.grp : mainGroup(bd, B);
+      fill = Promise.resolve(topOf(bd, B, g0, 2));
     } else if (list.length === 1) {
+      /* one picked: the player most like him in his own group */
       fill = SC.load(S + '/players/' + list[0] + '.json').then(function (pf) {
-        var sim = ((SC.ok(pf) && pf.similar) || []).filter(function (x) { return B.by[String(x.id)]; })[0];
-        return sim ? list.concat([String(sim.id)]) : list;
+        var p2 = partnerOf(bd, B, list[0], SC.ok(pf) ? pf : null);
+        return p2 ? list.concat([p2]) : list;
       });
     }
     return fill.then(function (l2) {
       return Promise.all(l2.map(function (id) { return SC.load(S + '/players/' + id + '.json'); })).then(function (pfs) {
         if (!U.alive(body)) return;
-        drawPlayers(body, S, bd, B, l2, pfs);
+        drawPlayers(body, S, bd, B, l2, pfs, cat);
       });
     });
   });
 }
 
-function drawPlayers(body, S, bd, B, list, pfs) {
+function drawPlayers(body, S, bd, B, list, pfs, cat) {
   var ix = B.ix;
   var E = list.map(function (id, i) { return { id: id, r: B.by[id], pf: SC.ok(pfs[i]) ? pfs[i] : null }; }).filter(function (e) { return e.r; });
-  var opts = (bd.rows || []).map(function (r) { return [String(r[ix.id]), r[ix.n] + ' (' + SC.tabbr(S, r[ix.team]) + ', ' + SC.posName(r[ix.pos]) + ')']; });
-  opts.sort(function (a, b) { return a[1].localeCompare(b[1]); });
+  var grpA = E.length ? E[0].r[ix.grp] : mainGroup(bd, B);
+  var same = E.every(function (e) { return e.r[ix.grp] === grpA; });
+  var active = same ? grpA : null;
+  /* the name boxes: the active group first (best first), then everyone else by name; team and position on each */
+  var lbl = function (r) { return r[ix.n] + ' (' + SC.tabbr(S, r[ix.team]) + ', ' + SC.posName(r[ix.pos]) + ')'; };
+  var first = groupRows(bd, B, active || grpA);
+  var seen = {}; first.forEach(function (r) { seen[String(r[ix.id])] = 1; });
+  var others = (bd.rows || []).filter(function (r) { return !seen[String(r[ix.id])]; }).sort(function (a, b) { return String(a[ix.n]).localeCompare(String(b[ix.n])); });
+  var opts = first.concat(others).map(function (r) { return [String(r[ix.id]), lbl(r)]; });
   var lab = function (id) { var o = opts.filter(function (x) { return x[0] === id; })[0]; return o ? o[1] : ''; };
   var ECOL = ['var(--wp-a)', 'var(--wp-b)', 'var(--c-5)'];
   var pick = '<div class="sc-cmp-slots">' + [0, 1, 2].map(function (i) {
     return '<label class="sc-cmp-slot" style="--ec:' + ECOL[i] + '"><span class="qk-kicker">' + (i === 2 ? 'Third player (optional)' : 'Player ' + (i + 1)) + '</span>' +
       '<input class="qk-input" list="cm-names" data-i="' + i + '" value="' + esc(E[i] ? lab(E[i].id) : '') + '" placeholder="Type a name" autocomplete="off"></label>';
   }).join('') + '<datalist id="cm-names">' + opts.map(function (o) { return '<option value="' + esc(o[1]) + '"></option>'; }).join('') + '</datalist></div>';
+  /* position first: one chip per group (its top two by Scrum value), then what the group is judged on */
+  var chips = '<div class="qk-chips sc-cmp-grps" role="group" aria-label="Position group">' + GROUPS.map(function (g) {
+    var pair = topOf(bd, B, g, 2);
+    if (pair.length < 2) return '';
+    return '<a class="qk-chip" href="' + esc(cmpHref(S, 'p', pair)) + '"' + (g === active ? ' aria-current="true" aria-pressed="true"' : '') + '>' + esc(SC.GROUP[g]) + '</a>';
+  }).join('') + '</div>';
+  var keyLine = function (g) {
+    var hs = headOf(cat, g).map(function (id) { var m = cat && cat.metric ? cat.metric(id, 'player') : null; return lc1(m ? m.label : (SC.scout && SC.scout.mmeta ? SC.scout.mmeta(id).label : id)); });
+    return '<p class="sc-cmp-key"><b>' + esc(SC.GROUP[g] || g) + ':</b> ' + esc(hs.join(', ')) + ' — the metrics that best describe and predict a ' + esc(SC.GROUP1[g] || 'player') + '.</p>';
+  };
+  var lines = '';
+  if (same) lines += keyLine(grpA);
+  else {
+    /* different positions: say so, and offer each a partner from his own group */
+    var gs = []; E.forEach(function (e) { if (gs.indexOf(e.r[ix.grp]) < 0) gs.push(e.r[ix.grp]); });
+    lines += '<p class="sc-cmp-key"><b>Different positions</b> (' + esc(gs.map(function (g) { return SC.GROUP[g]; }).join(', ')) + '): the key metrics of each lead, and each percentile is against the player’s own group.</p>' +
+      '<div class="qk-chips sc-cmp-inst">' + E.map(function (e) {
+        var p2 = partnerOf(bd, B, e.id, e.pf);
+        return p2 ? '<a class="qk-chip" href="' + esc(cmpHref(S, 'p', [e.id, p2])) + '">Compare ' + esc(e.r[ix.n]) + ' with a ' + esc(SC.GROUP1[e.r[ix.grp]] || 'player') + ' instead →</a>' : '';
+      }).join('') + '</div>';
+  }
+  /* thin groups: say so in one line */
+  var thin = (same ? [grpA] : E.map(function (e) { return e.r[ix.grp]; })).filter(function (g, i, a) { return a.indexOf(g) === i && nQual(bd, B, g) < THIN; });
+  thin.forEach(function (g) {
+    lines += U.note('Early days for this group: only ' + nQual(bd, B, g) + ' qualified ' + esc(String(SC.GROUP[g] || g).toLowerCase()) + ' (' + Math.round(bd.min_q || 160) + '+ minutes in the last two years) so far; percentiles settle as more tests are played.');
+  });
+  var top = U.card('Pick a position, then the players', 'Each chip loads the two best qualified players of the group by Scrum value; or type any names (the group on screen is suggested first)', chips + lines + pick +
+    (E.length >= 2 ? '<div class="qk-chips" style="margin-top:10px">' + (E.length === 2 ? '<a class="qk-chip" href="' + esc(cmpHref(S, 'p', [E[1].id, E[0].id])) + '">⇄ Swap</a>' : '') +
+      '<a class="qk-chip" href="' + esc(progHref(S, 'p', E.map(function (e) { return e.id; }))) + '">Careers year by year →</a></div>' : ''));
   if (E.length < 2) {
-    body.innerHTML = U.card('Pick players', 'Two or three players from the board (every player with minutes in the last two years)', pick + QK.empty('Pick at least two players', 'Type a name in each box.'));
+    body.innerHTML = top + QK.empty('Pick at least two players', 'Type a name in each box, or pick a position above.');
     wirePick(body, S, opts); return;
   }
   var metrics = (bd.metrics || []);
-  var same = E.every(function (e) { return e.r[ix.grp] === E[0].r[ix.grp]; });
-  var groups = FAMILY.map(function (f) {
-    return { label: f[1], rows: metrics.filter(function (m) { return m.family === f[0] && ix[m.id] !== undefined; }).map(function (m) {
-      return { key: m.id, label: m.label, better: m.dir === 'lower' ? 'low' : 'high', values: E.map(function (e) { return e.r[ix[m.id]]; }),
-        pctls: E.map(function (e) { var k = ix['p_' + m.id]; return k !== undefined ? e.r[k] : null; }), fmt: function (v) { return SC.vfmt(m.id, v); } };
-    }).filter(function (r) { return r.values.some(isNum); }) };
-  }).filter(function (g) { return g.rows.length; });
+  var MM = {}; metrics.forEach(function (m) { MM[m.id] = m; });
+  var label = function (m) { return cat && cat.label ? cat.label(m.id, 'player', m.label) : m.label; };
+  var tip = function (m) { return cat && cat.tip ? cat.tip(m.id, 'player', '') : ''; };
+  var rowOf = function (m) {
+    return { key: m.id, label: label(m), tip: tip(m), better: m.dir === 'lower' ? 'low' : 'high', values: E.map(function (e) { return e.r[ix[m.id]]; }),
+      pctls: E.map(function (e) { var k = ix['p_' + m.id]; return k !== undefined ? e.r[k] : null; }), fmt: function (v) { return SC.vfmt(m.id, v); } };
+  };
+  /* the key metrics lead: the group's headline set (both groups' when they differ), then everything else by family */
+  var keyIds = [];
+  (same ? [grpA] : E.map(function (e) { return e.r[ix.grp]; })).forEach(function (g) { headOf(cat, g).forEach(function (id) { if (keyIds.indexOf(id) < 0 && MM[id] && ix[id] !== undefined) keyIds.push(id); }); });
+  var groups = [{ label: same ? 'Key metrics · ' + (SC.GROUP[grpA] || '') : 'Key metrics of both positions', rows: keyIds.map(function (id) { return rowOf(MM[id]); }).filter(function (r) { return r.values.some(isNum); }) }];
+  FAMILY.forEach(function (f) {
+    var rs = metrics.filter(function (m) { return m.family === f[0] && ix[m.id] !== undefined && keyIds.indexOf(m.id) < 0; }).map(rowOf).filter(function (r) { return r.values.some(isNum); });
+    if (rs.length) groups.push({ label: 'More · ' + f[1], rows: rs });
+  });
+  groups = groups.filter(function (g) { return g.rows.length; });
   var ents = E.map(function (e) {
     var tid = e.r[ix.team], t = SC.team(S, tid) || {};
     return { name: e.r[ix.n], short: QK.surname(e.r[ix.n]), abbr: QK.surname(e.r[ix.n]), href: SC.playerHref(S, e.id), colour: t.colour, alt: t.alt,
@@ -273,23 +365,22 @@ function drawPlayers(body, S, bd, B, list, pfs) {
     var best = null, bd2 = 0;
     groups.forEach(function (g) { g.rows.forEach(function (r) {
       var mine = r.pctls[i]; if (!isNum(mine)) return;
-      var others = r.pctls.filter(function (_, j) { return j !== i; }).map(function (v) { return isNum(v) ? v : 0; });
-      var d = mine - Math.max.apply(null, others);
+      var oth = r.pctls.filter(function (_, j) { return j !== i; }).map(function (v) { return isNum(v) ? v : 0; });
+      var d = mine - Math.max.apply(null, oth);
       if (d > bd2) { bd2 = d; best = r; }
     }); });
     return best ? { title: 'Best on ' + best.label.toLowerCase(), who: short[i], text: 'best of the ' + E.length + ' (' + best.fmt(best.values[i]) + ', ' + QK.ordinal(Math.round(best.pctls[i])) + ' percentile).' } : null;
   });
   var quals = E.filter(function (e) { return !e.r[ix.q]; }).map(function (e) { return e.r[ix.n]; });
-  var peer = same ? (SC.GROUP[E[0].r[ix.grp]] || 'the position').toLowerCase() : 'each player’s own position group';
-  var html = U.card('Players', 'Every player with minutes since ' + esc(SC.date(bd.from)) + '; percentiles against ' + esc(peer), pick +
-    '<div class="qk-chips" style="margin-top:10px"><a class="qk-chip" href="' + esc(progHref(S, 'p', E.map(function (e) { return e.id; }))) + '">Careers year by year →</a></div>');
+  var peer = same ? (SC.GROUP[grpA] || 'the position').toLowerCase() : 'each player’s own position group';
+  var html = top;
   html += '<section class="qk-section sc-sec">' + QK.sectionHead({ kicker: 'Side by side', title: question(short),
-    sub: E.length === 2 ? 'Bar length = percentile against ' + peer + ' (100 = best). The better number in each row is solid.' : 'Value and percentile against ' + peer + ' (100 = best). The best in each row is marked.' }) +
+    sub: (E.length === 2 ? 'Bar length = percentile against ' + peer + ' (100 = best). The better number in each row is solid.' : 'Value and percentile against ' + peer + ' (100 = best). The best in each row is marked.') + ' Every player with minutes since ' + SC.date(bd.from) + '.' }) +
     U.card('', '', QK.compareView({ entities: ents, groups: groups }) + QK.verdicts(verd) +
       (quals.length ? U.note(esc(quals.join(', ')) + (quals.length > 1 ? ' are' : ' is') + ' short of the ' + Math.round(bd.min_q || 160) + '-minute floor: read the percentiles as early.') : '') +
       (!same ? U.note('Different positions: each percentile is against the player’s own position group, so the bars compare standing, not raw output.') : '')) + '</section>';
   /* careers */
-  var crow = function (label, fn) { return [{ v: label, html: esc(label) }].concat(E.map(function (e) { var v = e.pf ? fn(e.pf) : null; return { v: v === null ? '' : v, html: v === null || v === undefined ? '—' : esc(String(v)) }; })); };
+  var crow = function (label2, fn) { return [{ v: label2, html: esc(label2) }].concat(E.map(function (e) { var v = e.pf ? fn(e.pf) : null; return { v: v === null ? '' : v, html: v === null || v === undefined ? '—' : esc(String(v)) }; })); };
   var age = function (pf) { return isNum(pf.age) ? SC.f(pf.age, 1) : null; };
   html += U.sec('Careers', 'Their tests side by side', 'Tests in our data (from 1996 for line-ups), with the career caps from Wikipedia where we have them.',
     U.card('', '', U.table([{ label: '', align: 'left' }].concat(E.map(function (e) { return { label: e.r[ix.n] }; })), [
@@ -297,28 +388,26 @@ function drawPlayers(body, S, bd, B, list, pfs) {
       crow('Starts', function (pf) { return pf.starts; }), crow('Won–drawn–lost', function (pf) { return (pf.wdl || []).join('–'); }),
       crow('Points', function (pf) { return pf.pts; }), crow('Tries', function (pf) { return pf.tries; }),
       crow('First test', function (pf) { return pf.first ? SC.date(pf.first) : null; }), crow('Last test', function (pf) { return pf.last ? SC.date(pf.last) : null; })], { cls: 'sc-tbl' })));
-  if (same) html += U.sec('Where they sit', 'Among the ' + esc(peer), 'Every qualified player of the position with each of these marked.', U.card('', '', '<div class="qk-seg" id="cm-dm" role="group" aria-label="Metric" style="margin-bottom:10px"></div>' + U.chart('cm-dist', 260, 'Peer distribution with the players marked')));
+  if (same) html += U.sec('Where they sit', 'Among the ' + esc(peer), 'Every qualified player of the position with each of these marked, on the group’s key metrics.', U.card('', '', '<div class="qk-seg" id="cm-dm" role="group" aria-label="Metric" style="margin-bottom:10px"></div>' + U.chart('cm-dist', 260, 'Peer distribution with the players marked')));
   body.innerHTML = html;
   wirePick(body, S, opts);
   if (!same || !window.QKC) return;
-  var grp = E[0].r[ix.grp];
-  var HEAD = { front_row: ['val80', 'tk', 'car', 'rk'], lock: ['val80', 'tk', 'car', 'rk'], back_row: ['val80', 'tk', 'car', 'm'], halves: ['val80', 'pts', 'pas', 'kfh'], centres: ['val80', 'm', 'cb', 'db'], back_three: ['val80', 'm', 'cb', 'db'] };
-  var keys = (HEAD[grp] || ['val80', 'm', 'tk', 'car']).filter(function (k) { return ix[k] !== undefined; });
-  var M = {}; metrics.forEach(function (m) { M[m.id] = m; });
+  var grp = grpA;
+  var keys = keyIds.slice(0, 6);
+  var M = MM;
   var seg = QK.$('#cm-dm', body);
-  seg.innerHTML = keys.map(function (k, i) { return '<button type="button" aria-pressed="' + (i === 0) + '" data-value="' + k + '">' + esc((M[k] || {}).short || k) + '</button>'; }).join('');
+  seg.innerHTML = keys.map(function (k, i) { return '<button type="button" aria-pressed="' + (i === 0) + '" data-value="' + k + '">' + esc((cat && cat.short ? cat.short(k, 'player') : null) || (M[k] || {}).short || k) + '</button>'; }).join('');
   var PCT = { tkpct: 1, kpct: 1, lopct: 1 };
   var dd = function (k) {
     var m = M[k] || {};
     var vals = (bd.rows || []).filter(function (r) { return r[ix.grp] === grp && r[ix.q] && isNum(r[ix[k]]); }).map(function (r) { return PCT[k] ? r[ix[k]] * 100 : r[ix[k]]; });
     var el = QK.$('#cm-dist', body);
-    if (vals.length < 8) { el.innerHTML = QK.empty('Too few qualified players of the position', ''); return; }
+    if (vals.length < 8) { el.innerHTML = QK.empty('Too few qualified players of the position', 'The chart appears once eight or more have played enough minutes.'); return; }
     QKC.distribution(el, { values: vals, binCount: 20, lowerBetter: m.dir === 'lower', colorBy: 'flat', fmt: function (v) { return PCT[k] ? Math.round(v) + '%' : fmt.num(v, Math.abs(v) >= 20 ? 0 : 1); },
-      xName: (m.label || k) + ' · ' + vals.length + ' qualified ' + peer, yName: 'Players', label: 'Distribution of ' + (m.label || k),
+      xName: label(m.id ? m : { id: k, label: k }) + ' · ' + vals.length + ' qualified ' + peer, yName: 'Players', label: 'Distribution of ' + (m.label || k),
       marks: E.map(function (e, i) { var v = e.r[ix[k]]; return { x: isNum(v) ? (PCT[k] ? v * 100 : v) : null, label: short[i], color: ['wpA', 'wpB', 'c5'][i] }; }).filter(function (x) { return isNum(x.x); }) });
   };
-  dd(keys[0]);
-  QK.seg(seg, dd);
+  if (keys.length) { dd(keys[0]); QK.seg(seg, dd); }
 }
 function wirePick(body, S, opts) {
   QK.$$('.sc-cmp-slots input', body).forEach(function (inp) {
@@ -444,7 +533,7 @@ function toP(S, pf) {
 function playerProgression(page, P) {
   var S = P.S, q = P.query || {};
   page.innerHTML = U.head('Progression', 'Up to four careers year by year on the Scouting Room’s numbers, each year against that year’s qualified players of the position: by year, by age or by career year.', SC.SNAME[S]) +
-    tabs(S, 'progression', 'p') + '<div id="pg-body">' + QK.skeleton('chart', 1) + '</div>';
+    scoutTabs(S, 'progression') + '<div id="pg-body">' + QK.skeleton('chart', 1) + '</div>';
   var body = QK.$('#pg-body', page);
   return Promise.all([SC.load(S + '/players.json'), refJson(S)]).then(function (res0) {
     if (!U.alive(body)) return;
@@ -508,6 +597,6 @@ function drawPlayerProg(body, S, bd, B, ref, pfs, q) {
   });
 }
 
-SC.route('compare', function (page, P) { return kindOf(P.query) === 'p' ? comparePlayers(page, P) : compareTeams(page, P); });
-SC.route('progression', function (page, P) { return kindOf(P.query) === 'p' ? playerProgression(page, P) : teamProgression(page, P); });
+SC.route('compare', function (page, P) { return kindOf(P.query) === 'p' || P.id === 'players' ? comparePlayers(page, P) : compareTeams(page, P); });
+SC.route('progression', function (page, P) { return kindOf(P.query) === 'p' || P.id === 'players' ? playerProgression(page, P) : teamProgression(page, P); });
 })();

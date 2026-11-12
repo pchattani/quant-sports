@@ -163,6 +163,13 @@ html[data-nosrc-sofascore] [data-src="sofascore"]{display:none}
 .sc-cmp-add { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin-top: 14px; }
 .sc-cmp-add label { display: inline-flex; flex-wrap: wrap; gap: 8px; align-items: center; min-width: 0; max-width: 100%; font: 700 var(--fs-2xs)/1 var(--font-cond); text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); }
 .sc-cmp-add .qk-input, .sc-cmp-add .qk-select { min-width: 0; width: min(260px, 70vw); }
+/* player compare, position first (12 Nov 2026): the group chips, the key-metrics line, the "instead" links */
+.sc-cmp-grps { margin-bottom: 10px; }
+.sc-cmp-grps .qk-chip[aria-current="true"] { background: color-mix(in srgb, var(--ca, var(--volt)) 16%, transparent); border-color: var(--ink-1); color: var(--ink-1); font-weight: 700; }
+.sc-cmp-key { color: var(--ink-2); font-size: var(--fs-sm); margin: 0 0 12px; max-width: 900px; overflow-wrap: anywhere; }
+.sc-cmp-key b { color: var(--ink-1); }
+.sc-cmp-inst { margin: -4px 0 12px; }
+.sc-cmp-inst .qk-chip { white-space: normal; max-width: 100%; }
 .sc-ctl { display: flex; flex-wrap: wrap; gap: 10px 14px; margin: 0 0 12px; }
 .sc-ctl .qk-seg { max-width: 100%; overflow-x: auto; }
 .sc-jump { margin-top: var(--sp-3); }

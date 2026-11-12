@@ -118,7 +118,15 @@ K.learn = (T, pid, info) => { if (!pid || !info) return; const N = K.NAMES[T] ||
 K.loadNames = T => TA.load(T + '/players_index.json').then(d => {
   // PAYLOADS: {pid: [name, short, country, rank]}; the builder wraps it as {"ok", "players": {...}}.
   const m = d && typeof d === 'object' && d.ok !== false ? (d.players && typeof d.players === 'object' && !Array.isArray(d.players) ? d.players : d) : null;
-  if (m) Object.keys(m).forEach(pid => { const r = m[pid]; if (Array.isArray(r)) K.learn(T, pid, { name: r[0], short: r[1], country: r[2], rank: r[3] }); });
+  // a rank counts only when the player has played in the last 400 days (r[4], the last match): the index keeps the last
+  // rank a player held, so a retired player kept her old ranking and led the name suggestions (12 Nov 2026)
+  const cut = Date.now() - 400 * 86400000;
+  if (m) Object.keys(m).forEach(pid => {
+    const r = m[pid];
+    if (!Array.isArray(r)) return;
+    const last = r[4] ? Date.parse(r[4]) : NaN;
+    K.learn(T, pid, { name: r[0], short: r[1], country: r[2], rank: isNaN(last) || last >= cut ? r[3] : null, last: r[4] || null });
+  });
   return d;
 });
 K.learnCat = (T, cat) => { const P = ((cat || {}).players) || {}; Object.keys(P).forEach(id => { const p = P[id] || {}; if (p.name) K.learn(T, id, { name: p.name, country: p.country, rank: p.rank }); }); };
