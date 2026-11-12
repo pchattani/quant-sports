@@ -1452,9 +1452,15 @@ home page (its own build) and a sport page (another build) disagree. Since 11 No
     reader gets is what its edge fetched after the last purge. Edges in different places can hold different
     deployments: the loop's edge confirmed each deploy in 3 s while a reader in Toronto was served a copy four
     to eight minutes old (at 00:09:24 UTC a fresh fetch returned the deploy sent at 00:01:36). The loop cannot
-    see or fix that. Measured from the reader's side over 34 minutes with 80 games on: about two thirds of the
-    minutes under a minute old, the rest in stalls of 2 to 5 minutes. A page already open never goes back
-    (`QK.live` keeps the newest copy it has seen); it stops moving until a fresh copy arrives.
+    see or fix that. Measured from the reader's side over 76 minutes (23:58 to 01:13 UTC, 80 to 95 games on,
+    one read every 10 s): the file was under a minute old in 49% of the minutes, under two minutes in 59%,
+    under five in 86%; the worst minute 10 minutes old; stalls of 3 to 8 minutes. A page already open never
+    goes back (`QK.live` keeps the newest copy it has seen); it stops moving until a fresh copy arrives.
+  - The pattern: the reader's copy is fresh for the first 5 to 7 minutes after a NEW COMMIT to the feed repo
+    (about ten deploys), then falls behind. A new run on the same commit does not reset it: six-minute runs
+    handing over on one commit were tried (00:54 to 01:13 UTC) and were stale from their second minute, so the
+    run length is back at 330 minutes. Committing to the feed repo every few minutes to reset it was not done:
+    it would be steering GitHub's pipeline, not a fix.
   - `loop.json` beside the feed is the loop's own record: the run, the pacing gap, and for the last 60 deploys
     when each was sent and how many seconds it took to be served (null = never). Read it while a run is going
     (a run's log cannot be read until it ends).
