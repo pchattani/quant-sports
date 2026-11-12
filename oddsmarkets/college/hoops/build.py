@@ -1181,11 +1181,26 @@ def player_line(r: dict) -> dict:
     return {**pg, "value": r2(r["value"]), "value_pg": r2(r["value_pg"]), "r": r2(r["r"])}
 
 
-def qual_roles(rows: dict) -> tuple:
-    """A season's qualification floor and qualified players (games >= max(5, 0.4 x the most games) and 10+ minutes a
-    game) and the spec's guard / wing / big role of each player: (floor, qual, role_of, role_thr)."""
+def games_floor(rows: dict) -> dict:
+    """The games floor: max(5, 0.4 x the most games), except early in a season, when it follows the games a typical team
+    has played (the median of each team's most games by one player): max(2, ceil(0.6 x that)), up to 5. A week in
+    (12 Nov 2026, teams on 2 to 4 games) the fixed 5 qualified 20 men's players nationally; this gives 2 there and
+    reaches 5 by about the eighth game. The same scaling as the Paddock's starts floor. {"gp", "mpg", "early"}."""
     maxgp = max(r["gp"] for r in rows.values())
-    floor = {"gp": max(5, int(0.4 * maxgp)), "mpg": 10.0}
+    team_gp: dict = {}
+    for r in rows.values():
+        k = r.get("team")
+        team_gp[k] = max(team_gp.get(k, 0), r["gp"])
+    typical = float(np.median(list(team_gp.values()))) if team_gp else float(maxgp)
+    early = max(2, min(5, math.ceil(0.6 * typical)))
+    gp = max(early, int(0.4 * maxgp))
+    return {"gp": gp, "mpg": 10.0, "early": gp < 5, "team_games": round(typical, 1)}
+
+
+def qual_roles(rows: dict) -> tuple:
+    """A season's qualification floor and qualified players (games_floor and 10+ minutes a game) and the spec's
+    guard / wing / big role of each player: (floor, qual, role_of, role_thr)."""
+    floor = games_floor(rows)
     qual = {p for p, r in rows.items() if r["gp"] >= floor["gp"] and r["min"] / max(r["gp"], 1) >= floor["mpg"]}
     role_of, role_thr = PL.classify_roles(rows, qual)
     return floor, qual, role_of, role_thr
@@ -1236,7 +1251,7 @@ def players_payload(ctx, s) -> dict:
     out = {}
     old = archive(ctx, s)                              # archive seasons: qualified players only (size budget)
     for p, r in rows.items():
-        if r["gp"] < 5 or (old and p not in qual):
+        if r["gp"] < min(5, floor["gp"]) or (old and p not in qual):
             continue
         out[p] = {"name": r["name"], "team": r["team"], "pos": r["pos"], "role": role_of.get(p), "class": r.get("class"), "gp": r["gp"],
                   "qualified": p in qual, "values": {k: lines[p].get(k) for k, *_ in PLAYER_METRICS if lines[p].get(k) is not None},

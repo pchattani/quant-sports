@@ -1466,9 +1466,12 @@ home page (its own build) and a sport page (another build) disagree. Since 11 No
     (a run's log cannot be read until it ends).
   - The loop refreshes its checkout of the build repo every ten minutes, so the live models follow the hourly
     export without a restart.
-  - **Steady 30 s needs another host** (a store built for frequent writes; a Cloudflare Worker with a Durable
-    Object fits the free plan: 100,000 requests and 100,000 rows written a day against our 2,880 writes). It
-    needs an account, which is the user's decision; put to the user on 12 Nov 2026.
+  - **Decided by the user, 12 Nov 2026: stay on GitHub Pages and state the lag.** (Steady 30 s would need a host
+    built for frequent writes; not wanted.) The pages say it: `QK.live` shows a small status line, bottom left,
+    while a game of a sport the page covers is live: "Live scores · updated 40 s ago"; over 90 s it turns amber
+    and adds "may trail play"; a feed past 15 minutes reads "Live scores paused · showing the last site build".
+    A tap opens the reason in one paragraph (`QK.live.NOTE`). The home page's footer line says the feed can trail
+    play by a few minutes.
 - **The readers**: the home page (`QK.live.apply`) and each sport site's loader (`QK.live.watch` on every payload,
   `QK.live.attach` to redraw the overview, games and game pages) poll the file every 20 s. The feed only moves a game
   forward (pre, live, final), never touches a game the build calls final, and is ignored when older than 15 minutes:

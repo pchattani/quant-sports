@@ -4182,7 +4182,7 @@
     "field": "qualified",
     "value": true,
     "unit": "minutes",
-    "note": "players.json `qualified`: games >= max(5, 0.4 x the season's most games) and 10+ minutes a game (min_floor); scales through a season"
+    "note": "players.json `qualified`: games >= max(5, 0.4 x the season's most games), fewer early in a season (max(2, 0.6 x a typical team's games)), and 10+ minutes a game (min_floor); scales through a season"
    },
    "basis": "per 100 possessions on the floor and shooting / share rates; box rating per 100",
    "percentile_field": "pct_role",
@@ -5529,7 +5529,7 @@
     "field": "qualified",
     "value": true,
     "unit": "minutes",
-    "note": "players.json `qualified`: games >= max(5, 0.4 x the season's most games) and 10+ minutes a game (min_floor); scales through a season"
+    "note": "players.json `qualified`: games >= max(5, 0.4 x the season's most games), fewer early in a season (max(2, 0.6 x a typical team's games)), and 10+ minutes a game (min_floor); scales through a season"
    },
    "basis": "per 100 possessions on the floor and shooting / share rates; box rating per 100",
    "percentile_field": "pct_role",
@@ -6880,7 +6880,7 @@
     "field": "qualified",
     "value": true,
     "unit": "minutes",
-    "note": "players.json `qualified`: games >= max(5, 0.4 x the season's most games) and 10+ minutes a game (min_floor); scales through a season"
+    "note": "players.json `qualified`: games >= max(5, 0.4 x the season's most games), fewer early in a season (max(2, 0.6 x a typical team's games)), and 10+ minutes a game (min_floor); scales through a season"
    },
    "basis": "per 100 possessions on the floor and shooting / share rates; box rating per 100",
    "percentile_field": "pct_role",
@@ -8271,7 +8271,7 @@
     "field": "qualified",
     "value": true,
     "unit": "minutes",
-    "note": "players.json `qualified`: games >= max(5, 0.4 x the season's most games) and 10+ minutes a game (min_floor); scales through a season"
+    "note": "players.json `qualified`: games >= max(5, 0.4 x the season's most games), fewer early in a season (max(2, 0.6 x a typical team's games)), and 10+ minutes a game (min_floor); scales through a season"
    },
    "basis": "per 100 possessions on the floor and shooting / share rates; box rating per 100",
    "percentile_field": "pct_role",
@@ -9618,7 +9618,7 @@
     "field": "qualified",
     "value": true,
     "unit": "minutes",
-    "note": "players.json `qualified`: games >= max(5, 0.4 x the season's most games) and 10+ minutes a game (min_floor); scales through a season"
+    "note": "players.json `qualified`: games >= max(5, 0.4 x the season's most games), fewer early in a season (max(2, 0.6 x a typical team's games)), and 10+ minutes a game (min_floor); scales through a season"
    },
    "basis": "per 100 possessions on the floor and shooting / share rates; box rating per 100",
    "percentile_field": "pct_role",
@@ -10969,7 +10969,7 @@
     "field": "qualified",
     "value": true,
     "unit": "minutes",
-    "note": "players.json `qualified`: games >= max(5, 0.4 x the season's most games) and 10+ minutes a game (min_floor); scales through a season"
+    "note": "players.json `qualified`: games >= max(5, 0.4 x the season's most games), fewer early in a season (max(2, 0.6 x a typical team's games)), and 10+ minutes a game (min_floor); scales through a season"
    },
    "basis": "per 100 possessions on the floor and shooting / share rates; box rating per 100",
    "percentile_field": "pct_role",

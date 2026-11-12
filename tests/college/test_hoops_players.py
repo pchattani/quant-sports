@@ -101,3 +101,21 @@ def test_non_member_rows_dropped(roots):
     ratings = {t: {"rating": 0.0, "tempo": 68.0} for t in members}
     res = PL.season_players("mbb", 2026, ratings, br, st)
     assert res["rows"] and all(r["team"] in members for r in res["rows"].values())
+
+
+def test_games_floor_scales_early_in_the_season():
+    """12 Nov 2026: a week in, a fixed 5-game floor qualified 20 men's players nationally."""
+    from oddsmarkets.college.hoops import build as B
+
+    def rows(team_games):
+        out = {}
+        for t, g in enumerate(team_games):
+            for k in range(8):
+                out[f"{t}-{k}"] = {"team": str(t), "gp": max(1, g - (k % 3)), "min": 20.0 * g}
+        return out
+    early = B.games_floor(rows([2, 3, 3, 4, 3, 5]))            # a week in: typical team on 3 games
+    assert early["gp"] == 2 and early["early"] is True
+    mid = B.games_floor(rows([8, 9, 8, 10, 9]))                  # two months in: back to the usual floor
+    assert mid["gp"] == 5 and mid["early"] is False
+    late = B.games_floor(rows([28, 30, 31, 29]))                 # 0.4 x the most games takes over
+    assert late["gp"] == int(0.4 * 31) and late["early"] is False

@@ -1177,11 +1177,20 @@ QK.fetchJSON = function (url, o) {
  * ignored: the page then shows what the build says, as before. A live win chance: the feed's own when it has one
  * ("wp", the site's live model run on the latest play, scripts/live_chances.py); otherwise, when the feed moves a
  * score, the build's chance is dropped (it was computed for the old score). Pages opened with ?asof= never read the feed.
- * ?live=<url> reads another feed (local previews and tests). */
+ * ?live=<url> reads another feed (local previews and tests).
+ *
+ * The lag, stated (12 Nov 2026, the user's choice to stay on GitHub Pages): while a game of a sport the page covers is
+ * live, a small status line (.qk-livebar, bottom left) says how old the scores are; over 90 s it turns amber and says
+ * they may trail play; a tap opens the reason (Pages can serve a copy several minutes old). A feed past 15 minutes:
+ * "Live scores paused". The sports covered are the ones the page hands to watch / overlay / apply (none yet: all). */
 QK.LIVE_URL = PUB + 'the-quant-live/live.json';
 QK.live = (function () {
   var doc = null, timer = null, subs = [], hooks = [], watched = {}, seen = '', RANK = { pre: 0, live: 1, final: 2 };
   var POLL = 20000, MAX_AGE = 900, MAX_BOARD_AGE = 600, fails = 0, holdUntil = 0;
+  var pageSports = {}, bar = null, everLive = false, SLOW = 90;
+  var NOTE = 'Scores between site builds come from our live feed. It is written every 30 to 60 seconds, but the servers that ' +
+    'host it (GitHub Pages) can keep handing out an older copy for a few minutes, so a score here can trail the game by up to ' +
+    'several minutes. Win chances follow the score shown.';
   function feedUrl() {
     try { var m = /[?&]live=([^&#]+)/.exec((root.location && root.location.search) || ''); if (m) return decodeURIComponent(m[1]); } catch (e) { /* default */ }
     return QK.LIVE_URL;
@@ -1214,12 +1223,50 @@ QK.live = (function () {
     }, function () {
       /* no feed: the pages keep the built snapshot, and the feed is asked less often (40 s, 80 s ... 5 minutes) */
       fails += 1; holdUntil = Date.now() + Math.min(300000, 20000 * Math.pow(2, fails));
+    }).then(status, status);
+  }
+  /* games live now in the sports this page covers */
+  function liveHere() {
+    if (!doc || !doc.sports) return 0;
+    var ks = Object.keys(pageSports), n = 0;
+    (ks.length ? ks : Object.keys(doc.sports)).forEach(function (k) {
+      var s = doc.sports[k];
+      if (!s || !s.g) return;
+      Object.keys(s.g).forEach(function (id) { if (s.g[id] && s.g[id].s === 'live') n += 1; });
     });
+    return n;
+  }
+  function agoWords(sec) { return sec < 60 ? sec + ' s' : Math.round(sec / 60) + ' min'; }
+  function status() {
+    if (!root.document || !document.body || ASOF !== null) return;
+    var fresh = ok(), n = fresh ? liveHere() : 0, age = doc ? Math.max(0, Math.round(Date.now() / 1000 - doc.at)) : null;
+    if (n) everLive = true;
+    if (!n && !(everLive && !fresh)) { if (bar) bar.hidden = true; return; }
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.className = 'qk-livebar';
+      bar.setAttribute('role', 'status');
+      /* built once and only its words change after, so a tap is never lost to a redraw */
+      bar.innerHTML = '<button type="button" class="qk-livebar-b" aria-expanded="false" title="Why scores can lag"><i aria-hidden="true"></i>' +
+        '<span class="t"></span><span class="ix" aria-hidden="true">ⓘ</span></button><p>' + esc(NOTE) + '</p>';
+      bar.firstChild.addEventListener('click', function () {
+        bar.classList.toggle('open');
+        bar.firstChild.setAttribute('aria-expanded', String(bar.classList.contains('open')));
+      });
+      document.body.appendChild(bar);
+    }
+    var slow = !fresh || age > SLOW;
+    var lab = !fresh ? 'Live scores paused · showing the last site build' : 'Live scores · updated ' + agoWords(age) + ' ago' + (slow ? ' · may trail play' : '');
+    bar.hidden = false;
+    bar.classList.toggle('slow', slow);
+    var t = bar.querySelector('.t');
+    if (t && t.textContent !== lab) t.textContent = lab;
   }
   function start() {
     if (timer || ASOF !== null || !root.document) return;
     poll();
     timer = setInterval(poll, POLL);
+    setInterval(status, 10000);                             /* the age keeps counting between polls */
     document.addEventListener('visibilitychange', function () { if (!document.hidden) poll(); });
   }
   function norm(s) {
@@ -1234,6 +1281,7 @@ QK.live = (function () {
     return e;
   }
   function apply(sport, g) {
+    pageSports[sport] = 1;
     if (!g) return false;
     var e = step(norm(g.status), entry(sport, g.id));
     if (!e) return false;
@@ -1248,6 +1296,7 @@ QK.live = (function () {
     return true;
   }
   function overlay(sport, json, map) {
+    pageSports[sport] = 1;
     if (!ok() || !json || typeof json !== 'object') return 0;
     var S = doc.sports && doc.sports[sport];
     if (!S || !S.g) return 0;
@@ -1291,7 +1340,7 @@ QK.live = (function () {
   }
   return { start: start, poll: poll, onChange: function (fn) { subs.push(fn); }, entry: entry, apply: apply, overlay: overlay,
     watch: watch, attach: function (fn) { if (fn) hooks.push(fn); start(); },
-    ok: ok, age: function () { return doc ? Math.round(Date.now() / 1000 - doc.at) : null; }, norm: norm,
+    ok: ok, age: function () { return doc ? Math.round(Date.now() / 1000 - doc.at) : null; }, norm: norm, status: status, NOTE: NOTE,
     _set: function (j) { doc = j; } };
 })();
 

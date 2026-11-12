@@ -91,7 +91,7 @@ function prep(g) {
 function renderAll() {
   var jobs = [renderYours, renderTicker, renderSportNav, renderFeature, renderToplines, renderAround, renderWatch, renderHot, renderSurprises, renderStats, renderReal, renderRoll, renderRaces, renderChips, renderGames, renderCharts, renderHow];
   jobs.forEach(function (f) { try { f(); } catch (e) { if (window.console) console.error(e); } });
-  $('#updated').textContent = 'Data built ' + fmt.ago(D.updated_at) + ' (' + fmt.date(D.updated_at) + ' ' + fmt.time(D.updated_at) + '). Live scores come from the live feed, every 20 seconds while games are on.';
+  $('#updated').textContent = 'Data built ' + fmt.ago(D.updated_at) + ' (' + fmt.date(D.updated_at) + ' ' + fmt.time(D.updated_at) + '). Live scores come from a separate live feed, checked every 20 seconds while games are on; it can trail play by a few minutes.';
   QK.seg($('#when'), function (v) { state.when = v; state.shown = PAGE; renderChips(); renderGames(); });
 }
 
