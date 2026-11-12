@@ -580,8 +580,9 @@ def players_from_summary(raw: dict) -> dict[str, dict]:
     return out
 
 
-def compact_pbp(raw: dict) -> dict | None:
-    """Play-by-play rows (CONTRACT.md section 1) or None when the game has no real play-by-play.
+def compact_pbp(raw: dict, min_plays: int = MIN_PBP_PLAYS) -> dict | None:
+    """Play-by-play rows (CONTRACT.md section 1) or None when the game has no real play-by-play (fewer than
+    `min_plays` plays: the store's rule; the live feed passes 1, a game in its first minutes has few plays yet).
 
     row = [seq, period, clock_s, type_id, team_id|null, [participant ids], x|null, y|null, score_value,
            shooting(0/1), scoring(0/1), home_score, away_score, text, points_attempted]
@@ -590,7 +591,7 @@ def compact_pbp(raw: dict) -> dict | None:
     plays = raw.get("plays") or []
     header = raw.get("header") or {}
     gid = str(header.get("id") or "")
-    if sum(1 for p in plays if str((p.get("type") or {}).get("id")) not in ("411", "412", "402")) < MIN_PBP_PLAYS:
+    if sum(1 for p in plays if str((p.get("type") or {}).get("id")) not in ("411", "412", "402")) < min_plays:
         return None
     rows, types, seq_of = [], {}, {}
     for i, p in enumerate(plays):

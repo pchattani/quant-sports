@@ -94,6 +94,13 @@ DEFAULTS: dict[str, Any] = {
 _P: dict | None = None
 
 
+def params_key() -> str:
+    """A short key of the fitted parameters in use: the build publishes it (index.json models.game_params) and the
+    live feed computes a live chance only when its own is the same (scripts/live_chances.py)."""
+    import hashlib
+    return hashlib.sha1(repr(sorted(params().items())).encode()).hexdigest()[:12]
+
+
 def params(over: dict | None = None) -> dict:
     """Fitted parameters: the local cache, else the committed fit, else the defaults."""
     global _P

@@ -156,9 +156,10 @@ def nfl_game_id(e: dict) -> str | None:
 
 def parse_espn_nfl(d: dict | None) -> dict[str, dict]:
     out = {}
-    for e in parse_espn(d).values():
+    for eid, e in parse_espn(d).items():
         gid = nfl_game_id(e)
         if gid:
+            e["eid"] = eid               # ESPN's event id: kept in the state for the live model, not published
             out[gid] = e
     return out
 
@@ -556,7 +557,7 @@ def tick(state: dict, now: int | None = None, reader=read_board) -> dict:
             if on and not s.get("_on"):
                 s["t"], s["_on"] = b["ok"], True
         for gid, e in (b.get("g") or {}).items():
-            s["g"][gid] = {k: v for k, v in e.items() if k != "seen"}
+            s["g"][gid] = {k: v for k, v in e.items() if k not in ("seen", "eid")}
     for s in sports.values():
         s.pop("_on", None)
     return {"v": 1, "at": now, "sports": sports}

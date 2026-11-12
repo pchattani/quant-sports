@@ -1436,8 +1436,33 @@ home page (its own build) and a sport page (another build) disagree. Since 11 No
   five minutes otherwise). It hands over to a successor every five and a half hours, or within three minutes of a
   push; `watchdog.yml` restarts it. Nothing in it can fail a run. Each deploy is an artifact upload and one call
   to the Pages deployments API with the commit id as its version (any other version answers 404); the same commit
-  deployed again replaces the content in about three seconds. Measured on 11 Nov 2026: a reader gets a file a
-  median of 25 s old, 55 s at worst.
+  deployed again replaces the content in about three seconds. Measured on 11 Nov 2026, in the first hour: a
+  reader gets a file a median of 25 s old, 55 s at worst.
+- **GitHub Pages does not hold that rate (11-12 Nov 2026, the first full evening).** What was seen, and what the
+  loop does about it:
+  - A deployment's status is keyed by the commit, which every deploy of a run shares, so it reads `succeed`
+    within 3 s whatever happened. For ten minutes (23:43 to 23:53 UTC) nineteen deploys in a row read `succeed`
+    and none was served. **The proof of a deploy is the served file**: the loop reads
+    `https://pchattani.github.io/the-quant-live/live.json` until its `at` is the one it sent (120 s at most),
+    and sends nothing else meanwhile.
+  - After about eleven deploys at two a minute Pages takes 18 to 55 s to serve one, or never serves it, and a
+    late one can land after a newer one. **Pacing**: a slow (over 10 s) or unserved deploy doubles the least gap
+    before the next (60 s to 300 s); five quick ones in a row halve it.
+  - Pages' cache ignores the query string (a random `?t=` is a cache HIT), so cache busting does nothing: what a
+    reader gets is what its edge fetched after the last purge. Edges in different places can hold different
+    deployments: the loop's edge confirmed each deploy in 3 s while a reader in Toronto was served a copy four
+    to eight minutes old (at 00:09:24 UTC a fresh fetch returned the deploy sent at 00:01:36). The loop cannot
+    see or fix that. Measured from the reader's side over 34 minutes with 80 games on: about two thirds of the
+    minutes under a minute old, the rest in stalls of 2 to 5 minutes. A page already open never goes back
+    (`QK.live` keeps the newest copy it has seen); it stops moving until a fresh copy arrives.
+  - `loop.json` beside the feed is the loop's own record: the run, the pacing gap, and for the last 60 deploys
+    when each was sent and how many seconds it took to be served (null = never). Read it while a run is going
+    (a run's log cannot be read until it ends).
+  - The loop refreshes its checkout of the build repo every ten minutes, so the live models follow the hourly
+    export without a restart.
+  - **Steady 30 s needs another host** (a store built for frequent writes; a Cloudflare Worker with a Durable
+    Object fits the free plan: 100,000 requests and 100,000 rows written a day against our 2,880 writes). It
+    needs an account, which is the user's decision; put to the user on 12 Nov 2026.
 - **The readers**: the home page (`QK.live.apply`) and each sport site's loader (`QK.live.watch` on every payload,
   `QK.live.attach` to redraw the overview, games and game pages) poll the file every 20 s. The feed only moves a game
   forward (pre, live, final), never touches a game the build calls final, and is ignored when older than 15 minutes:
@@ -1449,10 +1474,21 @@ home page (its own build) and a sport page (another build) disagree. Since 11 No
   game (at most one per game every 45 s, twelve a tick) goes through the same `compact_pbp` / `compact_game` the
   build stores and the same function the build calls (`winprob.live_now`), with the model the last build
   published (`index.json` `leagues.<L>.wp_model`: K and beta) and the pregame margin it published on the card
-  (`wp_s`). Nothing else is ever used: the public build refits the model on the seasons it has on disk, so the
+  (`wp_s`). `compact_pbp` is called with `min_plays=1` (the store's rule is 50 plays before a game counts as
+  play-by-play; a live game has a chance from its first play). First live evening, 12 Nov: three NBA games, a
+  chance on each about once a minute; the feed's value against the model run directly at the same score and
+  clock: 0.701 against 0.685 to 0.697 (the last play at the moment of the read decides possession). Nothing else is ever used: the public build refits the model on the seasons it has on disk, so the
   committed fitted file is about one point of chance away from it. The entry gets `wp`; the readers show it,
-  and drop a chance older than four minutes. The other sites keep the rule above (the build's chance is dropped
-  when the feed moves the score) until theirs is added: Gridiron, Rink, Bullpen, then tennis.
+  and drop a chance older than four minutes. **Gridiron (NFL), built 12 Nov 2026, first live game Thursday 13
+  Nov 01:15 UTC:** the ESPN summary of each live game (the feed keeps ESPN's event id for NFL games in its state,
+  not in the published file) goes through `sources.espn.compact_summary` and `models.live.live_wp`, the pair the
+  build uses, with the pregame margin the build published on the game's card (`wp_mu`; the build's own live
+  chance now starts from that same rounded number). The model is a committed LightGBM fit the build cannot
+  refit, so the loop computes only when its checkout's fit and game parameters carry the keys the build
+  published (`index.json` `models.fits.wp`, `models.game_params`; `game.params_key()`); checked equal on 12 Nov
+  with the committed fit alone. Summaries are one budget of twelve a tick across the sites. The other sites keep
+  the rule above (the build's chance is dropped when the feed moves the score) until theirs is added: Rink,
+  Bullpen, then tennis.
 - **Not in the feed**: golf and F1 (their pages read the hourly build), and the football fixtures ESPN does not
   carry. Box scores, play-by-play and live win chances on every site also still come from the build.
 - **Running it**: `python scripts/setup_live_repo.py --create` once (creates the public repo, turns on Pages, starts

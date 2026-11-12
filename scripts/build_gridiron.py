@@ -123,7 +123,7 @@ def model_versions() -> dict:
     gp = None
     try:
         from oddsmarkets.nfl.models import game as GMm
-        gp = hashlib.sha1(repr(sorted(GMm.params().items())).encode()).hexdigest()[:12]
+        gp = GMm.params_key()
     except Exception:                                            # noqa: BLE001
         pass
     return {**adapters.model_versions(), "fits": adapters.fitted_keys(), "game_params": gp}

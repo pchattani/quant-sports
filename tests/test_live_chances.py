@@ -37,7 +37,7 @@ def fake_model(monkeypatch):
         seen.update(model=model, s=exp_margin_, league=league)
         return {"wp_home": 0.6123}
     monkeypatch.setattr(W, "live_now", live_now)
-    monkeypatch.setattr(espn, "compact_pbp", lambda raw: {"plays": []})
+    monkeypatch.setattr(espn, "compact_pbp", lambda raw, min_plays=50: seen.update(min_plays=min_plays) or {"plays": []})
     monkeypatch.setattr(espn, "compact_game", lambda raw: {"id": "1"})
     return seen
 
@@ -49,6 +49,7 @@ def test_chance_uses_the_published_model_and_margin(fake_model):
     assert (n, used, calls) == (1, 1, [("nba", "1")])
     assert feed["sports"]["basketball"]["g"]["1"]["wp"] == 0.6123
     assert fake_model["model"]["K"] == 20.0 and fake_model["model"]["beta"] == MODEL["beta"] and fake_model["s"] == 4.5
+    assert fake_model["min_plays"] == 1                # a live game has a chance from its first play, not its fiftieth
 
 
 def test_no_published_model_no_chance(fake_model):
@@ -108,3 +109,95 @@ def test_the_build_publishes_what_the_live_loop_reads():
     assert '"wp_s"' in g and "W.live_now(ctx.wp_model, raw, g, ctx.league)" in g
     kit = (ROOT / "docs" / "_design" / "quant.js").read_text(encoding="utf-8")
     assert "isNum(e.wp) ? e.wp : null" in kit
+
+
+# ---------------------------------------------------------------------------------------------- Gridiron (NFL)
+
+GID = "2026_10_WAS_NYG"
+
+
+def nfl_feed_and_state(entry):
+    feed = {"v": 1, "at": NOW, "sports": {"nfl": {"t": NOW, "g": {GID: dict(entry)}}}}
+    state = {"boards": {"nfl": {"g": {GID: dict(entry, eid="401772999")}}}}
+    return feed, state
+
+
+def nfl_index(fit="fitkey", params="parkey", mu=-0.412, gid=GID):
+    return {"season": 2026, "models": {"fits": {"wp": fit}, "game_params": params}, "games": [{"game_id": gid, "wp_mu": mu}], "live": []}
+
+
+@pytest.fixture
+def fake_nfl(monkeypatch):
+    from oddsmarkets.nfl.models import live as L
+    from oddsmarkets.nfl.sources import espn as nfl_espn
+    seen = {}
+
+    def live_wp(rec, pregame=None, season=None, home=None):
+        seen.update(rec=rec, mu=(pregame or {}).get("margin"), season=season, home=home)
+        return {"wp_home": 0.43219, "source": "wp_model"}
+    monkeypatch.setattr(L, "live_wp", live_wp)
+    monkeypatch.setattr(nfl_espn, "compact_summary", lambda raw, game_id=None, season=None: {"game_id": game_id, "season": season, "status": "live"})
+    return seen
+
+
+OWN = lambda: {"fit": "fitkey", "params": "parkey"}  # noqa: E731
+NFL_LIVE = {"s": "live", "hs": 7, "as": 10, "p": 2, "c": "8:41"}
+
+
+def test_gridiron_chance_uses_the_published_margin_and_the_same_fit(fake_nfl):
+    feed, state = nfl_feed_and_state(NFL_LIVE)
+    asked = []
+    n, used = lc.gridiron(feed, state, NOW, lambda u, p=None: nfl_index(), summary=lambda eid: asked.append(eid) or {"header": 1}, own=OWN)
+    assert (n, used, asked) == (1, 1, ["401772999"])
+    assert feed["sports"]["nfl"]["g"][GID]["wp"] == 0.4322
+    assert (fake_nfl["mu"], fake_nfl["season"], fake_nfl["home"]) == (-0.412, 2026, "NYG")
+    assert fake_nfl["rec"]["game_id"] == GID
+    # a card published with no margin: the build used 0, so does the feed
+    feed, state = nfl_feed_and_state(NFL_LIVE)
+    lc.gridiron(feed, state, NOW, lambda u, p=None: nfl_index(mu=None), summary=lambda eid: {"header": 1}, own=OWN)
+    assert fake_nfl["mu"] == 0.0
+
+
+@pytest.mark.parametrize("index", [nfl_index(fit="another"), nfl_index(params="another"), nfl_index(gid="2026_10_DAL_PHI"), None])
+def test_gridiron_no_chance_from_a_model_the_build_did_not_use(fake_nfl, index):
+    feed, state = nfl_feed_and_state(NFL_LIVE)
+    asked = []
+    n, used = lc.gridiron(feed, state, NOW, lambda u, p=None: index, summary=lambda eid: asked.append(eid) or {"header": 1}, own=OWN)
+    assert (n, used, asked) == (0, 0, []) and "wp" not in feed["sports"]["nfl"]["g"][GID]
+
+
+def test_gridiron_a_finished_summary_gives_no_chance_and_the_budget_is_shared(fake_nfl, monkeypatch):
+    from oddsmarkets.nfl.models import live as L
+    monkeypatch.setattr(L, "live_wp", lambda rec, pregame=None, season=None, home=None: {"wp_home": 1.0, "source": "final"})
+    feed, state = nfl_feed_and_state(NFL_LIVE)
+    assert lc.gridiron(feed, state, NOW, lambda u, p=None: nfl_index(), summary=lambda eid: {"header": 1}, own=OWN) == (0, 1)
+    # the tick's summaries are one budget across the sites: none left, none asked
+    feed, state = nfl_feed_and_state(NFL_LIVE)
+    asked = []
+    assert lc.gridiron(feed, state, NOW, lambda u, p=None: nfl_index(), summary=lambda eid: asked.append(eid), calls=lc.MAX_CALLS, own=OWN) == (0, lc.MAX_CALLS)
+    assert asked == []
+
+
+def test_the_gridiron_build_publishes_what_the_live_loop_reads():
+    s = (ROOT / "oddsmarkets" / "nfl" / "analytics" / "season.py").read_text(encoding="utf-8")
+    assert 'c["wp_mu"] = an.rnd((pr or {}).get("margin"), 3)' in s and 'adapters.live_wp(ctx, g, rec, {"margin": c.get("wp_mu")})' in s
+    b = (ROOT / "scripts" / "build_gridiron.py").read_text(encoding="utf-8")
+    assert "gp = GMm.params_key()" in b
+    from oddsmarkets.nfl.models import game as GMm
+    assert len(GMm.params_key()) == 12 and GMm.params_key() == GMm.params_key()
+
+
+def test_the_feed_keeps_espn_event_id_for_nfl_in_the_state_only():
+    spec2 = importlib.util.spec_from_file_location("live_feed", ROOT / "scripts" / "live_feed.py")
+    lf = importlib.util.module_from_spec(spec2)
+    spec2.loader.exec_module(lf)
+    board = {"events": [{"id": "401772999", "date": "2026-11-13T01:15Z", "season": {"year": 2026, "type": 2}, "week": {"number": 10},
+                         "competitions": [{"status": {"period": 2, "displayClock": "8:41", "type": {"state": "in", "name": "STATUS_IN_PROGRESS", "shortDetail": "8:41 - 2nd"}},
+                                           "competitors": [{"homeAway": "home", "score": "7", "team": {"abbreviation": "NYG"}},
+                                                           {"homeAway": "away", "score": "10", "team": {"abbreviation": "WSH"}}]}]}]}
+    got = lf.parse_espn_nfl(board)
+    assert list(got) == [GID] and got[GID]["eid"] == "401772999"
+    state = {}
+    doc = lf.tick(state, NOW, lambda key: got if key == "nfl" else {})
+    assert state["boards"]["nfl"]["g"][GID]["eid"] == "401772999"
+    assert "eid" not in doc["sports"]["nfl"]["g"][GID] and doc["sports"]["nfl"]["g"][GID]["hs"] == 7

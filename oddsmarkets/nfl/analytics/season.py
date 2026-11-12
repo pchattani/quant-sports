@@ -177,9 +177,13 @@ def schedule(ctx: SeasonContext, prices: dict, frozen: dict, markets: dict | Non
                                                             str(kv[1].get("kickoff") or kv[1].get("date") or ""), kv[0])):
         pr = prices.get(gid) or frozen.get(gid) or (wf or {}).get(gid)
         c = GM.card(ctx, g, GM.model_block(pr), GM.market_block(g, mk.get(gid) if isinstance(mk, dict) else None))
+        # the pregame expected home margin the live chance starts from, published so that the live feed between
+        # builds (scripts/live_chances.py) computes with the very number this build does (None: no margin, 0 used)
+        if str(g.get("status") or "").lower() not in ("final", "post"):
+            c["wp_mu"] = an.rnd((pr or {}).get("margin"), 3)
         if str(g.get("status") or "").lower() in adapters.LIVE:
             rec = GM.espn_summary(g) or (g.get("live") if isinstance(g.get("live"), dict) else None)
-            w = adapters.live_wp(ctx, g, rec, pr)
+            w = adapters.live_wp(ctx, g, rec, {"margin": c.get("wp_mu")})
             if w:
                 c["status"] = "live"
                 c["wp_home"] = an.rnd(w.get("wp_home"), 4)

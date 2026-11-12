@@ -13,7 +13,10 @@ when the home team is favoured (`line.spread_home`, `market.spread`, `model.spre
   "leaders": {metric: [[pid, value]] x10},"gaps": [ {"game_id"|"market","model","market","edge"} ],"teams": {abbr: {"name","colour","alt","division","conference"}}}`
   GAME_CARD = `{"game_id","week","gtype","kickoff","home","away","hs","as","status","qtr","clock","possession","down","dist","yl100",
    "model":{"p_home","spread","total"},"market":{"p_home","spread","total","sources"}|null,"line":{"spread_home","total","ml_home","ml_away","open","close"}|null,
-   "wp_home": live|null,"qbs":{"home","away"},"weather":{...}|null}`
+   "wp_home": live|null,"qbs":{"home","away"},"weather":{...}|null,
+   "wp_mu": the pregame expected home margin the live chance starts from (games not final; null = none, 0 used)}`
+  The live feed between builds (`scripts/live_chances.py`) computes `wp_home` with `wp_mu` and only when its own
+  fit and game parameters carry the keys in `index.json` `models.fits.wp` and `models.game_params`.
 - `data/players_index.json` `{pid: [name, team, pos, first_season, last_season]}`
 - `data/glossary.json`, `data/calibration.json`, `data/history.json` (1999→ leaders, era-adjusted), `data/coaches.json`
   (decision grades by coach and season), `data/referees.json`.
