@@ -1762,3 +1762,29 @@ a.qk-fc-next:hover { background: var(--s-3); color: var(--ink-1); }
 .qk-livebar p { display: none; margin: 0; padding: 0 12px 10px 28px; font-weight: 500; color: rgba(255, 255, 255, 0.82); }
 .qk-livebar.open p { display: block; }
 @media print { .qk-livebar { display: none; } }
+
+/* ── table tools (QK.tableTools): "24 rows · CSV" under every data table */
+.qk-ttools { display: flex; justify-content: flex-end; align-items: center; gap: 10px; padding: 6px 2px 2px; font: 600 11px/1 var(--font-cond); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
+.qk-ttools-csv { display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border: 1px solid var(--line-2); background: transparent; color: var(--ink-2); font: inherit; letter-spacing: inherit; text-transform: inherit; cursor: pointer; border-radius: 0; }
+.qk-ttools-csv svg { width: 11px; height: 11px; }
+.qk-ttools-csv:hover, .qk-ttools-csv:focus-visible { color: var(--volt); border-color: var(--volt); }
+@media print { .qk-ttools { display: none; } }
+/* ── data freshness (QK.stamp) */
+.qk-secnav-in > .qk-stamp { margin-left: auto; padding-left: 14px; align-self: center; flex: none; white-space: nowrap; font: 600 11px/1 var(--font-cond); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); cursor: help; }
+.qk-secnav-ctx + .qk-stamp { margin-left: 0; }
+.qk-stamp.old, .qk-stamp-f.old { color: var(--sun); }
+.qk-stamp-f { margin-top: 10px; font: 600 11px/1.3 var(--font-cond); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
+@media (max-width: 900px) { .qk-secnav-in > .qk-stamp { display: none; } }
+/* ── likely range (QK.rangeBar, statTile range) */
+.qk-range { margin: 8px 0 2px; min-width: 0; }
+.qk-range-track { position: relative; height: 8px; background: var(--seg-off); }
+.qk-range-band { position: absolute; top: 0; bottom: 0; background: var(--signal); }
+.qk-range-mid { position: absolute; top: -3px; bottom: -3px; width: 3px; margin-left: -1px; background: var(--volt); }
+.qk-range-cap { margin-top: 4px; font: 600 11px/1.3 var(--font-cond); letter-spacing: .04em; text-transform: uppercase; color: var(--block-ink-2); }
+/* ── recent form for both sides (QK.formPair) */
+.qk-fpair { display: grid; gap: 8px; padding: 12px 0; }
+.qk-fpair-h { display: flex; justify-content: space-between; align-items: baseline; font: 700 12px/1 var(--font-cond); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); }
+.qk-fpair-h span { font-weight: 600; color: var(--ink-3); letter-spacing: .04em; }
+.qk-fpair-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 10px; }
+.qk-fpair-nm { font: 700 14px/1.2 var(--font-cond); text-transform: uppercase; letter-spacing: .03em; color: var(--ink-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qk-fpair-rec { font: 600 13px/1 var(--font-cond); color: var(--ink-2); min-width: 44px; text-align: right; }

@@ -264,6 +264,16 @@ All builders return HTML strings unless noted. Signatures are in `quant.js` / `q
 | Strengths | `QK.strengths({ best, worst })` | a club's three best and three worst metrics as percentile chips |
 | Tape gap | `QK.tape({ ..., gap: true })` | head to head: the gap in percentile points under each metric |
 
+**Round 11: quant friendliness** (12 Nov 2026, the user's sweep: "more analytics ... homogenise the views ... a strong
+preference for quant user friendliness")
+
+| Component | Builder | Where |
+|---|---|---|
+| Table tools | automatic (`QK.tableTools`, run by the same observer as the header tooltips) | every table of 8+ rows and 3+ columns gets "N rows · CSV" under it; the CSV is the table as shown (a cell's `data-csv` wins over its text); skipped inside the Scouting Room board (it has its own CSV), the legal panel and `[data-no-tools]` |
+| Data freshness | `QK.stamp(iso, { what })` | every site, once, with its index's build time: "Updated 14 min ago" at the right of the section bar (wide screens) and in the footer (all widths); amber after three hours; the tooltip gives the clock time and what updates when |
+| Likely range | `QK.rangeBar({ lo, hi, mid, min, max, caption })`; `QK.statTile({ range })` | any interval the payload already has (projected points, "9 seasons in 10", margin ± spread); never invented |
+| Form pair | `QK.formPair({ left: { name, abbr, colour, form }, right, n })` | game pages: both sides' last five, oldest first, with the record |
+
 The CSV helpers are `QK.csv(cols, rows)` and `QK.download(name, text)`. `QK.formDots(f, n)` shows the last n results
 (the power board shows ten). `QKC.scatter` takes `onClick(point)` (the drawer instead of a page change) and `pad: '8%'`.
 The showcase has a "Scouting Room" block (`showcase.html#scouting`).

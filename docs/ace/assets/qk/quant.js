@@ -692,17 +692,117 @@ QK.explainHeaders = function (el) {
     if (!tgt.getAttribute('aria-label')) tgt.setAttribute('aria-label', txt + ': ' + def);
   });
 };
+
+/* ─────────────────────────────────────── table tools: a row count and a CSV download under every data table */
+/* Any table of 8 rows or more and 3 columns or more, kit-made or not, gets one quiet line under it: "24 rows · CSV".
+ * The CSV is the table as shown: the last header row, then every row's cells (a cell's data-csv wins over its text;
+ * sort arrows are dropped). Skipped: the Scouting Room board (it has its own CSV), the legal panel, and anything under
+ * [data-no-tools]. Runs from the same MutationObserver as the header tooltips, so site code needs nothing. */
+var TT_ARROWS = /[\u2191\u2193\u2195\u25b2\u25bc\u25b4\u25be\u21c5]/g;
+function ttText(c) {
+  var v = c.getAttribute('data-csv');
+  if (v !== null) return v;
+  return String(c.innerText || c.textContent || '').replace(TT_ARROWS, '').replace(/\s+/g, ' ').trim();
+}
+function ttRows(table) { return $$('tbody tr', table).filter(function (tr) { return !tr.hidden && tr.style.display !== 'none'; }); }
+function ttCsv(table) {
+  var q = function (s) { s = String(s); return /[",\n;]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  var out = [], heads = $$('thead tr', table);
+  if (heads.length) out.push([].map.call(heads[heads.length - 1].children, function (c) { return q(ttText(c)); }).join(','));
+  ttRows(table).forEach(function (tr) { out.push([].map.call(tr.children, function (c) { return q(ttText(c)); }).join(',')); });
+  return out.join('\r\n');
+}
+function ttName(table) {
+  var card = table.closest('section, .qk-card, .card, [class*="card"]');
+  var hd = card && $('h2, h3, .qk-sh-title, .card-header, [class*="card-title"], [class*="card-h"]', card);
+  var parts = String(document.title || '').split('·'), site = parts.length > 1 ? parts.pop() : '';
+  var base = ((hd ? hd.textContent : '') || '').replace(/\s+/g, ' ').trim() || parts.join(' ') || 'table';
+  var slug = function (s) { return String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''); };
+  return (slug(site).slice(0, 30) + '-' + slug(base).slice(0, 60)).replace(/^-+|-+$/g, '') || 'table';
+}
+function ttDownload(name, text) {
+  try {
+    var blob = new Blob(['\ufeff' + text], { type: 'text/csv;charset=utf-8' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  } catch (e) { /* no Blob download in this browser */ }
+}
+QK.tableTools = function (el) {
+  $$('table:not([data-qk-tt])', el || document).forEach(function (table) {
+    table.setAttribute('data-qk-tt', '1');
+    if (table.closest('[data-no-tools], .qk-board, .qk-legal') || table.classList.contains('qk-bd-t')) return;
+    var rows = ttRows(table).length, cols = $$('thead tr:last-child th', table).length;
+    if (rows < 8 || cols < 3) return;
+    var par = table.parentNode;
+    var host = par && par.children.length === 1 && /(wrap|scroll|table|flush|hscroll)/i.test(String(par.className || '')) ? par : table;
+    var tools = host.nextElementSibling;
+    if (!tools || !tools.classList || !tools.classList.contains('qk-ttools')) {
+      tools = h('<div class="qk-ttools"><span class="qk-ttools-n"></span><button type="button" class="qk-ttools-csv" aria-label="Download this table as a CSV file">CSV<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1v7M3 5.5 6 8.5 9 5.5M2 11h8" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></button></div>');
+      host.parentNode.insertBefore(tools, host.nextSibling);
+      $('.qk-ttools-csv', tools).addEventListener('click', function () { if (tools._qkTable) ttDownload(ttName(tools._qkTable) + '.csv', ttCsv(tools._qkTable)); });
+    }
+    tools._qkTable = table;
+  });
+  /* refresh every count (a table can grow: "show more", a filter) */
+  $$('.qk-ttools', el || document).forEach(function (tools) {
+    var t = tools._qkTable, n = t ? ttRows(t).length : 0;
+    var lab = $('.qk-ttools-n', tools);
+    if (lab) lab.textContent = n + (n === 1 ? ' row' : ' rows');
+  });
+};
+
+/* ─────────────────────────────────────── data freshness: "Updated 14 min ago" */
+/* QK.stamp(iso, { what }) once a site knows when its data was built (index.json): a quiet line at the right of the
+ * section bar (wide screens) and under the brand in the footer (every width), redrawn each minute. Over three hours old
+ * it turns amber and says so. The tooltip gives the clock time (the viewer's own) and what updates when (o.what, else
+ * the default line). Calling it again with a newer time moves it on; an older or bad time is ignored. */
+var stampAt = null, stampWhat = '', stampTimer = null;
+function stampAgo(ms) {
+  var m = Math.max(0, Math.round(ms / 60000));
+  if (m < 1) return 'just now';
+  if (m < 60) return m + ' min ago';
+  var hh = Math.round(m / 60);
+  return hh < 36 ? hh + ' h ago' : Math.round(hh / 24) + ' days ago';
+}
+function stampPaint() {
+  if (stampAt === null) return;
+  var age = QK.now() - stampAt, old = age > 3 * 3600e3;
+  var txt = 'Updated ' + stampAgo(age) + (old ? ' · may be behind' : '');
+  var tip = 'Data built ' + fmt.date(stampAt) + ' ' + fmt.time(stampAt) + ' (your time). ' + (stampWhat || 'The site rebuilds about once an hour; live scores update on their own feed.');
+  var bar = $('.qk-secnav-in');
+  if (bar) {
+    var s = $('.qk-stamp', bar);
+    if (!s) { s = h('<span class="qk-stamp" tabindex="0"></span>'); bar.appendChild(s); }
+    s.textContent = txt; s.setAttribute('data-tip', tip); s.classList.toggle('old', old);
+  }
+  var foot = $('.qk-footer-in > div');
+  if (foot) {
+    var f = $('.qk-stamp-f', foot);
+    if (!f) { f = h('<div class="qk-stamp-f"></div>'); foot.appendChild(f); }
+    f.textContent = txt + ' · ' + fmt.date(stampAt) + ' ' + fmt.time(stampAt); f.classList.toggle('old', old);
+  }
+}
+QK.stamp = function (iso, o) {
+  var t = iso instanceof Date ? iso.getTime() : (typeof iso === 'number' ? (iso < 1e12 ? iso * 1000 : iso) : Date.parse(iso || ''));
+  if (!isFinite(t) || t <= 0 || t > QK.now() + 6 * 3600e3) return;
+  if (stampAt !== null && t < stampAt) return;
+  stampAt = t; if (o && o.what) stampWhat = o.what;
+  stampPaint();
+  if (!stampTimer) stampTimer = setInterval(stampPaint, 60000);
+};
 var glossObs = null;
 function glossWatch() {
   if (glossObs || !root.MutationObserver || !document.body) return;
   var queued = false;
-  QK.explainHeaders();
+  QK.explainHeaders(); QK.tableTools();
   glossObs = new MutationObserver(function (muts) {
     if (queued) return;
     for (var i = 0; i < muts.length; i++) {
       if (muts[i].addedNodes && muts[i].addedNodes.length) {
         queued = true;
-        (root.requestAnimationFrame || setTimeout)(function () { queued = false; QK.explainHeaders(); });
+        (root.requestAnimationFrame || setTimeout)(function () { queued = false; QK.explainHeaders(); QK.tableTools(); if (stampAt !== null && !$('.qk-secnav-in .qk-stamp')) stampPaint(); });
         return;
       }
     }
@@ -1697,10 +1797,45 @@ QK.statTile = function (k) {
   return '<' + tag + ' class="qk-stat' + (k.cls ? ' ' + esc(k.cls) : '') + '"' + (k.href ? ' href="' + esc(k.href) + '"' : '') + '>' +
     '<div class="qk-stat-label">' + lab + '</div>' +
     '<div class="qk-stat-v' + (k.signal ? ' signal' : '') + (k.text ? ' text' : '') + long + '">' + v + (k.unit && !empty ? '<span class="u">' + esc(k.unit) + '</span>' : '') + '</div>' + pc +
+    (k.range && !empty ? QK.rangeBar(k.range) : '') +
     (dl || sub ? '<div class="qk-stat-sub">' + dl + (sub ? '<span>' + sub + '</span>' : '') + '</div>' : '') + spark + '</' + tag + '>';
 };
 QK.stats = function (list) {
   return '<div class="qk-stats">' + (list || []).filter(Boolean).map(function (x) { return typeof x === 'string' ? x : QK.statTile(x); }).join('') + '</div>';
+};
+/* QK.rangeBar({ lo, hi, mid, min, max, label, caption }) -> the likely-range bar: a track from min to max, our likely
+ * range (lo to hi) as a cobalt band, a volt tick at mid. Only for intervals the payload already has ("9 seasons in 10:
+ * 68-96"); never invent one (STYLE_GUIDE §6). min and max default to the range padded by a quarter each side.
+ * caption: a short line under it (plain text). statTile takes it as k.range. */
+QK.rangeBar = function (o) {
+  if (!o || !isNum(o.lo) || !isNum(o.hi) || o.hi < o.lo) return '';
+  var pad = (o.hi - o.lo) * 0.25 || Math.abs(o.hi) * 0.1 || 1;
+  var mn = isNum(o.min) ? o.min : o.lo - pad, mx = isNum(o.max) ? o.max : o.hi + pad;
+  if (!(mx > mn)) return '';
+  var f = o.fmt || function (v) { return fmt.num(v); };
+  var pos = function (v) { return Math.max(0, Math.min(100, (v - mn) / (mx - mn) * 100)); };
+  var a = pos(o.lo), b = pos(o.hi), m = isNum(o.mid) ? pos(o.mid) : null;
+  var lab = (o.label || 'Likely range') + ': ' + f(o.lo) + ' to ' + f(o.hi) + (m !== null ? ', most likely ' + f(o.mid) : '');
+  return '<div class="qk-range" role="img" aria-label="' + esc(lab) + '"><div class="qk-range-track"><span class="qk-range-band" style="left:' + a.toFixed(1) + '%;width:' + Math.max(1.5, b - a).toFixed(1) + '%"></span>' +
+    (m !== null ? '<span class="qk-range-mid" style="left:' + m.toFixed(1) + '%"></span>' : '') + '</div>' +
+    (o.caption ? '<div class="qk-range-cap">' + esc(o.caption) + '</div>' : '') + '</div>';
+};
+/* QK.formPair({ left: { name, abbr, colour, form }, right: {...}, n, title }) -> recent form for the two sides of a
+ * game, each a row of QK.formDots (oldest first, the newest at the right) with the record over them, for game pages.
+ * form: 'WWLDW' or an array of 'W'/'D'/'L' (as QK.formDots). Sides with no form are left out; nothing at all -> ''. */
+QK.formPair = function (o) {
+  o = o || {};
+  var n = o.n || 5;
+  var side = function (s) {
+    if (!s || !s.form || !s.form.length) return '';
+    var f = (typeof s.form === 'string' ? s.form.replace(/[^A-Za-z]/g, '').split('') : s.form.slice()).map(function (x) { return String(x).toUpperCase().charAt(0); }).slice(-n);
+    var w = f.filter(function (x) { return x === 'W'; }).length, d = f.filter(function (x) { return x === 'D'; }).length, l = f.filter(function (x) { return x === 'L'; }).length;
+    return '<div class="qk-fpair-row">' + (s.abbr ? QK.teamMark({ abbr: s.abbr, colour: s.colour }, 'sm') : '') + '<span class="qk-fpair-nm">' + esc(s.name || s.abbr || '') + '</span>' +
+      QK.formDots(f.join(''), n) + '<span class="qk-fpair-rec num">' + w + '–' + (d ? d + '–' : '') + l + '</span></div>';
+  };
+  var rows = side(o.left) + side(o.right);
+  if (!rows) return '';
+  return '<div class="qk-fpair"><div class="qk-fpair-h">' + esc(o.title || ('Form, last ' + n)) + '<span>oldest first</span></div>' + rows + '</div>';
 };
 /* QK.statStrip([tile objects or HTML], { bleed: true }) -> the black strip of big numbers that runs under a hero, edge
  * to edge (the player page's "points · goals · assists · pace · minutes"). */

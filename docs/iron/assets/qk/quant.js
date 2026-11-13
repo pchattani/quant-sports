@@ -692,17 +692,117 @@ QK.explainHeaders = function (el) {
     if (!tgt.getAttribute('aria-label')) tgt.setAttribute('aria-label', txt + ': ' + def);
   });
 };
+
+/* ─────────────────────────────────────── table tools: a row count and a CSV download under every data table */
+/* Any table of 8 rows or more and 3 columns or more, kit-made or not, gets one quiet line under it: "24 rows · CSV".
+ * The CSV is the table as shown: the last header row, then every row's cells (a cell's data-csv wins over its text;
+ * sort arrows are dropped). Skipped: the Scouting Room board (it has its own CSV), the legal panel, and anything under
+ * [data-no-tools]. Runs from the same MutationObserver as the header tooltips, so site code needs nothing. */
+var TT_ARROWS = /[\u2191\u2193\u2195\u25b2\u25bc\u25b4\u25be\u21c5]/g;
+function ttText(c) {
+  var v = c.getAttribute('data-csv');
+  if (v !== null) return v;
+  return String(c.innerText || c.textContent || '').replace(TT_ARROWS, '').replace(/\s+/g, ' ').trim();
+}
+function ttRows(table) { return $$('tbody tr', table).filter(function (tr) { return !tr.hidden && tr.style.display !== 'none'; }); }
+function ttCsv(table) {
+  var q = function (s) { s = String(s); return /[",\n;]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  var out = [], heads = $$('thead tr', table);
+  if (heads.length) out.push([].map.call(heads[heads.length - 1].children, function (c) { return q(ttText(c)); }).join(','));
+  ttRows(table).forEach(function (tr) { out.push([].map.call(tr.children, function (c) { return q(ttText(c)); }).join(',')); });
+  return out.join('\r\n');
+}
+function ttName(table) {
+  var card = table.closest('section, .qk-card, .card, [class*="card"]');
+  var hd = card && $('h2, h3, .qk-sh-title, .card-header, [class*="card-title"], [class*="card-h"]', card);
+  var parts = String(document.title || '').split('·'), site = parts.length > 1 ? parts.pop() : '';
+  var base = ((hd ? hd.textContent : '') || '').replace(/\s+/g, ' ').trim() || parts.join(' ') || 'table';
+  var slug = function (s) { return String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''); };
+  return (slug(site).slice(0, 30) + '-' + slug(base).slice(0, 60)).replace(/^-+|-+$/g, '') || 'table';
+}
+function ttDownload(name, text) {
+  try {
+    var blob = new Blob(['\ufeff' + text], { type: 'text/csv;charset=utf-8' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  } catch (e) { /* no Blob download in this browser */ }
+}
+QK.tableTools = function (el) {
+  $$('table:not([data-qk-tt])', el || document).forEach(function (table) {
+    table.setAttribute('data-qk-tt', '1');
+    if (table.closest('[data-no-tools], .qk-board, .qk-legal') || table.classList.contains('qk-bd-t')) return;
+    var rows = ttRows(table).length, cols = $$('thead tr:last-child th', table).length;
+    if (rows < 8 || cols < 3) return;
+    var par = table.parentNode;
+    var host = par && par.children.length === 1 && /(wrap|scroll|table|flush|hscroll)/i.test(String(par.className || '')) ? par : table;
+    var tools = host.nextElementSibling;
+    if (!tools || !tools.classList || !tools.classList.contains('qk-ttools')) {
+      tools = h('<div class="qk-ttools"><span class="qk-ttools-n"></span><button type="button" class="qk-ttools-csv" aria-label="Download this table as a CSV file">CSV<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1v7M3 5.5 6 8.5 9 5.5M2 11h8" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></button></div>');
+      host.parentNode.insertBefore(tools, host.nextSibling);
+      $('.qk-ttools-csv', tools).addEventListener('click', function () { if (tools._qkTable) ttDownload(ttName(tools._qkTable) + '.csv', ttCsv(tools._qkTable)); });
+    }
+    tools._qkTable = table;
+  });
+  /* refresh every count (a table can grow: "show more", a filter) */
+  $$('.qk-ttools', el || document).forEach(function (tools) {
+    var t = tools._qkTable, n = t ? ttRows(t).length : 0;
+    var lab = $('.qk-ttools-n', tools);
+    if (lab) lab.textContent = n + (n === 1 ? ' row' : ' rows');
+  });
+};
+
+/* ─────────────────────────────────────── data freshness: "Updated 14 min ago" */
+/* QK.stamp(iso, { what }) once a site knows when its data was built (index.json): a quiet line at the right of the
+ * section bar (wide screens) and under the brand in the footer (every width), redrawn each minute. Over three hours old
+ * it turns amber and says so. The tooltip gives the clock time (the viewer's own) and what updates when (o.what, else
+ * the default line). Calling it again with a newer time moves it on; an older or bad time is ignored. */
+var stampAt = null, stampWhat = '', stampTimer = null;
+function stampAgo(ms) {
+  var m = Math.max(0, Math.round(ms / 60000));
+  if (m < 1) return 'just now';
+  if (m < 60) return m + ' min ago';
+  var hh = Math.round(m / 60);
+  return hh < 36 ? hh + ' h ago' : Math.round(hh / 24) + ' days ago';
+}
+function stampPaint() {
+  if (stampAt === null) return;
+  var age = QK.now() - stampAt, old = age > 3 * 3600e3;
+  var txt = 'Updated ' + stampAgo(age) + (old ? ' · may be behind' : '');
+  var tip = 'Data built ' + fmt.date(stampAt) + ' ' + fmt.time(stampAt) + ' (your time). ' + (stampWhat || 'The site rebuilds about once an hour; live scores update on their own feed.');
+  var bar = $('.qk-secnav-in');
+  if (bar) {
+    var s = $('.qk-stamp', bar);
+    if (!s) { s = h('<span class="qk-stamp" tabindex="0"></span>'); bar.appendChild(s); }
+    s.textContent = txt; s.setAttribute('data-tip', tip); s.classList.toggle('old', old);
+  }
+  var foot = $('.qk-footer-in > div');
+  if (foot) {
+    var f = $('.qk-stamp-f', foot);
+    if (!f) { f = h('<div class="qk-stamp-f"></div>'); foot.appendChild(f); }
+    f.textContent = txt + ' · ' + fmt.date(stampAt) + ' ' + fmt.time(stampAt); f.classList.toggle('old', old);
+  }
+}
+QK.stamp = function (iso, o) {
+  var t = iso instanceof Date ? iso.getTime() : (typeof iso === 'number' ? (iso < 1e12 ? iso * 1000 : iso) : Date.parse(iso || ''));
+  if (!isFinite(t) || t <= 0 || t > QK.now() + 6 * 3600e3) return;
+  if (stampAt !== null && t < stampAt) return;
+  stampAt = t; if (o && o.what) stampWhat = o.what;
+  stampPaint();
+  if (!stampTimer) stampTimer = setInterval(stampPaint, 60000);
+};
 var glossObs = null;
 function glossWatch() {
   if (glossObs || !root.MutationObserver || !document.body) return;
   var queued = false;
-  QK.explainHeaders();
+  QK.explainHeaders(); QK.tableTools();
   glossObs = new MutationObserver(function (muts) {
     if (queued) return;
     for (var i = 0; i < muts.length; i++) {
       if (muts[i].addedNodes && muts[i].addedNodes.length) {
         queued = true;
-        (root.requestAnimationFrame || setTimeout)(function () { queued = false; QK.explainHeaders(); });
+        (root.requestAnimationFrame || setTimeout)(function () { queued = false; QK.explainHeaders(); QK.tableTools(); if (stampAt !== null && !$('.qk-secnav-in .qk-stamp')) stampPaint(); });
         return;
       }
     }
@@ -1150,6 +1250,200 @@ QK.fetchJSON = function (url, o) {
   });
 };
 
+/* ─────────────────────────────────────── live scores (QK.live) */
+/* The live-score feed: one small file (the-quant-live/live.json, scripts/live_feed.py) rewritten every 30 to 60
+ * seconds while games are on, with the score, period, clock and status of every game on today's boards, keyed by the
+ * ids the sites use. The home page and every sport page lay it over the hourly-built payloads through this one
+ * object, so a score is the same everywhere and does not wait for a site build.
+ *
+ *   QK.live.start()                      begin polling (every 20 s while the tab is visible); safe to call twice
+ *   QK.live.onChange(fn)                 fn() after a poll that changed something
+ *   QK.live.entry(sport, id)             -> { s: 'pre'|'live'|'final', hs, as, p, c, d, st } or null
+ *   QK.live.apply(sport, g)              lay the feed over one game in the kit's shape (status pre|live|final, hs, as,
+ *                                        period, clock, wp_home); true when it changed
+ *   QK.live.watch(key, sport, json, map) overlay now and again after every poll (key: the payload's path; a payload
+ *                                        loaded again replaces the one watched under the same key)
+ *   QK.live.attach(fn)                   start polling; fn(n) after a poll that changed n watched games
+ *   QK.live.overlay(sport, json, map)    the same for a site's own payload: every object in `json` that has
+ *                                        map.id and a status is patched in the site's words. map: { id: 'game_id',
+ *                                        live: 'live', final: 'final', period: 'period', clock: 'clock',
+ *                                        clear: ['wp_home', ...], need: ['home', 'away'] (keys an object must
+ *                                        also have to count as a game), same(o, e) / set(o, e) (a sport whose
+ *                                        games are not a score, tennis: the map compares and writes the entry
+ *                                        itself) }; returns the number of games changed
+ *
+ * Rules: the feed only moves a game forward (pre -> live -> final), never back, and never touches a game the build
+ * already calls final. A feed older than 15 minutes, or a live entry whose board has not answered for 10, is
+ * ignored: the page then shows what the build says, as before. A live win chance: the feed's own when it has one
+ * ("wp", the site's live model run on the latest play, scripts/live_chances.py); otherwise, when the feed moves a
+ * score, the build's chance is dropped (it was computed for the old score). Pages opened with ?asof= never read the feed.
+ * ?live=<url> reads another feed (local previews and tests).
+ *
+ * The lag, stated (12 Nov 2026, the user's choice to stay on GitHub Pages): while a game of a sport the page covers is
+ * live, a small status line (.qk-livebar, bottom left) says how old the scores are; over 90 s it turns amber and says
+ * they may trail play; a tap opens the reason (Pages can serve a copy several minutes old). A feed past 15 minutes:
+ * "Live scores paused". The sports covered are the ones the page hands to watch / overlay / apply (none yet: all). */
+QK.LIVE_URL = PUB + 'the-quant-live/live.json';
+QK.live = (function () {
+  var doc = null, timer = null, subs = [], hooks = [], watched = {}, seen = '', RANK = { pre: 0, live: 1, final: 2 };
+  var POLL = 20000, MAX_AGE = 900, MAX_BOARD_AGE = 600, fails = 0, holdUntil = 0;
+  var pageSports = {}, bar = null, everLive = false, SLOW = 90;
+  var NOTE = 'Scores between site builds come from our live feed. It is written every 30 to 60 seconds, but the servers that ' +
+    'host it (GitHub Pages) can keep handing out an older copy for a few minutes, so a score here can trail the game by up to ' +
+    'several minutes. Win chances follow the score shown.';
+  function feedUrl() {
+    try { var m = /[?&]live=([^&#]+)/.exec((root.location && root.location.search) || ''); if (m) return decodeURIComponent(m[1]); } catch (e) { /* default */ }
+    return QK.LIVE_URL;
+  }
+  function ok() { return !!doc && ASOF === null && (Date.now() / 1000 - doc.at) < MAX_AGE; }
+  function entry(sport, id) {
+    if (!ok()) return null;
+    var s = doc.sports && doc.sports[sport], e = s && s.g ? s.g[String(id)] : null;
+    if (!e || !RANK.hasOwnProperty(e.s)) return null;
+    if (e.s === 'live' && doc.at - (s.t || 0) > MAX_BOARD_AGE) return null;
+    return e;
+  }
+  function poll() {
+    if (ASOF !== null || (root.document && document.hidden) || Date.now() < holdUntil) return;
+    var u = feedUrl();
+    /* one cache key per 10 s, shared by every reader, so the CDN is asked for the file a few times a minute at most */
+    QK.fetchJSON(u + (u.indexOf('?') < 0 ? '?' : '&') + 't=' + Math.floor(Date.now() / 10000), { cache: 'no-store', timeout: 8000 }).then(function (j) {
+      fails = 0; holdUntil = 0;
+      if (!j || j.v !== 1 || !j.sports) return;
+      if (doc && j.at < doc.at) return;                       /* an older copy from a slow edge: keep the newer one */
+      doc = j;
+      var g = {}; Object.keys(j.sports).forEach(function (k) { g[k] = j.sports[k].g; });
+      var now = JSON.stringify(g);
+      if (now === seen) return;
+      seen = now;
+      subs.forEach(function (fn) { try { fn(); } catch (e) { /* one reader never stops the others */ } });
+      var n = 0;
+      Object.keys(watched).forEach(function (k) { var w = watched[k]; try { n += overlay(w[0], w[1], w[2]); } catch (e) { /* the built payload stands */ } });
+      if (n) hooks.forEach(function (fn) { try { fn(n); } catch (e) { /* a page that cannot redraw keeps what it shows */ } });
+    }, function () {
+      /* no feed: the pages keep the built snapshot, and the feed is asked less often (40 s, 80 s ... 5 minutes) */
+      fails += 1; holdUntil = Date.now() + Math.min(300000, 20000 * Math.pow(2, fails));
+    }).then(status, status);
+  }
+  /* games live now in the sports this page covers */
+  function liveHere() {
+    if (!doc || !doc.sports) return 0;
+    var ks = Object.keys(pageSports), n = 0;
+    (ks.length ? ks : Object.keys(doc.sports)).forEach(function (k) {
+      var s = doc.sports[k];
+      if (!s || !s.g) return;
+      Object.keys(s.g).forEach(function (id) { if (s.g[id] && s.g[id].s === 'live') n += 1; });
+    });
+    return n;
+  }
+  function agoWords(sec) { return sec < 60 ? sec + ' s' : Math.round(sec / 60) + ' min'; }
+  function status() {
+    if (!root.document || !document.body || ASOF !== null) return;
+    var fresh = ok(), n = fresh ? liveHere() : 0, age = doc ? Math.max(0, Math.round(Date.now() / 1000 - doc.at)) : null;
+    if (n) everLive = true;
+    if (!n && !(everLive && !fresh)) { if (bar) bar.hidden = true; return; }
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.className = 'qk-livebar';
+      bar.setAttribute('role', 'status');
+      /* built once and only its words change after, so a tap is never lost to a redraw */
+      bar.innerHTML = '<button type="button" class="qk-livebar-b" aria-expanded="false" title="Why scores can lag"><i aria-hidden="true"></i>' +
+        '<span class="t"></span><span class="ix" aria-hidden="true">ⓘ</span></button><p>' + esc(NOTE) + '</p>';
+      bar.firstChild.addEventListener('click', function () {
+        bar.classList.toggle('open');
+        bar.firstChild.setAttribute('aria-expanded', String(bar.classList.contains('open')));
+      });
+      document.body.appendChild(bar);
+    }
+    var slow = !fresh || age > SLOW;
+    var lab = !fresh ? 'Live scores paused · showing the last site build' : 'Live scores · updated ' + agoWords(age) + ' ago' + (slow ? ' · may trail play' : '');
+    bar.hidden = false;
+    bar.classList.toggle('slow', slow);
+    var t = bar.querySelector('.t');
+    if (t && t.textContent !== lab) t.textContent = lab;
+  }
+  function start() {
+    if (timer || ASOF !== null || !root.document) return;
+    poll();
+    timer = setInterval(poll, POLL);
+    setInterval(status, 10000);                             /* the age keeps counting between polls */
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) poll(); });
+  }
+  function norm(s) {
+    s = String(s || '').toLowerCase();
+    if (/^(final|post|finished|done|closed|ft|complete|completed|off|ret|wo|def)$/.test(s)) return 'final';
+    if (/^(live|in|crit|inprogress|in_progress|in progress|running|halftime|end_period)$/.test(s)) return 'live';
+    return 'pre';
+  }
+  /* what to do with entry e for a game whose own status reads `cur` (pre|live|final): null = leave it alone */
+  function step(cur, e) {
+    if (!e || cur === 'final' || e.s === 'pre' || RANK[e.s] < RANK[cur]) return null;
+    return e;
+  }
+  function apply(sport, g) {
+    pageSports[sport] = 1;
+    if (!g) return false;
+    var e = step(norm(g.status), entry(sport, g.id));
+    if (!e) return false;
+    var per = e.s === 'live' ? e.p : null, clk = e.s === 'live' ? e.c : null, wp = e.s === 'live' && isNum(e.wp) ? e.wp : null;
+    if (g.status === e.s && g.hs === e.hs && g.as === e.as && (g.period || null) === (per || null) && (g.clock || null) === (clk || null) && (wp === null || g.wp_home === wp)) return false;
+    /* the build's sentence under the chance was written for the state the build saw (12 Nov 2026: "The Celtics are
+     * slight favourites at 63%" under a live card whose bars had the Raptors at 63%): the card writes its own */
+    if (g.why && (g.status !== e.s || g.hs !== e.hs || g.as !== e.as || (wp !== null && g.wp_home !== wp))) g.why = null;
+    if (wp !== null) g.wp_home = wp;
+    else if (g.hs !== e.hs || g.as !== e.as || g.status !== e.s) { if (isNum(g.wp_home)) g.wp_home = null; }
+    g.status = e.s; g.hs = e.hs; g.as = e.as; g.period = per; g.clock = clk;
+    return true;
+  }
+  function overlay(sport, json, map) {
+    pageSports[sport] = 1;
+    if (!ok() || !json || typeof json !== 'object') return 0;
+    var S = doc.sports && doc.sports[sport];
+    if (!S || !S.g) return 0;
+    map = map || {};
+    var idK = map.id || 'id', perK = map.period || 'period', clkK = map.clock || 'clock', n = 0;
+    var words = { live: map.live || 'live', final: map.final || 'final' }, need = map.need || [];
+    function isGame(x) {
+      if (!x.hasOwnProperty(idK) || !x.hasOwnProperty('status') || (typeof x[idK] !== 'string' && typeof x[idK] !== 'number')) return false;
+      for (var i = 0; i < need.length; i++) if (!x.hasOwnProperty(need[i])) return false;
+      return true;
+    }
+    function patch(o) {
+      var e = step(norm(o.status), entry(sport, o[idK]));
+      if (!e) return;
+      if (map.set) { if (map.same && map.same(o, e)) return; map.set(o, e); o.live_feed = true; n += 1; return; }
+      var per = e.s === 'live' ? e.p : null, clk = e.s === 'live' ? e.c : null;
+      var moved = norm(o.status) !== e.s || o.hs !== e.hs || o.as !== e.as;
+      var wp = e.s === 'live' && isNum(e.wp) ? e.wp : null, wpK = map.wp || 'wp_home';
+      if (!moved && (o[perK] || null) === (per || null) && (o[clkK] || null) === (clk || null) && (wp === null || o[wpK] === wp)) return;
+      if (moved) (map.clear || ['wp_home']).forEach(function (k) { if (o.hasOwnProperty(k)) o[k] = null; });
+      if (wp !== null) o[wpK] = wp;
+      if (norm(o.status) !== e.s) o.status = words[e.s];
+      o.hs = e.hs; o.as = e.as; o[perK] = per; o[clkK] = clk;
+      if (map.detail) o[map.detail] = e.d || null;
+      o.live_feed = true;
+      n += 1;
+    }
+    (function walk(x, depth) {
+      if (!x || typeof x !== 'object' || depth > 7) return;
+      if (Array.isArray(x)) { for (var i = 0; i < x.length; i++) walk(x[i], depth + 1); return; }
+      if (isGame(x)) { patch(x); return; }
+      for (var k in x) if (x.hasOwnProperty(k) && x[k] && typeof x[k] === 'object') walk(x[k], depth + 1);
+    })(json, 0);
+    return n;
+  }
+  function watch(key, sport, json, map) {
+    if (!json || typeof json !== 'object') return json;
+    watched[String(key)] = [sport, json, map];
+    try { overlay(sport, json, map); } catch (e) { /* the built payload stands */ }
+    return json;
+  }
+  return { start: start, poll: poll, onChange: function (fn) { subs.push(fn); }, entry: entry, apply: apply, overlay: overlay,
+    watch: watch, attach: function (fn) { if (fn) hooks.push(fn); start(); },
+    ok: ok, age: function () { return doc ? Math.round(Date.now() / 1000 - doc.at) : null; }, norm: norm, status: status, NOTE: NOTE,
+    _set: function (j) { doc = j; } };
+})();
+
 /* ═══════════════════════════════════════ v2 "Signal" builders (Design System 2.0; STYLE_GUIDE.md) ═══ */
 
 /* The v4 faces: Bebas Neue (scores, big numbers, short headlines), Barlow (UI, body, tabular figures) and Barlow
@@ -1503,10 +1797,45 @@ QK.statTile = function (k) {
   return '<' + tag + ' class="qk-stat' + (k.cls ? ' ' + esc(k.cls) : '') + '"' + (k.href ? ' href="' + esc(k.href) + '"' : '') + '>' +
     '<div class="qk-stat-label">' + lab + '</div>' +
     '<div class="qk-stat-v' + (k.signal ? ' signal' : '') + (k.text ? ' text' : '') + long + '">' + v + (k.unit && !empty ? '<span class="u">' + esc(k.unit) + '</span>' : '') + '</div>' + pc +
+    (k.range && !empty ? QK.rangeBar(k.range) : '') +
     (dl || sub ? '<div class="qk-stat-sub">' + dl + (sub ? '<span>' + sub + '</span>' : '') + '</div>' : '') + spark + '</' + tag + '>';
 };
 QK.stats = function (list) {
   return '<div class="qk-stats">' + (list || []).filter(Boolean).map(function (x) { return typeof x === 'string' ? x : QK.statTile(x); }).join('') + '</div>';
+};
+/* QK.rangeBar({ lo, hi, mid, min, max, label, caption }) -> the likely-range bar: a track from min to max, our likely
+ * range (lo to hi) as a cobalt band, a volt tick at mid. Only for intervals the payload already has ("9 seasons in 10:
+ * 68-96"); never invent one (STYLE_GUIDE §6). min and max default to the range padded by a quarter each side.
+ * caption: a short line under it (plain text). statTile takes it as k.range. */
+QK.rangeBar = function (o) {
+  if (!o || !isNum(o.lo) || !isNum(o.hi) || o.hi < o.lo) return '';
+  var pad = (o.hi - o.lo) * 0.25 || Math.abs(o.hi) * 0.1 || 1;
+  var mn = isNum(o.min) ? o.min : o.lo - pad, mx = isNum(o.max) ? o.max : o.hi + pad;
+  if (!(mx > mn)) return '';
+  var f = o.fmt || function (v) { return fmt.num(v); };
+  var pos = function (v) { return Math.max(0, Math.min(100, (v - mn) / (mx - mn) * 100)); };
+  var a = pos(o.lo), b = pos(o.hi), m = isNum(o.mid) ? pos(o.mid) : null;
+  var lab = (o.label || 'Likely range') + ': ' + f(o.lo) + ' to ' + f(o.hi) + (m !== null ? ', most likely ' + f(o.mid) : '');
+  return '<div class="qk-range" role="img" aria-label="' + esc(lab) + '"><div class="qk-range-track"><span class="qk-range-band" style="left:' + a.toFixed(1) + '%;width:' + Math.max(1.5, b - a).toFixed(1) + '%"></span>' +
+    (m !== null ? '<span class="qk-range-mid" style="left:' + m.toFixed(1) + '%"></span>' : '') + '</div>' +
+    (o.caption ? '<div class="qk-range-cap">' + esc(o.caption) + '</div>' : '') + '</div>';
+};
+/* QK.formPair({ left: { name, abbr, colour, form }, right: {...}, n, title }) -> recent form for the two sides of a
+ * game, each a row of QK.formDots (oldest first, the newest at the right) with the record over them, for game pages.
+ * form: 'WWLDW' or an array of 'W'/'D'/'L' (as QK.formDots). Sides with no form are left out; nothing at all -> ''. */
+QK.formPair = function (o) {
+  o = o || {};
+  var n = o.n || 5;
+  var side = function (s) {
+    if (!s || !s.form || !s.form.length) return '';
+    var f = (typeof s.form === 'string' ? s.form.replace(/[^A-Za-z]/g, '').split('') : s.form.slice()).map(function (x) { return String(x).toUpperCase().charAt(0); }).slice(-n);
+    var w = f.filter(function (x) { return x === 'W'; }).length, d = f.filter(function (x) { return x === 'D'; }).length, l = f.filter(function (x) { return x === 'L'; }).length;
+    return '<div class="qk-fpair-row">' + (s.abbr ? QK.teamMark({ abbr: s.abbr, colour: s.colour }, 'sm') : '') + '<span class="qk-fpair-nm">' + esc(s.name || s.abbr || '') + '</span>' +
+      QK.formDots(f.join(''), n) + '<span class="qk-fpair-rec num">' + w + '–' + (d ? d + '–' : '') + l + '</span></div>';
+  };
+  var rows = side(o.left) + side(o.right);
+  if (!rows) return '';
+  return '<div class="qk-fpair"><div class="qk-fpair-h">' + esc(o.title || ('Form, last ' + n)) + '<span>oldest first</span></div>' + rows + '</div>';
 };
 /* QK.statStrip([tile objects or HTML], { bleed: true }) -> the black strip of big numbers that runs under a hero, edge
  * to edge (the player page's "points · goals · assists · pace · minutes"). */
