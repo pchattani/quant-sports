@@ -63,8 +63,11 @@ untouched). A match gives ESPN's row its referee and crowd; an unmatched test be
 `source: "wikipedia"`, the ESPN team id where ESPN knows the side (else `w<CODE>`), no line-ups or statistics. The
 report (`store.MERGE_REPORT`, also in `index.json` per scope) counts rows, matches, conflicts and additions.
 
-**Venues and weather.** A venue is placed from our city table, else Open-Meteo's geocoder on its city (restricted to the
-venue's or the home side's country); elevations from Open-Meteo's elevation API (Copernicus DEM). Weather is one
+**Venues and weather.** A venue is placed from our ground and city tables (`nations.place`: a ground name shared by
+several grounds, such as "Allianz Stadium" in London, Sydney and Turin, goes by its city; a city shared by two countries,
+such as Perth, by the ground's name; the tables win over the venues cache, so a corrected entry re-places a cached venue
+and its elevation and weather are fetched again), else Open-Meteo's geocoder on its city (restricted to the venue's or
+the home side's country); elevations from Open-Meteo's elevation API (Copernicus DEM). Weather is one
 archive call per match day with every venue that day: temperature, humidity and wind over the kick-off hour and the
 next two, rain summed over the match. Kick-off times are ESPN's (UTC), Wikipedia's when it gives a UTC offset, else
 15:00 local. Realised weather is never a pre-match input; venue elevation is static and is (the altitude rung,
@@ -124,17 +127,19 @@ store shape, and a scope tab on the site. Nothing else in the store changes; the
 ## Models and payloads
 
 1. `scripts/scrum_fit.py` tunes on 2004-2018, scores once on 2019-, applies the promotion rule and writes
-   `oddsmarkets/rugby/fitted/params.json` and `report.json` (MODELS.md).
+   `oddsmarkets/rugby/fitted/params.json` and `report.json` (MODELS.md). Since 13 Nov 2026 it also scores the model in
+   use on the same inputs and keeps it unless the re-run's choice clears the same rule against it (`--replace` skips
+   the check); the report's `incumbent` block has both (MODELS.md 2b).
 2. `scripts/scrum_spec.py` measures each player metric's reliability and writes `docs/_design/metrics/rugby.json`.
 3. `scripts/build_scrum.py` (every step guarded, every import that can fail inside its step) copies the kit and
    writes per scope (`oddsmarkets/rugby/pages.py`):
 
 | Payload | What |
 |---|---|
-| `index.json` | site, scopes (teams with colours, years, competitions), freshness, credit |
+| `index.json` | site, scopes (teams with colours, years, competitions, `alias`: a side's dropped second id -> the id kept, `store.unify_ids`), freshness, credit |
 | `<S>/overview.json` | digest top lines, featured test, upcoming tests with our chances, power board, who's hot by position, stories, who's for real, title races, champions |
 | `<S>/fixtures.json`, `<S>/years/<Y>.json` | upcoming tests with chances; results with our walk-forward pre-match call; the archive |
-| `<S>/matches/<id>.json` | the match page: card, halves, forecast and its inputs, team stats, the matchday 23 with minutes, key moments, the World Rugby exchange |
+| `<S>/matches/<id>.json` | the match page: card, halves, forecast and its inputs, team stats, the matchday 23 with minutes, key moments, the World Rugby exchange; once the test has started, `pre` (`pages.GoingIn`): how the sides stood going in, from tests dated before the start only (last five results, head to head, our ratings rank at the start of the day, World Rugby points before the test, the team profile over the two years before) |
 | `<S>/ratings.json`, `<S>/rankings.json` | our ratings with history; our World Rugby rebuild (table, week's movement, history, "what each result would do", the replica check) |
 | `<S>/comps/<key>.json` | standings with bonus points, simulations (Six Nations 2027, Nations Championship 2026, Rugby World Cup 2027), past winners |
 | `<S>/teams.json`, `<S>/teams/<id>.json` | the profile grid; team pages (profile, results, head to head, squad, most capped, rating history) |

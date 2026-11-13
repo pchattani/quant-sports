@@ -242,21 +242,61 @@ function forecastSide(S, M) {
     'From our ratings model: win, draw and loss, the margin with its spread, the total and the score' + (asof ? '. As of ' + esc(fmt.date(asof) + ' ' + fmt.time(asof)) + '; it moves with every result until the start' : '') + '.', tbl, { flush: true }) + '</div>';
 }
 
-/* the tale of the tape: the ratings the forecast used; before the start each side's last two years per test (the
-   percentile among test sides is the bar), after it the test's own two stat lines */
+/* a test under way or over: a final or live status, or a kick-off already passed (the feed can lag) */
+function started(c) {
+  if (c.status === 'final' || c.status === 'live') return true;
+  var t = Date.parse(String(c.date || ''));
+  return isNum(t) && t <= QK.now();
+}
+
+/* the tale of the tape. Before the start: the ratings our forecast uses, then each side's last two years per test (the
+   team files, as of the latest finished test; the bar is the percentile among test sides). Once it has started: "Going
+   in", every row as it stood before the start (the match file's `pre` block: our rank, World Rugby points and the
+   profile over the two years before that day; the ratings and the points we expected are the walk-forward forecast's),
+   then the test's own stat lines as a separate "In this game" tape. A build without `pre` keeps only the forecast's
+   own pre-match rows. */
 function tapeHTML(S, M, TH, TA, MET) {
-  var c = M.match, F = M.forecast || {}, fin = c.status === 'final';
+  var c = M.match, F = M.forecast || {}, fin = c.status === 'final', go = started(c), P = M.pre || null;
   var groups = [], pre = [];
   if (F.rating && isNum(F.rating[0])) pre.push({ label: 'Our rating (points v an average side)', a: F.rating[0], b: F.rating[1], ta: SC.signed(F.rating[0], 1), tb: SC.signed(F.rating[1], 1), tip: 'The rating each side carried into this test: points a test better than an average test side' });
   if (F.exp && isNum(F.exp[0])) pre.push({ label: 'Points we expected', a: F.exp[0], b: F.exp[1], ta: SC.f(F.exp[0], 0), tb: SC.f(F.exp[1], 0) });
-  if (!fin && TH && TA && isNum(TH.wr) && isNum(TA.wr)) pre.push({ label: 'World Rugby points (our rebuild)', a: TH.wr, b: TA.wr, ta: SC.f(TH.wr, 1), tb: SC.f(TA.wr, 1) });
-  if (pre.length) groups.push({ label: fin ? 'Before the start' : 'Ratings', rows: pre });
-  if (!fin && TH && TA && TH.profile && TA.profile) {
+  var wr = go ? (P && P.wr) : (TH && TA && isNum(TH.wr) && isNum(TA.wr) ? [TH.wr, TA.wr] : null);
+  if (wr && isNum(wr[0]) && isNum(wr[1])) pre.push({ label: 'World Rugby points (our rebuild)', a: wr[0], b: wr[1], ta: SC.f(wr[0], 1), tb: SC.f(wr[1], 1), tip: go ? 'Each side’s points in our World Rugby rebuild before this test' : 'Each side’s points in our World Rugby rebuild today' });
+  if (pre.length) groups.push({ label: 'Ratings', rows: pre });
+  var prow = function (k, x, y) {
+    var m = MET[k];
+    return { label: m.label, a: x[0], b: y[0], ta: tfmt(m, x[0]), tb: tfmt(m, y[0]), pa: x[1], pb: y[1], better: m.dir === 'lower' ? 'low' : 'high', tip: m.label + (m.unit === '%' ? '' : ', per test') + '; the bar is the opponent-adjusted percentile among test sides' };
+  };
+  if (go && P && P.profile && P.profile.m) {
+    var prs = TAPE_IDS.filter(function (k) { return MET[k] && P.profile.m[k]; }).map(function (k) { return prow(k, P.profile.m[k][0], P.profile.m[k][1]); });
+    if (prs.length) groups.push({ label: 'Per test, the two years before (' + P.profile.n[0] + ' and ' + P.profile.n[1] + ' tests)', rows: prs });
+  } else if (!go && TH && TA && TH.profile && TA.profile) {
     var rows = TAPE_IDS.filter(function (k) { return MET[k] && TH.profile.m[k] && TA.profile.m[k]; }).map(function (k) {
-      var m = MET[k], x = TH.profile.m[k], y = TA.profile.m[k];
-      return { label: m.label, a: x.v, b: y.v, ta: tfmt(m, x.v), tb: tfmt(m, y.v), pa: x.pct, pb: y.pct, better: m.dir === 'lower' ? 'low' : 'high', tip: m.label + (m.unit === '%' ? '' : ', per test') + '; the bar is the opponent-adjusted percentile among test sides' };
+      var x = TH.profile.m[k], y = TA.profile.m[k];
+      return prow(k, [x.v, x.pct], [y.v, y.pct]);
     });
     if (rows.length) groups.push({ label: 'Per test, last two years (' + TH.profile.n + ' and ' + TA.profile.n + ' tests)', rows: rows });
+  }
+  var rk = function (i, T) {
+    if (go) return P && P.rank && isNum(P.rank[i]) ? QK.ordinal(P.rank[i]) + ' in our ratings' : SC.compName(c.comp);
+    return T && isNum(T.rank) && T.rank ? QK.ordinal(T.rank) + ' in our ratings' : SC.compName(c.comp);
+  };
+  var side = function (tid, T, i) {
+    var t = SC.team(S, tid) || {};
+    return { name: t.name, short: t.abbr || t.name, sub: rk(i, T), colour: t.colour, alt: t.alt, href: SC.teamHref(S, tid) };
+  };
+  var fav = (F.p || [])[0] >= (F.p || [])[2] ? 'a' : 'b';
+  var ctx = [];
+  if (F.travel_km) ctx.push('distance from home to the venue ' + SC.tabbr(S, c.home) + ' ' + fmt.num(F.travel_km[0]) + ' km, ' + SC.tabbr(S, c.away) + ' ' + fmt.num(F.travel_km[1]) + ' km');
+  var days = function (d) { return d >= 99 ? '99+' : String(Math.round(d)); };
+  if (F.rest && isNum(F.rest[0]) && isNum(F.rest[1])) ctx.push('days since the last test ' + days(F.rest[0]) + ' and ' + days(F.rest[1]));
+  var note = ctx.length ? U.note(esc(ctx.join('; ').replace(/^./, function (x) { return x.toUpperCase(); })) + '.') : '';
+  var out = '';
+  if (groups.length) {
+    var when = esc(SC.date(c.date));
+    out += U.card(go ? 'Going in' : 'Tale of the tape', go ? 'Before ' + when + ': the ratings each side carried in' + (groups.length > 1 ? ', then each side over the two years before, opponent-adjusted (the bar is the percentile among test sides)' : '') + '. Nothing from this test or after it.' :
+      'The ratings our forecast uses, then each side over the last two years, opponent-adjusted: the bar is the percentile among test sides.',
+      QK.tape({ left: side(c.home, TH, 0), right: side(c.away, TA, 1), groups: groups, fav: fav }) + note);
   }
   if (fin && M.stats) {
     var hs = M.stats.home, as = M.stats.away;
@@ -264,52 +304,56 @@ function tapeHTML(S, M, TH, TA, MET) {
       var f = r[2] === 'pct' ? function (v) { return Math.round(v * 100) + '%'; } : function (v) { return fmt.num(v); };
       return { label: r[0], a: hs[r[1]], b: as[r[1]], ta: f(hs[r[1]]), tb: f(as[r[1]]), better: r[3] === 'low' ? 'low' : 'high' };
     });
-    if (srows.length) groups.push({ label: 'The test itself', rows: srows });
+    if (srows.length) {
+      var gs = function (tid) { var t = SC.team(S, tid) || {}; return { name: t.name, short: t.abbr || t.name, sub: tid === c.home ? String(c.hs) + ' points' : String(c.as) + ' points', colour: t.colour, alt: t.alt, href: SC.teamHref(S, tid) }; };
+      out += U.card('In this game', 'The two stat lines from the test; the better side of each row is solid.',
+        QK.tape({ left: gs(c.home), right: gs(c.away), groups: [{ label: 'The test itself', rows: srows }], fav: c.hs >= c.as ? 'a' : 'b' }));
+    }
   }
-  if (!groups.length) return '';
-  var side = function (tid, T) {
-    var t = SC.team(S, tid) || {};
-    return { name: t.name, short: t.abbr || t.name, sub: T && isNum(T.rank) && T.rank ? QK.ordinal(T.rank) + ' in our ratings' : SC.compName(c.comp), colour: t.colour, alt: t.alt, href: SC.teamHref(S, tid) };
-  };
-  var ctx = [];
-  if (F.travel_km) ctx.push('distance from home to the venue ' + SC.tabbr(S, c.home) + ' ' + fmt.num(F.travel_km[0]) + ' km, ' + SC.tabbr(S, c.away) + ' ' + fmt.num(F.travel_km[1]) + ' km');
-  var days = function (d) { return d >= 99 ? '99+' : String(Math.round(d)); };
-  if (F.rest && isNum(F.rest[0]) && isNum(F.rest[1])) ctx.push('days since the last test ' + days(F.rest[0]) + ' and ' + days(F.rest[1]));
-  return U.card('Tale of the tape', fin ? 'The ratings each side carried in, then the two stat lines from the test; the better side of each row is solid.' : 'The ratings our forecast uses, then each side over the last two years, opponent-adjusted: the bar is the percentile among test sides.',
-    QK.tape({ left: side(c.home, TH), right: side(c.away, TA), groups: groups, fav: (F.p || [])[0] >= (F.p || [])[2] ? 'a' : 'b' }) + (ctx.length ? U.note(esc(ctx.join('; ').replace(/^./, function (x) { return x.toUpperCase(); })) + '.') : ''));
+  return out;
 }
 
-/* each side's last five tests before this one (the team files' results, dated before the start) and the head to head */
+/* each side's last five tests before this one and the head to head. Once the test has started both come from the
+   match file's `pre` block (every test dated before the start); a build without it falls back to the team files'
+   results dated before the start, and to the all-time head to head only where this test is the latest meeting (it
+   is taken out), never a record that runs past the start. */
 function formHTML(S, M, TH, TA) {
-  var c = M.match, before = String(c.date || '');
-  var last5 = function (T, tid) {
+  var c = M.match, before = String(c.date || ''), go = started(c), P = (go && M.pre) || null;
+  var last5 = function (T, tid, i) {
+    if (P && P.form) return String(P.form[i] || '').split('').filter(Boolean);
     return ((T || {}).results || []).filter(function (r) { return isNum(r.hs) && String(r.id) !== String(c.id) && String(r.date) < before; }).slice(0, 5).reverse().map(function (r) { return SC.result(S, r, tid); });
   };
-  var side = function (tid, T) { var t = SC.team(S, tid) || {}; return { name: t.name, abbr: t.abbr, colour: t.colour, form: last5(T, tid) }; };
-  var fp = QK.formPair({ left: side(c.home, TH), right: side(c.away, TA), n: 5, title: 'Last five tests before this one' });
-  var h = ((TH || {}).h2h || []).filter(function (x) { return String(x.opp) === String(c.away); })[0];
-  var line = '';
-  if (h && h.p) {
-    var H = SC.tname(S, c.home), A = SC.tname(S, c.away);
-    var p = h.p, w = h.w, d = h.d, l = h.l, pf = h.pf, pa = h.pa, todate = false;
-    /* a finished test is in the record: take it out when it is the latest meeting, else say the record runs to date */
-    if (c.status === 'final' && isNum(c.hs)) {
-      if (h.last && String(h.last.id) === String(c.id)) {
-        p -= 1; if (c.hs > c.as) w -= 1; else if (c.hs < c.as) l -= 1; else d -= 1;
-        if (!c.ro) { pf -= c.hs; pa -= c.as; }
-      } else todate = true;
+  var side = function (tid, T, i) { var t = SC.team(S, tid) || {}; return { name: t.name, abbr: t.abbr, colour: t.colour, form: last5(T, tid, i) }; };
+  var fp = QK.formPair({ left: side(c.home, TH, 0), right: side(c.away, TA, 1), n: 5, title: 'Last five tests before this one' });
+  var H = SC.tname(S, c.home), A = SC.tname(S, c.away);
+  var h = null;
+  if (P) h = P.h2h || { p: 0 };
+  else {
+    var hh = ((TH || {}).h2h || []).filter(function (x) { return String(x.opp) === String(c.away); })[0];
+    if (hh && hh.p) {
+      h = { p: hh.p, w: hh.w, d: hh.d, l: hh.l, pf: hh.pf, pa: hh.pa, ro: hh.ro || 0, first: hh.first, last: hh.last };
+      if (go) {
+        if (c.status === 'final' && isNum(c.hs) && hh.last && String(hh.last.id) === String(c.id)) {
+          h.p -= 1; if (c.hs > c.as) h.w -= 1; else if (c.hs < c.as) h.l -= 1; else h.d -= 1;
+          if (!c.ro) { h.pf -= c.hs; h.pa -= c.as; } else h.ro -= 1;
+          h.last = null;
+        } else h = null;           /* the record runs past the start: left out until the next build */
+      }
     }
-    if (p <= 0) line = 'The first meeting in our data.';
+  }
+  var line = '';
+  if (h) {
+    if (h.p <= 0) line = 'The first meeting in our data.';
     else {
-      line = (todate ? 'All time, to date (this test included): ' : (c.status === 'final' ? 'Before this test: ' : '')) + p + ' meeting' + (p === 1 ? '' : 's') + ' since ' + esc(SC.year(h.first)) + ', ' +
-        w + ' ' + esc(H) + ' win' + (w === 1 ? '' : 's') + ', ' + d + ' draw' + (d === 1 ? '' : 's') + ', ' + l + ' ' + esc(A) + ' win' + (l === 1 ? '' : 's') +
-        (p > (h.ro || 0) ? ' (points ' + pf + '–' + pa + (h.ro ? ', the ' + h.ro + ' tests before 1891 had no points' : '') + ')' : '') + '.';
-      if (h.last && c.status !== 'final') line += ' The last: ' + esc(SC.scoreText(h.last.us, h.last.them, h.last.ro)) + ' to ' + esc(SC.tabbr(S, c.home)) + ', ' + esc(SC.date(h.last.date)) + '.';
+      line = (go ? 'Before this test: ' : '') + h.p + ' meeting' + (h.p === 1 ? '' : 's') + ' since ' + esc(SC.year(h.first)) + ', ' +
+        h.w + ' ' + esc(H) + ' win' + (h.w === 1 ? '' : 's') + ', ' + h.d + ' draw' + (h.d === 1 ? '' : 's') + ', ' + h.l + ' ' + esc(A) + ' win' + (h.l === 1 ? '' : 's') +
+        (h.p > (h.ro || 0) ? ' (points ' + h.pf + '–' + h.pa + (h.ro ? ', the ' + h.ro + ' tests before 1891 had no points' : '') + ')' : '') + '.';
+      if (h.last) line += ' The last: ' + esc(SC.scoreText(h.last.us, h.last.them, h.last.ro)) + ' to ' + esc(SC.tabbr(S, c.home)) + ', ' + esc(SC.date(h.last.date)) + '.';
     }
   }
   if (!fp && !line) return '';
-  return U.card('Form and head to head', 'Results dated before the start only.', fp + (line ? QK.explain('<b>Head to head.</b> ' + line) : '') +
-    (h && h.last ? '<p class="sc-note"><a href="' + esc(SC.teamHref(S, c.home)) + '">' + esc(SC.tname(S, c.home)) + '’s every opponent →</a></p>' : ''));
+  return U.card('Form and head to head', go ? 'Results dated before ' + esc(SC.date(c.date)) + ' only.' : 'Results dated before the start only.', fp + (line ? QK.explain('<b>Head to head.</b> ' + line) : '') +
+    '<p class="sc-note"><a href="' + esc(SC.teamHref(S, c.home)) + '">' + esc(H) + '’s every opponent →</a></p>');
 }
 
 /* the key players: the best by Scrum value per 80 among those who played the side's last test (the team file's squad
@@ -386,7 +430,11 @@ SC.route('match', function (page, P) {
       html += U.note('Our source has no line-ups or player statistics for this match.');
     }
     if (F.p && !fin) {
-      html += QK.explain('<b>How we got there.</b> Our rating gap with home advantage (' + (c.neutral ? 'none: a neutral venue' : isNum(F.edge) && Math.abs(F.edge) < 0.05 ? 'none in this test' : 'about ' + SC.f(F.edge, 1) + ' points for the home side, travel and rest included') +
+      /* the edge is signed: + for the home side in its own country, − when the side listed second is the one at home
+         (a World Cup host listed away), 0 at a neutral venue or a "home" test abroad */
+      var adv = !isNum(F.edge) || Math.abs(F.edge) < 0.05 ? (c.neutral ? 'none: a neutral venue' : 'none: neither side plays in its own country here') :
+        'about ' + SC.f(Math.abs(F.edge), 1) + ' points for ' + esc(SC.tname(S, F.edge > 0 ? c.home : c.away)) + (F.edge > 0 ? ', at home' : ', at home in its own country though listed second');
+      html += QK.explain('<b>How we got there.</b> Our rating gap with home advantage (' + adv +
         '), then a normal spread of margins around it' + (isNum(F.sd) ? ' (' + SC.f(F.sd, 1) + ' points here: 8 tests in 10 land within ' + Math.round(Z80 * F.sd) + ' points of our margin)' : '') + '. <a class="qk-link" href="' + esc(SC.href(S, 'model')) + '">The method</a>.');
     }
     page.innerHTML = html;

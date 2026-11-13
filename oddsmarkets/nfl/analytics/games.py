@@ -13,13 +13,17 @@ play-by-play for the game (CI before nflverse publishes it) the previous page's 
 has not published yet is built from ESPN's record (plays, ESPN and our live WP, drives, score by quarter and ESPN's box
 score, source "espn"), replaced by the nflverse blocks on the first build after nflverse publishes (the page signature
 counts the game's nflverse plays).
+
+Every page also carries `tape_pre`, the two teams' tale of the tape going into the game (see tape_pre below); a game that
+has started carries its unit matchups going in too, never today's.
 """
 from __future__ import annotations
 
+import bisect
 import hashlib
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 import numpy as np
@@ -607,15 +611,191 @@ def _injury_impacts(inj: dict | None, av: dict | None) -> dict | None:
     return out
 
 
+# ---------------------------------------------------------------------------------------------- going in (tape_pre)
+
+# The no-look-ahead rule for game pages (13 Nov 2026): a game that has started compares the two teams going in, never
+# with today's season numbers (which count the game itself and everything after it). The game file's `tape_pre` holds
+# the comparison rows: {"before": the kickoff (UTC), "source": "snapshot" | "computed", "home" / "away": {"gp" (games
+# whose plays are counted), "rating", "off_rating", "def_rating", "off_pass_epa", "off_rush_epa", "def_pass_epa",
+# "def_rush_epa", "st_epa_g", "rank" {the four EPA units' league ranks going in}}, "rating_asof"?}. While the game is
+# upcoming every build writes the snapshot; once it starts the snapshot is kept unchanged (like the frozen pre-game
+# forecast). A game that started before snapshots were written gets the rows computed going in ("computed"); the front
+# end drops the rows when the file has neither. The unit matchups of a started game come from the same rows.
+TAPE_VERSION = 1                     # in the page signatures from TAPE_FROM: one rewrite backfills every page of the season
+TAPE_FROM = 2026                     # the first season whose page signatures carry it (earlier seasons keep theirs)
+TAPE_EPA = ("off_pass_epa", "off_rush_epa", "def_pass_epa", "def_rush_epa")
+
+
+def _utc(v: Any) -> str:
+    """An ISO time or date as UTC "YYYY-MM-DDTHH:MM:SSZ" (store kickoffs are UTC, schedule ones carry an offset); "" when
+    unreadable."""
+    s = str(v or "").strip()
+    if not s:
+        return ""
+    try:
+        d = datetime.fromisoformat(s.replace("Z", "+00:00"))
+    except ValueError:
+        return ""
+    if d.tzinfo is not None:
+        d = d.astimezone(timezone.utc)
+    return d.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def kickoff_utc(g: dict) -> str:
+    return _utc(g.get("kickoff")) or _utc(g.get("date"))
+
+
+def started(g: dict, now: str | None = None) -> bool:
+    """A game that has begun: live or final in the store, or its kickoff passed (a postponement aside)."""
+    st = g.get("status")
+    if st in ("live", "final"):
+        return True
+    if st in ("postponed", "cancelled"):
+        return False
+    k = kickoff_utc(g)
+    return bool(k and now and k <= now)
+
+
+class GoingIn:
+    """Each team's tape rows going into a game. The EPA units (teams.epa_units: opponent-adjusted pass and rush EPA for
+    and against, special teams a game) are refitted on the regular-season plays of games final before the kickoff, so a
+    game never counts itself or anything after it; the league ranks of the four units come from the same fit. The
+    ratings (overall, offence, defence): the published ones (`values_now`, the snapshot of an upcoming game), else the
+    rating history the team pages plot (teams.json history [[week, net, off, def]]), the latest point whose fit ends
+    on or before the game's date (a team_strength point fits games dated before the week's last day + 2:
+    adapters._ts_history; the EPA fallback's point counts the weeks up to its own)."""
+
+    def __init__(self, ctx, P: pd.DataFrame | None, values_now: dict | None = None, history: dict | None = None):
+        self.values_now = values_now or {}
+        self.history = history or {}
+        fin = sorted((kickoff_utc(g), str(gid)) for gid, g in ctx.games.items()
+                     if g.get("gtype") == "REG" and g.get("status") == "final" and kickoff_utc(g))
+        self.fin_t = [k for k, _ in fin]
+        self.fin_id = [gid for _, gid in fin]
+        if P is not None and len(P) and "season_type" in P:
+            P = P[P["season_type"].astype(str).str.upper() == "REG"]
+        self.P = P[P["game_id"].astype(str).isin(set(self.fin_id))] if P is not None and len(P) and "game_id" in P else None
+        # each history point's end: the last date of the week's final regular-season games + 2 days (adapters._ts_history)
+        last: dict[int, str] = {}
+        for g in ctx.games.values():
+            if g.get("gtype") == "REG" and g.get("status") == "final" and g.get("date"):
+                w = int(g.get("week") or 0)
+                last[w] = max(last.get(w, ""), str(g["date"])[:10])
+        self.through: dict[int, str] = {}
+        for w, d in last.items():
+            try:
+                self.through[w] = (date.fromisoformat(d) + timedelta(days=2)).isoformat()
+            except ValueError:
+                pass
+        self._cache: dict[int, tuple] = {}
+
+    def _units(self, n: int) -> tuple[dict, dict, dict]:
+        """(units by team, games counted by team, ranks by unit) on the first n final games by kickoff."""
+        if n in self._cache:
+            return self._cache[n]
+        from oddsmarkets.nfl.analytics import teams as TM
+        u: dict = {}
+        gp: dict[str, int] = {}
+        rk: dict[str, dict] = {}
+        if self.P is not None and n:
+            Q = self.P[self.P["game_id"].astype(str).isin(set(self.fin_id[:n]))]
+            if len(Q):
+                u = TM.epa_units(Q)
+                for col in ("posteam", "defteam"):
+                    if col in Q:
+                        for t, k in Q[["game_id", col]].dropna().drop_duplicates().groupby(col)["game_id"].nunique().items():
+                            gp[str(t)] = max(gp.get(str(t), 0), int(k))
+                for k in TAPE_EPA:
+                    rk[k] = an.ranks({t: v.get(k) for t, v in u.items()}, lower=k.startswith("def_"))
+        self._cache[n] = (u, gp, rk)
+        return self._cache[n]
+
+    def hist_rating(self, team: str, day: str) -> tuple[dict, str | None]:
+        """{"rating", "off_rating", "def_rating"} from the latest history point that ends on or before `day`."""
+        if not day:
+            return {}, None
+        pts = [p for p in (self.history.get(team) or []) if isinstance(p, (list, tuple)) and len(p) >= 4
+               and self.through.get(int(p[0] or 0)) and self.through[int(p[0] or 0)] <= day[:10]]
+        if not pts:
+            return {}, None
+        p = max(pts, key=lambda x: int(x[0] or 0))
+        return {"rating": an.rnd(p[1], 2), "off_rating": an.rnd(p[2], 2), "def_rating": an.rnd(p[3], 2)}, self.through[int(p[0] or 0)]
+
+    def rows(self, g: dict, source: str) -> dict | None:
+        before = kickoff_utc(g)
+        if not before or self.P is None:
+            return None
+        n = bisect.bisect_left(self.fin_t, before)
+        u, gp, rk = self._units(n)
+        out: dict = {"before": before, "source": source}
+        asof = None
+        for side in ("home", "away"):
+            t = g.get(side)
+            if not t:
+                return None
+            x = u.get(t) or {}
+            r: dict = {"gp": gp.get(t, 0)}
+            if source == "snapshot":
+                v = self.values_now.get(t) or {}
+                r.update({k: an.rnd(v.get(k), 2) for k in ("rating", "off_rating", "def_rating")})
+            else:
+                hr, asof = self.hist_rating(t, str(g.get("date") or before)[:10])
+                r.update(hr)
+            r.update({k: an.rnd(x.get(k), 3) for k in TAPE_EPA})
+            r["st_epa_g"] = an.rnd(x.get("st_epa_g"), 2)
+            r["rank"] = {k: rk[k][t] for k in TAPE_EPA if t in rk.get(k, {})}
+            out[side] = r
+        if source != "snapshot" and asof:
+            out["rating_asof"] = asof
+        return out
+
+
+def tape_pre(gi: GoingIn | None, g: dict, old: dict | None, now: str | None) -> dict | None:
+    """The game file's tape_pre: the snapshot while the game is upcoming; once it has started, the snapshot written
+    before kickoff, kept unchanged while it counts the same games as the rows computed going in (a snapshot left behind
+    by a missed build or play-by-play published late is replaced), else the computed rows; None when neither exists."""
+    if gi is None:
+        return (old or {}).get("tape_pre") if started(g, now) else None
+    if not started(g, now):
+        return gi.rows(g, "snapshot")
+    comp = gi.rows(g, "computed")
+    prev = (old or {}).get("tape_pre")
+    if isinstance(prev, dict) and isinstance(prev.get("home"), dict) and isinstance(prev.get("away"), dict):
+        if comp is None or all((prev[s] or {}).get("gp") == comp[s].get("gp") for s in ("home", "away")):
+            return prev
+    return comp
+
+
+def matchup_from_tape(tp: dict | None) -> dict | None:
+    """Unit matchups going in (the shape of season.matchup) from tape_pre: each offence against the other's defence."""
+    if not tp or not isinstance(tp.get("home"), dict) or not isinstance(tp.get("away"), dict):
+        return None
+    h, a = tp["home"], tp["away"]
+    hr, ar = h.get("rank") or {}, a.get("rank") or {}
+
+    def side(o, orank, d, drank):
+        return {u: {"off": o.get("off_" + u + "_epa"), "off_rank": orank.get("off_" + u + "_epa"), "def": d.get("def_" + u + "_epa"),
+                    "def_rank": drank.get("def_" + u + "_epa")} for u in ("pass", "rush")}
+    return {"home_off": side(h, hr, a, ar), "away_off": side(a, ar, h, hr), "rating": {"home": h.get("rating"), "away": a.get("rating")},
+            "st": {"home": h.get("st_epa_g"), "away": a.get("st_epa_g")}, "going_in": True}
+
+
 def build_page(ctx: SeasonContext, g: dict, G: pd.DataFrame | None, crd: dict, pregame: dict | None, old: dict | None,
                names: dict, ngs_w: dict, matchups: dict | None, injuries: dict | None = None,
-               availability: dict | None = None) -> dict:
+               availability: dict | None = None, going_in: GoingIn | None = None, now: str | None = None) -> dict:
+    now = now or an.now()
+    tp = tape_pre(going_in, g, old, now)
+    if started(g, now):
+        # today's unit matchups count the game itself and everything after it: a started game carries them going in
+        matchups = matchup_from_tape(tp)
     out = {"ok": True, "game_id": g["game_id"], "season": ctx.season, "updated_at": an.now(), "card": crd,
            "game": {**{k: g.get(k) for k in ("stadium", "roof", "surface", "temp", "wind", "referee", "home_coach", "away_coach",
                                             "home_rest", "away_rest", "div_game", "overtime", "espn_id", "date", "neutral")},
                     "stadium_id": g.get("stadium"), "stadium_name": stadium_name(g)},
            "pregame": pregame or (old or {}).get("pregame"), "matchups": matchups,
            "credits": [an.NFLVERSE_CREDIT] + ([an.FTN_CREDIT] if ctx.season >= 2022 else []) + ([an.NGS_CREDIT] if ctx.season >= 2016 else [])}
+    if tp:
+        out["tape_pre"] = tp
     sm = espn_summary(g) if g.get("status") != "final" or not (old or {}).get("injuries") else None
     # the NFL's report via nflverse first once it has this week (complete, with gsis ids); ESPN's list before that
     # (since 22 Oct 2026; ESPN's summary lists about five players a team)

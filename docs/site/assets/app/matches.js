@@ -11,7 +11,9 @@
  *   score once it starts, our chance for the favourite, the home / draw / away bar, the market as a quiet line before
  *   kick-off: the only place it appears besides the Model page), stat tiles, our forecast before kick-off (win, draw, expected goals, most likely score, 3 or more goals, both score)
  *   with the prediction market only as a quiet reference column named by its source, the tale of the tape (our
- *   rating, Elo, xG for and against, from the competition's strength.json and team_stats.json), the confirmed XIs
+ *   rating, Elo, xG for and against, from the competition's strength.json and team_stats.json; once the match has
+ *   started, "Going in": the same rows from this competition's matches before kick-off only, our rating and Elo from
+ *   the snapshot frozen before kick-off, fixtures[].pre), the confirmed XIs
  *   once posted (fixtures[].xi, about an hour before kick-off) with our forecast before and after the line-up term
  *   (model_pre, model), and,
  *   when the match has a page (fixtures[].detail): summary tiles, the expected result (every shot replayed at its
@@ -177,15 +179,17 @@ function teamIds(teamsDoc) {
 function findFixture(c, id) {
   return FB.compFiles(c.slug, ['fixtures', 'teams']).then(function (d) {
     var ids = teamIds(d.teams);
-    var f = (((d.fixtures || {}).matches) || []).filter(function (m) { return String(m.id) === String(id); })[0];
-    if (f) return { f: f, ids: ids, season: FB.currentSeason(c).season, past: false, asof: (d.fixtures || {}).updated_at || null };
+    var season = ((d.fixtures || {}).matches) || [];
+    var f = season.filter(function (m) { return String(m.id) === String(id); })[0];
+    /* `all`: the season's fixtures, for the "Going in" tape of a started match (goingIn) */
+    if (f) return { f: f, ids: ids, season: FB.currentSeason(c).season, past: false, asof: (d.fixtures || {}).updated_at || null, all: season };
     return FB.seasonsOf(c).then(function (list) {
       var past = list.filter(function (s) { return s.source !== 'live' && (s.source === 'store' || s.path) && (s.matches || s.finished || s.detail); });
       function next(i) {
         if (i >= past.length || i >= 6) return FB.load('hub.json').then(function (h) {
           var all = hubAll(h).concat((h || {}).recent || [], (h || {}).upcoming || []);
           var x = all.filter(function (m) { return String(m.id) === String(id) && m.comp === c.slug; })[0];
-          return x ? { f: x, ids: ids, season: FB.currentSeason(c).season, past: false } : null;
+          return x ? { f: x, ids: ids, season: FB.currentSeason(c).season, past: false, all: season } : null;
         });
         return FB.loadPastSeason(c, past[i].sid).then(function (doc) {
           var x = ((doc || {}).fixtures || []).filter(function (m) { return String(m.id) === String(id); })[0];
@@ -217,14 +221,16 @@ FB.route('match', function (el, p) {
     jobs.push(f.status !== 'finished' && FB.hasFile(c.slug, 'market_odds') ? FB.compFile(c.slug, 'market_odds') : Promise.resolve(null));
     jobs.push(!hit.past ? FB.compFiles(c.slug, ['strength', 'team_stats', 'table']) : Promise.resolve(null));
     /* a finished match whose fixture no longer carries our line: the chance frozen before kick-off (forecast_log.json,
-       id -> [home, draw, away, kick-off, competition]), so the page keeps "Our pre-match call" */
-    var needLog = f.status === 'finished' && !(f.model && isNum(f.model.h));
+       id -> [home, draw, away, kick-off, competition]), so the page keeps "Our pre-match call". A match in play takes
+       the same frozen line: its fixture's line is re-fitted every build, so it can already include results that came in
+       after kick-off (no look-ahead); the re-fitted line stays only when the log has no entry. */
+    var needLog = (f.status === 'finished' && !(f.model && isNum(f.model.h))) || f.status === 'live';
     jobs.push(needLog ? FB.load('forecast_log.json') : Promise.resolve(null));
     return Promise.all(jobs).then(function (r) {
       if (!FB.alive(el)) return;
       var m = r[0];
       var lg = needLog && r[3] ? r[3][String(f.id)] : null;
-      if (lg && isNum(lg[0]) && isNum(lg[1]) && isNum(lg[2])) f = FB.merge(f, { model: { h: lg[0], d: lg[1], a: lg[2], logged: true } });
+      if (lg && isNum(lg[0]) && isNum(lg[1]) && isNum(lg[2])) f = FB.merge(f, { model: { h: lg[0], d: lg[1], a: lg[2], logged: true }, model_pre: null });
       var mk = null;
       (((r[1] || {}).matches || {}).fixtures || []).forEach(function (x) { if (String(x.match_id) === String(f.id) && x.market) mk = x; });
       if (mk) { mk._src = (r[1] || {}).sources || []; mk._at = (r[1] || {}).updated_at; }
@@ -250,13 +256,16 @@ function renderMatch(el, c, f, m, mk, hit, side) {
   if (pre && f.model) right = kpiStrip(f) + forecastCard(f, mk, false, hit.asof);
   else if (f.model) right = forecastCard(f, null, true);
   var html = back + '<div class="fb-mx-top' + (right ? '' : ' solo') + '">' + hero(c, f, m, hit, mk, side) + (right ? '<div class="fb-mx-stack">' + right + '</div>' : '') + '</div>';
-  /* v4 (as the Rink's game page): the tale of the tape (QK.matchupBar: the season so far from strength.json and
-     team_stats.json) beside each side's recent form before kick-off (QK.formPair, from the club files) */
-  var tape = tapeCard(c, f, side, !pre);
+  /* v4 (as the Rink's game page): the tale of the tape (QK.matchupBar) beside each side's recent form before kick-off
+     (QK.formPair, from the club files). Before kick-off the tape is the season so far (strength.json, team_stats.json);
+     once the match has started it is "Going in": only this competition's matches before kick-off (goingIn) */
+  var tape = tapeCard(c, f, side, !pre, !pre && side ? goingIn(f, side, hit.all) : null);
   var hasDetail = !!(m && (m.shots || m.lineups || m.team_stats));
   var formBox = f.home_id && f.away_id ? '<div class="qk-span-' + (tape ? 5 : 12) + ' fb-mx-stack" id="mx-recent"></div>' : '';
   if (tape || formBox) html += '<div class="fb-mt">' + FB.grid(tape + formBox) + '</div>';
-  if (f.status !== 'finished' && f.xi) html += xiCard(f);
+  /* the XI card values both line-ups at the latest build's player values: before kick-off only (a match in play shows
+     its line-ups in the match centre below) */
+  if (pre && f.xi) html += xiCard(f);
   if (m && (m.shots || m.lineups || m.team_stats)) {
     html += '<section class="qk-section">' + QK.sectionHead({ kicker: f.status === 'live' ? 'In play' : 'After the whistle', title: 'How the match was won', sub: 'What the chances were worth, where the shots came from, the line-ups and every player’s line.' }) + '<div id="mx-detail"></div></section>';
   } else {
@@ -268,7 +277,7 @@ function renderMatch(el, c, f, m, mk, hit, side) {
   if (m && (m.shots || m.lineups || m.team_stats)) detail(el, c, f, m);
   else preview(el, c, f, '');
   recentForm(el, f, hasDetail);
-  absences(el, c, f, m);
+  absences(el, c, f, m, !pre);
 }
 
 /* Each side's last five before kick-off, every competition (the club files: results dated before this match only, so
@@ -321,8 +330,10 @@ function recentForm(el, f, h2h) {
    doubtful players (the match file's `missing`); a match whose XIs are in also lists the usual starters left out
    (fixtures[].xi out, each with the value the line-up model gives them). Each player carries our projected value
    (GAR/90 from the club's value file: goals of expected goal difference a match above a replacement-level player);
-   the regulars' sum is what the side is missing, about, if a replacement-level player stands in. */
-function absences(el, c, f, m) {
+   the regulars' sum is what the side is missing, about, if a replacement-level player stands in.
+   Once the match has started (`started`) the value file is today's, fitted on this match and those since: the page
+   lists who was missing and why, without values, regulars or sums (no look-ahead), in the order the source gives. */
+function absences(el, c, f, m, started) {
   var miss = (m && m.missing) || {};
   var x = f.xi || {};
   var sides = ['home', 'away'].map(function (s) {
@@ -337,6 +348,29 @@ function absences(el, c, f, m) {
   el.appendChild(host);
   Promise.all(sides.map(function (s) { return FB.absenceRows(s.tid, s.list); })).then(function (rows) {
     if (!FB.alive(el)) return;
+    /* after kick-off: who was missing, in the source's order, without today's values */
+    var listed = function (s, rs) {
+      var at = {};
+      s.list.forEach(function (p, i) { if (p.id) at[String(p.id)] = i; });
+      rs = rs.slice().sort(function (a, b) { return (at[String(a.id)] === undefined ? 999 : at[String(a.id)]) - (at[String(b.id)] === undefined ? 999 : at[String(b.id)]); });
+      var n = {};
+      rs.forEach(function (r) { n[r.why] = (n[r.why] || 0) + 1; });
+      var why = ['injured', 'suspended', 'doubtful'].filter(function (k) { return n[k]; }).map(function (k) { return n[k] + ' ' + k; }).join(', ');
+      var head = rs.length ? FB.kpi('Missing', String(rs.length), { sub: why }) : '';
+      var headOut = s.out.length ? FB.kpi('Usual starters left out', String(s.out.length), { sub: 'against the club’s usual XI' }) : '';
+      var li = rs.map(function (r) {
+        return '<li><span class="fb-mx-abn">' + (r.id ? FB.playerLink(r.id, r.name) : esc(r.name)) + (r.role ? ' <span class="qk-muted">' + esc(r.role) + '</span>' : '') + '</span>' +
+          '<span class="fb-mx-abw ' + esc(r.why) + '">' + esc(r.why) + '</span></li>';
+      }).join('') + s.out.map(function (o) {
+        return '<li><span class="fb-mx-abn">' + FB.playerLink(o.id, o.n || ('#' + o.id)) + '</span><span class="fb-mx-abw out">left out</span></li>';
+      }).join('');
+      return FB.card(FB.clubLink(s.tid, s.name), (rs.length + s.out.length) + ' absent', FB.kpis([head, headOut].filter(Boolean)) + '<ul class="fb-mx-ab novalue">' + li + '</ul>', { span: 6 });
+    };
+    if (started) {
+      host.innerHTML = QK.sectionHead({ kicker: 'Absences', title: 'Who was missing', sub: 'Injured, suspended and doubtful players' + (sides.some(function (s) { return s.out.length; }) ? ', and the usual starters left out of the XI' : '') + '. Our player values are left out once a match has started: today’s values already include this match and any since.' }) +
+        FB.grid(listed(sides[0], rows[0]) + listed(sides[1], rows[1]));
+      return;
+    }
     var col = function (s, rs) {
       var reg = rs.filter(function (r) { return r.regular && isNum(r.proj); });
       var cost = reg.reduce(function (a, r) { return a + r.proj; }, 0);
@@ -379,9 +413,9 @@ function hero(c, f, m, hit, mk, side) {
   (((side && side.strength) || {}).rows || []).forEach(function (r) { st[r.team] = r; });
   var rec = function (n) { var r = rows[n]; return r && isNum(r.w) ? r.w + '–' + r.d + '–' + r.l + (isNum(r.pts) ? ' · ' + r.pts + ' pts' : '') : ''; };
   var form = function (n) { var r = st[n]; return r && (r.form_results || []).length ? r.form_results.slice(-5).join('') : null; };
-  /* today's records and form describe the match only before it is played: after it, the tape below carries today's
-     numbers, labelled as today's */
-  if (f.status !== 'finished') { g.home.record = rec(f.home); g.away.record = rec(f.away); g.home.form = form(f.home); g.away.form = form(f.away); }
+  /* today's records and form describe the match only before kick-off: once it has started (in play or finished) the
+     hero carries none, and the "Going in" tape below has each side's record before kick-off (no look-ahead) */
+  if (f.status !== 'finished' && f.status !== 'live') { g.home.record = rec(f.home); g.away.record = rec(f.away); g.home.form = form(f.home); g.away.form = form(f.away); }
   var md = f.model || {};
   var extra = [];
   if (!live && f.status !== 'finished' && isNum(md.lh) && isNum(md.la)) extra.push('We expect about ' + num(md.lh + md.la, 1) + ' goals in all' + (md.score ? ', and ' + esc(md.score) + ' is the likeliest score' + (isNum(md.p_score) ? ' (' + pct(md.p_score) + ')' : '') : ''));
@@ -480,9 +514,60 @@ function forecastCard(f, mk, done, asof) {
   return FB.card(done ? 'Our pre-match call' : 'Our forecast', done ? 'What we said before kick-off, against what happened.' : 'Win, draw and loss, the goals, the likeliest score and both sides scoring' + (asof ? '. As of ' + esc(FB.fmtStamp(asof)) + '; it moves with results, ratings and confirmed line-ups until kick-off' : '') + '.', table + shift + cap, { flush: false });
 }
 
-/* The tale of the tape: our rating, Elo and the season's xG for both clubs (strength.json, team_stats.json). */
-function tapeCard(c, f, side, after) {
+/* Each side's numbers going in, for a match that has started: only this competition's matches dated before kick-off,
+   never this one or any since (no look-ahead). Record, points and points a game from the season's fixtures
+   (fixtures.json, `list`); xG for and against, shots on target and possession as the means of each club's match rows
+   (team_stats.json, the same means the season tape uses; xG falls back to the fixtures' xG); our rating and the model's
+   Elo from the snapshot written at the last build before kick-off (fixtures[].pre). A match that started before the
+   snapshot existed takes Elo from the season's Elo line (strength.json elo_history, the value after each side's last
+   match before the match day) and has no rating: today's is never shown in its place.
+   -> { home: {...}, away: {...}, eloSrc: 'pre' | 'line' | null } */
+function goingIn(f, side, list) {
+  var k0 = FB.parseDate(f.date);
+  if (!k0) return null;
+  var t0 = k0.getTime(), day = k0.toISOString().slice(0, 10);
+  var before = function (x, id) { var t = FB.parseDate(x && x.date); return !!t && t.getTime() < t0 && String(id) !== String(f.id); };
+  var ts = ((side.team_stats || {}).teams) || {}, eh = ((side.strength || {}).elo_history) || {}, pre = f.pre || {};
+  var mean = function (arr, k) { var v = arr.map(function (r) { return r[k]; }).filter(isNum); return v.length ? v.reduce(function (a, b) { return a + b; }, 0) / v.length : null; };
+  var out = { eloSrc: pre.elo ? 'pre' : null };
+  /* Colombia, Uruguay, Peru: only this match's tournament (Apertura or Clausura), as the season tape */
+  var other = {};
+  if (f.torneo) (list || []).forEach(function (x) { if (x.torneo && x.torneo !== f.torneo) other[String(x.id)] = 1; });
+  ['home', 'away'].forEach(function (s, i) {
+    var name = s === 'home' ? f.home : f.away;
+    var res = [];
+    (list || []).forEach(function (x) {
+      if (x.status !== 'finished' || !isNum(x.hs) || !isNum(x.as) || !before(x, x.id) || (x.home !== name && x.away !== name) || other[String(x.id)]) return;
+      var hm = x.home === name, gf = hm ? x.hs : x.as, ga = hm ? x.as : x.hs;
+      res.push({ t: FB.parseDate(x.date).getTime(), r: gf > ga ? 'W' : gf < ga ? 'L' : 'D', xg: x.xg ? x.xg[hm ? 0 : 1] : null, xga: x.xg ? x.xg[hm ? 1 : 0] : null });
+    });
+    res.sort(function (a, b) { return a.t - b.t; });
+    var n = function (r) { return res.filter(function (x) { return x.r === r; }).length; };
+    var o = { n: res.length, w: n('W'), d: n('D'), l: n('L') };
+    o.pts = 3 * o.w + o.d;
+    o.ppg = o.n ? o.pts / o.n : null;
+    var rows = ((ts[name] || {}).matches || []).filter(function (r) { return before(r, r.gid) && !other[String(r.gid)]; });
+    o.xg = mean(rows, 'xg'); o.xga = mean(rows, 'xga');
+    if (!isNum(o.xg)) o.xg = mean(res, 'xg');
+    if (!isNum(o.xga)) o.xga = mean(res, 'xga');
+    o.sot = mean(rows, 'sot'); o.poss = mean(rows, 'poss');
+    o.r = pre.r && isNum(pre.r[i]) ? pre.r[i] : null;
+    if (pre.elo) o.elo = isNum(pre.elo[i]) ? pre.elo[i] : null;
+    else {
+      var line = (eh[name] || []).filter(function (e) { return e && isNum(e.elo) && e.date && String(e.date).slice(0, 10) < day; });
+      o.elo = line.length ? line[line.length - 1].elo : null;
+      if (isNum(o.elo)) out.eloSrc = 'line';
+    }
+    out[s] = o;
+  });
+  return out;
+}
+
+/* The tale of the tape: our rating, Elo and the season's xG for both clubs (strength.json, team_stats.json); once the
+   match has started, "Going in" (gi, from goingIn): the same rows from before kick-off only. */
+function tapeCard(c, f, side, after, gi) {
   if (!side) return '';
+  if (after) return goingInCard(c, f, gi);
   var st = {}, ts = ((side.team_stats || {}).teams) || {};
   (((side.strength || {}).rows) || []).forEach(function (r) { st[r.team] = r; });
   var h = st[f.home] || {}, a = st[f.away] || {}, th = (ts[f.home] || {}).season || {}, ta = (ts[f.away] || {}).season || {};
@@ -502,10 +587,33 @@ function tapeCard(c, f, side, after) {
   ((tb.standings || tb.overall || []).concat(Object.keys(conf).reduce(function (a, k) { return a.concat(conf[k] || []); }, []))).forEach(function (r) { if (r && !tr[r.team]) tr[r.team] = r; });
   var rec = function (n) { var r = tr[n]; return r && isNum(r.w) ? r.w + '–' + r.d + '–' + r.l + (isNum(r.pts) ? ' · ' + r.pts + ' pts' : '') : (c.short_name || c.name); };
   var team = function (tid, name) { return { name: name, abbr: FB.clubCode(name, name === f.home ? f.away : f.home), logo: FB.crestUrl(tid), colour: FB.clubColour(tid), alt: FB.clubAlt(tid), sub: rec(name) }; };
-  /* after kick-off the season numbers are today's (this match and any since included): said so, never passed off as the
-     numbers the match was played on */
-  return FB.card('Tale of the tape', (after ? 'This season in ' + esc(c.name) + ' as it stands today, this match included' : 'This season in ' + esc(c.name) + ' so far') + '; the better side\'s bar is solid.',
+  /* before kick-off only: today's numbers are as of the latest finished match, so before this one */
+  return FB.card('Tale of the tape', 'This season in ' + esc(c.name) + ' so far; the better side\'s bar is solid.',
     QK.matchupBar({ left: team(f.home_id, f.home), right: team(f.away_id, f.away), rows: rows }), { span: 7 });
+}
+
+/* "Going in" (a started match): the tape from before kick-off only (goingIn); a row without both sides' number before
+   kick-off is left out, never filled with today's. */
+function goingInCard(c, f, gi) {
+  if (!gi) return '';
+  var H = gi.home, A = gi.away;
+  var eloTip = gi.eloSrc === 'pre' ? 'Our model\'s Elo for each club at the last update before kick-off'
+    : 'The season\'s Elo line (as on the club page): each club\'s Elo after its last match in ' + c.name + ' before this one';
+  var rows = [
+    { label: 'Our rating (points a game)', a: H.r, b: A.r, fmt: function (v) { return num(v, 2); }, tip: 'Our model\'s expected points a game against an average side in this competition, at the last update before kick-off' },
+    { label: 'Elo', a: H.elo, b: A.elo, fmt: function (v) { return num(v, 0); }, tip: eloTip },
+    { label: 'Points a game', a: H.ppg, b: A.ppg, fmt: function (v) { return num(v, 2); } },
+    { label: 'xG for a match', a: H.xg, b: A.xg, fmt: function (v) { return num(v, 2); } },
+    { label: 'xG against a match', a: H.xga, b: A.xga, fmt: function (v) { return num(v, 2); }, better: 'low' },
+    { label: 'Shots on target a match', a: H.sot, b: A.sot, fmt: function (v) { return num(v, 1); } },
+    { label: 'Possession', a: H.poss, b: A.poss, fmt: function (v) { return Math.round(v) + '%'; } }
+  ].filter(function (r) { return isNum(r.a) && isNum(r.b); });   // home on the left, as in the hero ("Home v Away")
+  if (rows.length < 2) return '';
+  var rec = function (o) { return o.n ? o.w + '–' + o.d + '–' + o.l + ' · ' + o.pts + ' pts' : 'first match in ' + (c.short_name || c.name); };
+  var team = function (tid, name, o) { return { name: name, abbr: FB.clubCode(name, name === f.home ? f.away : f.home), logo: FB.crestUrl(tid), colour: FB.clubColour(tid), alt: FB.clubAlt(tid), sub: rec(o) }; };
+  var played = H.n === A.n ? H.n + (H.n === 1 ? ' match' : ' matches') + ' each' : H.n + ' and ' + A.n + ' matches';
+  return FB.card('Going in', 'Before ' + esc(FB.fmtDate(f.date, { year: true })) + ': ' + esc(c.name) + ' only, ' + played + ' before kick-off; the better side\'s bar is solid.',
+    QK.matchupBar({ left: team(f.home_id, f.home, H), right: team(f.away_id, f.away, A), rows: rows }), { span: 7 });
 }
 
 // Percentage points, signed: 0.034 -> "+3.4" (the column header says pts).

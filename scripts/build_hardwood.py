@@ -25,7 +25,9 @@ Seasons come in two weights:
          rebuilds it).
 
 A game page is never downgraded: when its raw play-by-play is not on this machine (CI holds only the
-current season's) and the page on disk already carries play-by-play blocks, the page is kept.
+current season's) and the page on disk already carries play-by-play blocks, the page is kept. Each page carries
+tape_pre, the teams' tale of the tape going into the game (written while it is upcoming, kept once it starts:
+analytics/games.py).
 
 Every step is isolated: a failure is logged with its traceback and the build goes on; a payload that
 cannot be built is written as {"ok": false, "reason": ...}.
@@ -182,7 +184,7 @@ def sig_unchanged(old: dict | None, new: dict) -> bool:
     return False
 
 
-def page_sig(store: dict, gid: str, has_raw: bool) -> str:
+def page_sig(store: dict, gid: str, has_raw: bool, tape: bool = False) -> str:
     g = (store.get("games") or {}).get(gid) or {}
     from oddsmarkets.basketball.analytics import pbpx
     from oddsmarkets.basketball.models import winprob
@@ -190,6 +192,12 @@ def page_sig(store: dict, gid: str, has_raw: bool) -> str:
     # but a change to how win probability or WPA is computed must
     parts = [BUILD_VERSION, winprob.MODEL_VERSION, pbpx.VERSION, (store.get("meta") or {}).get("fetched", {}).get(gid),
              g.get("status"), g.get("hs"), g.get("as"), bool(g.get("box")), has_raw]
+    if tape:
+        # the tale of the tape going in (tape_pre, analytics/games.py): its version in the current season's
+        # signatures moves them once, so the next build rewrites that season's pages through the normal writer (the
+        # backfill), and never again after; earlier seasons keep their signatures
+        from oddsmarkets.basketball.analytics import games as GMS
+        parts.append(["tape", GMS.TAPE_VERSION])
     return hashlib.sha1(json.dumps(parts, default=str).encode()).hexdigest()[:16]
 
 
@@ -232,6 +240,33 @@ def build_season(b: Build, league: str, season: int, full: bool, cfg: dict, shar
         return bst.pbp_path(league, season, gid).exists()
 
     pages_on = season >= shared.get("page_cutoff", 0)
+    tape_on = season >= shared["current"]
+    now_iso = _digest_now(today).strftime("%Y-%m-%dT%H:%M:%SZ")
+    going: dict = {}
+
+    def psig(gid, raw):
+        return page_sig(store, gid, raw, tape_on)
+
+    def tape_for(gid, old_doc: dict | None = None) -> dict | None:
+        """tape_pre for a page about to be written (the teams going in: GMS.tape_pre); the page on disk is read only
+        for a game that has started, whose snapshot is kept."""
+        g = ctx.games.get(gid) or {}
+        if "gi" not in going:
+            going["gi"] = b.step(f"{league} {season} going in", lambda: GMS.GoingIn(ctx), None)
+        old_tape = None
+        if GMS.started(g, now_iso):
+            if old_doc is None:
+                path = b.data / league / str(season) / "games" / f"{gid}.json"
+                old_doc = (an.read_json(path) or {}) if path.exists() else {}
+            old_tape = old_doc.get("tape_pre")
+        return b.step(f"tape {league}/{gid}", lambda: GMS.tape_pre(going["gi"], g, old_tape, now_iso), None)
+
+    def with_tape(gid, payload):
+        if isinstance(payload, dict) and payload.get("ok", True):
+            tp = tape_for(gid)
+            if tp:
+                payload["tape_pre"] = tp
+        return payload
 
     def due(gid) -> bool:
         if not pages_on:
@@ -239,7 +274,7 @@ def build_season(b: Build, league: str, season: int, full: bool, cfg: dict, shar
         g = ctx.games.get(gid) or {}
         if cfg["all_games"] or full and cfg["games_recent"] < 0:
             return True
-        ps = page_sig(store, gid, has_raw(gid))
+        ps = psig(gid, has_raw(gid))
         if pages_old.get(gid) != ps or not (b.data / league / str(season) / "games" / f"{gid}.json").exists():
             return True
         if full:
@@ -253,10 +288,10 @@ def build_season(b: Build, league: str, season: int, full: bool, cfg: dict, shar
     def write_page(gid, g, parsed):
         if gid not in ctx.games or not due(gid):
             return
-        payload = GMS.build_game(ctx, gid, parsed)
+        payload = with_tape(gid, GMS.build_game(ctx, gid, parsed))
         b.write(f"{d}games/{gid}.json", payload)
         written.add(gid)
-        pages_new[gid] = page_sig(store, gid, has_raw(gid))
+        pages_new[gid] = psig(gid, has_raw(gid))
 
     # play-by-play pass (feeds catalogues and the pages that are due)
     if an.has_pbp_dir(league, season):
@@ -288,9 +323,13 @@ def build_season(b: Build, league: str, season: int, full: bool, cfg: dict, shar
             if g.get("has_pbp") and not has_raw(gid) and path.exists():
                 old = an.read_json(path) or {}
                 if old.get("has_pbp") and old.get("status") == g.get("status") and old.get("hs") == g.get("hs"):
-                    pages_new[gid] = page_sig(store, gid, False)
-                    continue                          # never downgrade a page built with play-by-play
-            payload = b.step(f"game {league}/{gid}", lambda: GMS.build_game(ctx, gid, None))
+                    # never downgrade a page built with play-by-play; it still gets the teams going in
+                    tp = tape_for(gid, old)
+                    if tp and tp != old.get("tape_pre"):
+                        b.write(f"{d}games/{gid}.json", {**old, "tape_pre": tp})
+                    pages_new[gid] = psig(gid, False)
+                    continue
+            payload = b.step(f"game {league}/{gid}", lambda: with_tape(gid, GMS.build_game(ctx, gid, None)))
             failed = payload is None
             if failed:
                 payload = {"ok": False, "reason": "game page could not be built", "id": gid}
@@ -298,7 +337,7 @@ def build_season(b: Build, league: str, season: int, full: bool, cfg: dict, shar
             # Unsigned (retried next run) when the page failed, or when the play-by-play pass should have built it
             # (raw on disk, the game has play-by-play) but its callback failed: a signed box-only page is never redone.
             pbp_missed = bool(g.get("has_pbp") and has_raw(gid) and ctx.pbp_available)
-            pages_new[gid] = None if (failed or pbp_missed) else page_sig(store, gid, has_raw(gid))
+            pages_new[gid] = None if (failed or pbp_missed) else psig(gid, has_raw(gid))
             n += 1
         return n
     n_other = b.step(f"{league} {season} game pages", other_pages, 0)

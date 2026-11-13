@@ -244,6 +244,7 @@ function draw(el, c) {
     '<div class="qk-grid"><div class="qk-span-6">' + U.card2('Pitch mix', 'Usage, speed, Stuff+ and whiffs; the heat cells are percentiles among pitches of the same type', '<div id="pp-mix"></div>') + '</div>' +
     '<div class="qk-span-6">' + U.card2('Movement', 'Average induced vertical break against horizontal break towards the arm side, in inches; size is usage', U.chart('pp-mov', 360, 'Pitch movement') + '<div class="bp-note" id="pp-mov-cap"></div>') + '</div></div></section>';
   // the club's next game (the scoreboard bug) and its last game (the line score and our win chance through it)
+  const afterPaint = [];                                     // fills that need the page in place (a live game's tape_pre)
   const idx = BP.index() || {};
   const src = L === 'mlb' ? idx : BP.levelInfo(L);
   const isCur = Number(S) === Number(BP.currentSeason(L));
@@ -261,19 +262,24 @@ function draw(el, c) {
       const g = BP.kitGame(nxt, L);
       g.league = BP.levelLong(L);
       g.home.record = BP.RECORDS[String(nxt.home)] || ''; g.away.record = BP.RECORDS[String(nxt.away)] || '';
-      /* how the clubs match up: our team ratings (season.json), as on the game page */
-      const rows0 = BP.standingsRows ? BP.standingsRows(c.season || {}) : {};
-      const ra = (rows0[String(nxt.away)] || {}).rating || {}, rh = (rows0[String(nxt.home)] || {}).rating || {};
-      const fx = [];
-      const add = (label, x1, x2, f, low) => { if (isNum(x1) && isNum(x2)) fx.push({ label: label, a: f(x1), b: f(x2), better: Math.abs(x1 - x2) < 1e-9 ? null : ((x1 > x2) !== !!low ? 'a' : 'b') }); };
-      add('Team rating, runs a game', ra.net, rh.net, x => U.signed(x, 2));
-      add('Offence, runs a game', ra.off, rh.off, x => U.signed(x, 2));
-      add('Run prevention, runs a game', (ra.def || 0) + (ra.pitch || 0), (rh.def || 0) + (rh.pitch || 0), x => U.signed(x, 2));
+      /* how the clubs match up: our team ratings (season.json), as on the game page; a live game shows the clubs going in
+         (its game file's tape_pre, filled after the first paint) and never today's season numbers */
+      const nxtLive = BP.isLive(nxt);
+      const fx = nxtLive ? [] : U.clubRows(U.seasonSide(c.season, nxt.away), U.seasonSide(c.season, nxt.home));
       const prob = nxt.probables || {};
       const spTxt = !BP.isLive(nxt) && (prob.home || prob.away) ? 'Probable starters: ' + (prob.away ? BP.playerSurname(prob.away) : 'TBD') + ' v ' + (prob.home ? BP.playerSurname(prob.home) : 'TBD') + '.' : '';
       const occ = nxt.series ? BP.seriesText(nxt.series, true) : '';
       h += '<div>' + QK.sectionHead({ kicker: BP.isLive(nxt) ? 'Live now' : (QK.fmt.relDay(nxt.start || nxt.date) === 'Today' ? 'What to watch tonight' : 'Next up'), title: BP.teamShort(nxt.away) + ' at ' + BP.teamShort(nxt.home), sub: occ ? esc(occ) : '', html: true }) +
-        QK.previewCard(g, { layout: 'bug', nick: t => t.short || t.name, factors: fx, factorsTitle: 'How they match up this season', noteExtra: esc(spTxt) }) + '</div>';
+        '<div id="pp-nextcard">' + QK.previewCard(g, { layout: 'bug', nick: t => t.short || t.name, factors: fx, factorsTitle: 'How they match up this season', noteExtra: esc(spTxt) }) + '</div></div>';
+      if (nxtLive) {
+        afterPaint.push(root => BP.loadGame(nxt.gpk, L, S).then(d => {
+          const gi = U.goingIn(d && d.ok !== false ? d : null), box = root.querySelector('#pp-nextcard');
+          if (!gi || !box || !box.isConnected) return;
+          let f2 = U.clubRows(gi.away, gi.home);
+          if (!f2.length) f2 = U.clubRows(gi.away, gi.home, ['rs_g', 'ra_g']);
+          box.innerHTML = QK.previewCard(g, { layout: 'bug', nick: t => t.short || t.name, factors: f2, factorsTitle: U.goingTitle(gi), noteExtra: esc(spTxt) });
+        }, () => null));
+      }
     }
     if (lastG) {
       const w = lastG.hs >= lastG.as ? [lastG.home, lastG.hs, lastG.away, lastG.as] : [lastG.away, lastG.as, lastG.home, lastG.hs];
@@ -320,6 +326,7 @@ function draw(el, c) {
   h += '<section class="qk-section" id="pp-mv"></section>';
   h += '<section class="qk-section">' + U.card2('Season by season', 'Every ' + (pit ? 'pitching' : 'hitting') + ' season in the data, all levels', '<div id="pp-career"></div>', { flush: true }) + '</section>';
   el.innerHTML = h;
+  afterPaint.forEach(f => f(el));
   const logAll = el.querySelector('.bp-logall');
   if (logAll) logAll.addEventListener('click', () => { const t = logAll.closest('.qk-card'); t.querySelectorAll('tr.bp-logmore').forEach(r => { r.hidden = false; }); logAll.remove(); });
 

@@ -17,7 +17,7 @@ from urllib.request import Request, urlopen
 import numpy as np
 import pandas as pd
 
-from .. import canon, store
+from .. import canon, identity, store
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,9 @@ KEEP = [
     "Squat1Kg", "Squat2Kg", "Squat3Kg", "Bench1Kg", "Bench2Kg", "Bench3Kg",
     "Deadlift1Kg", "Deadlift2Kg", "Deadlift3Kg", "Wilks", "AgeClass", "BirthYearClass",
 ]
-SCHEMA = 2
+# schema 3 (13 Nov 2026): lifter ids from identity.pids (a bare Name that holds several people is split), so a
+# schema-2 store is re-parsed from the cached zip by scripts/pl_fetch.py
+SCHEMA = 3
 ATTEMPTS = {"s1": "Squat1Kg", "s2": "Squat2Kg", "s3": "Squat3Kg", "b1": "Bench1Kg", "b2": "Bench2Kg", "b3": "Bench3Kg",
             "d1": "Deadlift1Kg", "d2": "Deadlift2Kg", "d3": "Deadlift3Kg"}
 
@@ -109,7 +111,7 @@ def parse_zip(path: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
         if c in df.columns:
             df[c] = pd.to_numeric(df[c], errors="coerce")
     df["tested"] = df["Tested"].fillna("").eq("Yes") if "Tested" in df.columns else False
-    df["pid"] = df["Name"].map(canon.pid)
+    df["pid"] = ""                                  # set below from the parsed rows (identity.pids)
     df["meet_id"] = [
         canon.meet_id(str(f), str(d), str(n), str(c))
         for f, d, n, c in zip(df["Federation"], df["Date"], df["MeetName"], df["MeetCountry"])
@@ -147,6 +149,8 @@ def parse_zip(path: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
     })
     for k, col in ATTEMPTS.items():
         entries[k] = (df[col] if col in df.columns else pd.Series(np.nan, index=df.index)).astype("float32")
+    # one OpenPowerlifting Name can hold several people until the archive adds a "#N": split on hard evidence
+    entries["pid"] = identity.pids(entries).to_numpy()
     meets = (
         entries.groupby("meet_id", as_index=False)
         .agg(date=("date", "first"), name=("meet_name", "first"), fed=("fed", "first"),

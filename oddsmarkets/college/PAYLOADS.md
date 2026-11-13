@@ -255,6 +255,9 @@ The existing `moves` (inferred transfers that happened) is unchanged.
 ```
 {"ok","id","level","season", ...CARD fields..., "teams": {tid: TEAM}, "venue","attendance",
  "pregame": {"model": predict output, "market": {...}|null, "espn_predictor": p|null, "elo_p_home"},
+ "tape_pre": {"day": "YYYY-MM-DD", "teams": {tid: {"rating","off","def","sos","w","l","games", cfb: "epa_off",
+              "epa_def","sr_off", hockey: "t","sf_pg","sa_pg","pp_pct","pk_pct","sv_pct"}}} | null,
+ "line" (cfb, mbb, wbb): {"home": [points by quarter or half, overtime after], "away": [...]} | null,
  "box": {...as stored, with names: football categories; basketball players rows as objects},
  "team_stats": {tid: {...}},
  "flow": [[t, margin_home]] | null, "wp": {"model": [[t, p]], "espn": [[t, p]]} | null,
@@ -263,6 +266,11 @@ The existing `moves` (inferred transfers that happened) is unchanged.
  "plays": top-leverage plays, largest |wpa| first [{"t","period","clock","team","text","wpa"}] | null,
  "leaders": {tid: [{"id","name","line"}]}}
 ```
+`tape_pre` (13 Nov 2026, no look-ahead) is written for a game that has started or finished: each team's ratings from
+the games before the game day only (the walk-forward fit our pregame forecast used, on season.json's `ratings` basis),
+its strength of schedule from the opponents played before that day at those ratings, and its record before that day.
+The game page's "Going in" tape and "How they matched up going in" rows read it; before the start (null) they read
+season.json `ratings`. Hockey pages carry it only when set (no null key). `line` is the store's ESPN line score.
 
 ## Front end (`docs/campus/`)
 

@@ -15,7 +15,8 @@ bracket, strength, history, market):
   fixtures.json         every match of the season with status, score, xG and —
                         for matches still to play — the model's win/draw/loss
                         probabilities, expected goals, most likely score and fair
-                        decimal odds
+                        decimal odds; `pre`, our rating and Elo for both sides
+                        frozen at the last build before kick-off (freeze_pre)
   players_live.json     every player's season line: totals, per-90 rates and
                         percentiles against positional peers, with the metric
                         catalogue that drives the front-end
@@ -1434,6 +1435,46 @@ def build_fixtures_json(store: dict, norm, model, season_filter, xg_map: dict, n
     return {"matches": rows, "updated_at": _now()}
 
 
+PRE_DAYS = 9          # fixtures[].pre is written for kick-offs this many days ahead (the last build before one is what counts)
+
+
+def freeze_pre(rows: list[dict], prev_rows: list[dict] | None, strength_rows: list[dict] | None,
+               now: datetime | None = None) -> list[dict]:
+    """
+    fixtures[].pre: the match page's tale-of-the-tape numbers that cannot be recomputed after the match, frozen at
+    the last build before kick-off: our rating ("r", strength.json strength_ppg) and the model's Elo ("elo"), each
+    [home, away]. The rest of the tape (record, points a game, xG, shots, possession) is recomputed on the page from
+    the matches before kick-off. A row still to play whose kick-off is ahead (within PRE_DAYS, to keep the file small)
+    takes today's numbers (as of the latest finished match, so before kick-off by construction); any other row (live,
+    finished, postponed, or scheduled with its kick-off passed) keeps the block of the previous fixtures.json unchanged
+    and is never given a new one, so a match that started before this field existed has none and the page drops our
+    rating there (no look-ahead).
+    """
+    now = now or datetime.now(timezone.utc)
+    prev = {str(r.get("id")): r.get("pre") for r in (prev_rows or []) if isinstance(r, dict) and isinstance(r.get("pre"), dict)}
+    st = {str(r.get("team")): r for r in (strength_rows or []) if isinstance(r, dict) and r.get("team")}
+
+    def pair(h: dict | None, a: dict | None, key: str, nd: int) -> list[float] | None:
+        hv, av = (h or {}).get(key), (a or {}).get(key)
+        ok = all(isinstance(v, (int, float)) and not isinstance(v, bool) and np.isfinite(v) and v > 0 for v in (hv, av))
+        return [round(float(hv), nd), round(float(av), nd)] if ok else None
+
+    for r in rows:
+        gid = str(r.get("id"))
+        ko = _parse_utc(r.get("date")) if r.get("date") else None
+        if r.get("status") == "scheduled" and ko is not None and now < ko <= now + timedelta(days=PRE_DAYS):
+            h, a = st.get(str(r.get("home"))), st.get(str(r.get("away")))
+            snap = {k: v for k, v in (("r", pair(h, a, "strength_ppg", 4)), ("elo", pair(h, a, "elo", 1))) if v}
+            if snap:
+                r["pre"] = snap
+                continue
+        if prev.get(gid):
+            r["pre"] = prev[gid]
+        else:
+            r.pop("pre", None)
+    return rows
+
+
 def _prune(dir_path: Path, keep: set[str]) -> None:
     """Remove shard files a rebuild no longer writes (a season rollover, a renamed club)."""
     if not dir_path.exists():
@@ -1524,6 +1565,10 @@ def write_analytics(out_dir: Path, store: dict, registry, model, season_filter, 
     xg_map = _liga.team_xg_map(store, registry=registry)
     norm = lambda name: normalize_team_name(name, registry)  # noqa: E731
     fixtures = build_fixtures_json(store, norm, model, season_filter, xg_map, neutral_when, lineup_terms=lineup_terms)
+    # the tape's model numbers frozen before kick-off (freeze_pre): the previous fixtures.json is read before it is
+    # overwritten; strength.json is this build's where it is written first, else the last build's (still pre-match)
+    freeze_pre(fixtures["matches"], (_read_json(out_dir / "fixtures.json", {}) or {}).get("matches"),
+               (_read_json(out_dir / "strength.json", {}) or {}).get("rows"))
     _write(out_dir, "fixtures.json", fixtures)
     write_match_pages(out_dir, details, fixtures["matches"])
     write_player_shards(out_dir, logs, players)

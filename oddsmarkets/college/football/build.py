@@ -296,6 +296,86 @@ def rating_paths(pipe: dict, season: int, st: dict, mem: list[str]) -> dict[str,
     return out
 
 
+def going_in(ctx: dict, season: int, day: str | None) -> dict[str, dict]:
+    """The tale of the tape going into a game played on `day` (no look-ahead, 13 Nov 2026): every team's walk-forward
+    ratings from the games before that day (the snapshot our pregame forecast used, on season.json's `ratings` basis:
+    rating, off, def, epa_off, epa_def, sr_off, the same blend and centring as the rating path), its strength of
+    schedule (the opponents it played before that day, at those ratings) and its record before that day.
+    {tid: {...}}; {} when the season has no snapshot for that exact day: a later snapshot would contain the game.
+    Cached per day on the season state."""
+    if not day:
+        return {}
+    S = season_state(ctx, season)
+    cache = S.setdefault("going_in", {})
+    if day in cache:
+        return cache[day]
+    pipe = ctx["pipe"]
+    u = (pipe["snapshots"].get(season) or {}).get(day) or {}
+    out: dict[str, dict] = {}
+    if u.get("pts") is not None:
+        teams = pipe["teams"].get(season) or []
+        b = pipe["blends"].get(season) or {}
+        pw = _power_of(u.get("pts"), u.get("epa"), u.get("sr"), teams, b)
+        mem = [t for t in S["mem"] if t in pw]
+        m = float(np.mean([pw[t] for t in mem])) if mem else 0.0
+        power = {t: v - m for t, v in pw.items()}
+
+        def unit(k):
+            x = u.get(k)
+            if x is None:
+                return None
+            return {"mu": float(x["mu"]), "off": dict(zip(teams, map(float, x["off"]))),
+                    "def": dict(zip(teams, map(float, x["def"])))}
+        pts, epa, sr = unit("pts"), unit("epa"), unit("sr")
+        mo = float(np.mean([pts["off"][t] for t in mem if t in pts["off"]])) if mem else 0.0
+        md = float(np.mean([pts["def"][t] for t in mem if t in pts["def"]])) if mem else 0.0
+        gf = S["gf"]
+        g2 = gf[gf["final"] & (gf["day"] < day)]
+        rec: dict[str, list[int]] = {}
+        opps: dict[str, list[str]] = {}
+        for h, a, hs, as_ in zip(g2["home"], g2["away"], g2["hs"], g2["as"]):
+            for t, o, won in ((h, a, hs > as_), (a, h, as_ > hs)):
+                rec.setdefault(t, [0, 0])[0 if won else 1] += 1
+                opps.setdefault(t, []).append(o)
+        for t, v in power.items():
+            o = pts["off"].get(t, 0.0) - mo
+            d = pts["def"].get(t, 0.0) - md
+            adj = (v - (o + d)) / 2.0
+            ops = opps.get(t) or []
+            w, l_ = rec.get(t, [0, 0])
+            out[t] = {"rating": r2(v), "off": r2(o + adj), "def": r2(d + adj),
+                      "epa_off": r2(epa["mu"] + epa["off"][t], 3) if epa and t in epa["off"] else None,
+                      "epa_def": r2(epa["mu"] - epa["def"][t], 3) if epa and t in epa["def"] else None,
+                      "sr_off": r2(sr["mu"] + sr["off"][t], 3) if sr and t in sr["off"] else None,
+                      "sos": r2(np.mean([power.get(x, -20.0) for x in ops])) if ops else None,
+                      "w": w, "l": l_, "games": w + l_}
+    cache[day] = out
+    return out
+
+
+def tape_pre(ctx: dict, season: int, g: dict) -> dict | None:
+    """The game page's going-in block for a game that has started or finished: {"day", "teams": {tid: going_in row}}
+    for its two teams (None before the start: the page then shows the season so far)."""
+    if g.get("status") not in ("in", "post"):
+        return None
+    day = data.us_day(g.get("date"))
+    try:
+        gi = going_in(ctx, season, day)
+    except Exception as exc:  # noqa: BLE001 - the page keeps everything else; the tape then shows no rows
+        logger.warning("cfb going-in tape failed for %s: %s", g.get("id"), exc)
+        return None
+    teams = {str(t): gi[str(t)] for t in (g.get("home"), g.get("away")) if str(t) in gi}
+    return {"day": day, "teams": teams} if teams else None
+
+
+def line_score(g: dict) -> dict | None:
+    """The line score by quarter (ESPN's linescores, kept in the store as `line`): {"home": [...], "away": [...]}, or
+    None while either side has none."""
+    ln = g.get("line") or {}
+    h, a = list(ln.get("home") or []), list(ln.get("away") or [])
+    return {"home": h, "away": a} if h and a else None
+
+
 def phase_of(season: int, gf: pd.DataFrame, current: int) -> tuple[str, int | None]:
     if season < current:
         return "offseason", None
@@ -1363,6 +1443,7 @@ def game_page(ctx: dict, season: int, g: dict, cardd: dict, pl: pd.DataFrame | N
                 "attendance": g.get("attendance"),
                 "pregame": {"model": pg_model, "market": cardd.get("market"), "espn_predictor": (g.get("predictor") or {}).get("home"),
                             "elo_p_home": r2(pred.get("elo_p_home"), 4) if pred is not None else None},
+                "tape_pre": tape_pre(ctx, season, g), "line": line_score(g),
                 "box": None, "team_stats": g.get("team_stats") or {}, "flow": None, "wp": None, "drives": None, "epa": None,
                 "plays": None, "leaders": {}})
     box = g.get("box") or {}

@@ -186,7 +186,7 @@ def build(out: Path, today: date | None = None, full: bool = False) -> dict:
             r["pg"] = r["pid"] in pset
     _write(out / "rankings.json", ranks)
     _tick('_write(out / "rankings.json", ranks)')
-    keep = _meet_pages(out, entries, meets, ent, walked, train_model, live, names, today, pset, rep.get("podium") or {})
+    keep = _meet_pages(out, entries, meets, ent, walked, train_model, live, names, today, pset, rep.get("podium") or {}, p, m0)
     _tick('keep = _meet_pages(out, entries, meets, ')
     n_player = _player_pages(out, ppids, walked, entries, prof, pct, prof_prev, pct_prev, cur, ranks, names,
                              meet_name, meet_fed, T)
@@ -357,14 +357,25 @@ def _prev_best_total(walked) -> dict:
     return dict(zip(zip(w["meet_id"], w["pid"], w["stream"]), pb))
 
 
-def _meet_pages(out: Path, entries, meets, ent, walked, train_model, live, names, today: date, pset: set, pod: dict) -> set[str]:
+def _meet_pages(out: Path, entries, meets, ent, walked, train_model, live, names, today: date, pset: set, pod: dict,
+                p=None, m0: dict | None = None) -> set[str]:
     cutoff_recent = (today - timedelta(days=MEET_RECENT_DAYS)).isoformat()
     cutoff_big = (today - timedelta(days=MEET_BIG_DAYS)).isoformat()
     pick = meets[(meets["date"] >= cutoff_recent) | ((meets["date"] >= cutoff_big) & (meets["n_sbd"] >= MEET_BIG_N))]
     pick = pick.sort_values("date", ascending=False).head(MEET_CAP)
     keep = set(pick["meet_id"])
-    # forecasts and podium chances for the full-power entrants of these meets (pre-state: rows before the meet only)
+    # forecasts and podium chances for the full-power entrants of these meets (pre-state: rows before the meet only).
+    # A lifter disqualified for doping (DD) lifted in the flight and was disqualified after the meet: kept here, so a
+    # flight's chances are the ones it had before the meet (the sealed evaluation leaves DD out; models/evaluate.py)
     e = ent[ent["meet_id"].isin(keep)].copy()
+    if p is not None:
+        dd = entries[entries["meet_id"].isin(keep) & entries["place"].astype(str).eq("DD")]
+        if len(dd):
+            dd = EV.entrant_frame(dd, since="1900-01-01", keep_dd=True)
+            if len(dd):
+                dd = F.pre_state(dd, walked, p, m0)
+                dd["new"] = dd["n"] == 0
+                e = pd.concat([e, dd[e.columns.intersection(dd.columns)]], ignore_index=True)
     sims = pd.DataFrame()
     if len(e):
         late = e["date"] > BT.TEST_END

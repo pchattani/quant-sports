@@ -112,6 +112,43 @@ def test_game_page(built):
     assert obj["epa"] and all("epa_play" in v for v in obj["epa"].values())
 
 
+def test_game_page_going_in_tape_and_line_score(built):
+    """No look-ahead on a played game's page (13 Nov 2026): `tape_pre` holds each team's walk-forward ratings for the
+    game day (the same numbers as sim.power_table as of that day: the snapshot from the games before it), its record
+    and games from the games before that day only, and is absent before the start; `line` passes the store's line
+    score through (None while a side has none)."""
+    from oddsmarkets.college.football import data as FD
+    from oddsmarkets.college.football import sim
+    ctx = build.context(2024)
+    S = build.season_state(ctx, 2024)
+    gf = S["gf"]
+    pages = [_load(p) for p in sorted((built["out"] / "2024" / "games").glob("*.json"))]
+    post = [p for p in pages if p["status"] == "post"]
+    assert post and all(p.get("tape_pre") and len(p["tape_pre"]["teams"]) == 2 for p in post)
+    assert all(p.get("tape_pre") is None for p in pages if p["status"] not in ("in", "post"))
+    seen_first = False
+    for p in post[:: max(1, len(post) // 15)] + post[:3]:
+        tp = p["tape_pre"]
+        day = FD.us_day(p["date"])
+        assert tp["day"] == day
+        power, _, _ = sim.power_table(2024, ctx["pipe"], as_of=day)
+        earlier = gf[gf["final"] & (gf["day"] < day)]
+        for t, row in tp["teams"].items():
+            assert row["rating"] == pytest.approx(power[t], abs=0.006)
+            n = int(((earlier["home"] == t) | (earlier["away"] == t)).sum())
+            assert row["games"] == n and row["w"] + row["l"] == n
+            if n == 0:
+                seen_first = True
+                assert row["sos"] is None
+    assert seen_first                                     # a season opener: no games before it, no schedule yet
+    g = dict(next(x for x in S["st"]["games"].values() if x.get("status") == "post"))
+    g["line"] = {"home": [7, 3, 0, 14], "away": [0, 10, 7, 3]}
+    assert build.game_page(ctx, 2024, g, {}, None, None, {}, None)["line"] == g["line"]
+    assert build.line_score({"line": {"home": [7], "away": []}}) is None and build.line_score({}) is None
+    g["status"] = "pre"
+    assert build.tape_pre(ctx, 2024, g) is None
+
+
 def test_players_rate_fields(built):
     """Metrics spec (docs/_design/metrics/college.json): rate fields by position, `qualified_rate`, rate percentiles
     within the position among rate-qualified players only (100 = best, lower-is-better rates reversed)."""

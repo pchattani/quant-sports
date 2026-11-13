@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import math
+from bisect import bisect_left
 from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -66,7 +67,103 @@ def short_card(S, m, fc):
 
 # ── matches ───────────────────────────────────────────────────────────────────────────────────────────────
 
-def match_page(S, w, rep, m, ana) -> dict:
+# the team measures the match page's tale of the tape compares (docs/scrum/assets/js/sc-matches.js TAPE_IDS)
+TAPE_METRICS = ["pf", "pa", "tf", "ta", "metres", "breaks", "gainline", "tackle_pct", "to_won", "ruck_pct", "scrum_pct",
+                "lineout_pct", "pens", "kick_pct"]
+
+
+class GoingIn:
+    """How the two sides stood going into a test that has started or finished (no look-ahead: a game page never shows
+    numbers that include the test itself or anything after it). Each side's last five results, the head to head, our
+    ratings rank (build.walk, from the ratings at the start of the day), World Rugby points (the replica's points
+    before the test) and the team profile over the two years before (analytics.team_profiles on the tests played before
+    that day). All of it comes from tests dated before the start, so every past page is backfilled by the normal page
+    writer at the next build."""
+
+    def __init__(self, S, w, rep):
+        self.S, self.w, self.rep = S, w, rep
+        self.days = [m["date"][:10] for m in S.finals]
+        self.res: dict = defaultdict(list)          # team -> [(day, W|D|L)]
+        self.pairs: dict = defaultdict(list)        # (team, team) sorted -> [match]
+        self.stat_days: dict = defaultdict(list)    # team -> [day] of its tests with team statistics
+        for m in S.finals:
+            h, a, d = m["home"]["id"], m["away"]["id"], m["date"][:10]
+            r = "W" if m["hs"] > m["as"] else ("D" if m["hs"] == m["as"] else "L")
+            self.res[h].append((d, r))
+            self.res[a].append((d, {"W": "L", "L": "W"}.get(r, r)))
+            self.pairs[tuple(sorted((h, a)))].append(m)
+            if m.get("hstat") and m.get("astat"):
+                self.stat_days[h].append(d)
+                self.stat_days[a].append(d)
+        self._prof: dict = {}
+
+    def form(self, tid: str, day: str, n: int = 5) -> str:
+        rs = self.res.get(tid) or []
+        i = bisect_left(rs, (day, ""))
+        return "".join(r for _d, r in rs[max(0, i - n):i])
+
+    def h2h(self, h: str, a: str, day: str) -> dict | None:
+        out = {"p": 0, "w": 0, "d": 0, "l": 0, "pf": 0, "pa": 0, "ro": 0, "first": None, "last": None}
+        for m in self.pairs.get(tuple(sorted((h, a)))) or []:
+            if m["date"][:10] >= day:
+                break
+            us, th = (m["hs"], m["as"]) if m["home"]["id"] == h else (m["as"], m["hs"])
+            out["p"] += 1
+            out["w" if us > th else ("d" if us == th else "l")] += 1
+            if m.get("ro"):
+                out["ro"] += 1
+            else:
+                out["pf"] += us
+                out["pa"] += th
+            out["first"] = out["first"] or m["date"][:10]
+            out["last"] = {"id": m["id"], "date": m["date"][:10], "us": us, "them": th, "ro": 1 if m.get("ro") else 0}
+        return out if out["p"] else None
+
+    def profile(self, h: str, a: str, day: str, days: int = 730, min_n: int = 6) -> dict | None:
+        since = (date.fromisoformat(day) - timedelta(days=days)).isoformat()
+
+        def n_in(t):
+            ds = self.stat_days.get(t) or []
+            return bisect_left(ds, day) - bisect_left(ds, since)
+        if n_in(h) < min_n or n_in(a) < min_n:
+            return None
+        if day not in self._prof:
+            lo, hi = bisect_left(self.days, since), bisect_left(self.days, day)
+            self._prof[day] = AN.team_profiles(self.S.finals[lo:hi], day, days=days, min_n=min_n)["teams"]
+        ph, pa = self._prof[day].get(h), self._prof[day].get(a)
+        if not ph or not pa:
+            return None
+        rows = {}
+        for k in TAPE_METRICS:
+            x, y = ph["m"].get(k), pa["m"].get(k)
+            if x and y and x.get("pct") is not None and y.get("pct") is not None:
+                rows[k] = [[r1(x["raw"], 3), x["pct"]], [r1(y["raw"], 3), y["pct"]]]
+        return {"n": [ph["n"], pa["n"]], "since": since, "m": rows} if rows else None
+
+    def block(self, m: dict, fc: dict | None) -> dict:
+        h, a, day = m["home"]["id"], m["away"]["id"], m["date"][:10]
+        out = {"before": m["date"], "form": [self.form(h, day), self.form(a, day)], "h2h": self.h2h(h, a, day)}
+        if fc and fc.get("rank") is not None:
+            out["rank"], out["of"] = fc["rank"], fc.get("of")
+        ex = self.rep["exchange"].get(m["id"])
+        if ex:
+            out["wr"] = ex["before"]
+        elif m["status"] != "final":
+            live = self.rep["live"].points
+            if h in live and a in live:
+                out["wr"] = [round(live[h], 2), round(live[a], 2)]
+        pr = self.profile(h, a, day)
+        if pr:
+            out["profile"] = pr
+        return out
+
+
+def started(S, m: dict) -> bool:
+    """Under way or over: a final or live status, or a kick-off time already passed (the feed can lag)."""
+    return m.get("status") in ("final", "live") or str(m.get("date") or "") <= S.now.strftime("%Y-%m-%dT%H:%M")
+
+
+def match_page(S, w, rep, m, ana, gi: GoingIn | None = None) -> dict:
     fc = w["fc"].get(m["id"]) or w["up"].get(m["id"])
     out = {"ok": True, "match": B.card(S, m, fc), "season": int(m["date"][:4]), "comp_name": COMP_NAME.get(m.get("comp"), ""),
            "attendance": m.get("attendance")}
@@ -112,6 +209,10 @@ def match_page(S, w, rep, m, ana) -> dict:
                            "rest": [ctx.get("rest_h"), ctx.get("rest_a")], "alt": ctx.get("alt") or 0,
                            # the margin's spread (the model's normal sd behind p): the match page's likely-range bar
                            "sd": r1(fc.get("sd"))}
+        if (fc.get("ctx") or {}).get("side") == -1:
+            out["forecast"]["at_home"] = "a"        # the side listed second plays in its own country (Model.context)
+    if gi is not None and started(S, m):
+        out["pre"] = gi.block(m, fc)
     # World Rugby exchange (replica): the points each side took
     ex = rep["exchange"].get(m["id"])
     if ex:
@@ -735,7 +836,8 @@ def model_payload(S, w, rep, flog) -> dict:
         won = sum(1 for x in done if (x["hs"] > x["as"] and x["p"][0] >= x["p"][2]) or (x["as"] > x["hs"] and x["p"][2] > x["p"][0]))
         exp = sum(max(x["p"][0], x["p"][2]) for x in done)
         rec = {"n": len(done), "won": won, "expected": round(exp, 1)}
-    return {"ok": True, "asof": S.today, "report": {k: R.get(k) for k in ("n", "dev", "test", "rungs", "paired", "chosen", "total", "tries", "value", "replica")},
+    return {"ok": True, "asof": S.today, "report": {k: R.get(k) for k in ("n", "dev", "test", "rungs", "paired", "chosen", "total", "tries", "value", "replica",
+                                                                          "incumbent", "kept_in_use")},
             "params": S.fit.get("params"), "fitted_through": S.fit.get("fitted_through"), "by_year": by_year,
             "calibration": {"n": cal["n"], "bins": cal["bins"], "ece": cal["ece"], "span": f"{models.TEST_FROM} to {S.now.year}"},
             "log": log, "record": rec}
@@ -1191,10 +1293,11 @@ def build_scope(scope: str, data_root: Path, sims: int = 20000, now: datetime | 
     sizes["board"] += B.write(data / "players.json", board_payload(S, ana))
     sizes["progression_ref"] += B.write(data / "progression_ref.json", progression_ref(S, ana))
     if game_pages:
+        gi = GoingIn(S, w, rep)
         for m in S.finals + S.upcoming + S.live:
             if m["status"] == "final" and not (m.get("hstat") or m.get("lh") or m.get("events")) and m["date"][:4] < "2004":
                 pass
-            sizes["match_pages"] += B.write(data / "matches" / f"{m['id']}.json", match_page(S, w, rep, m, ana))
+            sizes["match_pages"] += B.write(data / "matches" / f"{m['id']}.json", match_page(S, w, rep, m, ana, gi))
     sizes["model"] += B.write(data / "model.json", model_payload(S, w, rep, flog))
     sizes["lab"] += B.write(data / "lab.json", lab_payload(S, w, ana))
     sizes["records"] += B.write(data / "records.json", records_payload(S, ana))
@@ -1203,6 +1306,8 @@ def build_scope(scope: str, data_root: Path, sims: int = 20000, now: datetime | 
             "teams": {tid: dict(S.teams[tid], **({"active": 1} if tid in set(team_ids) else {})) for tid in S.teams}, "years": yp["years"], "latest": S.finals[-1]["date"][:10],
             "next": S.upcoming[0]["date"] if S.upcoming else None, "comps": sorted(comps_out),
             "n_matches": len(S.finals), "n_players": len(ana["players"]), "first": S.finals[0]["date"][:10],
-            "merge": store.MERGE_REPORT.get(scope), "caps": {k: CAPS.get(k) for k in ("matched", "rows")}}
+            "merge": store.MERGE_REPORT.get(scope), "caps": {k: CAPS.get(k) for k in ("matched", "rows")},
+            # a second id a side once had (store.unify_ids): an old team link resolves to the id kept
+            "alias": dict(store.ID_ALIAS.get(scope) or {})}
     return {"ok": True, "info": info, "sizes": dict(sizes), "search": search_rows(S, ana), "S": S, "w": w, "rep": rep,
             "ana": ana, "prof": prof, "comps": comps_out, "ratings": ratings}

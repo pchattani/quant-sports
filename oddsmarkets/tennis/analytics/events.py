@@ -297,6 +297,184 @@ def _sim_out(sim: dict | None) -> dict | None:
             "format": sim.get("format"), "matches": sim.get("matches") or {}, "rounds": sim.get("rounds")}
 
 
+# ---------------------------------------------------------------------------------------------- before the first ball
+
+PRE_VERSION = 1
+PRE_SIMS = 4000
+QROUNDS = ("Q1", "Q2", "Q3")
+
+
+def pre_event_day(ev: dict, ms: list[dict]) -> date | None:
+    """The day the event began: its start date, or its first match (qualifying included) if that came earlier. The
+    pre-event chances use only matches dated before this day."""
+    s = an.day(ev.get("start"))
+    days = [d for d in (an.day(m.get("date")) for m in ms) if d is not None and (s is None or abs((d - s).days) <= 60)]
+    cand = [d for d in days + [s] if d is not None]
+    return min(cand) if cand else None
+
+
+def pre_event_contexts(td: an.TourData, wants: dict[date, set[str]]) -> dict[date, Any]:
+    """{day: predict.Context as it stood before that day} for the players in wants[day], from data dated before the day
+    only, with every term of the live blend, as the tournament backtest's "pre" checkpoint builds it
+    (models/backtest.py tournaments): Elo and the game-share Elo before the day, the serve/return fit at the month
+    checkpoint (through the last day of the month before, as finished matches are priced), the market-rating and
+    schedule states before the first match on or after the day (one pass each for all the days), and future rounds on
+    an assumed schedule. A day whose serve/return checkpoint is beyond this run's refit
+    budget maps to None (a later, warmer run fills it)."""
+    from oddsmarkets.tennis.models import _io
+    from oddsmarkets.tennis.models import elo as E
+    from oddsmarkets.tennis.models import predict as P
+    from oddsmarkets.tennis.models import serve_return as SR
+    blend = P.blend_params(td.tour)
+    by_ord = {d.toordinal(): ps for d, ps in wants.items()}
+    msnap, mprm = {}, None
+    if blend.get("w_mr"):
+        from oddsmarkets.tennis.models import mrating as MRt
+        mprm = MRt.params(td.tour)
+        msnap = MRt.snapshots(MRt.prepare(sorted(td.rated_matches(), key=_io.match_key), max_margin=mprm["max_margin"]),
+                              mprm, by_ord)
+    xsnap = {}
+    if blend.get("w_x"):
+        from oddsmarkets.tennis.models import sched as SC
+        xsnap = SC.snapshots(td.all_matches(), td.elo, by_ord)
+    out: dict = {}
+    for d in sorted(wants):
+        # the serve/return fit at the month checkpoint, as a finished match's pre-match chance uses (matches.predictions):
+        # fitted through the last day of the month before, so nothing from the event enters and the fit is cached
+        day_before = MT.checkpoint(d) - timedelta(days=1)
+        sr = td.sr_fit(day_before)
+        if sr is None and day_before.isoformat() in td.sr_skipped:
+            out[d] = None
+            continue
+        gr = gp = None
+        if blend.get("w_gelo"):
+            gr, gp = td.gelo_at(d), td.gelo.get("params")
+        out[d] = P.Context(td.tour, d, elo_ratings=td.elo_at(d), elo_params=td.elo_params(), elo_mod=E, sr_model=sr,
+                           sr_mod=SR if sr else None, gelo_ratings=gr, gelo_params=gp,
+                           mr_states=(msnap.get(d.toordinal()) or {}) if mprm else None, mr_params=mprm,
+                           sched=(xsnap.get(d.toordinal()) or {}) if blend.get("w_x") else None, assumed=True)
+    return out
+
+
+def pre_event_draw(d: dict, ms: list[dict]) -> tuple[dict, dict[str, str]]:
+    """The draw as it stood before the first ball: a slot whose player came through qualifying here (or whose entry is
+    Q / LL) is an unknown qualifier ("tbd:<slot>"). -> (draw, {pid: "tbd:<slot>"})."""
+    qual = {str(p) for m in ms if m.get("round") in QROUNDS for p in (m.get("p1"), m.get("p2")) if p}
+    slots, tbd = [], {}
+    for s in d.get("slots") or []:
+        s = list(s) + [None] * max(0, 4 - len(s))
+        pid, entry = s[1], s[3]
+        if (pid and str(pid) in qual) or entry in ("Q", "LL"):
+            if pid:
+                tbd[str(pid)] = f"tbd:{s[0]}"
+            slots.append([s[0], None, None, "Q"])
+        else:
+            slots.append(s[:4])
+    return {"size": d.get("size"), "slots": slots}, tbd
+
+
+def _pre_setup(td: an.TourData, ev: dict, ms: list[dict], n: int) -> tuple | None:
+    """(day, event for the simulation, {pid: "tbd:<slot>"}, cache path, cache key) or None when there is nothing to
+    simulate (not begun, no draw)."""
+    from oddsmarkets.tennis.models import _io
+    from oddsmarkets.tennis.models import elo as E
+    from oddsmarkets.tennis.models import gelo as G
+    from oddsmarkets.tennis.models import mrating as MRt
+    from oddsmarkets.tennis.models import predict as P
+    from oddsmarkets.tennis.models import sched as SC
+    from oddsmarkets.tennis.models import serve_return as SR
+    from oddsmarkets.tennis.models import tournament_sim as TS
+    when = pre_event_day(ev, ms)
+    if when is None or when > td.today:
+        return None
+    d = draw_of(ev, ms)
+    if not d or not d.get("slots"):
+        return None
+    draw, tbd = pre_event_draw(d, ms)
+    if sum(1 for s in draw["slots"] if s[1]) < 2:
+        return None
+    ev2 = dict(ev, tour=td.tour, draw=draw)
+    if TS.is_round_robin(ev, ms):
+        ev2["groups"] = TS._groups(ev, ms)          # the groups are set before a ball; no result is used
+    key = an.digest(PRE_VERSION, E.VERSION, SR.VERSION, P.VERSION, G.VERSION, MRt.VERSION, SC.VERSION,
+                    _io.fits_signature(td.tour), when.isoformat(), n, draw, ev2.get("groups"))
+    path = _io.cache_root() / "ace_pre_event" / f"{td.tour}-{an.fname(str(ev.get('id')))}.json"
+    return when, ev2, tbd, path, key
+
+
+def pre_events(td: an.TourData, year: int, n: int = PRE_SIMS) -> dict[str, dict]:
+    """{event_id: pre-event chances} for the year's tour-level events that have begun: our title chances before the
+    first ball, walk-forward (round 10, 13 Nov 2026). The tournament simulation runs over the draw as it stood
+    (qualifiers unknown), with no result fixed and the model as it stood the day before (pre_event_contexts). Kept on
+    the event page once play begins, as a match page keeps its pre-match chance.
+
+    Each: {"asof": the day the event began (only matches dated before it enter), "n_sims", "title": {pid | "tbd:<slot>":
+    p}, "final": {...}, "qualifier": {pid: "tbd:<slot>"} (a player who came through qualifying holds that slot's
+    chance)}. Cached per event under ACE_CACHE (ace_pre_event/<tour>-<event_id>.json), keyed on the code and fit
+    versions, the day, the draw and the groups: computed once, then fixed while the event plays out. An event whose
+    model checkpoint is not ready is left out and not cached (a later run fills it). Memoised on `td` per year."""
+    from oddsmarkets.tennis.models import _io
+    from oddsmarkets.tennis.models import tournament_sim as TS
+    memo = td.__dict__.setdefault("_pre_events", {})
+    if year in memo:
+        return memo[year]
+    by: dict[str, list[dict]] = defaultdict(list)
+    for m in td.matches(year).values():
+        by[m.get("event")].append(m)
+    out: dict[str, dict] = {}
+    todo: list = []
+    for eid, ev in td.events(year).items():
+        if str(ev.get("level")) not in an.TOUR_LEVELS:
+            continue
+        ms = by.get(eid) or []
+        if not (str(ev.get("status")) in ("live", "done") or any(m.get("status") in an.FINISHED or m.get("status") == "live" for m in ms)):
+            continue
+        try:
+            st = _pre_setup(td, dict(ev, id=eid), ms, n)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("%s %s pre-event setup failed: %s", td.tour, eid, exc)
+            continue
+        if st is None:
+            continue
+        when, ev2, tbd, path, key = st
+        hit = _io.read_json(path)
+        res = hit.get("result") if isinstance(hit, dict) and hit.get("key") == key else None
+        if res:
+            out[eid] = dict(res, qualifier=tbd) if tbd else dict(res)
+        else:
+            todo.append((eid, when, ev2, tbd, path, key))
+    if todo:
+        wants: dict[date, set[str]] = defaultdict(set)
+        for _, when, ev2, _, _, _ in todo:
+            wants[when].update(str(s[1]) for s in (ev2.get("draw") or {}).get("slots") or [] if s[1])
+        try:
+            ctxs = pre_event_contexts(td, wants)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("%s %s pre-event contexts failed: %s", td.tour, year, exc)
+            ctxs = {}
+        for eid, when, ev2, tbd, path, key in todo:
+            ctx = ctxs.get(when)
+            if ctx is None:
+                continue
+            try:
+                sim = TS.simulate(ev2, n=n, matches=[], tour=td.tour, ctx=ctx, conditional=False)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("%s %s pre-event simulation failed: %s", td.tour, eid, exc)
+                continue
+            if not sim.get("ok", True) or not sim.get("players"):
+                continue
+            pl = sim["players"]
+            res = {"asof": when.isoformat(), "n_sims": n,
+                   "title": {p: an.prob(r.get("p_title")) for p, r in pl.items() if (r.get("p_title") or 0) > 0},
+                   "final": {p: an.prob(r.get("p_final")) for p, r in pl.items() if (r.get("p_final") or 0) > 0}}
+            _io.write_json(path, {"key": key, "result": res})
+            out[eid] = dict(res, qualifier=tbd) if tbd else dict(res)
+        logger.info("%s %s pre-event chances: %d computed, %d from cache", td.tour, year, sum(1 for t in todo if t[0] in out),
+                    len(out) - sum(1 for t in todo if t[0] in out))
+    memo[year] = out
+    return out
+
+
 def simulate(td: an.TourData, ev: dict, ms: list[dict], n: int, ctx=None) -> dict | None:
     from oddsmarkets.tennis.models import tournament_sim as TS
     try:
@@ -323,6 +501,9 @@ def build_event(td: an.TourData, eid: str, year: int, preds: dict | None = None,
         c = MT.card(td, m, preds.get(m["id"]), (markets_m or {}).get(m["id"]))
         if m["id"] in nd:
             c["node"] = nd[m["id"]]
+        # the rankings the two held going in (the result row's), so a played match never shows today's ranking
+        if m.get("status") != "upcoming" and (m.get("rank1") or m.get("rank2")):
+            c["rk"] = [m.get("rank1"), m.get("rank2")]
         cards[m["id"]] = c
     qual = [MT.card(td, m, preds.get(m["id"]), light=True) for m in ms if m.get("round") in ("Q1", "Q2", "Q3")]
     results = [cards[m["id"]] for m in sorted(main, key=lambda m: (str(m.get("date") or ""), an.ROUND_ORDER.get(m.get("round"), 5)),
@@ -333,10 +514,17 @@ def build_event(td: an.TourData, eid: str, year: int, preds: dict | None = None,
     meta = {k: ev.get(k) for k in ("name", "tid", "year", "level", "surface", "indoor", "start", "end", "status", "champion",
                                    "draw_size", "best_of", "city", "country")}
     meta.update(id=eid, runner_up=runner_up(ev, ms), round_now=round_now(main))
+    # our title chances before the first ball, kept once play begins (this season's events; see pre_event)
+    pre = None
+    if int(year) == int(td.current):
+        try:
+            pre = pre_events(td, int(year)).get(eid)
+        except Exception as exc:  # noqa: BLE001 - the page stands without it
+            logger.warning("%s %s pre-event chances failed: %s", td.tour, eid, exc)
     return {"ok": True, "tour": td.tour, "updated_at": an.now(), "event": meta,
             "draw": {"rounds": rounds, "size": size, "slots": slots, "source": (d or {}).get("source") or ("results" if d else None),
                      "complete": (d or {}).get("complete"), "matches": cards},
-            "sim": _sim_out(sim), "market": market, "results": results, "qualifying": qual,
+            "sim": _sim_out(sim), "pre": pre, "market": market, "results": results, "qualifying": qual,
             "upsets": upsets(ms, preds, td), "draw_difficulty": draw_difficulty(td, ev, leaves) if leaves else {},
             "awards": event_awards(td, ms, preds), "history": hrec.get("champions") or [],
             "names": {p: td.short(p) for p in {x for m in ms for x in (m.get("p1"), m.get("p2")) if x}}}

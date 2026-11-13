@@ -1353,6 +1353,115 @@ def top_performers(rows: dict, t: str) -> dict | None:
 
 # ── game pages ─────────────────────────────────────────────────────────────────────────────────────────────
 
+def _day_of(g: dict) -> int | None:
+    try:
+        return M.game_day(g)
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
+def day_fits(ctx: dict, s: int) -> dict:
+    """The walk-forward's rating fits for season s, replayed exactly as M.walk_forward runs them (refitted once per
+    game day from the games before it, warm-started from the game day before, last season's end as the prior):
+    {"fits": {day: Fit}, "rows", "prior", "p", "d1"}. Cached on the season bundle."""
+    b = ctx["bundles"].setdefault(s, {})
+    if "day_fits" in b:
+        return b["day_fits"]
+    st = ctx["stores"][s]
+    p = {**M.DEFAULTS, **(ctx.get("p") or {})}
+    before = [k for k in ctx["ends"] if k < s]
+    prior = M.end_prior(ctx["ends"][max(before)] if before else None, p["carry"])
+    d1 = {t for t, v in st["teams"].items() if v.get("d1")}
+    by_day: dict[int, list] = {}
+    for g in st["games"]:
+        if g.get("stype") != "exh" and g.get("status") == "post":
+            by_day.setdefault(M.game_day(g), []).append(g)
+    rows: list[tuple] = []
+    f = None
+    fits: dict[int, M.Fit] = {}
+    for dday in sorted(by_day):
+        f = M.fit(rows, dday, prior, p, d1, init=f, iters=4 if f is not None else 8)
+        fits[dday] = f
+        for g in by_day[dday]:
+            rh, ra = M.regulation_goals(g)
+            if rh is not None:
+                rows.append((dday, g["home"], g["away"], bool(g.get("neutral")), rh, ra))
+    b["day_fits"] = {"fits": fits, "rows": rows, "prior": prior, "p": p, "d1": d1}
+    return b["day_fits"]
+
+
+def fit_before(ctx: dict, s: int, day: int) -> M.Fit:
+    """The ratings from the games before `day`: the walk-forward's own fit on a game day (the one our pregame forecast
+    used); on a day with no finished game yet (a live game), the refit the walk-forward will run on it (the games
+    before it, warm-started from the last game day before)."""
+    w = day_fits(ctx, s)
+    if day in w["fits"]:
+        return w["fits"][day]
+    prev = [d for d in w["fits"] if d < day]
+    init = w["fits"][max(prev)] if prev else None
+    rows = [r for r in w["rows"] if r[0] < day]
+    return M.fit(rows, day, w["prior"], w["p"], w["d1"], init=init, iters=4 if init is not None else 8)
+
+
+def going_in(ctx: dict, s: int, day: int) -> dict[str, dict]:
+    """The tale of the tape going into a game on `day` (M.game_day ordinal; no look-ahead, 13 Nov 2026): every D-I
+    team's rating, attack and defence from the games before that day (fit_before, on season.json's `ratings` basis),
+    its strength of schedule (the opponents it played before the day, at those ratings), its W-L-T record before the
+    day (as the standings count it) and, where CHN's lines are on, shots, power play, penalty kill and save % from the
+    games before the day (special_teams). {tid: {...}}, cached per day."""
+    b = ctx["bundles"].setdefault(s, {})
+    cache = b.setdefault("going_in", {})
+    if day in cache:
+        return cache[day]
+    st = ctx["stores"][s]
+    f = fit_before(ctx, s, day)
+    base = math.exp(f.mu)
+    earlier = [g for g in st["games"] if (_day_of(g) or day) < day]
+    gp: Counter = Counter()
+    opp_sum: dict[str, float] = defaultdict(float)
+    rec: dict[str, list[int]] = defaultdict(lambda: [0, 0, 0])
+    for g in earlier:
+        if g.get("status") != "post" or g.get("res") not in ("W", "L", "T") or g.get("stype") == "exh":
+            continue
+        for side, o in (("home", "away"), ("away", "home")):
+            t = g[side]
+            gp[t] += 1
+            opp_sum[t] += f.net(g[o])
+            res = g["res"] if side == "home" else {"W": "L", "L": "W", "T": "T"}[g["res"]]
+            rec[t][{"W": 0, "L": 1, "T": 2}[res]] += 1
+    sh = special_teams({**st, "games": earlier})
+    keep = ("sf_pg", "sa_pg", "pp_pct", "pk_pct", "sv_pct")
+    out: dict[str, dict] = {}
+    for t, v in st["teams"].items():
+        if not v.get("d1"):
+            continue
+        a, d = f.rating(t)
+        n = gp[t]
+        w, l_, ti = rec[t] if t in rec else (0, 0, 0)
+        out[t] = {"rating": r2(f.net(t)), "off": r2(base * (math.exp(a) - 1)), "def": r2(base * (1 - math.exp(-d))),
+                  "sos": r2(opp_sum[t] / n) if n else None, "w": w, "l": l_, "t": ti, "games": n,
+                  **{k: x for k, x in (sh.get(t) or {}).items() if k in keep}}
+    cache[day] = out
+    return out
+
+
+def tape_pre(ctx: dict, s: int, g: dict) -> dict | None:
+    """The game page's going-in block for a game that has started or finished: {"day", "teams": {tid: going_in row}}
+    for its D-I teams (None before the start: the page then shows the season so far)."""
+    if g.get("status") not in ("in", "post"):
+        return None
+    day = _day_of(g)
+    if day is None:
+        return None
+    try:
+        gi = going_in(ctx, s, day)
+    except Exception as exc:  # noqa: BLE001 - the page keeps everything else; the tape then shows no rows
+        logger.warning("%s going-in tape failed for %s: %s", ctx["level"], g.get("id"), exc)
+        return None
+    teams = {str(t): gi[str(t)] for t in (g.get("home"), g.get("away")) if str(t) in gi}
+    return {"day": date.fromordinal(day).isoformat(), "teams": teams} if teams else None
+
+
 def game_page(ctx: dict, s: int, g: dict) -> dict:
     st = ctx["stores"][s]
     c = card(ctx, s, g)
@@ -1360,6 +1469,9 @@ def game_page(ctx: dict, s: int, g: dict) -> dict:
     page = {"ok": True, "level": ctx["level"], **c, "teams": teams,
             "venue": {"name": g.get("venue")} if g.get("venue") else None, "attendance": g.get("att"),
             "pregame": {"model": c.get("model")}}
+    tp = tape_pre(ctx, s, g)
+    if tp:
+        page["tape_pre"] = tp
     cb = g.get("chn") or {}
     box = ((st.get("chn") or {}).get("boxes") or {}).get(g["id"]) if chn_on(st) else None
     if chn_on(st) and cb:

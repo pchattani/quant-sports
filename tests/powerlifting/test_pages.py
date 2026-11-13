@@ -69,6 +69,25 @@ def test_build_writes_index_rankings_meet_and_lifter(tmp_path, monkeypatch):
     assert "openpowerlifting.org" in model["credit"]
 
 
+def test_a_doping_disqualification_stays_in_its_flight_on_the_meet_page(tmp_path, monkeypatch):
+    """No look-ahead (13 Nov 2026): a lifter disqualified for doping after the meet (place DD) lifted in the flight, so
+    the meet page forecasts the flight with them, as it stood before the meet."""
+    entries, meets = _archive(n_lifters=20, n_meets=8)
+    last = meets["meet_id"].iloc[-1]
+    who = (entries["meet_id"] == last) & (entries["name"] == "Lifter 18")
+    entries.loc[who, "place"] = "DD"
+    monkeypatch.setenv("POWERLIFTING_DATA", str(tmp_path / "raw"))
+    store.save_table(store.entries_path(), entries)
+    store.save_table(store.meets_path(), meets)
+    out = tmp_path / "site"
+    pages.build(out, today=date(2025, 11, 1))
+    board = json.loads((out / "events" / f"{last}.json").read_text(encoding="utf-8"))["board"]
+    dd = next(r for r in board if r["name"] == "Lifter 18")
+    assert dd["place"] == "DD" and dd["exp"] is not None and dd["p_pod"] is not None
+    men = [r for r in board if r["sex"] == "M" and r["fsize"]]
+    assert {r["fsize"] for r in men} == {10}                  # ten men in the flight, the disqualified one included
+
+
 def test_s_turns_pandas_na_into_empty_string():
     assert pages._s(None) == "" and pages._s(float("nan")) == "" and pages._s(np.nan) == ""
     assert pages._s("USA") == "USA"

@@ -184,3 +184,123 @@ def test_featured_prefers_the_big_game_over_the_closest(synth):
     assert sorted(ids[:2]) == ["2", "3"] and ("1" not in ids or ids[-1] == "1")
     why = {r["id"]: r["why"] for r in f["today"]}
     assert "two title contenders" in why["2"] and "Bears v Packers" in why["3"]
+
+
+# ---------------------------------------------------------------------------------------------- tape_pre (going in)
+
+def _dated(raw: Path, season: int, last_final_week: int) -> None:
+    """Give the synthetic schedule game days (week 1 on 8 Sep, a week apart, 13:00 ET) and leave the weeks after
+    `last_final_week` unplayed (no score: scheduled)."""
+    import pandas as pd
+    sp = raw / "raw" / "schedules" / "games.parquet"
+    df = pd.read_parquet(sp)
+    m = df["season"] == season
+    from datetime import date as _d, timedelta as _td
+    df.loc[m, "gameday"] = [(_d(season, 9, 8) + _td(days=7 * (int(w) - 1))).isoformat() for w in df.loc[m, "week"]]
+    df.loc[m, "gametime"] = "13:00"
+    late = m & (df["week"] > last_final_week)
+    df["home_score"] = df["home_score"].astype("float")
+    df["away_score"] = df["away_score"].astype("float")
+    df.loc[late, ["home_score", "away_score"]] = None
+    df.to_parquet(sp, index=False)
+
+
+def test_tape_pre_going_in_unit():
+    """tape_pre (the no-look-ahead rule for game pages): the computed rows refit the EPA units on games final before the
+    kickoff only (never the game itself or a later one) and take the ratings from the history point that ends before the
+    game's date; an upcoming game gets the snapshot with the published ratings; once it starts the snapshot is kept
+    unchanged, live or final, unless it counts other games than the rows going in."""
+    from datetime import date as _d, timedelta as _td
+
+    from oddsmarkets.nfl.analytics import games as GM
+    from oddsmarkets.nfl.analytics import teams as TM
+    from oddsmarkets.nfl.models import synthetic_b
+    pbp, _, _, sched, _ = synthetic_b.simulate_season(2024, n_teams=8, rounds=2, seed=4)
+    games = {}
+    for r in sched.to_dict("records"):
+        day = _d(2024, 9, 8) + _td(days=7 * (int(r["week"]) - 1))
+        fin = int(r["week"]) <= 10
+        games[r["game_id"]] = {"game_id": r["game_id"], "week": int(r["week"]), "gtype": "REG", "date": day.isoformat(),
+                               "kickoff": f"{day.isoformat()}T13:00:00-04:00", "home": r["home_team"], "away": r["away_team"],
+                               "hs": r["home_score"] if fin else None, "as": r["away_score"] if fin else None,
+                               "status": "final" if fin else "scheduled"}
+
+    class Ctx:
+        pass
+    Ctx.games = games
+    teams = sorted({g["home"] for g in games.values()})
+    hist = {t: [[w, 0.1 * w, 0.05 * w, 0.05 * w] for w in range(1, 15)] for t in teams}
+    gi = GM.GoingIn(Ctx, pbp, {t: {"rating": 4.2, "off_rating": 2.0, "def_rating": 2.2} for t in teams}, hist)
+    # a week-8 game: its teams going in = their games of weeks 1-7 (same-week games share the kickoff), refitted
+    x = next(g for g in games.values() if g["week"] == 8)
+    c = gi.rows(x, "computed")
+    prior = {gid for gid, g in games.items() if g["week"] < 8}
+    assert c["home"]["gp"] == sum(1 for gid in prior if x["home"] in (games[gid]["home"], games[gid]["away"]))
+    want = TM.epa_units(pbp[pbp["game_id"].isin(prior)])[x["home"]]
+    assert all(abs(c["home"][k] - want[k]) < 5e-4 for k in GM.TAPE_EPA)
+    with_it = TM.epa_units(pbp[pbp["game_id"].isin(prior | {x["game_id"]})])[x["home"]]
+    assert any(abs(c["home"][k] - with_it[k]) > 1e-3 for k in GM.TAPE_EPA)          # the game itself would move them
+    # the rating: week 7's point ends two days after week 7 (before the week-8 game day); week 8's would count the game
+    assert c["home"]["rating"] == 0.7 and c["rating_asof"] == (_d(2024, 9, 8) + _td(days=7 * 6 + 2)).isoformat()
+    assert set(c["home"]["rank"]) == set(GM.TAPE_EPA) and c["before"] == "2024-10-27T17:00:00Z"
+    # an upcoming week-12 game: the snapshot, every final game counted, the published ratings
+    y = next(g for g in games.values() if g["week"] == 12)
+    now = "2024-11-20T12:00:00Z"
+    snap = GM.tape_pre(gi, y, None, now)
+    assert snap["source"] == "snapshot" and snap["home"]["rating"] == 4.2
+    assert snap["home"]["gp"] == sum(1 for g in games.values() if g["status"] == "final" and y["home"] in (g["home"], g["away"]))
+    # it starts: the snapshot is kept unchanged (a marker proves it is not recomputed), live or final, or kickoff passed
+    snap["home"]["rating"] = 9.99
+    for st in ("live", "final"):
+        assert GM.tape_pre(gi, dict(y, status=st), {"tape_pre": snap}, "2024-12-01T00:00:00Z") is snap
+    assert GM.tape_pre(gi, y, {"tape_pre": snap}, "2024-12-01T00:00:00Z") is snap
+    # a snapshot that counts other games than the rows going in gives way to the computed rows
+    stale = dict(snap, home=dict(snap["home"], gp=1))
+    got = GM.tape_pre(gi, dict(y, status="final"), {"tape_pre": stale}, "2024-12-01T00:00:00Z")
+    assert got["source"] == "computed" and got["home"]["gp"] == snap["home"]["gp"] and got["home"]["rating"] != 9.99
+    # the unit matchups of a started game come from the same rows
+    mu = GM.matchup_from_tape(snap)
+    assert mu["going_in"] and mu["home_off"]["pass"]["off"] == snap["home"]["off_pass_epa"] and mu["home_off"]["pass"]["def"] == snap["away"]["def_pass_epa"]
+    assert GM.tape_pre(None, dict(y, status="final"), None, now) is None
+
+
+def test_tape_pre_in_game_pages(synth):
+    """End to end: a final game's page carries the rows going in (its own and later games left out) and its unit matchups
+    going in; an upcoming game's snapshot survives its kickoff unchanged."""
+    _dated(synth["raw"], SEASON, 11)
+    an._STORES.clear()
+    bg = _load_build()
+    args = _args(synth, "--no-light", "--no-careers")
+    args[args.index("--today") + 1] = "2024-11-20"
+    assert bg.main(args) == 0
+    gdir = synth["data"] / str(SEASON) / "games"
+    sched = _read(synth["data"] / str(SEASON) / "schedule.json")["games"]
+    fin = [c for c in sched if c["status"] == "final"]
+    last = max(fin, key=lambda c: (c["kickoff"], c["game_id"]))
+    page = _read(gdir / f"{last['game_id']}.json")
+    tp = page["tape_pre"]
+    assert tp["source"] == "computed" and tp["before"] == "2024-11-17T17:00:00Z"
+    h = last["home"]
+    assert tp["home"]["gp"] == sum(1 for c in fin if c["week"] < last["week"] and h in (c["home"], c["away"]))
+    assert page["matchups"]["going_in"] and page["matchups"]["home_off"]["pass"]["off"] == tp["home"]["off_pass_epa"]
+    up = min((c for c in sched if c["status"] != "final"), key=lambda c: (c["kickoff"], c["game_id"]))
+    p = gdir / f"{up['game_id']}.json"
+    doc = _read(p)
+    snap = doc["tape_pre"]
+    assert snap["source"] == "snapshot" and snap["home"]["gp"] == sum(1 for c in fin if up["home"] in (c["home"], c["away"]))
+    assert not doc["matchups"].get("going_in")                      # before kickoff: the season's unit matchups
+    # it is played: the page is rewritten (status and score moved) and keeps the snapshot as written (marker)
+    doc["tape_pre"]["home"]["rating"] = 9.99
+    p.write_text(json.dumps(doc), encoding="utf-8")
+    import pandas as pd
+    sp = synth["raw"] / "raw" / "schedules" / "games.parquet"
+    df = pd.read_parquet(sp)
+    m = df["game_id"] == up["game_id"]
+    df.loc[m, ["home_score", "away_score"]] = [24.0, 17.0]
+    df.to_parquet(sp, index=False)
+    an._STORES.clear()
+    args[args.index("--today") + 1] = "2024-11-25"
+    assert bg.main(args) == 0
+    kept = _read(p)
+    assert kept["card"]["status"] == "final" and kept["tape_pre"]["home"]["rating"] == 9.99 and kept["tape_pre"]["source"] == "snapshot"
+    assert kept["matchups"]["going_in"] and kept["matchups"]["rating"]["home"] == 9.99

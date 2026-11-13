@@ -6,7 +6,8 @@
  *   - game by game: our pre-game chance for each side (schedule.json model.p_home: the walk-forward number from the
  *     ratings before the game day, no look-ahead) as bars, the result marked, then the games as a table linking the game
  *     pages;
- *   - the tale of the tape on the season's ratings and the explain strip.
+ *   - the tale of the tape on the season's ratings before the series starts; once it has, the teams going into game 1
+ *     (that game file's tape_pre; never today's ratings, which count the series' own games), and the explain strip.
  * Data: <L>/<S>/season.json (postseason, ratings, standings, bracket) and <L>/<S>/schedule.json. Older-browser rule: no
  * optional chaining, no nullish coalescing. */
 (function (HW) {
@@ -52,12 +53,24 @@ function render(el, params) {
     if (kp.length) h += '<div class="hw-kpis">' + QK.stats(kp) + '</div>';
     h += '<div class="qk-grid hw-sec">' + U.card2('Game by game', 'Our pre-game chance for the ' + esc(HW.teamShort(L, hi)) + ' in each game; the result under each bar', U.chart('ser-c', 300, 'Our pre-game chance in each game'), { cls: 'qk-span-7' }) +
       U.card2('The games', '', '<div id="ser-t"></div>', { cls: 'qk-span-5', flush: true }) + '</div>';
+    /* the tale of the tape: the season's ratings before the series starts; once a game has started, the teams going
+       into game 1 (its file's tape_pre, filled below), or nothing: today's ratings count the series' own games */
+    const tapeOf = (ra, rb) => QK.matchupBar({ left: U.team(L, hi), right: U.team(L, lo), colors: pc, rows: [
+      { label: 'Net rating', a: ra.net, b: rb.net, fmt: v => U.signed(v, 1) }, { label: 'Offensive rating', a: ra.off, b: rb.off, fmt: v => U.f(v, 1) }, { label: 'Defensive rating', a: ra.def, b: rb.def, fmt: v => U.f(v, 1), better: 'low' }] });
+    const begun = games.some(g => g.status === 'in' || g.status === 'post');
     const R = season.ratings || {};
     const ra = R[hi] || {}, rb = R[lo] || {};
-    if (isNum(ra.net) && isNum(rb.net)) h += U.card2('Tale of the tape', 'The two teams’ season ratings (points per 100 possessions, opponent-adjusted)', QK.matchupBar({ left: U.team(L, hi), right: U.team(L, lo), colors: pc, rows: [
-      { label: 'Net rating', a: ra.net, b: rb.net, fmt: v => U.signed(v, 1) }, { label: 'Offensive rating', a: ra.off, b: rb.off, fmt: v => U.f(v, 1) }, { label: 'Defensive rating', a: ra.def, b: rb.def, fmt: v => U.f(v, 1), better: 'low' }] }), { cls: 'hw-sec' });
+    if (begun) h += '<div id="ser-tape"></div>';
+    else if (isNum(ra.net) && isNum(rb.net)) h += U.card2('Tale of the tape', 'The two teams’ season ratings to date (points per 100 possessions, opponent-adjusted)', tapeOf(ra, rb), { cls: 'hw-sec' });
     h += QK.explain('Each bar is the chance our game model gave the ' + esc(HW.teamShort(L, hi)) + ' before that game, from the ratings as they stood the day before (no hindsight). A 60% call still goes the other way 4 times in 10, so a series can turn on one or two of them.', { title: 'What’s that number?' });
     el.innerHTML = h;
+    if (begun && games[0] && HW.gameCentre) HW.gameCentre.loadGame(L, S, games[0].id).then(r => {
+      const gi = U.goingIn(r && U.ok(r.d) ? r.d : null), node = el.querySelector('#ser-tape');
+      if (!gi || !node || !U.alive(node)) return;
+      const side = t => (String(t) === String(r.d.home) ? gi.home : String(t) === String(r.d.away) ? gi.away : null);
+      const xa = side(hi), xb = side(lo);
+      if (xa && xb && isNum(xa.net) && isNum(xb.net)) node.innerHTML = U.card2(U.goingTitle(gi), 'Going into the series: the ratings before game 1 (points per 100 possessions, opponent-adjusted); the stronger side of each bar is solid', tapeOf(xa, xb), { cls: 'hw-sec' });
+    });
     const cats = games.map((g, i) => 'Game ' + (i + 1) + (g.status === 'post' && isNum(g.hs) ? ' · ' + HW.teamAbbr(L, winner(g)) + ' won' : ''));
     QKC.bar('#ser-c', { cats: cats, series: [{ name: 'Our chance for ' + HW.teamAbbr(L, hi), data: games.map(g => { const p = pFor(g, hi); return isNum(p) ? Math.round(p * 1000) / 10 : null; }), color: 'model' }], labels: true, fmt: v => v + '%', max: 100,
       valName: 'Our pre-game chance for ' + HW.teamAbbr(L, hi) + ' (%)', catName: 'Game', hrefs: games.map(g => HW.gameHref(L, g.id, S)) });

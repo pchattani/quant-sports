@@ -126,6 +126,8 @@ def load_all(scope: str, upto: int | None = None, tests_only: bool = True, with_
                     if vv and not cur.get(kk):
                         cur[kk] = vv
     matches.sort(key=lambda m: (m.get("date") or "", m.get("id")))
+    if tests_only and scope in ("men", "women"):
+        ID_ALIAS[scope] = unify_ids(matches)
     if with_wiki and tests_only and scope in ("men", "women"):
         from . import wiki
         matches, rep = wiki.merge(scope, matches)
@@ -139,6 +141,32 @@ def load_all(scope: str, upto: int | None = None, tests_only: bool = True, with_
     if tests_only:
         attach_elevation(matches)
     return matches, athletes
+
+
+# {scope: {dropped id: the id kept}} from the last load_all (index.json carries it so old team links still resolve)
+ID_ALIAS: dict = {}
+
+
+def unify_ids(matches: list[dict]) -> dict:
+    """One team id per side. ESPN's World Cup league kept its first ids for three unions (Spain 18, Zimbabwe 42, Cote
+    d'Ivoire 63, in the 1987-1999 World Cups) while its test-match feed, and now the 2027 World Cup fixtures, use newer
+    ones (289211, 289356, 289358); the Wikipedia merge then hung every older test on the first id, so each side had two
+    ratings and two rows on the power board (found 13 Nov 2026). The id a side first appears under (matches sorted by
+    date) is kept, the one the Wikipedia and Sofascore merges already use; every later id of the same side (its
+    canonical name) is rewritten to it. Returns {dropped id: kept id}."""
+    first: dict[str, str] = {}
+    alias: dict[str, str] = {}
+    for m in matches:
+        for s in ("home", "away"):
+            t = m.get(s) or {}
+            nm, tid = t.get("name"), t.get("id")
+            if not nm or not tid:
+                continue
+            keep = first.setdefault(nm, tid)
+            if tid != keep:
+                alias[str(tid)] = str(keep)
+                t["id"] = keep
+    return alias
 
 
 def save(scope: str, year: int, matches: list[dict], athletes: dict) -> Path:

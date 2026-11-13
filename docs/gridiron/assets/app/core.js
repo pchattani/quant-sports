@@ -1323,3 +1323,18 @@ GI.followRows = function () {
   return Object.keys(tm).filter(t => tm[t] && tm[t].name).map(t => ({ sport: 'nfl', t: tm[t].name, s: 'NFL' + (tm[t].division ? ' · ' + tm[t].division : ''), k: 'gridiron:team:' + t,
     href: '#/team/' + t, abbr: t, colour: tm[t].colour, alt: tm[t].alt }));
 };
+/* Going in (the no-look-ahead rule for game pages, 13 Nov 2026). A game that has started (live or final) compares the
+   teams as they stood before it, from the game file's tape_pre: regular-season games final before kickoff, written while
+   the game was upcoming and kept once it started ("snapshot"), or computed going in for a game that started before
+   snapshots ("computed"). Never today's season numbers in their place: those count the game and everything after it,
+   so a started game without tape_pre shows no comparison rows.
+     goingIn(g) -> tape_pre or null              goingTitle(t) -> 'Going in · before 12 Nov 2026'
+     goingSub(t, away, home) -> the sample line */
+GI.goingIn = function (g) { const t = g && g.tape_pre; return t && t.home && t.away ? t : null; };
+GI.goingDate = function (iso) { return QK.fmt.date(iso, { day: 'numeric', month: 'short', year: 'numeric' }); };
+GI.goingTitle = function (t) { return 'Going in · before ' + GI.goingDate(t.before); };
+GI.goingSub = function (t, away, home) {
+  const rated = GI.isNum((t.away || {}).rating) || GI.isNum((t.home || {}).rating);
+  return 'Regular-season games final before this one (' + GI.teamAbbr(away) + ' ' + ((t.away || {}).gp || 0) + ', ' + GI.teamAbbr(home) + ' ' + ((t.home || {}).gp || 0) + ')' +
+    (t.source === 'computed' && t.rating_asof && rated ? '; ratings as they stood on ' + GI.goingDate(t.rating_asof + 'T12:00:00Z') : '');
+};

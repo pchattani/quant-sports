@@ -291,3 +291,94 @@ def test_progression_fields_and_reference(tmp_path):
     assert "dp" not in rows[(2030, "28")]                                              # under the floor: values only
     g = ref["seasons"]["2030"]["nba_wings"]
     assert g["n"] == 9 and len(g["m"]["pts100"]) == 5 and ref["seasons"]["2030"]["len"] >= 85
+
+
+def test_tape_pre_going_in_unit():
+    """tape_pre (the no-look-ahead rule for game pages): the computed rows count only regular-season games final before
+    the tip (never the game itself or a later one, nor the preseason) with the ratings fitted before the game day; an
+    upcoming game gets the snapshot with the season's current ratings; once it starts (live or final, or the tip
+    passed) the snapshot is kept unchanged, unless it counts other games than the rows going in."""
+    from datetime import date
+    from oddsmarkets.basketball.analytics import games as GMS
+
+    def gm(i, day, h, a, hs=None, as_=None, status="post", stype="reg"):
+        return {"id": str(i), "date": f"2030-11-{day:02d}T00:30Z", "status": status, "stype": stype, "home": h, "away": a,
+                "hs": hs, "as": as_}
+
+    class Ctx:
+        teams = ["1", "2", "3"]
+        games = {"0": gm(0, 2, "1", "2", 90, 120, stype="pre"), "1": gm(1, 4, "1", "2", 110, 100), "2": gm(2, 6, "3", "1", 99, 101),
+                 "3": gm(3, 8, "1", "3", 95, 120), "4": gm(4, 10, "2", "1", status="pre")}
+        ratings = {"teams": {"1": {"net": 4.0, "off": 115.0, "def": 111.0}, "2": {"net": -1.0, "off": 110.0, "def": 111.0},
+                             "3": {"net": 0.5, "off": 112.0, "def": 111.5}}}
+        asked: list = []
+
+        def ratings_before(self, d):
+            self.asked.append(d)
+            return {"teams": {"1": {"net": 2.0, "off": 113.0, "def": 111.0}, "3": {"net": 1.0, "off": 112.0, "def": 111.0}}}
+    ctx = Ctx()
+    gi = GMS.GoingIn(ctx)
+    # game 3, final: team 1 going in = games 1 and 2 (2-0, +12), not game 3 (lost by 25), not the preseason game 0
+    c = gi.rows(ctx.games["3"], "computed")
+    assert c["home"] == {"gp": 2, "w": 2, "l": 0, "pct": 1.0, "pd": 12, "net": 2.0, "off": 113.0, "def": 111.0}
+    assert c["away"]["gp"] == 1 and c["away"]["w"] == 0 and c["away"]["pd"] == -2 and c["source"] == "computed"
+    assert ctx.asked[-1] == date(2030, 11, 7)            # the fit through the day before (US day of a 00:30Z tip)
+    assert gi.rows(ctx.games["1"], "computed")["home"]["gp"] == 0
+    # game 4, upcoming: the snapshot (team 1 3 games 2-1, the current ratings)
+    now = "2030-11-09T12:00:00Z"
+    snap = GMS.tape_pre(gi, ctx.games["4"], None, now)
+    assert snap["source"] == "snapshot" and snap["away"]["gp"] == 3 and snap["away"]["pd"] == -13 and snap["away"]["net"] == 4.0
+    # it starts: the snapshot is kept unchanged (a marker proves it is not recomputed), live or final
+    snap["away"]["net"] = 99.9
+    for st, hs, as_ in (("in", 40, 38), ("post", 100, 90)):
+        g4 = dict(ctx.games["4"], status=st, hs=hs, **{"as": as_})
+        assert GMS.tape_pre(gi, g4, snap, "2030-11-10T02:00:00Z") is snap
+    # the tip passed with the store still saying "pre": started all the same
+    assert GMS.tape_pre(gi, ctx.games["4"], snap, "2030-11-10T02:00:00Z") is snap
+    # a snapshot counting other games than the rows going in (a missed build) gives way to the computed rows
+    stale = {"before": snap["before"], "source": "snapshot", "home": {"gp": 0}, "away": {"gp": 1, "net": 99.9}}
+    got = GMS.tape_pre(gi, dict(ctx.games["4"], status="post"), stale, "2030-11-10T02:00:00Z")
+    assert got["source"] == "computed" and got["away"]["gp"] == 3 and got["away"]["net"] == 2.0
+    # a postponed game is not started; nothing at all without a table and a snapshot
+    assert not GMS.started(dict(ctx.games["4"], status="postponed"), "2030-12-01T00:00:00Z")
+    assert GMS.tape_pre(None, dict(ctx.games["4"], status="post"), None, now) is None
+
+
+def test_tape_pre_in_game_pages(root):
+    """End to end: the current season's pages carry tape_pre; a final game's rows exclude the game itself; an upcoming
+    game's snapshot survives its start unchanged (the page is rewritten when its status moves)."""
+    assert _run(root, "--no-light", "--no-careers") == 0
+    d = root / "nba" / "2031"
+    st = _load(d / "store.json")
+    from oddsmarkets.basketball.analytics.games import _ts
+    games = sorted(st["games"].values(), key=lambda g: _ts(g["date"]))
+    fin = [g for g in games if g["status"] == "post" and g.get("stype") == "reg"]
+    last = fin[-1]
+    tp = _load(d / "games" / f"{last['id']}.json")["tape_pre"]
+    h = str(last["home"])
+    prior = [g for g in fin if _ts(g["date"]) < _ts(last["date"]) and h in (str(g["home"]), str(g["away"]))]
+    won = sum(1 for g in prior if (str(g["home"]) == h) == (g["hs"] > g["as"]))
+    assert tp["source"] == "computed" and tp["home"]["gp"] == len(prior) and tp["home"]["w"] == won
+    assert tp["home"]["pd"] == sum((g["hs"] - g["as"]) * (1 if str(g["home"]) == h else -1) for g in prior)
+    assert all(tp[s]["net"] is not None for s in ("home", "away"))
+    t_now = _ts(f"{TODAY}T23:59:00Z")
+    up = next(g for g in games if g["status"] == "pre" and _ts(g["date"]) > t_now)
+    p = d / "games" / f"{up['id']}.json"
+    snap = _load(p)["tape_pre"]
+    sn = _load(d / "season.json")["ratings"][str(up["home"])]
+    assert snap["source"] == "snapshot" and snap["home"]["net"] == sn["net"] and snap["home"]["off"] == sn["off"]
+    assert snap["home"]["gp"] == len([g for g in fin if str(up["home"]) in (str(g["home"]), str(g["away"]))])
+    # the game is played: its page is rewritten (status moved) and keeps the snapshot as written (marker)
+    doc = _load(p)
+    doc["tape_pre"]["home"]["net"] = 99.9
+    p.write_text(json.dumps(doc), encoding="utf-8")
+    st["games"][str(up["id"])].update(status="post", hs=101, **{"as": 99})
+    write_store(root, st)
+    an._clear()
+    day = up["date"][:10]
+    assert BH.main(["--leagues", "nba", "--seasons", "2031", "--quick", "--no-market", "--today", day, "--data", str(root),
+                    "--no-light", "--no-careers"]) == 0
+    after = _load(p)
+    kept = after["tape_pre"]
+    assert after["status"] == "post" and after["hs"] == 101                       # the page was rewritten
+    assert kept["home"]["net"] == 99.9 and kept["source"] == "snapshot" and kept["home"]["gp"] == snap["home"]["gp"]

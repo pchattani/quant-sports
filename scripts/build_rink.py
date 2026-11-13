@@ -25,7 +25,8 @@ Seasons come in two weights:
 Game pages are written for the --game-page-seasons most recent seasons (default 2): pages whose signature changed
 (status, score, lines, goalies, events on the table, model versions) plus every not-final game of the current
 season in the pricing window; --all-games rebuilds every page of those seasons. A page is never downgraded: without
-the game's events on this machine the old page's event-level blocks are kept.
+the game's events on this machine the old page's event-level blocks are kept. Each page carries tape_pre, the clubs'
+tale of the tape going into the game (written while it is upcoming, kept once it starts: analytics/games.py).
 
 Memory: one season of events and stints at a time; the context is released after each season.
 
@@ -223,7 +224,7 @@ def build_season(b: Build, season: int, full: bool, cfg: dict, shared: dict) -> 
     # game pages
     pages = manifest.get("games") or {}
     if season in shared["page_seasons"]:
-        pages = b.step(f"game pages {season}", lambda: game_pages(b, ctx, cfg, manifest, prices, frozen, wf, cards, markets), pages) or pages
+        pages = b.step(f"game pages {season}", lambda: game_pages(b, ctx, cfg, manifest, prices, frozen, wf, cards, markets, tms), pages) or pages
     blocks = {}
     if full and not cfg["no_careers"]:
         blocks = b.step(f"player blocks {season}", lambda: CR.current_blocks(ctx, sk, gk), {}) or {}
@@ -318,11 +319,16 @@ def price_window(ctx, cfg: dict) -> dict[str, dict]:
     return out
 
 
-def game_pages(b: Build, ctx, cfg: dict, manifest: dict, prices: dict, frozen: dict, wf: dict, cards: list[dict], markets: dict | None) -> dict:
+def game_pages(b: Build, ctx, cfg: dict, manifest: dict, prices: dict, frozen: dict, wf: dict, cards: list[dict], markets: dict | None,
+               tms: dict | None = None) -> dict:
     from oddsmarkets.nhl.analytics import games as GM
     from oddsmarkets.nhl.analytics import tables
     old_sigs = dict(manifest.get("games") or {})
     mv = {**model_versions(), "build": BUILD_VERSION, "xg": ctx.xg_source}
+    if ctx.season >= GM.TAPE_FROM:
+        # the tale of the tape going in (tape_pre): a new version moves every signature of these seasons once, so the
+        # next build rewrites each page through this writer (the backfill), and never again after
+        mv["tape"] = GM.TAPE_VERSION
     gdir = b.data / str(ctx.season) / "games"
     by_card = {c["game_id"]: c for c in cards}
     T = tables.tables(ctx)
@@ -352,6 +358,11 @@ def game_pages(b: Build, ctx, cfg: dict, manifest: dict, prices: dict, frozen: d
             due.append(gid)
     logger.info("%s: %d game pages due of %d", ctx.season, len(due), len(by_card))
     mk_games = (markets or {}).get("games") or {}
+    # each club going in: the snapshot's rating is the published one (teams.json), the computed rows' the weekly history
+    ratings_now = {t: ((v or {}).get("units") or {}).get("rating") for t, v in ((tms or {}).get("teams") or {}).items()}         if (tms or {}).get("ok") else {}
+    gi = b.step(f"going in {ctx.season}", lambda: GM.GoingIn(ctx, T["tg"], ratings_now,
+                                                             an.read_json(b.data / str(ctx.season) / "rating_history.json")), None)
+    now = _digest_now(cfg["today"]).strftime("%Y-%m-%dT%H:%M:%SZ")
     written = 0
     for gid in due:
         g = ctx.games[gid]
@@ -371,7 +382,7 @@ def game_pages(b: Build, ctx, cfg: dict, manifest: dict, prices: dict, frozen: d
             stg = st.iloc[st_idx[gid]] if gid in st_idx else None
             pgg = pg.iloc[pg_idx[gid]] if gid in pg_idx else None
             ggg = gg.iloc[gg_idx[gid]] if gid in gg_idx else None
-            return GM.build_page(ctx, g, evg, stg, pgg, ggg, by_card.get(gid) or GM.card(g), pregame, old, T["pos"])
+            return GM.build_page(ctx, g, evg, stg, pgg, ggg, by_card.get(gid) or GM.card(g), pregame, old, T["pos"], gi, now)
         payload = b.step(f"game {gid}", build)
         if payload is None:
             payload = {"ok": False, "reason": "game page could not be built", "game_id": gid}

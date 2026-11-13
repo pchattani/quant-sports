@@ -26,14 +26,17 @@ logger = logging.getLogger(__name__)
 VARIANTS = ("last", "buckets", "full")
 
 
-def entrant_frame(entries: pd.DataFrame, since: str = "2016-01-01") -> pd.DataFrame:
-    """Full-power entries from `since` with a stream, one row per lifter per meet, bomb-outs included."""
+def entrant_frame(entries: pd.DataFrame, since: str = "2016-01-01", keep_dd: bool = False) -> pd.DataFrame:
+    """Full-power entries from `since` with a stream, one row per lifter per meet, bomb-outs included.
+
+    keep_dd: keep doping disqualifications (place DD). The sealed evaluation leaves them out; a meet page keeps them,
+    because they lifted in the flight and the disqualification came after the meet (no look-ahead)."""
     e = entries[(entries["event"] == "SBD") & (entries["date"] >= since) & entries["sex"].isin(("M", "F")) &
                 entries["eq"].isin(("raw", "wraps", "equipped"))].copy()
     e["stream"] = np.where(e["sex"] == "M", "men_", "women_") + e["eq"].map({"raw": "raw", "wraps": "wraps", "equipped": "eq"})
     e["date"] = pd.to_datetime(e["date"])
     e["dq"] = e["place"].astype(str).eq("DQ") | e["total"].isna()
-    e = e[~e["place"].astype(str).isin(("G", "NS", "DD"))]
+    e = e[~e["place"].astype(str).isin(("G", "NS") if keep_dd else ("G", "NS", "DD"))]
     e = e.sort_values("total", ascending=False).drop_duplicates(["meet_id", "pid", "stream", "division"], keep="first")
     return e.reset_index(drop=True)
 

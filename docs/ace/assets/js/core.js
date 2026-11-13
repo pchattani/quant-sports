@@ -816,6 +816,15 @@ function playerSurname(T, id) {
 }
 function playerCountry(T, id) { const a = args(arguments); return (NAMES[a[0]][String(a[1])] || {}).country || ''; }
 function playerRank(T, id) { const a = args(arguments); const r = (NAMES[a[0]][String(a[1])] || {}).rank; return isNum(r) ? Number(r) : null; }
+/* A player's ranking for a match: today's before the first ball; once it has started, the ranking held going in (the
+   match file's "ranks" or a card's "rk", from the result row), else null. Never today's ranking on a played match. */
+function rankAt(c, T, pid, i) {
+  if (!c || matchState(c) === 'pre') return playerRank(T, pid);
+  const k = isNum(i) ? i : (String(pid) === String(c.p1) ? 0 : String(pid) === String(c.p2) ? 1 : -1);
+  const src = c.rk || c.ranks;
+  const r = k >= 0 && Array.isArray(src) ? Number(src[k]) : NaN;
+  return isNum(r) && r > 0 ? r : null;
+}
 /* A stable colour per player (for multi-line charts). */
 function hashIndex(s, n) { let h = 0; String(s).split('').forEach(ch => { h = (h * 31 + ch.charCodeAt(0)) >>> 0; }); return h % n; }
 function playerColour(T, id) { const a = args(arguments); return a[1] ? PALETTE[hashIndex(a[1], PALETTE.length)] : C.text3; }
@@ -914,8 +923,10 @@ function matchCard(c, opts) {
     }
     return '<span class="ta-sets" aria-label="Games by set">' + h + '</span>';
   };
-  const sub = pid => { const rk = playerRank(T, pid), cc = playerCountry(T, pid); return [isNum(rk) ? 'No. ' + rk : '', cc].filter(Boolean).join(' · '); };
-  g.away.record = sub(c.p1) + '\u0001a'; g.home.record = sub(c.p2) + '\u0001h';
+  /* the ranking under the name: today's before the first ball; once play starts, the one the player held going in (the
+     card's rk, from the result row), else none, so a played match never shows a later ranking (13 Nov 2026) */
+  const sub = (pid, i) => { const rk = rankAt(c, T, pid, i), cc = playerCountry(T, pid); return [isNum(rk) ? 'No. ' + rk : '', cc].filter(Boolean).join(' · '); };
+  g.away.record = sub(c.p1, 0) + '\u0001a'; g.home.record = sub(c.p2, 1) + '\u0001h';
   const why = o.why ? (QK.whyLine ? QK.whyLine(g) : '') : false;
   /* round 6: the market's chance small and grey under ours before the first ball, only where a page asks for it
      (o.market: 'quiet'); sweep (12 Nov 2026): off by default, since the market sits quietly on the match centre and the
@@ -1306,7 +1317,7 @@ return {
   matchCard: matchCard, kitGame: kitGame, fresh: fresh, titleProbs: titleProbs, awardValue: awardValue, playersOf: playersOf, eventsOf: eventsOf,
   // names and links
   player: player, playerName: playerName, playerShort: playerShort, playerSurname: playerSurname, playerCountry: playerCountry,
-  playerRank: playerRank, playerColour: playerColour, playerLink: playerLink, playerHref: playerHref,
+  playerRank: playerRank, rankAt: rankAt, playerColour: playerColour, playerLink: playerLink, playerHref: playerHref,
   eventInfo: eventInfo, eventName: eventName, eventLink: eventLink, eventHref: eventHref, matchLink: matchLink, matchHref: matchHref,
   h2hHref: h2hHref, compareHref: compareHref, href: href, yq: yq,
   // HTML

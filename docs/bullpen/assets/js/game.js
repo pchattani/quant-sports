@@ -233,22 +233,21 @@ function header(g, L, S, season, recs) {
   const A = U.team(g.away, L, S), H = U.team(g.home, L, S);
   A.colour = U.raw(g.away) || pair[0]; H.colour = U.raw(g.home) || pair[1];
   /* round 11: recs, the regular-season records going in (formGoingIn), replace the season's final record once the game
-     has started */
-  const rec = t => (recs && recs[String(t)]) || BP.RECORDS[String(t)] || '';
+     has started; until they arrive a started game shows no record (today's counts the game and everything after it) */
+  const rec = t => (recs && recs[String(t)]) || (started ? '' : BP.RECORDS[String(t)] || '');
   A.record = rec(g.away); H.record = rec(g.home);
   const tag = g.series ? BP.seriesText(g.series) : (g.gtype && g.gtype !== 'R' ? BP.roundLabel(g.gtype) : '');
   const G = { sport: 'baseball', id: g.gpk, start: g.start || g.date, status: live ? 'live' : fin ? 'final' : 'pre', league: BP.levelLong(L) + (tag ? ' · ' + tag : ''),
     home: H, away: A, hs: isNum(g.hs) ? Number(g.hs) : null, as: isNum(g.as) ? Number(g.as) : null,
     p_home: wpH !== null ? wpH : pH, wp_home: wpH, p_pre: live && wpH !== null ? pH : null, pre_only: live && wpH === null ? true : undefined,
     period: live && isNum(g.inning) ? g.inning : null };
-  // how they match up: our team ratings (runs a game against an average club) and the starters
-  const rows = BP.standingsRows ? BP.standingsRows(season || {}) : {};
-  const ra = (rows[String(g.away)] || {}).rating || {}, rh = (rows[String(g.home)] || {}).rating || {};
-  const fx = [];
-  const add = (label, a, b, f, low) => { if (isNum(a) && isNum(b)) fx.push({ label: label, a: f(a), b: f(b), better: Math.abs(a - b) < 1e-9 ? null : ((a > b) !== !!low ? 'a' : 'b') }); };
-  add('Team rating, runs a game', ra.net, rh.net, v => U.signed(v, 2));
-  add('Offence, runs a game', ra.off, rh.off, v => U.signed(v, 2));
-  add('Run prevention, runs a game', (ra.def || 0) + (ra.pitch || 0), (rh.def || 0) + (rh.pitch || 0), v => U.signed(v, 2));
+  /* how they match up: our team ratings (runs a game against an average club), the season to date before the first
+     pitch; once the game has started the clubs going in (the game file's tape_pre: computed rows carry runs a game
+     only), or no rows at all */
+  const gi = started ? U.goingIn(g) : null;
+  const sides = started ? (gi ? [gi.away, gi.home] : null) : [U.seasonSide(season, g.away), U.seasonSide(season, g.home)];
+  let fx = sides ? U.clubRows(sides[0], sides[1]) : [];
+  if (sides && !fx.length && gi) fx = U.clubRows(sides[0], sides[1], ['rs_g', 'ra_g']);
   const extra = [];
   const tot = isNum((m.runs || {}).total) ? m.runs.total : m.total;
   if (!started && isNum(tot)) extra.push('we expect about ' + Math.round(tot) + ' runs in all');
@@ -265,7 +264,7 @@ function header(g, L, S, season, recs) {
   /* the occasion names its level already ("Triple-A National Championship Game"): no "Triple-A · Triple-A ..." */
   const card = QK.previewCard(G, { kicker: tag ? (tagShort.indexOf(lvlWord) === 0 ? tagShort : lvlWord + ' · ' + tagShort) : lvlWord + (g._park && g._park.name ? ' · ' + g._park.name : ''),
     nick: t => t.short || t.name,
-    colors: pair, factors: fx, factorsTitle: 'How they match up this season',
+    colors: pair, factors: fx, factorsTitle: gi ? U.goingTitle(gi) : 'How they match up this season',
     noteExtra: (extra.length ? esc(extra.join('; ').replace(/^we/, 'We')) + '.' : '') + sure,
     /* round 6: the market quiet under the hero (small and grey, the source on hover) */
     market: !started && isNum(mk.p_home) ? { p: Number(mk.p_home), src: mk.sources || mk.source || null, label: U.srcName(mk.sources) || '', quiet: true } : null });
@@ -464,20 +463,24 @@ function contextCard(g, L) {
       kv('Accuracy', isNum(u.accuracy) ? BP.pct(u.accuracy, 1) + (isNum(u.x_accuracy) ? ' <span class="muted-inline">v ' + BP.pct(u.x_accuracy, 1) + ' expected</span>' : '') : '—') +
       kv('Run impact / game', isNum(u.run_impact_pg) ? BP.num(u.run_impact_pg, 2) : '—') + (u.zone ? kv('Zone', esc(u.zone)) : '') + (isNum(u.games) ? kv('Games', u.games) : '') + '</div></div>';
 }
-/* Tale of the tape from the season ratings and standings (season.json). */
+/* Tale of the tape: the two clubs' profile. Before the first pitch the season to date (season.json ratings and
+   standings); once the game has started the clubs going in (the game file's tape_pre), or nothing. */
+function tapeSides(g, season) {
+  const st = BP.gameState(g);
+  if (st === 'live' || st === 'final') { const gi = BP.ui.goingIn(g); return gi ? [gi.away, gi.home] : null; }
+  return season ? [BP.ui.seasonSide(season, g.away), BP.ui.seasonSide(season, g.home)] : null;
+}
 function tape(g, season) {
-  if (!season) return '';
-  const rows = BP.standingsRows ? BP.standingsRows(season) : {};
-  const a = rows[String(g.away)] || {}, h = rows[String(g.home)] || {};
-  const ra = a.rating || {}, rh = h.rating || {};
-  const pg = (r, k) => (isNum(r[k]) && (r.w || 0) + (r.l || 0) > 0 ? r[k] / ((r.w || 0) + (r.l || 0)) : null);
+  const sd = tapeSides(g, season);
+  if (!sd) return '';
+  const a = sd[0] || {}, h = sd[1] || {};
   const list = [
-    { label: 'Team rating (runs a game)', a: ra.net, b: rh.net, fmt: v => BP.ui.signed(v, 2), tip: 'Our rating: runs a game better than an average club' },
-    { label: 'Offence (runs a game)', a: ra.off, b: rh.off, fmt: v => BP.ui.signed(v, 2) },
-    { label: 'Pitching (runs a game)', a: ra.pitch, b: rh.pitch, fmt: v => BP.ui.signed(v, 2) },
-    { label: 'Defence (runs a game)', a: ra.def, b: rh.def, fmt: v => BP.ui.signed(v, 2) },
-    { label: 'Runs scored a game', a: pg(a, 'rs'), b: pg(h, 'rs'), fmt: v => BP.num(v, 2) },
-    { label: 'Runs allowed a game', a: pg(a, 'ra'), b: pg(h, 'ra'), fmt: v => BP.num(v, 2), better: 'low' }
+    { label: 'Team rating (runs a game)', a: a.rating, b: h.rating, fmt: v => BP.ui.signed(v, 2), tip: 'Our rating: runs a game better than an average club' },
+    { label: 'Offence (runs a game)', a: a.off, b: h.off, fmt: v => BP.ui.signed(v, 2) },
+    { label: 'Pitching (runs a game)', a: a.pitch, b: h.pitch, fmt: v => BP.ui.signed(v, 2) },
+    { label: 'Defence (runs a game)', a: a.def, b: h.def, fmt: v => BP.ui.signed(v, 2) },
+    { label: 'Runs scored a game', a: a.rs_g, b: h.rs_g, fmt: v => BP.num(v, 2) },
+    { label: 'Runs allowed a game', a: a.ra_g, b: h.ra_g, fmt: v => BP.num(v, 2), better: 'low' }
   ];
   if (!list.some(r => isNum(r.a) && isNum(r.b))) return '';
   const pair = BP.ui.pair(g.away, g.home);
@@ -832,8 +835,10 @@ function render(el, params) {
       '<div class="bp-gtop">' + header(g, L, S, season) + '<div class="bp-gside bp-stack"><div class="bp-stack">' + kpiStrip(g) +
       BP.ui.card2('Form going in', 'Each club’s last five results before this game, from the team logs', '<div id="gm-form">' + QK.skeleton('lines', 2) + '</div>') + '</div>' +
       ((g.model || preOf(g).model) && forecastRows(g).length ? BP.ui.card2(st === 'pre' ? 'Our forecast' : 'Our pre-game forecast', 'the questions our simulation answers' + (g.updated_at ? ' · game file as of ' + esc(BP.fmtStamp(g.updated_at)) : '') + '; the market column is a reference, not our forecast', forecastTable(g)) : '') + '</div></div>' +
-      /* round 11: once the game has started the default tab is the game itself, so the tale of the tape sits here */
-      (started && res.full && tape(g, season) ? '<section class="qk-section">' + QK.sectionHead({ kicker: 'Tale of the tape', title: BP.teamAbbr(g.away) + ' or ' + BP.teamAbbr(g.home) + '?', sub: 'The two clubs over the regular season, from our ratings (runs a game against an average club); the better side of each row is solid.' }) +
+      /* round 11: once the game has started the default tab is the game itself, so the tale of the tape sits here: the
+         clubs going in (tape_pre), never the season's final numbers */
+      (started && res.full && BP.ui.goingIn(g) && tape(g, season) ? '<section class="qk-section">' + QK.sectionHead({ kicker: 'Tale of the tape', title: BP.ui.goingTitle(BP.ui.goingIn(g)),
+        sub: BP.ui.goingSub(BP.ui.goingIn(g), g.away, g.home) + '. The stronger side of each bar is solid.' }) +
         '<article class="qk-card"><div class="qk-card-body">' + tape(g, season) + '</div></article></section>' : '') +
       '<div style="margin-top:var(--sp-6)"></div>' +
       (tabs.length > 1 ? '<nav class="qk-tabs bp-tabs2" id="gm-tabs" aria-label="Game views">' + tabs.map(t => '<a class="qk-tab" href="javascript:void(0)" data-tab="' + t.key + '" aria-selected="' + (t.key === tab ? 'true' : 'false') + '">' + esc(t.label) + '</a>').join('') + '</nav>' : '') +

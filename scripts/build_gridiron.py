@@ -22,7 +22,9 @@ Seasons come in two weights:
 Game pages are written for the --game-page-seasons most recent seasons (default 2): pages whose signature changed
 (status, score, lines, QBs, plays on the table, model versions) plus every not-final game of the current season in
 the pricing window; --all-games rebuilds every page of those seasons. A page is never downgraded: without the game's
-play-by-play on this machine the old page's play-level blocks are kept.
+play-by-play on this machine the old page's play-level blocks are kept. Each page carries tape_pre, the teams' tale of
+the tape going into the game (written while it is upcoming, kept once it starts: analytics/games.py); a started game's
+unit matchups are the ones going in.
 
 Memory: one season of plays at a time; the context is released after each season.
 
@@ -423,6 +425,10 @@ def game_pages(b: Build, ctx, cfg: dict, manifest: dict, prices: dict, cards: li
     from oddsmarkets.nfl.analytics import season as SN
     old_sigs = dict(manifest.get("games") or {})
     mv = model_versions()
+    if ctx.season >= GM.TAPE_FROM:
+        # the tale of the tape going in (tape_pre): a new version moves every signature of these seasons once, so the
+        # next build rewrites each page through this writer (the backfill), and never again after
+        mv = {**mv, "tape": GM.TAPE_VERSION}
     gdir = b.data / str(ctx.season) / "games"
     by_card = {c["game_id"]: c for c in cards}
     P = ctx.plays() if ctx.has_pbp() else pd.DataFrame(columns=["game_id"])
@@ -476,6 +482,11 @@ def game_pages(b: Build, ctx, cfg: dict, manifest: dict, prices: dict, cards: li
     inj = b.step(f"injuries {ctx.season}", lambda: GM.injuries_by_game(ctx), {}) or {}
     avail = b.step(f"availability {ctx.season}", lambda: GM.availability_by_game(ctx), {}) or {}
     mk_games = (markets or {}).get("games") or {}
+    # each team going in: the snapshot's ratings are the published ones (teams.json), the computed rows' the history
+    # the team pages plot; the EPA units are refitted on the plays before each kickoff
+    gi = b.step(f"going in {ctx.season}", lambda: GM.GoingIn(ctx, P, {t: v.get("values") or {} for t, v in tt.items()},
+                                                             {t: v.get("history") or [] for t, v in tt.items()}), None)
+    now = _digest_now(cfg["today"]).strftime("%Y-%m-%dT%H:%M:%SZ")
     groups = {k: v for k, v in P[P["game_id"].isin(set(due))].groupby("game_id")} if len(P) else {}
     written = 0
     for gid in due:
@@ -495,7 +506,7 @@ def game_pages(b: Build, ctx, cfg: dict, manifest: dict, prices: dict, cards: li
         def build(g=g, gid=gid, old=old, pregame=pregame, ngs_w=ngs_w):
             G = groups.get(gid)
             return GM.build_page(ctx, g, G, by_card.get(gid) or GM.card(ctx, g), pregame, old, nm, ngs_w,
-                                 SN.matchup(tt.get(g.get("home")), tt.get(g.get("away"))), inj, avail)
+                                 SN.matchup(tt.get(g.get("home")), tt.get(g.get("away"))), inj, avail, gi, now)
         payload = b.step(f"game {gid}", build)
         if payload is None:
             payload = {"ok": False, "reason": "game page could not be built", "game_id": gid}

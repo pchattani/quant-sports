@@ -8,7 +8,8 @@ and a defence rating `dfn` (points it stops). Before a match:
     expected away points = mu/2 + att_a - dfn_h - H/2 - travel/2 - rest/2
     expected margin m    = home - away;   expected total = home + away
 
-    H       home advantage in points (0 at a neutral venue)
+    H       home advantage in points: + for the home side in its own country, 0 at a neutral venue or a "home" test
+            abroad, - when the side listed away is the one in its own country (Model.context, "side")
     travel  c_km * (log1p(km_away/1000) - log1p(km_home/1000)) + c_tz * (zones_away - zones_home)
     rest    c_rest * (min(rest_h, 28) - min(rest_a, 28)) / 7          (days since each side's last test)
     alt     c_alt * [home venue 1,000 m or higher and the away side not from altitude]  (nations.altitude_edge)
@@ -152,7 +153,8 @@ class Model:
 
     # features ----------------------------------------------------------------------------------------------
     def context(self, m: dict) -> dict:
-        where = nations.venue_point(m)
+        pl = nations.place(m)
+        where = pl[:3] if pl else None
         kh, zh = nations.travel(m["home"]["name"], where)
         ka, za = nations.travel(m["away"]["name"], where)
         day = str(m.get("date") or "")[:10]
@@ -166,12 +168,23 @@ class Model:
                 return float((date.fromisoformat(day) - date.fromisoformat(l)).days)
             except ValueError:
                 return 28.0
-        # a "home" match played far from home (Fiji's 2026 home tests in Britain, Japan v Ireland in Newcastle, NSW)
-        # carries no home advantage: the feed's flag says home, the venue says otherwise
-        neutral = bool(m.get("neutral")) or kh > AWAY_FROM_HOME_KM
-        return {"neutral": neutral, "km_h": kh, "km_a": ka, "tz_h": zh, "tz_a": za,
+        # Who is at home (13 Nov 2026). When we know the venue's country (nations.place: our ground and city tables), a
+        # side is at home in its own country and nowhere else, whatever the source's flag: a "home" test abroad (Japan v
+        # Ireland in Newcastle, NSW, every side at someone else's World Cup) carries no home advantage; Australia is at
+        # home in Perth; a side listed second in its own country takes the advantage (side = -1: New Zealand v Australia
+        # in Sydney at the 2027 World Cup, the host at home as comps.simulate_rwc27 has it; Fiji's 2026 "home" tests in
+        # Cardiff, Liverpool and Edinburgh; the women's World Cup finals of 2022 and 2025). When we do not know the
+        # venue's country, the source's flag stands, unless the home side is more than 1,500 km from its home.
+        vc = pl[3] if pl and len(pl) > 3 else None
+        hc = nations.home_code(m["home"]["name"])
+        if vc and hc:
+            side = 1 if vc == hc else (-1 if vc == nations.home_code(m["away"]["name"]) else 0)
+        else:
+            side = 0 if (m.get("neutral") or kh > AWAY_FROM_HOME_KM) else 1
+        neutral = side == 0
+        return {"neutral": neutral, "side": side, "km_h": kh, "km_a": ka, "tz_h": zh, "tz_a": za,
                 "rest_h": rest(m["home"]["id"]), "rest_a": rest(m["away"]["id"]),
-                "alt": 0 if neutral else nations.altitude_edge(m)}
+                "alt": nations.altitude_edge(m) if side == 1 else 0}
 
     def expect(self, m: dict, ctx: dict | None = None) -> dict:
         p = self.p
@@ -179,7 +192,8 @@ class Model:
         self._ensure(h["id"], h["name"], str(m.get("date") or ""))
         self._ensure(a["id"], a["name"], str(m.get("date") or ""))
         ctx = ctx or self.context(m)
-        edge = 0.0 if ctx["neutral"] else p.H
+        side = ctx.get("side", 0 if ctx["neutral"] else 1)
+        edge = p.H * side
         edge += p.c_km * (math.log1p(ctx["km_a"] / 1000.0) - math.log1p(ctx["km_h"] / 1000.0))
         edge += p.c_tz * (ctx["tz_a"] - ctx["tz_h"])
         edge += p.c_rest * (min(ctx["rest_h"], 28.0) - min(ctx["rest_a"], 28.0)) / 7.0
@@ -200,7 +214,7 @@ class Model:
         if p.wr3 and tier >= 3 and self.wr is not None and self.wr_fit:
             from . import rankings
             ra, rb = self.wr.get(h["id"], m.get("date") or ""), self.wr.get(a["id"], m.get("date") or "")
-            bonus = rankings.HOME_BONUS if (not ctx["neutral"] and str(m.get("date") or "")[:10] < rankings.HOME_BONUS_ENDS) else 0.0
+            bonus = rankings.HOME_BONUS * side if str(m.get("date") or "")[:10] < rankings.HOME_BONUS_ENDS else 0.0
             z = self.wr_fit["a"] + self.wr_fit["b"] * (ra + bonus - rb)
             q = 1.0 / (1.0 + math.exp(-z))
             pd = self.wr_fit["draw"]

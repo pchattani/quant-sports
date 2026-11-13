@@ -95,13 +95,53 @@ CITIES = {
     "Manchester": (53.48, -2.24, 0), "Leeds": (53.80, -1.55, 0), "Bucharest": (44.43, 26.10, 2), "Tbilisi": (41.72, 44.78, 4),
     "Suva": (-18.14, 178.44, 12), "Lautoka": (-17.62, 177.45, 12), "Apia": (-13.83, -171.76, 13), "Nuku'alofa": (-21.14, -175.20, 13),
 }
-# venues the feed names without a usable city, and city names shared by two test grounds (resolved to the one nearer
-# the home side's home)
-VENUES = {"Hill Dickinson": (53.43, -3.00, 0), "Everton Stadium": (53.43, -3.00, 0), "Goodison": (53.44, -2.97, 0),
-          "St James": (54.98, -1.62, 0), "McDonald Jones": (-32.92, 151.73, 10), "Twickenham": (51.46, -0.34, 0),
-          "Allianz Stadium": (-33.89, 151.22, 10), "Stade de France": (48.92, 2.36, 1)}
-AMBIGUOUS = {"Newcastle": [(-32.93, 151.78, 10), (54.98, -1.61, 0)], "Hamilton": [(-37.79, 175.28, 12), (43.26, -79.87, -5)],
-             "Perth": [(-31.95, 115.86, 8), (56.40, -3.44, 0)], "Wellington": [(-41.29, 174.78, 12), (-33.65, 18.99, 2)]}
+# the union whose country each city in CITIES is in (13 Nov 2026): a side is at home in its own country, wherever in it
+# (Australia in Perth, 3,277 km from Sydney; the United States in Washington), and away anywhere else
+_CITY_UNION = {
+    "England": ["Twickenham", "London", "Liverpool", "Gloucester", "Leicester", "Exeter", "Brighton", "Newcastle upon Tyne",
+                "Milton Keynes", "Manchester", "Leeds"],
+    "Wales": ["Cardiff"], "Scotland": ["Edinburgh"], "Ireland": ["Dublin"],
+    "France": ["Paris", "Saint-Denis", "Marseille", "Lyon", "Nantes", "Bordeaux", "Toulouse", "Lille", "Nice", "Saint-Etienne",
+               "Montpellier"],
+    "Japan": ["Tokyo", "Yokohama", "Osaka", "Fukuoka", "Sapporo", "Kobe", "Kumamoto", "Oita", "Shizuoka", "Toyota", "Kamaishi",
+              "Kumagaya", "Higashiosaka", "Chofu"],
+    "Australia": ["Sydney", "Brisbane", "Perth", "Melbourne", "Adelaide", "Newcastle", "Townsville"],
+    "New Zealand": ["Auckland", "Wellington", "Christchurch", "Dunedin", "Hamilton"],
+    "South Africa": ["Johannesburg", "Cape Town", "Durban", "Pretoria"],
+    "Hong Kong": ["Hong Kong"], "Singapore": ["Singapore"], "United Arab Emirates": ["Dubai"],
+    "United States": ["Las Vegas", "Chicago", "Washington", "Denver"], "Uruguay": ["Montevideo"],
+    "Argentina": ["Buenos Aires", "La Plata"], "Spain": ["Madrid"], "Portugal": ["Lisbon"],
+    "Italy": ["Rome", "Genoa", "Turin", "Udine"], "Romania": ["Bucharest"], "Georgia": ["Tbilisi"], "Fiji": ["Suva", "Lautoka"],
+    "Samoa": ["Apia"], "Tonga": ["Nuku'alofa"],
+}
+CITY_UNION = {c: u for u, cs in _CITY_UNION.items() for c in cs}
+# grounds the feed names without a usable city: name -> (where, union)
+VENUES = {"Hill Dickinson": ((53.43, -3.00, 0), "England"), "Everton Stadium": ((53.43, -3.00, 0), "England"),
+          "Goodison": ((53.44, -2.97, 0), "England"), "St James": ((54.98, -1.62, 0), "England"),
+          "McDonald Jones": ((-32.92, 151.73, 10), "Australia"), "Twickenham": ((51.46, -0.34, 0), "England"),
+          "Stade de France": ((48.92, 2.36, 1), "France")}
+# one sponsor's name on three test grounds. ESPN gives every past test at a ground the ground's current name (England's
+# 1991 World Cup tests at Twickenham read "Allianz Stadium, London"), so the date of a rename cannot separate them; the
+# feed's city does (ESPN venue 16145 London = Twickenham, renamed 2024; 16575 Sydney = the Sydney Football Stadium; 308704,
+# no address = Juventus's ground in Turin, the name since 2017, where Italy played New Zealand in 2024 and South Africa in
+# 2025 and 2026). With no city, the home side's country picks; a neutral test with no city is left to the rules below.
+SHARED = {"Allianz Stadium": [(("london", "twickenham"), (51.46, -0.34, 0), "England"),
+                              (("sydney", "moore park", "paddington"), (-33.89, 151.22, 10), "Australia"),
+                              (("turin", "torino"), (45.11, 7.64, 1), "Italy")]}
+# city names shared by test grounds in two or three countries: the ground's name picks (Optus Stadium is Perth, Western
+# Australia; McDiarmid Park is Perth, Scotland), else the one nearer the home side's home
+AMBIGUOUS = {
+    "Newcastle": [((-32.93, 151.78, 10), "Australia", ("mcdonald jones", "newcastle international", "hunter stadium", "energyaustralia", "ausgrid")),
+                  ((54.98, -1.61, 0), "England", ("st james", "kingston park"))],
+    "Hamilton": [((-37.79, 175.28, 12), "New Zealand", ("waikato", "fmg stadium", "rugby park")),
+                 ((43.26, -79.87, -5), "Canada", ("mohawk", "tim hortons", "ivor wynne")),
+                 ((32.29, -64.78, -4), "Bermuda", ("national sports cent", "bermuda national"))],
+    "Perth": [((-31.95, 115.86, 8), "Australia", ("optus", "perth stadium", "hbf park", "nib stadium", "members equity", "perth oval",
+                                                  "subiaco", "patersons", "domain stadium", "waca")),
+              ((56.40, -3.44, 0), "Scotland", ("mcdiarmid",))],
+    "Wellington": [((-41.29, 174.78, 12), "New Zealand", ("athletic park", "hnry", "wellington regional", "westpac", "sky stadium")),
+                   ((-33.65, 18.99, 2), "South Africa", ("boland",))],
+}
 _FOLD = re.compile(r"[^a-z]")
 _NAME_FOLD = {_FOLD.sub("", k.lower()): k for k in NATIONS}
 
@@ -178,26 +218,79 @@ def km(a: tuple, b: tuple) -> float:
     return 2 * 6371.0 * math.asin(min(1.0, math.sqrt(h)))
 
 
-def venue_point(match: dict) -> tuple | None:
-    """Where a match was played: the venue city when we know it (CITIES), else the home side's home for a home match
-    and the venue country for a neutral one."""
+# the country an "A", XV or Maori side plays its home tests in; the Lions, the Barbarians, a World XV and the Pacific
+# Islanders have none (they are never at home: the distance rule in ratings.Model.context decides for them)
+HOME_OF = {"NZM": "NZL", "PUX": "NZL", "ENS": "ENG", "IRA": "IRE", "EIR": "IRE", "SCA": "SCO", "TGX": "TGA", "FIW": "FIJ",
+           "ANZ": "AUS", "FNP": "AUS", "ESA": "RSA", "ARX": "ARG", "AGU": "UAE"}
+NO_HOME = {"BIL", "BAR", "WXV", "PIS"}
+
+
+def home_code(name: str) -> str | None:
+    """The code of the country a side plays its home tests in ('New Zealand Maori' -> 'NZL'); None for a side with no
+    home country or a name we do not know."""
+    r = lookup(name)
+    if not r or r["code"] in NO_HOME:
+        return None
+    return HOME_OF.get(r["code"], r["code"])
+
+
+def _code(union: str | None) -> str | None:
+    r = lookup(union or "")
+    return r["code"] if r else None
+
+
+def _city(v: dict) -> str:
+    """The feed's city without a bracketed region ('Perth (WA)' -> 'Perth') or anything after a comma."""
+    return re.sub(r"\s*\(.*?\)", "", str(v.get("city") or "")).split(",")[0].strip()
+
+
+def place(match: dict, fallback: bool = True) -> tuple | None:
+    """Where a match was played and in which country: (lat, lon, utc offset, country code or None).
+
+    In order: a ground name shared by several grounds (SHARED: the city, else the home side's country), a ground we
+    place by name (VENUES), a city shared by grounds in two countries (AMBIGUOUS: the ground's name, else the one nearer
+    the home side's home), a city in our table (CITIES, with its country). With `fallback` (the default), a test whose
+    city we do not know is placed at the home side's home (country unknown: the feed's home flag stands) or, at a neutral
+    venue, in the feed's venue country."""
     v = match.get("venue") or {}
     name = str(v.get("name") or "")
-    for key, loc in VENUES.items():
+    lname = name.lower()
+    city = _city(v)
+    lcity = city.lower()
+    h = lookup((match.get("home") or {}).get("name"))
+    for key, cands in SHARED.items():
+        if key.lower() in lname:
+            got = next((c for c in cands if lcity and lcity in c[0]), None)
+            if got is None and not lcity and not match.get("neutral") and h:
+                hc = home_code(h["name"])
+                got = next((c for c in cands if _code(c[2]) == hc), None)
+            if got is not None:
+                return got[1] + (_code(got[2]),)
+            break
+    for key, (loc, union) in VENUES.items():
         if key in name:
-            return loc
-    city = str(v.get("city") or "").split(",")[0].strip()
+            return loc + (_code(union),)
     if city in AMBIGUOUS:
-        h = lookup((match.get("home") or {}).get("name"))
-        if h:
-            return min(AMBIGUOUS[city], key=lambda c: km((h["lat"], h["lon"]), c[:2]))
+        cands = AMBIGUOUS[city]
+        got = next((c for c in cands if any(g in lname for g in c[2])), None)
+        if got is None and h:
+            got = min(cands, key=lambda c: km((h["lat"], h["lon"]), c[0][:2]))
+        if got is not None:
+            return got[0] + (_code(got[1]),)
     if city in CITIES:
-        return CITIES[city]
+        return CITIES[city] + (_code(CITY_UNION.get(city)),)
+    if not fallback:
+        return None
     if not match.get("neutral"):
-        h = lookup((match.get("home") or {}).get("name"))
-        return (h["lat"], h["lon"], h["tz"]) if h else None
-    c = lookup(((match.get("venue") or {}).get("country")) or "")
-    return (c["lat"], c["lon"], c["tz"]) if c else None
+        return (h["lat"], h["lon"], h["tz"], None) if h else None
+    c = lookup(v.get("country") or "")
+    return (c["lat"], c["lon"], c["tz"], HOME_OF.get(c["code"], c["code"])) if c else None
+
+
+def venue_point(match: dict) -> tuple | None:
+    """Where a match was played, (lat, lon, utc offset): see place()."""
+    p = place(match)
+    return p[:3] if p else None
 
 
 def travel(team_name: str, where: tuple | None) -> tuple[float, float]:

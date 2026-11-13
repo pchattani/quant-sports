@@ -63,7 +63,11 @@ Names above are kept; additions and the exact shapes the front end reads:
   (goal = scoring team or null), wp {source "live" | "poisson", series [[sec, p_home]], now}, usage {team: [{id, name, pos,
   toi, toi_5v5, toi_pp, toi_sh, shifts}]} (minutes), lines {team: {forwards [LINE], pairs [LINE]}} (this game's 5v5 units),
   box {skater_cols, goalie_cols, skaters {team: [rows]}, goalies {team: [rows]}}, awards {stars [{id, name, team, score,
-  line}], top_xg, best_line, method}, kept_from (when event blocks were kept from an earlier build)}.
+  line}], top_xg, best_line, method}, kept_from (when event blocks were kept from an earlier build), tape_pre}.
+  `tape_pre` = the two clubs going into the game, from regular-season games final before the start: {before (the start),
+  source "snapshot" (written while upcoming, kept unchanged once the game starts) | "computed" (rebuilt going in for a
+  game that started before snapshots), home / away {gp, rating, xgf_pct5, xgf_g, xga_g, gf_g, ga_g}, rating_asof (computed
+  rows: the rating history's Monday)}. The game page shows it for started games instead of today's season numbers.
   `pregame` = {model, source, market, market_detail (Kalshi/Polymarket spread/total/OT ladders), line, goalies,
   priced_at}; `model` = {p_home, p_reg_home, p_reg_away, p_ot, p_so, p_ot_home, puck_line_home (P(home -1.5 covers)),
   puck_line_away, total (expected), fair_total, p_over, total_line, home_goals, away_goals, total_dist [P(total = 0..15)],

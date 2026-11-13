@@ -110,6 +110,30 @@ function pFor(c, pid) {
   return String(c.p1) === String(pid) ? p : String(c.p2) === String(pid) ? 1 - p : null;
 }
 const asOf = iso => (iso ? 'as of ' + QK.fmt.date(iso) + ' ' + QK.fmt.time(iso) : '');
+/* Round 10 (13 Nov 2026): our title chances before the first ball (d.pre, events.pre_events): the simulation over the
+   draw as it stood, qualifiers unknown, on ratings from matches before the day the event began. Kept once play begins.
+   -> { at: 'the date', n, chance(pid) (a qualifier holds their slot's chance), rank(pid) (1 = our favourite), fav, ids }
+   or null while the field is missing (an older file, an event still to start). */
+function preOf(d) {
+  const P = d && d.pre;
+  if (!P || !P.title) return null;
+  const t = P.title, q = P.qualifier || {};
+  const ids = Object.keys(t).filter(k => TA.isNum(t[k]) && t[k] > 0).sort((a, b) => t[b] - t[a]);
+  if (!ids.length) return null;
+  const chance = pid => { const k = q[pid] || pid; return TA.isNum(t[k]) ? t[k] : (P.title && pid in q ? 0 : null); };
+  const rank = pid => { const c = chance(pid); return TA.isNum(c) ? 1 + ids.filter(k => t[k] > c).length : null; };
+  return { at: P.asof ? QK.fmt.date(P.asof + 'T12:00:00', { day: 'numeric', month: 'short', year: 'numeric' }) : '', n: P.n_sims, t: t, q: q,
+    chance: chance, rank: rank, fav: ids[0], ids: ids };
+}
+/* a pre-event entry's label: the player, or "Qualifier" for a slot no one held yet */
+const preLabel = (T, k, P) => {
+  if (!String(k).startsWith('tbd:')) return TA.playerShort(T, k);
+  const who = Object.keys(P.q).filter(p => P.q[p] === k)[0];
+  return who ? TA.playerShort(T, who) + ' (Q)' : 'A qualifier';
+};
+const prePct = p => TA.pct(p, p < 0.1 ? 1 : 0);
+/* a pre-event entry in running text: the surname, or "a qualifier" */
+const preSur = (T, k) => (String(k).startsWith('tbd:') ? 'a qualifier' : TA.playerSurname(T, k));
 /* two blocks side by side (the kit's .qk-g2), or the one that exists at full width */
 const pair = (a, b) => (a && b ? '<div class="qk-g2"><div>' + a + '</div><div>' + b + '</div></div>' : (a || b || ''));
 
@@ -118,8 +142,9 @@ const pair = (a, b) => (a && b ? '<div class="qk-g2"><div>' + a + '</div><div>' 
    black strip of key numbers under it; "The short version" in plain words. Only numbers the event file, the draw and
    favourites.json carry: the champion against our pre-match chances, our top-rated entrant going in (Elo before the
    first ball), upsets, the toughest path (opponents' Elo at the start), and for an event in play or to come, our title
-   favourite from the simulation. The event file keeps no title chances once an event is over, so a finished event shows
-   our pre-match chances instead of a pre-event title chance. */
+   favourite from the simulation. Once play begins the event file keeps our title chances from before the first ball
+   (d.pre, round 10): a finished event shows the champion against them; a file without it (an older season) shows our
+   pre-match chances only. */
 function heroBlock(T, id, d, ev, fav) {
   const sim = (d.sim && d.sim.players) || {};
   const cards = (d.draw || {}).matches || {};
@@ -144,15 +169,21 @@ function heroBlock(T, id, d, ev, fav) {
   const pathP = path.map(c => ({ c: c, p: pFor(c, champ), opp: String(c.p1) === String(champ) ? c.p2 : c.p1 })).filter(x => TA.isNum(x.p));
   const under = pathP.filter(x => x.p < 0.5).length;
   const low = pathP.slice().sort((a, b) => a.p - b.p)[0];
+  const P = preOf(d);
+  const cp = P && champ ? P.chance(champ) : null, cr = P && champ ? P.rank(champ) : null;
   if (champ) {
     tiles.push(Object.assign({ label: 'Champion', href: TA.playerHref(T, champ),
       sub: (ev.runner_up ? 'Beat ' + sur(ev.runner_up) + ' in the final' : 'Won the title') + (pathP.length ? '; our underdog in ' + under + ' of ' + pathP.length + ' matches' : '') + '.' }, nameTile(champ)));
+    if (TA.isNum(cp)) tiles.push({ label: 'Our chance going in', value: prePct(cp), signal: true,
+      sub: 'Before ' + P.at + (P.q[champ] ? ', as an unknown qualifier' : '') + ': ' + (cr === 1 ? 'our favourite.' : 'No. ' + cr + ' in our order; ' + preSur(T, P.fav) + ' led on ' + prePct(P.t[P.fav]) + '.'),
+      tip: 'Our title chance for the champion from ' + (P.n ? QK.fmt.num(Number(P.n)) + ' ' : '') + 'simulated draws before a ball was struck, on ratings from matches before ' + P.at + ': nothing from the event enters.' });
     if (low) tiles.push({ label: 'Champion’s lowest chance', value: TA.pct(low.p, 0), signal: true,
       sub: 'Our chance before the ' + TA.roundLabel(low.c.round).toLowerCase() + ' against ' + sur(low.opp) + '.', tip: 'Our pre-match chance for the champion in the hardest match on the way, set before the first ball.' });
   } else if (ranked.length) {
     const f = ranked[0];
+    const fp0 = P ? P.chance(f) : null;
     tiles.push({ label: st === 'live' ? 'Our favourite now' : 'Our favourite', value: sur(f) + ' ' + TA.pct(sim[f].p_title, 0), signal: true, href: TA.playerHref(T, f),
-      sub: 'To win the title, from ' + (nSims ? nSims + ' ' : '') + 'simulated draws' + (st === 'live' ? ' of the matches left.' : '.') });
+      sub: 'To win the title, from ' + (nSims ? nSims + ' ' : '') + 'simulated draws' + (st === 'live' ? ' of the matches left' + (TA.isNum(fp0) ? '; ' + prePct(fp0) + ' before the first ball' : '') + '.' : '.') });
     if (ranked[1]) tiles.push({ label: 'Next best', value: sur(ranked[1]) + ' ' + TA.pct(sim[ranked[1]].p_title, 0), href: TA.playerHref(T, ranked[1]),
       sub: ranked.length + ' player' + (ranked.length === 1 ? '' : 's') + ' still with a chance' + (ev.draw_size ? ', of ' + ev.draw_size : '') + '.' });
   }
@@ -185,7 +216,9 @@ function heroBlock(T, id, d, ev, fav) {
       sub: 'Expected opponents’ Elo ' + TA.num(dd[t0].exp_opp_elo, 0) + ' at the start; the average path ' + TA.num(avg, 0) + '.', tip: 'Draw difficulty: the mean Elo of the likely opponent in each round, from ratings at the start of the event. It measures the strength of the field each player had to get through.' }, nameTile(t0)));
   }
   if (!champ && !played.length && (ev.draw_size || ranked.length)) tiles.push({ label: 'The field', value: String(ev.draw_size || ranked.length), sub: (ev.draw_size ? 'players in the draw' : 'players') + (ev.best_of ? ', best of ' + ev.best_of + ' sets' : '') + '.' });
-  if (champ) short = sur(champ) + ' won the title' + (ev.runner_up ? ', beating ' + sur(ev.runner_up) + ' in the final' : '') + '.' + (pathP.length ? ' Our underdog in ' + under + ' of ' + pathP.length + ' matches on the way' + (low ? ', ' + TA.pct(low.p, 0) + ' at the lowest' : '') + '.' : '') + favLine +
+  if (champ) short = sur(champ) + ' won the title' + (ev.runner_up ? ', beating ' + sur(ev.runner_up) + ' in the final' : '') + '.' +
+    (TA.isNum(cp) ? ' Before the first ball we gave ' + sur(champ) + ' ' + prePct(cp) + (cr === 1 ? ', our favourite.' : ', our No. ' + cr + ' (' + preSur(T, P.fav) + ' led on ' + prePct(P.t[P.fav]) + ').') : '') +
+    (pathP.length ? ' Our underdog in ' + under + ' of ' + pathP.length + ' matches on the way' + (low ? ', ' + TA.pct(low.p, 0) + ' at the lowest' : '') + '.' : '') + favLine +
     (played.length ? ' ' + ups.length + ' of ' + played.length + ' matches went to the player we had under 40%.' : '');
   else if (ranked.length) short = sur(ranked[0]) + ' is our favourite at ' + TA.pct(sim[ranked[0]].p_title, 0) + (ranked[1] ? ', ahead of ' + sur(ranked[1]) + ' at ' + TA.pct(sim[ranked[1]].p_title, 0) : '') + '.' +
     (st === 'live' && ev.round_now ? ' Next up: the ' + TA.roundLabel(ev.round_now).toLowerCase() + '.' : '') + favLine + (played.length ? ' ' + ups.length + ' upset' + (ups.length === 1 ? '' : 's') + ' in ' + played.length + ' matches so far.' : '');
@@ -229,6 +262,34 @@ function chancesBlock(T, d, ev) {
     (nPlayed ? '; across the draw, ' + nUps + ' of ' + nPlayed + ' matches went to the player we had under 40%.' : '.');
   return QK.sectionHead({ kicker: 'The champion’s path', title: 'How ' + sur(champ) + ' won it', sub: 'Our chance before each match on the way to the title' + (as ? ' · ' + as : '') + '.' }) +
     '<article class="qk-card"><div class="qk-card-body">' + QK.chances(rows, { sort: false, max: 1, oursName: 'Our pre-match chance for ' + sur(champ) }) + '</div></article>' + QK.explain(sure);
+}
+
+/* "Going in": our title chances before the first ball (top eight, the champion added when outside them), each with how
+   far the player went (finished) or whether still in (in play). The kit's one-line explain says what the top number
+   meant. Empty without d.pre. */
+function goingInBlock(T, d, ev) {
+  const P = preOf(d);
+  if (!P) return '';
+  const champ = ev.champion ? String(ev.champion) : null;
+  const cards = (d.draw || {}).matches || {};
+  const out = {};
+  Object.keys(cards).forEach(k => { const c = cards[k]; if (c && c.winner && TA.isFinished(c) && c.round !== 'RR') [c.p1, c.p2].forEach(x => { if (x && String(x) !== String(c.winner)) out[String(x)] = c.round; }); });
+  /* in play, "still in" only while the simulation of the matches left still gives a chance (a round robin's losses do
+     not knock anyone out) */
+  const sim = (d.sim && d.sim.players) || null;
+  const fate = pid => (!pid ? '' : champ === pid ? 'won the title' : out[pid] ? 'out in the ' + TA.roundLabel(out[pid], true) : champ ? ''
+    : sim && sim[pid] ? ((sim[pid].p_title || 0) > 0 ? 'still in' : 'out') : 'still in');
+  const who = k => (String(k).startsWith('tbd:') ? Object.keys(P.q).filter(p => P.q[p] === k)[0] || null : String(k));
+  let keys = P.ids.slice(0, 8);
+  const ck = champ ? (P.q[champ] || champ) : null;
+  if (ck && keys.indexOf(ck) < 0 && TA.isNum(P.t[ck])) keys = keys.concat([ck]);
+  const rows = keys.map(k => { const pid = who(k); return { label: preLabel(T, k, P), p: P.t[k], href: pid ? TA.playerHref(T, pid) : null, sub: fate(pid) }; });
+  const f = P.fav, pf = P.t[f], miss = Math.max(1, Math.round(10 * (1 - pf)));
+  const cr = champ ? P.rank(champ) : null;
+  const sure = '<b>How sure are we?</b> Our favourite going in, ' + esc(preSur(T, f)) + ', at ' + prePct(pf) + ' misses the title about ' + miss + ' time' + (miss === 1 ? '' : 's') + ' in 10' +
+    (champ && cr ? (cr === 1 ? '; this time the favourite won.' : '; ' + esc(TA.playerSurname(T, champ)) + ' won from our No. ' + cr + '.') : '.');
+  return QK.sectionHead({ kicker: 'Going in', title: 'Who we had before a ball was struck', sub: 'Our title chances before ' + P.at + ', from ' + (P.n ? QK.fmt.num(Number(P.n)) + ' ' : '') + 'simulated draws: ratings from matches before that day only' + (Object.keys(P.q).length ? ', qualifiers not yet known.' : '.') }) +
+    '<article class="qk-card"><div class="qk-card-body">' + QK.chances(rows, { sort: false, oursName: 'Our title chance before the first ball' }) + '</div></article>' + QK.explain(sure);
 }
 
 function render(el, params) {
@@ -301,12 +362,12 @@ function render(el, params) {
       /* once it is over the title chances are gone: the column says how far each player went instead */
       const outIn = {};
       if (champ) Object.keys(cards).forEach(k => { const c = cards[k]; if (c && c.winner && TA.isFinished(c)) [c.p1, c.p2].forEach(x => { if (x && String(x) !== String(c.winner) && TA.roundIndex(c.round) > TA.roundIndex(outIn[x] || '')) outIn[x] = c.round; }); });
-      const lastCol = champ ? { label: 'Went out', align: 'right', title: 'The round each player lost in' } : { label: 'Title', align: 'right', title: 'Our chance of winning the title' };
+      const lastCol = champ ? { label: 'Went out', align: 'right', title: 'The round each player lost in' } : { label: st === 'live' ? 'Title now' : 'Title', align: 'right', title: 'Our chance of winning the title' + (st === 'live' ? ', from the matches left' : '') };
       const lastCell = p => (champ ? (String(champ) === String(p) ? { v: 99, html: '<b>Won</b>' } : { v: TA.roundIndex(outIn[p] || ''), html: outIn[p] ? esc(TA.roundLabel(outIn[p], true)) : '—' })
         : { v: (sim[p] || {}).p_title, html: TA.isNum((sim[p] || {}).p_title) ? TA.pct(sim[p].p_title, 1) : '—' });
       ddH = TA.card('Draw difficulty', 'expected Elo of the opponents along each path, from ratings at the start · 1 = toughest' + (seeded.length ? ' · seeds' : ''),
         TA.tableHTML([{ label: '#', align: 'right' }, { label: 'Player' }, { label: 'Exp. opponent Elo', align: 'right' }, lastCol],
-          pick.slice(0, 16).map(p => [{ v: dd[p].rank, html: TA.isNum(dd[p].rank) ? String(dd[p].rank) : '—' }, { v: TA.playerName(T, p), html: TA.playerLink(T, p, { rank: true }) },
+          pick.slice(0, 16).map(p => [{ v: dd[p].rank, html: TA.isNum(dd[p].rank) ? String(dd[p].rank) : '—' }, { v: TA.playerName(T, p), html: TA.playerLink(T, p, { rank: st === 'upcoming' }) },
             { v: dd[p].exp_opp_elo, html: TA.num(dd[p].exp_opp_elo, 0) }, lastCell(p)]), { compact: true }));
     }
     // champions history
@@ -326,12 +387,15 @@ function render(el, params) {
     let side = upsH + awH, rbrUsed = false;
     if (!side && rbr) { side = rbr; rbrUsed = true; }
     document.getElementById('ev-s1').innerHTML = pair(oddsH, side);
-    /* 3. round by round (in play) or past champions, beside draw difficulty */
-    const left3 = rbr && !rbrUsed ? rbr : pastH;
+    /* 3. round by round (in play), or once it is over our chances going in, or past champions; beside draw difficulty.
+       In play, "Going in" sits beside past champions under it. */
+    const goH = goingInBlock(T, d, ev);
+    const left3 = rbr && !rbrUsed ? rbr : (champ && goH ? goH : pastH);
     document.getElementById('ev-s3').innerHTML = pair(left3, ddH);
     const moreEl = document.getElementById('ev-more');
-    moreEl.innerHTML = left3 === pastH ? '' : pastH;
-    moreEl.hidden = left3 === pastH;
+    const more = left3 === pastH ? (goH && left3 !== goH ? goH : '') : (goH && left3 !== goH ? pair(goH, pastH) : pastH);
+    moreEl.innerHTML = more;
+    moreEl.hidden = !more;
 
     // ── results
     const res = (d.results && d.results.length ? d.results : Object.keys(cards).map(k => cards[k]).filter(TA.isFinished));

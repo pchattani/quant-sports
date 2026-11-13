@@ -1454,6 +1454,75 @@ def thin_wp(series: list, eps: float = 0.01, cap: int = 300) -> list:
     return out
 
 
+def going_in(ctx: dict, s: int, day: int) -> dict[str, dict]:
+    """The tale of the tape going into a game on `day` (an ordinal, D.local_day; no look-ahead, 13 Nov 2026): every
+    member's ratings from the games on earlier days only, the very fit the walk-forward pregame ratings use (R.fit on
+    the games before the day, ref_day = day - 1, the season's prior), on season.json's `ratings` basis (rating, off,
+    def per 100), its strength of schedule (the opponents it played before the day, at those ratings) and its record
+    before the day (the standings' games: finished, counted types). {tid: {...}}, cached per day."""
+    b = ctx["bundles"].setdefault(s, {})
+    cache = b.setdefault("going_in", {})
+    if day in cache:
+        return cache[day]
+    tab = ctx["state"]["tabs"].get(s)
+    out: dict[str, dict] = {}
+    if tab is not None:
+        G, T = tab["g"], tab["T"]
+        m = G["day"] < int(day)
+        f = R.fit(tab, m, ctx["state"]["priors"][s], ref_day=int(day) - 1)
+        hi, ai = G["h"][m], G["a"][m]
+        gp = np.bincount(np.concatenate([hi, ai]), minlength=T).astype(float)
+        sos = (np.bincount(hi, weights=f["net"][ai], minlength=T) + np.bincount(ai, weights=f["net"][hi], minlength=T)) / np.maximum(gp, 1)
+        if "going_in_results" not in b:
+            res = []
+            for g in (D.load(ctx["level"], s).get("games") or {}).values():
+                if g.get("status") != "post" or g.get("hs") is None or g.get("as") is None or g.get("stype") not in D.COUNTED:
+                    continue
+                d = D.local_day(g.get("date"))
+                if d is not None:
+                    res.append((d.toordinal(), str(g["home"]), str(g["away"]), g["hs"] > g["as"]))
+            b["going_in_results"] = res
+        rec: dict[str, list[int]] = {}
+        for d, h, a, hw in b["going_in_results"]:
+            if d >= int(day):
+                continue
+            rec.setdefault(h, [0, 0])[0 if hw else 1] += 1
+            rec.setdefault(a, [0, 0])[1 if hw else 0] += 1
+        for i, t in enumerate(tab["teams"]):
+            if not tab["member"][i]:
+                continue
+            w, l_ = rec.get(t, (0, 0))
+            out[t] = {"rating": r2(f["net"][i]), "off": r2(f["off"][i]), "def": r2(f["def"][i]),
+                      "sos": r2(sos[i]) if gp[i] else None, "w": w, "l": l_, "games": int(gp[i])}
+    cache[day] = out
+    return out
+
+
+def tape_pre(ctx: dict, s: int, g: dict) -> dict | None:
+    """The game page's going-in block for a game that has started or finished: {"day", "teams": {tid: going_in row}}
+    for its member teams (None before the start: the page then shows the season so far)."""
+    if g.get("status") not in ("in", "post"):
+        return None
+    d = D.local_day(g.get("date"))
+    if d is None:
+        return None
+    try:
+        gi = going_in(ctx, s, d.toordinal())
+    except Exception as exc:  # noqa: BLE001 - the page keeps everything else; the tape then shows no rows
+        logger.warning("%s going-in tape failed for %s: %s", ctx["level"], g.get("id"), exc)
+        return None
+    teams = {str(t): gi[str(t)] for t in (g.get("home"), g.get("away")) if str(t) in gi}
+    return {"day": d.isoformat(), "teams": teams} if teams else None
+
+
+def line_score(g: dict) -> dict | None:
+    """The line score by half (men) or quarter (women; ESPN's linescores, kept in the store as `line`, overtimes
+    after): {"home": [...], "away": [...]}, or None while either side has none."""
+    ln = g.get("line") or {}
+    h, a = list(ln.get("home") or []), list(ln.get("away") or [])
+    return {"home": h, "away": a} if h and a else None
+
+
 def game_page(ctx: dict, s: int, g: dict) -> dict:
     lv = ctx["level"]
     st = D.load(lv, s)
@@ -1534,6 +1603,7 @@ def game_page(ctx: dict, s: int, g: dict) -> dict:
             "pregame": {"model": mdl, "market": {**(game_market(lv, g) or {}), "ml_home": o.get("ml_home"), "ml_away": o.get("ml_away"),
                                                  "open_spread_home": o.get("open_spread_home"), "provider": o.get("provider")} if o else None,
                         "espn_predictor": pred, "elo_p_home": el},
+            "tape_pre": tape_pre(ctx, s, g), "line": line_score(g),
             "box": box, "team_stats": {} if box and all(v.get("team") for v in box.values()) else (g.get("team_stats") or {}),
             "flow": flow, "wp": wp, "plays": plays, "leaders": leaders}
 

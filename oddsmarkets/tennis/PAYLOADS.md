@@ -41,7 +41,12 @@ MATCH_CARD = `{"id","event","round","date","status","p1","p2","winner","sets","l
 - `data/<T>/events/<event_id>.json` (tournament page): `{"event", "draw": {"rounds":[...], "slots": [...], "matches": {mid: MATCH_CARD}},
   "sim": {"players": {pid: {"p_title","p_final","p_sf","p_qf","reach":{round:p},"exp_points"}}, "n_sims"} | null,
   "market": TITLE | null, "results": [MATCH_CARD], "upsets": [...], "draw_difficulty": {pid: {"exp_opp_elo","rank"}}, "awards": {...},
-  "history": [[year, champion, runner_up]]}`
+  "history": [[year, champion, runner_up]],
+  "pre": {"asof", "n_sims", "title": {pid | "tbd:<slot>": p}, "final": {...}, "qualifier": {pid: "tbd:<slot>"}?} | null}`.
+  `pre` (13 Nov 2026, the current season's events once play begins): our title chances before the first ball, walk-forward
+  (analytics/events.py pre_events: the draw as it stood with qualifiers unknown, no result fixed, the model as it stood
+  before `asof`, the day the event began). Cached per event under ACE_CACHE/ace_pre_event, so it stays fixed while the
+  event plays out. A main-draw card of a played match carries `"rk": [rank1, rank2]`, the rankings the two held going in.
 - `data/<T>/matches/<mid>.json` (match centre; kept for the current and previous year):
 ```
 {"id","event","round","date","surface","best_of","status","p1","p2","winner","sets","duration_min",

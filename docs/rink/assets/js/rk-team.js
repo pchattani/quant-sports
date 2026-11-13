@@ -103,16 +103,19 @@ function fillNext(body, nxt, sj) {
   const g = U.gameV2(nxt, null, rows);
   g.away.alt = RK.teamAlt(nxt.away); g.home.alt = RK.teamAlt(nxt.home);
   g.away.full = RK.teamName(nxt.away); g.home.full = RK.teamName(nxt.home);
-  const R = season.ratings || {}, ua = (R[nxt.away] || {}).units || {}, uh = (R[nxt.home] || {}).units || {};
-  const fx = [];
-  const add = (label, a, b, f, low) => { if (isNum(a) && isNum(b)) fx.push({ label: label, a: f(a), b: f(b), better: Math.abs(a - b) < 1e-9 ? null : ((a > b) !== !!low ? 'a' : 'b') }); };
-  add('Goals for per game', ua.gf_g, uh.gf_g, v => U.f(v, 1));
-  add('Goals against per game', ua.ga_g, uh.ga_g, v => U.f(v, 1), true);
-  add('Chance share, 5-on-5', ua.xgf_pct5, uh.xgf_pct5, v => U.pct(v, 1));
-  add('Team rating', (rows[nxt.away] || {}).rating, (rows[nxt.home] || {}).rating, v => U.signed(v, 2));
+  const R = season.ratings || {};
+  const one = t => Object.assign({}, (R[t] || {}).units || {}, { rating: (rows[t] || {}).rating });
   const m = nxt.model || {};
   const extra = isNum(m.p_ot) ? 'Overtime: ' + U.pct(m.p_ot) + ' (about 1 in ' + Math.max(2, Math.round(1 / m.p_ot)) + ').' : '';
-  box.innerHTML = QK.previewCard(g, { layout: 'bug', nick: t => nickOf(t.abbr), factors: fx, factorsTitle: 'How they match up so far', noteExtra: esc(extra) });
+  const KEYS = ['gf_g', 'ga_g', 'xgf_pct5', 'rating'];
+  const paint = (fx, title) => { box.innerHTML = QK.previewCard(g, { layout: 'bug', nick: t => nickOf(t.abbr), factors: fx, factorsTitle: title, noteExtra: esc(extra) }); };
+  if (U.status(nxt) === 'pre') { paint(U.clubRows(one(nxt.away), one(nxt.home), KEYS), 'How they match up so far'); return; }
+  /* live: the clubs going in (the game file's tape_pre); today's season numbers would count this game */
+  paint([], '');
+  RK.loadGame(nxt.game_id).then(d => {
+    const gi = U.goingIn(RK.ok(d) ? d : null);
+    if (gi && box.isConnected) paint(U.clubRows(gi.away, gi.home, KEYS), U.goingTitle(gi));
+  });
 }
 function fillLast(body, abbr, last) {
   if (!last || !body.querySelector('#tp-box')) return;

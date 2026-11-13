@@ -83,7 +83,13 @@ futures rows `{name: "sb: KC", model, market, edge}` (the futures label is `name
 **games/<game_id>.json** = `{ok, game_id, season, updated_at, card (GAME_CARD), game {stadium (id), stadium_id,
 stadium_name, roof, surface, temp, wind, referee, home_coach, away_coach, home_rest, away_rest, div_game, overtime,
 espn_id, date, neutral}, pregame, matchups, injuries, espn_predictor, credits, score, drives, plays, wp, fourth_downs,
-box, key_plays, awards, source}`.
+box, key_plays, awards, source, tape_pre}`.
+- `tape_pre` = the two teams going into the game, from regular-season games final before kickoff: `{before (the kickoff,
+  UTC), source "snapshot" (written while upcoming, kept unchanged once the game starts) | "computed" (rebuilt going in
+  for a game that started before snapshots), home / away {gp (games whose plays count), rating, off_rating, def_rating,
+  off_pass_epa, off_rush_epa, def_pass_epa, def_rush_epa, st_epa_g, rank {the four EPA units' league ranks}},
+  rating_asof (computed rows: the rating history point's end)}`. The game page shows it for started games instead of
+  today's season numbers.
 - `pregame` = `{model: PRICE, source, market, market_detail (C's per-game record: sources, spread / total ladders, book),
   line, priced_at, qbs, weather}`; PRICE = `{p_home, p_tie, spread, margin, total, home_pts, away_pts, sigma, sigma_total,
   net_h?, net_a?, source, dist}`; `dist` = `{margin: {lo, p[]} (P(margin = lo + i), with the key numbers), total: {lo, p[]},
@@ -107,7 +113,8 @@ box, key_plays, awards, source}`.
 - `key_plays` = the top 8 by |WPA|: `[{play_id, qtr, clock, team, desc, wpa, epa, wp_home_before, wp_home_after}]`;
   `awards` = `{home_ball: {pid, name, epa}, away_ball, play_of_game}`.
 - `matchups` = `{home_off|away_off: {pass: {off, off_rank, def, def_rank}, rush: {...}, proe, pace}, rating: {home, away},
-  st: {home, away}}` (EPA per play; rank 1 = best). `injuries` = `{home: [{pid, name, pos, status, practice, injury}],
+  st: {home, away}}` (EPA per play; rank 1 = best); a game that has started carries the matchups going in, from
+  tape_pre (`going_in: true`, no proe / pace), or null. `injuries` = `{home: [{pid, name, pos, status, practice, injury}],
   away, source}` (the nflverse weekly report; ESPN's list for upcoming games).
 
 **season.json** = `{standings: [{division, conference, teams: [ROW]}], sos_units, seeds_today: {AFC|NFC: {seeds,

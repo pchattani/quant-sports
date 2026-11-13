@@ -130,3 +130,5 @@
 .fb-mx-abw { font: 700 var(--fs-2xs)/1.2 var(--font-cond); text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); }
 .fb-mx-abw.injured, .fb-mx-abw.suspended { color: var(--live); }
 .fb-mx-ab b { text-align: right; }
+/* after kick-off the list carries no values (matches.js absences: no look-ahead) */
+.fb-mx-ab.novalue li { grid-template-columns: minmax(0, 1fr) auto; }

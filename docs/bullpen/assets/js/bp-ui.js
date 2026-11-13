@@ -79,6 +79,40 @@ U.playerEnt = (pid, L, sub, role) => {
   return '<a class="bp-ent" href="' + esc(BP.playerHref(pid, { level: L, role: role })) + '">' + (x.team ? BP.teamMark(x.team, 'sm') : '') + '<span class="nm">' + esc(BP.playerName(pid)) + '</span>' + (sub ? '<span class="sb">' + esc(sub) + '</span>' : '') + '</a>';
 };
 
+/* Going in (the no-look-ahead rule for game pages, 13 Nov 2026). A game that has started (live or final) compares the
+   clubs as they stood before it, from the game file's tape_pre: regular-season games final before the start, written
+   while the game was upcoming and kept once it started ("snapshot"), or runs a game computed going in for a game that
+   started before snapshots ("computed"). Never today's season numbers in their place: those count the game and
+   everything after it, so a started game without tape_pre shows no comparison rows.
+     goingIn(d) -> tape_pre or null              goingTitle(t) -> 'Going in · before 12 Nov 2026'
+     goingSub(t, away, home) -> the sample line
+     seasonSide(season, tid) -> the season to date as the same value object {rating, off, pitch, def, rs_g, ra_g}
+     clubRows(a, h, keys) -> previewCard factor rows from two value objects */
+U.goingIn = d => { const t = d && d.tape_pre; return t && t.home && t.away ? t : null; };
+U.goingDate = iso => QK.fmt.date(/^\d{4}-\d\d-\d\d$/.test(String(iso || '')) ? iso + 'T12:00:00Z' : iso, { day: 'numeric', month: 'short', year: 'numeric' });
+U.goingTitle = t => 'Going in · before ' + U.goingDate(t.before);
+U.goingSub = (t, away, home) => 'Regular-season games final before this one (' + BP.teamAbbr(away) + ' ' + ((t.away || {}).gp || 0) + ', ' + BP.teamAbbr(home) + ' ' + ((t.home || {}).gp || 0) + ')' +
+  (t.source === 'computed' ? '; runs a game only, as our ratings are not kept by date' : '');
+U.seasonSide = (season, tid) => {
+  const rows = BP.standingsRows ? BP.standingsRows(season || {}) : {};
+  const r = rows[String(tid)] || {}, ra = r.rating || {}, n = (r.w || 0) + (r.l || 0);
+  return { rating: ra.net, off: ra.off, pitch: ra.pitch, def: ra.def, rs_g: isNum(r.rs) && n > 0 ? r.rs / n : null, ra_g: isNum(r.ra) && n > 0 ? r.ra / n : null };
+};
+U.clubRows = (a, h, keys) => {
+  const fx = [];
+  const add = (label, x, y, f, low) => { if (isNum(x) && isNum(y)) fx.push({ label: label, a: f(x), b: f(y), better: Math.abs(x - y) < 1e-9 ? null : ((x > y) !== !!low ? 'a' : 'b') }); };
+  const prev = v => (isNum(v.def) || isNum(v.pitch) ? (Number(v.def) || 0) + (Number(v.pitch) || 0) : null);
+  const K = {
+    rating: () => add('Team rating, runs a game', a.rating, h.rating, v => U.signed(v, 2)),
+    off: () => add('Offence, runs a game', a.off, h.off, v => U.signed(v, 2)),
+    prev: () => add('Run prevention, runs a game', prev(a), prev(h), v => U.signed(v, 2)),
+    rs_g: () => add('Runs scored a game', a.rs_g, h.rs_g, v => BP.num(v, 2)),
+    ra_g: () => add('Runs allowed a game', a.ra_g, h.ra_g, v => BP.num(v, 2), true)
+  };
+  (keys || ['rating', 'off', 'prev']).forEach(k => { if (K[k]) K[k](); });
+  return fx;
+};
+
 /* ── game cards ────────────────────────────────────────────────────────── */
 U.records = season => {
   const rows = BP.standingsRows ? BP.standingsRows(season || {}) : {};

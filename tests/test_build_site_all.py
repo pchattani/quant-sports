@@ -295,6 +295,44 @@ def test_hub_upcoming_lists_only_matches_still_to_play() -> None:
     assert hub["days"] == {}
 
 
+def test_pre_match_tape_numbers_are_frozen_before_kick_off() -> None:
+    """fixtures[].pre (the match page's "Going in" tape): our rating and Elo are written while the kick-off is ahead,
+    refreshed while the match is still to play, and carried unchanged once it starts; a match that started without a
+    snapshot, or whose kick-off has passed, is never given today's numbers."""
+    from datetime import datetime, timezone
+
+    import scripts.build_site_all as b
+
+    def fx(gid, date, status="scheduled", home="Arsenal", away="Chelsea"):
+        return {"id": gid, "date": date, "home": home, "away": away, "status": status}
+
+    st1 = [{"team": "Arsenal", "strength_ppg": 1.9238, "elo": 1857.54}, {"team": "Chelsea", "strength_ppg": 1.41, "elo": 1700.0},
+           {"team": "Wolves", "strength_ppg": 0.0, "elo": 1500.0}]
+    st2 = [{"team": "Arsenal", "strength_ppg": 2.2, "elo": 1900.0}, {"team": "Chelsea", "strength_ppg": 1.1, "elo": 1650.0}]
+    t1 = datetime(2026, 10, 17, 12, tzinfo=timezone.utc)
+    rows = b.freeze_pre([fx("1", "2026-10-18T14:00:00Z"), fx("2", "2026-10-16T14:00:00Z", "finished"),
+                         fx("3", "2026-10-17T11:00:00Z"), fx("4", "2026-10-18T14:00:00Z", home="Wolves"),
+                         fx("5", "2026-10-17T11:30:00Z", "live"), fx("6", "2026-11-20T14:00:00Z")], None, st1, t1)
+    by = {r["id"]: r for r in rows}
+    assert by["1"]["pre"] == {"r": [1.9238, 1.41], "elo": [1857.5, 1700.0]}       # ahead: written
+    assert "pre" not in by["6"]                                                   # over PRE_DAYS ahead: not yet
+    assert "pre" not in by["2"] and "pre" not in by["5"]                          # started without one: none
+    assert "pre" not in by["3"]                                                   # "scheduled" but kick-off passed
+    assert by["4"]["pre"] == {"elo": [1500.0, 1700.0]}                            # no rating for Wolves: Elo only
+    # a later build, still ahead: refreshed with that build's numbers
+    rows2 = b.freeze_pre([fx("1", "2026-10-18T14:00:00Z")], rows, st2, datetime(2026, 10, 18, 9, tzinfo=timezone.utc))
+    assert rows2[0]["pre"] == {"r": [2.2, 1.1], "elo": [1900.0, 1650.0]}
+    # live, then finished, with the strength file re-fitted after the result: the snapshot never moves
+    after = [{"team": "Arsenal", "strength_ppg": 2.6, "elo": 1950.0}, {"team": "Chelsea", "strength_ppg": 0.9, "elo": 1600.0}]
+    live = b.freeze_pre([fx("1", "2026-10-18T14:00:00Z", "live")], rows2, after, datetime(2026, 10, 18, 14, 30, tzinfo=timezone.utc))
+    assert live[0]["pre"] == {"r": [2.2, 1.1], "elo": [1900.0, 1650.0]}
+    done = b.freeze_pre([fx("1", "2026-10-18T14:00:00Z", "finished")], live, after, datetime(2026, 10, 19, 9, tzinfo=timezone.utc))
+    assert done[0]["pre"] == {"r": [2.2, 1.1], "elo": [1900.0, 1650.0]}
+    # the source still says "scheduled" an hour after kick-off: kept, not refreshed
+    late = b.freeze_pre([fx("1", "2026-10-18T14:00:00Z")], rows2, after, datetime(2026, 10, 18, 15, tzinfo=timezone.utc))
+    assert late[0]["pre"] == {"r": [2.2, 1.1], "elo": [1900.0, 1650.0]}
+
+
 def test_hub_items_carry_club_ids_for_kit_colours() -> None:
     """The public build ships no crests (D6), so the hub names each side's club id: the pages look up the club's kit
     colours (clubs_index.json) and its link by id."""
@@ -488,6 +526,11 @@ def test_fixtures_carry_the_model_line_and_results_carry_xg(built) -> None:
         assert m["lh"] > 0 and m["la"] > 0 and 0 < m["o25"] < 1 and 0 < m["btts"] < 1
         assert re.fullmatch(r"\d-\d", m["score"]) and len(m["fair"]) == 3
         assert abs(m["fair"][0] - 1 / m["h"]) < 0.02
+    # The "Going in" tape (freeze_pre): a first build snapshots only matches still ahead, from strength.json.
+    assert not any(f.get("pre") for f in played)
+    st = {r["team"]: r for r in _load(data, "premier-league", "strength.json")["rows"]}
+    for f in [f for f in upcoming if f.get("pre")]:
+        assert f["pre"]["elo"] == [round(st[f["home"]]["elo"], 1), round(st[f["away"]]["elo"], 1)]
     # Kickoff order.
     assert [f["date"] for f in fx] == sorted(f["date"] for f in fx)
 

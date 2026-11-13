@@ -181,6 +181,46 @@ U.card = (g, L, o) => QK.gameCard(U.game(g, L, o), { sport: false, market: 'quie
 /* Team nicknames for the preview card ("the Lakers"), two-word ones kept whole. */
 U.nick = (L, tid) => { const n = String(HW.teamName(L, tid) || tid); return /Trail Blazers$/.test(n) ? 'Trail Blazers' : n.split(' ').slice(-1)[0]; };
 
+/* Going in (the no-look-ahead rule for game pages, 13 Nov 2026, as the Rink's). A game that has started (live or
+   final) compares the teams as they stood before it, from the game file's tape_pre: the record and point differential
+   from regular-season games final before the tip and the ratings, written while the game was upcoming and kept once
+   it started ("snapshot"), or computed going in for a game that started before snapshots ("computed": the ratings
+   fitted on games before the game day). Never today's season numbers in their place: those count the game and
+   everything after it, so a started game without tape_pre shows no comparison rows.
+     goingIn(d) -> tape_pre or null              goingTitle(t) -> 'Going in · before 12 Nov 2026'
+     goingSub(L, t, away, home) -> the sample line
+     clubRows(a, h, keys) -> previewCard factor rows from two value objects {net, off, def}
+     recordsBefore(sch, g) -> { tid: 'W-L' } regular-season records going in, from the season's schedule */
+U.goingIn = d => { const t = d && d.tape_pre; return t && t.home && t.away ? t : null; };
+U.goingDate = iso => QK.fmt.date(iso, { day: 'numeric', month: 'short', year: 'numeric' });
+U.goingTitle = t => 'Going in · before ' + U.goingDate(t.before);
+U.goingSub = (L, t, away, home) => 'Regular-season games final before this one (' + HW.teamAbbr(L, away) + ' ' + ((t.away || {}).gp || 0) + ', ' + HW.teamAbbr(L, home) + ' ' + ((t.home || {}).gp || 0) + ')' +
+  (t.source === 'computed' ? '; ratings fitted on the games before that day' : '');
+U.clubRows = (a, h, keys) => {
+  const fx = [];
+  const add = (label, x, y, f, low) => { if (isNum(x) && isNum(y)) fx.push({ label: label, a: f(x), b: f(y), better: Math.abs(x - y) < 1e-9 ? null : ((x > y) !== !!low ? 'a' : 'b') }); };
+  const K = {
+    net: () => add('Net rating, per 100 trips', a.net, h.net, v => U.signed(v, 1)),
+    off: () => add('Points scored per 100', a.off, h.off, v => U.f(v, 1)),
+    def: () => add('Points allowed per 100', a.def, h.def, v => U.f(v, 1), true)
+  };
+  (keys || ['net', 'off', 'def']).forEach(k => { if (K[k]) K[k](); });
+  return fx;
+};
+U.recordsBefore = (sch, g) => {
+  const t0 = Date.parse(g.date), out = {};
+  if (!sch || !isFinite(t0)) return out;
+  const w = {}, l = {};
+  (sch.games || []).forEach(x => {
+    if (!x || String(x.id) === String(g.id) || x.status !== 'post' || x.stype !== 'reg' || !isNum(x.hs) || !isNum(x.as) || !(Date.parse(x.date) < t0)) return;
+    const hw = Number(x.hs) > Number(x.as), h = String(x.home), a = String(x.away);
+    (hw ? w : l)[h] = ((hw ? w : l)[h] || 0) + 1;
+    (hw ? l : w)[a] = ((hw ? l : w)[a] || 0) + 1;
+  });
+  [String(g.home), String(g.away)].forEach(t => { out[t] = (w[t] || 0) + '-' + (l[t] || 0); });
+  return out;
+};
+
 /* ── charts, numbers, cards ────────────────────────────────────────────── */
 U.chart = (id, h, label) => '<div id="' + esc(id) + '" class="qk-chart" style="--h:' + (h || 280) + 'px"' + (label ? ' role="img" aria-label="' + esc(label) + '"' : '') + '></div>';
 U.f = (v, d) => (isNum(v) ? Number(v).toFixed(d === undefined ? 1 : d) : '—');

@@ -4,9 +4,10 @@
  * Game centre (kit v4 "Broadcast", the Rink game page is the reference): the hero is QK.previewCard, the diagonal split
  * hero (away "at" home in the team colours with records, the clock when live, our chance for the favourite as a big blue number with a how-sure note, the
  * team-colour bar, the market as a quiet labelled reference before the game, how the teams match up from the
- * ratings); beside it the tiles and our forecast table (the market a reference column; "How our forecast is built",
- * the trial labelled as a trial); then win probability (model and ESPN), score flow, drives and EPA (cfb),
- * highest-leverage plays, box scores, team stats, leaders. Reads <L>/<S>/games/<gid>.json and falls back
+ * ratings: once the game has started, going in, from the games before it only); beside it the tiles and our forecast
+ * table (the market a reference column; "How our forecast is built", the trial labelled as a trial); then win
+ * probability (model and ESPN), score flow, drives and EPA (cfb), highest-leverage plays, box scores, the line score,
+ * team stats, leaders. Reads <L>/<S>/games/<gid>.json and falls back
  * to the schedule CARD when a game has no page (game pages exist for the current season and last postseason). */
 (function (CC) {
 'use strict';
@@ -262,11 +263,48 @@ CC.pair = function (L, a, h) {
 };
 function pickOf(L, g, margin) { return isNum(margin) ? (Math.abs(margin) < 0.05 ? 'Even' : CC.tabbr(L, margin > 0 ? g.home : g.away) + ' by ' + CC.f(Math.abs(margin), 1)) : '—'; }
 
+/* No look-ahead (13 Nov 2026): once a game has started, the two teams are compared only on games before it. The
+   game's day is its start less nine hours (the US day the builders file it under, never later than theirs). */
+function dayOf(g) {
+  var t = Date.parse(g.date);
+  return isFinite(t) ? new Date(t - 9 * 3600e3).toISOString().slice(0, 10) : '';
+}
+/* Going in: a started game's comparison rows, from the builder's tape_pre (each team's ratings from the games before
+   the game day, the very fit our pre-game call used, with its strength of schedule and record before it); without
+   it (a page built before 13 Nov 2026, a past season's recap card) the rating alone, from the season's rating path
+   (season.json rating_paths, the team page's "Rating through the season": the last point dated before the game day).
+   Records before the start come from the schedule when the block has none (the form card's games). Never today's
+   numbers; null for a game still to come. */
+function goingIn(L, g, season, sch) {
+  if (CC.status(g) === 'pre') return null;
+  var tp = g.tape_pre && g.tape_pre.teams ? g.tape_pre : null, day = (tp && tp.day) || dayOf(g), R = {};
+  if (tp) R = tp.teams;
+  else {
+    var P = (season && season.rating_paths) || {};
+    [g.home, g.away].forEach(function (t) {
+      var p = (P[String(t)] || []).filter(function (x) { return x && String(x[0]) < day && isNum(x[1]); });
+      if (p.length) R[String(t)] = { rating: p[p.length - 1][1] };
+    });
+  }
+  var t0 = Date.parse(g.date), hk = CC.hk(L);
+  var done = ((sch && sch.games) || []).filter(function (c) { return c && String(c.id) !== String(g.id) && c.status === 'post' && c.stype !== 'exh' && c.stype !== 'pre' && Date.parse(c.date) < t0; });
+  var rec = function (tid) {
+    if (!CC.rec(L, g.season, tid)) return '';         /* members only, as the standings (a non-member's schedule here is partial) */
+    var r = R[String(tid)] || {};
+    if (isNum(r.w) && isNum(r.l)) return r.w + '-' + r.l + (hk ? '-' + (isNum(r.t) ? r.t : 0) : '');
+    if (!sch) return '';
+    var n = { W: 0, L: 0, T: 0 };
+    done.forEach(function (c) { var x = CC.resultOf(L, c, tid); if (x) n[x]++; });
+    return n.W + '-' + n.L + (hk ? '-' + n.T : '');
+  };
+  return { R: R, day: day, full: !!tp, rec: rec };
+}
+
 /* v4 (Broadcast) hero: QK.previewCard, the diagonal split, with records, our chance (the live curve's last point once it starts, our
    pre-game call after it ends), a how-sure note with the projected score and the margin's spread, the market as a
    quiet reference line before the game (game detail is one of the two places it may appear) and how the teams match
-   up from the season ratings. */
-function hero(L, g, season) {
+   up from the season ratings (a started game: going in, goingIn). */
+function hero(L, g, season, gi) {
   var st = CC.status(g), live = st === 'live', pre = st === 'pre';
   var pg = g.pregame || {}, m = pg.model || g.model || {}, mk = pg.market || g.market || {};
   var cols = CC.pair(L, g.away, g.home);
@@ -274,11 +312,12 @@ function hero(L, g, season) {
   /* v4: the diagonal hero takes the raw kit colours and the alternates (CC.side: alt and full; QK.color.blockPair makes
      the blocks and resolves a clash, slate when no alternate is there yet); the lifted pair stays for the factors */
   G.home.colour = CC.traw(L, g.home) || cols[1]; G.away.colour = CC.traw(L, g.away) || cols[0];
-  G.home.record = CC.rec(L, g.season, g.home); G.away.record = CC.rec(L, g.season, g.away);
+  G.home.record = gi ? gi.rec(g.home) : pre ? CC.rec(L, g.season, g.home) : '';
+  G.away.record = gi ? gi.rec(g.away) : pre ? CC.rec(L, g.season, g.away) : '';
   var wpm = g.wp && g.wp.model && g.wp.model.length ? g.wp.model[g.wp.model.length - 1][1] : null;
   if (live && isNum(wpm)) { G.wp_home = wpm; G.pre_only = undefined; }
   if (isNum(m.p_home)) G.p_home = m.p_home;
-  var R = (season && season.ratings) || {}, ra = R[String(g.away)] || {}, rh = R[String(g.home)] || {}, fb = CC.fb(L), hk = CC.hk(L);
+  var R = pre ? ((season && season.ratings) || {}) : ((gi && gi.R) || {}), ra = R[String(g.away)] || {}, rh = R[String(g.home)] || {}, fb = CC.fb(L), hk = CC.hk(L);
   var fx = [];
   var add = function (label, x, y, f, low) { if (isNum(x) && isNum(y)) fx.push({ label: label, a: f(x), b: f(y), better: Math.abs(x - y) < 1e-9 ? null : ((x > y) !== !!low ? 'a' : 'b') }); };
   if (hk) {
@@ -303,7 +342,7 @@ function hero(L, g, season) {
   var venue = g.venue && g.venue.name ? g.venue.name : '';
   var src = CC.mkSource(mk);
   if (hk && isNum(m.p_tie) && g.stype !== 'ncaa' && g.stype !== 'conf') { G.p_draw = m.p_tie; G.p_away = m.p_away; }
-  return '<div class="cc-preview">' + (hk ? CC.tieWords : String)(QK.previewCard(G, { kicker: CC.LSHORT[L] + ' · ' + tag + (venue ? ' · ' + venue : ''), nick: function (x) { return x.name; }, colors: cols, factors: fx, factorsTitle: CC.isCur(L, g.season) ? 'How they match up this season' : 'How they matched up', vs: g.neutral ? 'v' : undefined,
+  return '<div class="cc-preview">' + (hk ? CC.tieWords : String)(QK.previewCard(G, { kicker: CC.LSHORT[L] + ' · ' + tag + (venue ? ' · ' + venue : ''), nick: function (x) { return x.name; }, colors: cols, factors: fx, factorsTitle: !pre ? 'How they matched up going in' : CC.isCur(L, g.season) ? 'How they match up this season' : 'How they matched up', vs: g.neutral ? 'v' : undefined,
     noteExtra: extra.length ? esc(extra.join(', and ') + '.') : '', market: pre && isNum(mk.p_home) ? { p: mk.p_home, src: src || undefined, quiet: true } : null })) + '</div>';
 }
 function heroMeta(L, g) {
@@ -395,9 +434,12 @@ function pregame(L, g) {
   return U.card(CC.status(g) === 'pre' ? 'Our forecast' : 'Our pre-game forecast', 'Chances from our game model; the market column is a reference, not our forecast.' + (refs.length ? ' Also: ' + esc(refs.join(', ')) + '.' : ''), '<div class="qk-stack">' + tbl + built + '</div>');
 }
 
-/* Tale of the tape: the two teams' season profile from the ratings (season.json ratings[team]). */
-function tape(L, g, season) {
-  var R = (season && season.ratings) || {}, a = R[String(g.away)] || {}, h = R[String(g.home)] || {}, fb = CC.fb(L);
+/* Tale of the tape: the two teams' season profile from the ratings (season.json ratings[team]); once the game has
+   started, "Going in": the same rows from the games before it only (goingIn), each team's record before it under its
+   name. A row the going-in data does not carry is left out, never filled with today's number. */
+function tape(L, g, season, gi) {
+  var pre = CC.status(g) === 'pre';
+  var R = pre ? ((season && season.ratings) || {}) : ((gi && gi.R) || {}), a = R[String(g.away)] || {}, h = R[String(g.home)] || {}, fb = CC.fb(L);
   var rows = CC.hk(L) ? [
     { label: 'Rating (goals v average)', a: a.rating, b: h.rating, fmt: function (v) { return CC.signed(v, 2); }, tip: 'Our rating: goals a game better than an average D-I team on neutral ice' },
     { label: 'Attack (goals above average)', a: a.off, b: h.off, fmt: function (v) { return CC.signed(v, 2); } },
@@ -425,6 +467,14 @@ function tape(L, g, season) {
   if (!rows.some(function (r) { return isNum(r.a) && isNum(r.b); })) return '';
   var cols = CC.pair(L, g.away, g.home), A = U.mark(L, g.away), H = U.mark(L, g.home);
   A.colour = cols[0]; H.colour = cols[1];
+  if (!pre) {
+    var ra = gi.rec(g.away), rh = gi.rec(g.home);
+    if (ra) A.sub = ra + ' going in';
+    if (rh) H.sub = rh + ' going in';
+    var when = gi.day ? CC.date(gi.day + 'T12:00:00Z') : 'the start';
+    return U.card('Going in', 'Before ' + esc(when) + (gi.full ? ': our ratings from the games before this one, the schedule faced and the record' : ': our rating from the games before this one, as on each team’s rating through the season') +
+      '; the stronger side of each bar is solid.', QK.matchupBar({ left: A, right: H, rows: rows, colors: cols }));
+  }
   return U.card('Tale of the tape', 'Season ratings ' + (CC.isCur(L, g.season) ? 'so far' : 'at season end') + '; the stronger side of each bar is solid.', QK.matchupBar({ left: A, right: H, rows: rows, colors: cols }));
 }
 
@@ -498,6 +548,17 @@ function boxHoops(L, g) {
   return U.card('Box score', '', html, { cls: 'cc-box' });
 }
 
+/* The line score (football and basketball game files' `line`, ESPN's linescores, from 13 Nov 2026): points by
+   quarter, or by half for the men's game, overtime last; the table CC.lastBox draws on the team page. '' while the
+   file has none (pages built before the field) or the game has not started. */
+function lineScore(L, g) {
+  var ln = g.line || {};
+  if (CC.status(g) === 'pre' || !(ln.home || []).length || !(ln.away || []).length) return '';
+  var halves = !CC.fb(L) && (L === 'mbb' || Number(g.season) < 2016);
+  var ot = Math.max(ln.home.length, ln.away.length) > (halves ? 2 : 4);
+  return U.card('Line score', 'Points by ' + (halves ? 'half' : 'quarter') + (ot ? ', then overtime' : '') + (CC.status(g) === 'live' ? ', so far' : '') + '.', CC.lastBox(L, g, null));
+}
+
 function leadersBlock(L, g) {
   var ld = g.leaders || {};
   var ts = [g.away, g.home].filter(function (t) { return (ld[t] || []).length; });
@@ -529,9 +590,10 @@ CC.route('game', function (el, p) {
     var fb = CC.fb(L), st = CC.status(g);
     var season = CC.ok(a[2]) ? a[2] : null;
     var back = '<div class="qk-kicker" style="margin-bottom:10px"><a href="' + esc(CC.href(L, 'games', null, g.season, fb && isNum(g.week) && g.stype === 'reg' ? 'w=w' + g.week : '')) + '">← ' + esc(CC.LSHORT[L]) + ' games</a></div>';
-    var html = back + '<div class="cc-gtop"><div class="qk-stack">' + hero(L, g, season) + heroMeta(L, g) + '</div><div class="qk-stack">' + tiles(L, g) + pregame(L, g) + CC.formPair(L, g, sch) + '</div></div>';
+    var gi = goingIn(L, g, season, sch);
+    var html = back + '<div class="cc-gtop"><div class="qk-stack">' + hero(L, g, season, gi) + heroMeta(L, g) + '</div><div class="qk-stack">' + tiles(L, g) + pregame(L, g) + CC.formPair(L, g, sch) + '</div></div>';
     if (g.light) html += QK.note(st === 'pre' ? 'The full game page appears on game day.' : 'The recap: this game has no detailed page (game pages are kept for the current season and the last postseason), so the result and our pre-game numbers are above.');
-    var tp = tape(L, g, season);
+    var tp = tape(L, g, season, gi);
     /* before the game there is no win-chance path: the tale of the tape takes the row */
     html += st === 'pre' ? '<div style="margin-top:var(--sp-6)">' + tp + '<div id="gc-wpcard"></div></div><div>'
       : '<div class="qk-grid cc-grid" style="margin-top:var(--sp-6)"><div class="qk-span-7"><div class="qk-stack"><div id="gc-wpcard"></div></div></div><div class="qk-span-5"><div class="qk-stack">' + tp + '</div></div>';
@@ -542,7 +604,7 @@ CC.route('game', function (el, p) {
     if ((g.plays || []).length) html += U.card('Highest-leverage plays', 'The plays that moved our win chance most (win chance added for the home side, in points).', '<ol class="cc-plays">' + g.plays.slice(0, 8).map(function (x) {
       return '<li><span class="t">' + esc(perLabel(L, g.season, x.period) + ' ' + (isNum(x.clock) ? fmtClock(x.clock / 60) : (x.clock || ''))) + '</span><span class="tx">' + (x.team ? QK.teamMark(CC.team(L, x.team) || {}, 'sm') : '') + esc(x.text || '') + '</span><b class="' + CC.cls(x.wpa) + '">' + (isNum(x.wpa) ? QK.fmt.pp(x.wpa) : '') + '</b></li>'; }).join('') + '</ol>');
     if (CC.hk(L)) html += '<div class="qk-grid cc-grid"><div class="qk-span-7"><div class="qk-stack">' + CC.hkBox(L, g) + '</div></div><div class="qk-span-5"><div class="qk-stack">' + leadersBlock(L, g) + teamStats(L, g) + '</div></div></div>' + CC.hkSkaters(L, g) + CC.hkAttempts(L, g) + (g.source && g.source !== 'ESPN' ? CC.hkCredit(true) : '');
-    else html += '<div class="qk-grid cc-grid"><div class="qk-span-8">' + (fb ? boxFootball(L, g) : boxHoops(L, g)) + '</div><div class="qk-span-4"><div class="qk-stack">' + leadersBlock(L, g) + teamStats(L, g) + '</div></div></div>';
+    else html += '<div class="qk-grid cc-grid"><div class="qk-span-8">' + (fb ? boxFootball(L, g) : boxHoops(L, g)) + '</div><div class="qk-span-4"><div class="qk-stack">' + lineScore(L, g) + leadersBlock(L, g) + teamStats(L, g) + '</div></div></div>';
     el.innerHTML = html;
     QK.$$('.qk-tabs[role="tablist"]', el).forEach(function (t) { QK.tabs(t.parentNode); });
     U.wire(el);

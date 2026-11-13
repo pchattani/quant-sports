@@ -173,8 +173,11 @@ def build_match(td: an.TourData, m: dict, pred: dict | None, market: dict | None
         sk = surf if surf in an.SURFACES else "hard"
         elo = {"p": an.prob((pred or {}).get("elo_p")), "p1": {"all": an.rnd(x1.get("all"), 1), "surface": an.rnd(x1.get(sk), 1)},
                "p2": {"all": an.rnd(x2.get("all"), 1), "surface": an.rnd(x2.get(sk), 1)}, "surface": surf}
-    # serve / return at the prediction's checkpoint
-    cp = an.day((pred or {}).get("_ctx_date")) or td.today
+    # serve / return at the prediction's checkpoint; without a prediction, a finished match takes its month checkpoint
+    # (as predictions() would), never today's fit, which has seen the match and everything after it
+    cp = an.day((pred or {}).get("_ctx_date"))
+    if cp is None:
+        cp = checkpoint(when) if m.get("status") in an.FINISHED and when <= td.today else td.today
     sr = td.sr_fit(cp - timedelta(days=1))
     holds = spw = None
     if sr:

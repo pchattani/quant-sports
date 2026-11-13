@@ -10,8 +10,16 @@ the sealed test years, apply the promotion rule, and write
 
     uv run python scripts/scrum_fit.py                 # men's tests (the default scope)
     uv run python scripts/scrum_fit.py --scope women
+    uv run python scripts/scrum_fit.py --replace       # skip the check against the model in use (a planned re-split)
 
 Runs in a few minutes on one core (each walk-forward pass is a few thousand matches).
+
+The model in use (13 Nov 2026). A re-run re-tunes every rung on the development years, and coordinate descent is path
+dependent: a small change in the inputs can move an early rung's settings and with them every later rung's. So a re-run
+never replaces the model in use (the params file already in place) unless its choice clears the ladder's own promotion
+rule against it, both scored walk-forward on today's inputs: the paired 95% interval of the per-test log-loss
+difference on the test years below zero, calibration no worse. Otherwise the model in use stays, every setting with
+it, and the report carries both ("incumbent").
 """
 from __future__ import annotations
 
@@ -26,6 +34,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from oddsmarkets.rugby import models as M, store, validate  # noqa: E402
+from oddsmarkets.rugby.build import mk_params  # noqa: E402
 from oddsmarkets.rugby.ratings import Params  # noqa: E402
 
 FITTED = ROOT / "oddsmarkets" / "rugby" / "fitted"
@@ -35,7 +44,11 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--scope", default="men")
     ap.add_argument("--rounds", type=int, default=2)
+    ap.add_argument("--replace", action="store_true", help="write the re-run's choice even if it does not beat the model in use")
     a = ap.parse_args(argv)
+    sfx = "" if a.scope == "men" else f"_{a.scope}"
+    p_in_use = FITTED / f"params{sfx}.json"
+    in_use = json.loads(p_in_use.read_text(encoding="utf-8")) if p_in_use.exists() else None
     t0 = time.time()
     matches, _ath = store.load_all(a.scope)
     ms = M.eligible(matches)
@@ -163,8 +176,39 @@ def main(argv=None) -> int:
               "wr_logistic": wr_fit, "tries": tries, "sd_total": rep["total"]["sd_dev"],
               "value": rep["value"].get("weights") if rep["value"].get("ok") else None,
               "fitted_through": max(r["date"] for r in chosen_rows)[:10]}
+    # the model in use against the re-run's choice, both on today's inputs (the docstring: "The model in use")
+    if in_use and in_use.get("params") and not a.replace:
+        inc = mk_params(in_use["params"])
+        inc_rows = M.walk(ms, inc, wr_fit=in_use.get("wr_logistic") if inc.wr3 else None)
+        inc_cal = M.calibration(inc_rows, *test)
+        pr = M.paired(inc_rows, chosen_rows, *test)
+        pr_dev = M.paired(inc_rows, chosen_rows, *M.DEV)
+        wins = bool(pr.get("better")) and rep["rungs"][chosen_name]["cal_test"]["ece"] <= inc_cal["ece"] + tol
+        inc_tot = M.walk(ms, mk_params(dict(in_use.get("total_params") or in_use["params"], split=True)))
+        tt_inc = [r for r in inc_tot if test[0] <= r["y"] <= test[1]]
+        rep["incumbent"] = {"model": in_use.get("model"), "fitted_through": in_use.get("fitted_through"),
+                            "params": in_use["params"], "dev": M.score(inc_rows, *M.DEV), "test": M.score(inc_rows, *test),
+                            "cal_test": inc_cal, "rerun_vs_incumbent": dict(pr, rerun=chosen_name),
+                            "rerun_vs_incumbent_dev": pr_dev, "replaced": wins, "vs_wr": M.paired(wr_rows, inc_rows, *test),
+                            "total_mae_test": round(sum(abs((r["hs"] + r["as"]) - r["total"]) for r in tt_inc) / max(1, len(tt_inc)), 3)}
+        for k in ("unc", "kal", "alt"):
+            if k in rep["rungs"] and k != chosen_name:
+                rows_k = M.walk(ms, mk_params(rep["rungs"][k]["params"]))
+                rep["incumbent"][f"{k}_vs_incumbent"] = M.paired(inc_rows, rows_k, *test)
+        if not wins:
+            params = dict(in_use, checked_through=params["fitted_through"])
+            rep["chosen"] = in_use.get("model")
+            rep["kept_in_use"] = True
+            # the total and the try model the site keeps using are the model in use's, scored on today's inputs
+            rep["incumbent"]["rerun_total"], rep["incumbent"]["rerun_tries"] = rep["total"], rep["tries"]
+            rep["total"] = {"sd_test": round(M.total_sd(inc_tot, *test), 3), "sd_dev": round(M.total_sd(inc_tot, *M.DEV), 3),
+                            "mae_test": rep["incumbent"]["total_mae_test"], "mae_test_baseline": rep["total"]["mae_test_baseline"]}
+            if in_use.get("tries"):
+                rep["tries"] = {"fit": in_use["tries"], "test": M.score_tries(inc_tot, by_id, in_use["tries"], *test)}
+            print(f"the model in use ({in_use.get('model')}, fitted through {in_use.get('fitted_through')}) stays: the re-run's "
+                  f"{chosen_name} v it on the test years {pr.get('diff')} ({pr.get('lo')} to {pr.get('hi')}), ECE "
+                  f"{rep['rungs'][chosen_name]['cal_test']['ece']} v {inc_cal['ece']}")
     FITTED.mkdir(parents=True, exist_ok=True)
-    sfx = "" if a.scope == "men" else f"_{a.scope}"
     (FITTED / f"params{sfx}.json").write_text(json.dumps(params, indent=1), encoding="utf-8")
     (FITTED / f"report{sfx}.json").write_text(json.dumps(rep, indent=1), encoding="utf-8")
     for k in ("wr", "elo", "unc", "ctx", "kal", "alt", "split", "hybrid", "hybrid_unc"):

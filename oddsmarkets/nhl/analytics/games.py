@@ -8,9 +8,11 @@ else this layer's Poisson fallback from the pre-game goal expectations, flagged 
 and TOI by strength; the box with advanced stats (individual xG, shots, hits, blocks, giveaways / takeaways,
 faceoffs, TOI by strength, on-ice 5v5 xGF%, CF%) for skaters and goalies (GSAx); and game awards (three stars by
 game score, top xG, best line).
+Every page also carries `tape_pre`, the two clubs' tale of the tape going into the game (see tape_pre below).
 """
 from __future__ import annotations
 
+import bisect
 import hashlib
 import json
 import math
@@ -230,14 +232,124 @@ def game_score_skater(r: dict) -> float:
             + 0.15 * f("gf_5v5") - 0.15 * f("ga_5v5"))
 
 
+# ---------------------------------------------------------------------------------------------- going in (tape_pre)
+
+# The no-look-ahead rule for game pages (13 Nov 2026): a game that has started compares the two clubs going in, never
+# with today's season numbers (which count the game itself and everything after it). The game file's `tape_pre` holds
+# the comparison rows: {"before": the start, "source": "snapshot" | "computed", "home" / "away": {"gp", "rating",
+# "xgf_pct5", "xgf_g", "xga_g", "gf_g", "ga_g"}, "rating_asof"?}. While the game is upcoming every build writes the
+# snapshot; once it starts the snapshot is kept unchanged (like the frozen pre-game forecast). A game that started
+# before snapshots were written gets the rows computed going in ("computed"); the front end drops the rows when the
+# file has neither.
+TAPE_VERSION = 1                     # in the current season's page signatures: one rewrite backfills every page
+TAPE_FROM = 20262027                 # the first season whose page signatures carry it (earlier seasons keep theirs)
+_TAPE_SUMS = ("gf_all", "ga_all", "xgf_all", "xga_all", "xgf_5v5", "xga_5v5")
+
+
+def started(g: dict, now: str | None = None) -> bool:
+    """A game that has begun: live or final in the store, or its start time passed (a postponement aside)."""
+    st = g.get("status")
+    if st in ("live", "final"):
+        return True
+    if st == "postponed":
+        return False
+    s = str(g.get("start") or "")
+    return bool(s and now and s <= now)
+
+
+class GoingIn:
+    """Each club's tape rows going into a game: sums over its regular-season games final before the start, from the
+    season's team-game table (the columns and per-game rates of teams.unit_ratings), so a game never counts itself or
+    anything after it. The rating: the published one (`ratings_now`, the snapshot of an upcoming game), else the weekly
+    rating history's point for the game's week (`rating_hist`, rating_history.py: each Monday's point fits only games
+    dated before it)."""
+
+    def __init__(self, ctx, tg: pd.DataFrame, ratings_now: dict | None = None, rating_hist: dict | None = None):
+        self.ratings_now = ratings_now or {}
+        self.hist = rating_hist if isinstance(rating_hist, dict) and rating_hist.get("ok") and rating_hist.get("weeks") else None
+        self.by: dict[str, tuple[list[str], np.ndarray]] = {}
+        if tg is None or not len(tg) or not all(c in tg for c in _TAPE_SUMS):
+            return
+        T = tg[(tg["gt"] == "REG").to_numpy()] if "gt" in tg else tg
+        meta = {gid: (str(g.get("start") or g.get("date") or ""), g.get("status") == "final") for gid, g in ctx.games.items()}
+        when = np.array([meta.get(str(x), ("", False))[0] for x in T["game_id"]], dtype=object)
+        fin = np.array([meta.get(str(x), ("", False))[1] for x in T["game_id"]], dtype=bool)
+        T = T.assign(_t=when)[fin & (when != "")]
+        for team, D in T.groupby("team"):
+            D = D.sort_values("_t")
+            cs = np.vstack([np.zeros(len(_TAPE_SUMS)), np.cumsum(D[list(_TAPE_SUMS)].to_numpy(float), axis=0)])
+            self.by[str(team)] = (D["_t"].tolist(), cs)
+
+    def side(self, team: str, before: str) -> dict | None:
+        x = self.by.get(str(team))
+        if x is None:
+            return None
+        n = bisect.bisect_left(x[0], before)
+        if n == 0:
+            return {"gp": 0}
+        gf, ga, xf, xa, xf5, xa5 = (float(v) for v in x[1][n])
+        return {"gp": n, "xgf_pct5": an.rnd(xf5 / (xf5 + xa5), 3) if xf5 + xa5 else None, "xgf_g": an.rnd(xf / n, 3),
+                "xga_g": an.rnd(xa / n, 3), "gf_g": an.rnd(gf / n, 3), "ga_g": an.rnd(ga / n, 3)}
+
+    def hist_rating(self, team: str, day: str) -> tuple[float | None, str | None]:
+        """The rating history's point for the week holding `day` (the last Monday on or before it)."""
+        if not self.hist or not day:
+            return None, None
+        wk = [w for w in self.hist["weeks"] if w <= day[:10]]
+        vals = (self.hist.get("teams") or {}).get(str(team)) or []
+        if not wk or len(vals) < len(wk):
+            return None, None
+        return an.rnd(vals[len(wk) - 1], 3), wk[-1]
+
+    def rows(self, g: dict, source: str) -> dict | None:
+        before = str(g.get("start") or g.get("date") or "")
+        if not before or not self.by:
+            return None
+        out: dict = {"before": before, "source": source}
+        asof = None
+        for side in ("home", "away"):
+            t = g.get(side)
+            r = self.side(t, before) if t else None
+            if r is None:
+                return None
+            if source == "snapshot":
+                r["rating"] = an.rnd(self.ratings_now.get(t), 3)
+            else:
+                r["rating"], asof = self.hist_rating(t, str(g.get("date") or before))
+            out[side] = r
+        if source != "snapshot" and asof:
+            out["rating_asof"] = asof
+        return out
+
+
+def tape_pre(gi: GoingIn | None, g: dict, old: dict | None, now: str | None) -> dict | None:
+    """The game file's tape_pre: the snapshot while the game is upcoming; once it has started, the snapshot written
+    before the start, kept unchanged while it counts the same games as the rows computed going in (a snapshot left
+    behind by a missed build or a late play-by-play is replaced), else the computed rows; None when neither exists."""
+    if gi is None:
+        return (old or {}).get("tape_pre") if started(g, now) else None
+    if not started(g, now):
+        return gi.rows(g, "snapshot")
+    comp = gi.rows(g, "computed")
+    prev = (old or {}).get("tape_pre")
+    if isinstance(prev, dict) and isinstance(prev.get("home"), dict) and isinstance(prev.get("away"), dict):
+        if comp is None or all((prev[s] or {}).get("gp") == comp[s].get("gp") for s in ("home", "away")):
+            return prev
+    return comp
+
+
 def build_page(ctx, g: dict, evg: pd.DataFrame | None, stg: pd.DataFrame | None, pgg: pd.DataFrame | None, ggg: pd.DataFrame | None,
-               card_: dict, pregame: dict | None, old: dict | None, pos: dict) -> dict:
+               card_: dict, pregame: dict | None, old: dict | None, pos: dict, going_in: GoingIn | None = None,
+               now: str | None = None) -> dict:
     gid = g["game_id"]
     home, away = g.get("home"), g.get("away")
     out: dict = {"ok": True, "game_id": gid, "season": ctx.season, "updated_at": an.now(), "card": card_,
                  "venue": g.get("venue"), "attendance": g.get("attendance"), "type": g.get("gtype"),
                  "teams": {t: {"abbr": t, "name": ctx.name(t), "colour": (ctx.teams.get(t) or {}).get("colour")} for t in (home, away) if t},
                  "pregame": pregame, "xg_source": ctx.xg_source}
+    tp = tape_pre(going_in, g, old, now or an.now())
+    if tp:
+        out["tape_pre"] = tp
     have_ev = evg is not None and len(evg)
     if not have_ev and old and old.get("ok") and old.get("shots"):
         # never downgrade: keep the event-level blocks of a page built where the events were on disk

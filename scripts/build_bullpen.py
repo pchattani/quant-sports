@@ -30,7 +30,9 @@ Game pages are written for each level's --game-page-seasons most recent seasons 
 changed (status, score, lines, lineups, pitches in the table, model versions) plus every not-final game of the
 current season within the pricing window; --all-games rebuilds every page of those seasons. A page is never
 downgraded: when the pitch table for its game is not on this machine (CI holds only the current season's) the old
-page's pitch-level blocks are kept, and a frozen pre-game price is carried into the live and final page.
+page's pitch-level blocks are kept, and a frozen pre-game price is carried into the live and final page. Each page
+carries tape_pre, the clubs going into the game (written while it is upcoming, kept once it starts:
+analytics/games.py); the current season's older pages get theirs once from _tape_backfill.
 
 Memory: one season's pitches at a time (column subsets, chunked aggregation); game pages load their pitches in
 batches pushed down to Parquet.
@@ -273,8 +275,10 @@ def build_season(b: Build, level: str, season: int, full: bool, cfg: dict, share
     # game pages
     pages = manifest.get("games") or {}
     pages_kept = not current and not ctx.has_pitches() and (sdir / "games").exists() and not cfg["all_games"]
+    tape = {"done": manifest.get("tape")}
     if season in shared["page_seasons"] and not pages_kept:
-        pages = b.step(f"game pages {level} {season}", lambda: game_pages(b, ctx, cfg, manifest, prices, sched, pit, ump), pages) or pages
+        pages = b.step(f"game pages {level} {season}", lambda: game_pages(b, ctx, cfg, manifest, prices, sched, pit, ump, tms, tape),
+                       pages) or pages
     if full and current and level == "mlb":
         b.write_or_fail(d + "markets.json", f"markets {level} {season}",
                         lambda: SN.markets_payload(ctx, sim, (awards or {}).get("awards"), prices, (spl or {}).get("postseason", {}) and
@@ -304,6 +308,8 @@ def build_season(b: Build, level: str, season: int, full: bool, cfg: dict, share
         out["hit_cat"], out["pit_cat"] = hit, pit
     manifest = {"sig": sig, "built_at": _now(), "full": full, "phase": ctx.phase, "games": pages, "prices": frozen, "sim_prices": sim_ledger,
                 "model_errors": ctx.model_errors, "timings": {k: round(v, 1) for k, v in ctx.timings.items()}}
+    if tape.get("done"):
+        manifest["tape"] = tape["done"]                          # the going-in backfill ran for this season
     b.step(f"manifest {level} {season}", lambda: b.write(d + "manifest.json", manifest))
     for k, v in ctx.timings.items():
         b.timings[f"{level} {season} {k}"] = v
@@ -443,10 +449,16 @@ def schedule(ctx, prices: dict, frozen: dict, markets: dict | None) -> dict:
     return {"ok": True, "level": ctx.level, "season": ctx.season, "updated_at": an.now(), "games": cards}
 
 
-def game_pages(b: Build, ctx, cfg: dict, manifest: dict, prices: dict, sched: dict | None, pit: dict | None, ump: dict | None) -> dict:
+def game_pages(b: Build, ctx, cfg: dict, manifest: dict, prices: dict, sched: dict | None, pit: dict | None, ump: dict | None,
+               tms: dict | None = None, tape: dict | None = None) -> dict:
     from oddsmarkets.baseball.analytics import games as GM
     from oddsmarkets.baseball.analytics import umpires as UM
     old_sigs = dict(manifest.get("games") or {})
+    # each club going into each game (the page's tape_pre): runs a game from the results, the snapshot's ratings teams.json's
+    ratings_now = {str(t): (v or {}).get("values") or {} for t, v in ((tms or {}).get("teams") or {}).items()} if (tms or {}).get("ok", True) else {}
+    gi = b.step(f"going in {ctx.level} {ctx.season}", lambda: GM.GoingIn(ctx, ratings_now), None)
+    now = _digest_now(cfg["today"]).strftime("%Y-%m-%dT%H:%M:%SZ")
+    tape = tape if tape is not None else {}
     counts = GM.pitch_counts(ctx.level, ctx.season)
     mv = GM.model_versions()
     gdir = b.data / ctx.level / str(ctx.season) / "games"
@@ -473,6 +485,7 @@ def game_pages(b: Build, ctx, cfg: dict, manifest: dict, prices: dict, sched: di
     cutoff = GM.full_pitch_cutoff(ctx)
     if not due:
         b.step(f"slim game pages {ctx.level} {ctx.season}", lambda: _slim_pages(b, ctx, gdir, cutoff, set()), None)
+        _tape_backfill(b, ctx, gdir, gi, now, set(), tape)
         return new_sigs
     umps = UM.profiles(ump)
     re_info = None
@@ -505,14 +518,45 @@ def game_pages(b: Build, ctx, cfg: dict, manifest: dict, prices: dict, sched: di
                 pas = {str(k): v for k, v in pa_all.groupby("game_pk")}
         for gpk in batch:
             written += _one_page(b, ctx, gpk, groups.get(gpk), cards, prices, gdir, arsenal, umps, re_info, parks, fls.get(gpk), pas.get(gpk),
-                                 sigs=new_sigs, cutoff=cutoff)
+                                 sigs=new_sigs, cutoff=cutoff, gi=gi, now=now)
         del gp_all, groups, fls, pas
         gc.collect()
     for gpk in without:
-        written += _one_page(b, ctx, gpk, None, cards, prices, gdir, arsenal, umps, re_info, parks, sigs=new_sigs, cutoff=cutoff)
+        written += _one_page(b, ctx, gpk, None, cards, prices, gdir, arsenal, umps, re_info, parks, sigs=new_sigs, cutoff=cutoff, gi=gi, now=now)
     logger.info("%s %s: %d game pages written", ctx.level, ctx.season, written)
     b.step(f"slim game pages {ctx.level} {ctx.season}", lambda: _slim_pages(b, ctx, gdir, cutoff, set(due)), None)
+    _tape_backfill(b, ctx, gdir, gi, now, set(due), tape)
     return new_sigs
+
+
+def _tape_backfill(b: Build, ctx, gdir: Path, gi, now: str, skip: set, tape: dict) -> None:
+    """Once per season from the current one on (manifest "tape"): give every started game's page that predates the
+    going-in rows its tape_pre, computed going in (games/<gpk>.json read and written back through this build's writer,
+    the page otherwise unchanged). Rebuilding those pages from their pitches instead (a page-signature change) would
+    redo about 2,500 pitch-level pages a level for one small block."""
+    from oddsmarkets.baseball.analytics import games as GM
+    if tape.get("done") == GM.TAPE_VERSION or not getattr(ctx, "current", False) or gi is None:
+        return
+
+    def run():
+        n = 0
+        if gdir.exists():
+            for p in gdir.glob("*.json"):
+                g = ctx.games.get(p.stem)
+                if p.stem in skip or g is None or not GM.started(g, now):
+                    continue
+                page = an.read_json(p)
+                if not isinstance(page, dict) or not page.get("ok") or page.get("tape_pre"):
+                    continue
+                tp = GM.tape_pre(gi, g, page, now)
+                if tp:
+                    page["tape_pre"] = tp
+                    b.write(f"{ctx.level}/{ctx.season}/games/{p.name}", page)
+                    n += 1
+        logger.info("%s %s: %d game pages given the clubs going in", ctx.level, ctx.season, n)
+        return True
+    if b.step(f"going-in backfill {ctx.level} {ctx.season}", run, None):
+        tape["done"] = GM.TAPE_VERSION
 
 
 def _slim_pages(b: Build, ctx, gdir: Path, cutoff: str | None, skip: set) -> int:
@@ -533,7 +577,7 @@ def _slim_pages(b: Build, ctx, gdir: Path, cutoff: str | None, skip: set) -> int
 
 
 def _one_page(b: Build, ctx, gpk: str, gp, cards: dict, prices: dict, gdir: Path, arsenal: dict, umps: dict, re_info, parks,
-              fl=None, pa=None, sigs: dict | None = None, cutoff: str | None = None) -> int:
+              fl=None, pa=None, sigs: dict | None = None, cutoff: str | None = None, gi=None, now: str | None = None) -> int:
     from oddsmarkets.baseball.analytics import games as GM
     g = ctx.games[gpk]
     old = an.read_json(gdir / f"{gpk}.json") if (gdir / f"{gpk}.json").exists() else None
@@ -544,7 +588,7 @@ def _one_page(b: Build, ctx, gpk: str, gp, cards: dict, prices: dict, gdir: Path
                    "priced_at": pr.get("priced_at")}
 
     def build():
-        return GM.build_page(ctx, g, gp, cards.get(gpk) or GM.card(ctx, g), pregame, old, arsenal, umps, re_info, parks, fl, pa)
+        return GM.build_page(ctx, g, gp, cards.get(gpk) or GM.card(ctx, g), pregame, old, arsenal, umps, re_info, parks, fl, pa, gi, now)
     payload = b.step(f"game {ctx.level}/{gpk}", build)
     if payload is None:
         payload = {"ok": False, "reason": "game page could not be built", "gpk": gpk}

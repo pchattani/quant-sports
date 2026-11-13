@@ -23,12 +23,15 @@ Game awards
                          (xPTS + made free throws, both sides)
     stopper              max defensive WPA (credit on plays by the other team: blocks, steals, contests)
     excitement           sum of |dWP| over the game;  comeback = the winner's lowest WP
+
+Every page also carries `tape_pre`, the two teams' tale of the tape going into the game (see tape_pre below).
 """
 from __future__ import annotations
 
+import bisect
 import logging
 import math
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 import numpy as np
@@ -417,6 +420,107 @@ def _safe(fn, default=None):
     except Exception as exc:  # noqa: BLE001
         logger.warning("game block failed: %s", exc, exc_info=True)
         return default
+
+
+# ---------------------------------------------------------------------------------------------- going in (tape_pre)
+
+# The no-look-ahead rule for game pages (13 Nov 2026): a game that has started compares the two teams going in, never
+# with today's season numbers (which count the game itself and everything after it). The game file's `tape_pre` holds
+# the comparison rows: {"before": the tip-off, "source": "snapshot" | "computed", "home" / "away": {"gp", "w", "l",
+# "pct", "pd", "net", "off", "def"}}. While the game is upcoming every page write writes the snapshot (the ratings the
+# page shows, season.json's, and the record and point differential from regular-season games final before the tip);
+# once it has started the snapshot is kept unchanged. A game that started before snapshots were written gets the rows
+# computed going in ("computed": the same ratings fitted on games strictly before the game day, the fit the pre-game
+# forecast of a finished game already uses); the front end drops the rows when the file has neither.
+TAPE_VERSION = 1                     # in the current season's page signatures: one rewrite backfills every page
+
+
+def _ts(v: Any) -> float | None:
+    """An ESPN tip-off ("2026-11-12T00:30Z" or with seconds) as a UTC timestamp."""
+    s = str(v or "").strip()
+    if not s:
+        return None
+    try:
+        d = datetime.fromisoformat(s.replace("Z", "+00:00"))
+        return (d if d.tzinfo else d.replace(tzinfo=timezone.utc)).timestamp()
+    except ValueError:
+        return None
+
+
+def started(g: dict, now: Any = None) -> bool:
+    """A game that has begun: in progress or final in the store, or its tip-off passed (a postponement aside)."""
+    st = g.get("status")
+    if st in ("in", "post"):
+        return True
+    if st != "pre":
+        return False
+    t, n = _ts(g.get("date")), _ts(now)
+    return t is not None and n is not None and t <= n
+
+
+class GoingIn:
+    """Each team's tape rows going into a game: the regular-season record and point differential from games between
+    league members final before the tip (the standings' rule: stype "reg"), never the game itself or a later one, and
+    the ratings (net, off, def): the season's current fit for the snapshot of an upcoming game (`ctx.ratings`, what
+    season.json shows), else the fit on games strictly before the game day (`ctx.ratings_before`)."""
+
+    def __init__(self, ctx: SeasonContext):
+        self.ctx = ctx
+        mem = {str(t) for t in ctx.teams}
+        self.by: dict[str, tuple[list[float], list[tuple[int, int]]]] = {}
+        rows = []
+        for g in ctx.games.values():
+            if g.get("stype") != "reg" or g.get("status") != "post" or g.get("hs") is None or g.get("as") is None:
+                continue
+            h, a, t = str(g.get("home")), str(g.get("away")), _ts(g.get("date"))
+            if h not in mem or a not in mem or t is None:
+                continue
+            hs, as_ = int(g["hs"]), int(g["as"])
+            rows.append((t, h, hs - as_))
+            rows.append((t, a, as_ - hs))
+        for t, team, m in sorted(rows):
+            ts, res = self.by.setdefault(team, ([], []))
+            ts.append(t)
+            res.append((1 if m > 0 else 0, m))
+
+    def side(self, team: str, before: float) -> dict:
+        ts, res = self.by.get(str(team), ([], []))
+        n = bisect.bisect_left(ts, before)
+        w = sum(r[0] for r in res[:n])
+        return {"gp": n, "w": w, "l": n - w, "pct": round(w / n, 3) if n else None, "pd": int(sum(r[1] for r in res[:n]))}
+
+    def rows(self, g: dict, source: str) -> dict | None:
+        before = _ts(g.get("date"))
+        if before is None:
+            return None
+        if source == "snapshot":
+            rt = (self.ctx.ratings or {}).get("teams") or {}
+        else:
+            d = _day(g)
+            rt = (self.ctx.ratings_before(d) or {}).get("teams") or {} if d is not None else {}
+        out: dict = {"before": g.get("date"), "source": source}
+        for side in ("home", "away"):
+            t = str(g.get(side))
+            r = self.side(t, before)
+            v = rt.get(t) or {}
+            for k in ("net", "off", "def"):
+                r[k] = an.rnd(v.get(k), 2)
+            out[side] = r
+        return out
+
+
+def tape_pre(gi: GoingIn | None, g: dict, old_tape: dict | None, now: Any) -> dict | None:
+    """The game file's tape_pre: the snapshot while the game is upcoming; once it has started, the snapshot written
+    before the tip kept unchanged while it counts the same games as the rows computed going in (a snapshot left behind
+    by a missed build is replaced), else the computed rows; None when neither exists."""
+    if not started(g, now):
+        return gi.rows(g, "snapshot") if gi is not None else None
+    comp = gi.rows(g, "computed") if gi is not None else None
+    prev = old_tape
+    if isinstance(prev, dict) and isinstance(prev.get("home"), dict) and isinstance(prev.get("away"), dict):
+        if comp is None or all((prev[s] or {}).get("gp") == comp[s].get("gp") for s in ("home", "away")):
+            return prev
+    return comp
 
 
 # ---------------------------------------------------------------------------------------------- cards

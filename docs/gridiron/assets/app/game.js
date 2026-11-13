@@ -1,10 +1,11 @@
 /* The Quant Gridiron — the game centre (#/game/<game_id>), on kit v4 "Broadcast" (the Rink game page is the reference).
  * Top: the hero is QK.previewCard, the diagonal split hero (away "at" home in the team colours with records, the clock when live, our chance for the
  * favourite as a big blue number with a how-sure note, the team-colour bar, the market as a quiet labelled reference
- * before kickoff, how the teams match up from the season ratings), then the week, venue, weather, quarterbacks and
+ * before kickoff), then the week, venue, weather, quarterbacks and
  * coaches, the field strip when live and the linescore; beside it the stat tiles, our forecast table (the market a
  * reference column) and, before kickoff, what the game means for each team's playoff chance.
- * Tabs: Preview (projected score, margin and points distributions, tale of the tape, unit matchups, injuries with their
+ * Tabs: Preview (projected score, margin and points distributions, tale of the tape and unit matchups: the season to
+ * date before kickoff, the teams going in once it has started (the game file's tape_pre), injuries with their
  * impact, the week's status changes and the starters out, venue and weather) · Game flow (win probability ours v ESPN
  * with every 4th down graded, scoring and key plays; the drive chart; 4th-down decisions; awards) · Play-by-play
  * (filters, search) · Box score (with EPA and Next Gen Stats columns). Reads <S>/games/<game_id>.json and
@@ -121,9 +122,10 @@ function heroMeta(g) {
   const hc = co.away || co.home ? 'Head coaches: ' + (co.away ? GI.coachLink(co.away) : '?') + ' and ' + (co.home ? GI.coachLink(co.home) : '?') : '';
   return '<div class="gi-hero-meta">' + meta.map(x => '<span>' + x + '</span>').join('') + '</div>' + (qb || hc ? '<div class="gi-hero-meta">' + [qb, hc].filter(Boolean).map(x => '<span>' + x + '</span>').join('') + '</div>' : '');
 }
-/* v4 (Broadcast) hero: QK.previewCard, the diagonal split, with the records and form from the standings, our chance (the live chance once it
-   starts, our pre-game call after it ends), a how-sure note with the projected score, the market as a quiet reference
-   line before kickoff (game detail is one of the two places it may appear) and how the teams match up so far. */
+/* v4 (Broadcast) hero: QK.previewCard, the diagonal split, with the records and form from the standings (going in once
+   it has started), our chance (the live chance once it starts, our pre-game call after it ends), a how-sure note with the
+   projected score and the market as a quiet reference line before kickoff (game detail is one of the two places it may
+   appear); how the teams match up lives in the tale of the tape (Preview tab). */
 function hero(g, pre, season, recs) {
   const st = GI.gameState(g), live = st === 'live' || st === 'half', fin = st === 'final';
   const m = (pre && pre.model) || g.model || {};
@@ -132,7 +134,9 @@ function hero(g, pre, season, recs) {
   ((season && season.standings) || []).forEach(d => (d.teams || []).forEach(t => { rows[GI.canonTeam(t.team)] = t; }));
   const cols = GI.pair(g.away, g.home);
   const G = GI.qkGame(Object.assign({}, g, { model: m }), rows);
-  /* round 11: recs, the records going in (formGoingIn), replace today's standings once the game has started */
+  /* round 11: recs, the records going in (formGoingIn), replace today's standings once the game has started; until they
+     arrive a started game shows no record or form (today's would count the game itself) */
+  if (st !== 'pre') { G.away.record = ''; G.home.record = ''; G.away.form = ''; G.home.form = ''; }
   if (recs) { if (recs[GI.canonTeam(g.away)]) G.away.record = recs[GI.canonTeam(g.away)]; if (recs[GI.canonTeam(g.home)]) G.home.record = recs[GI.canonTeam(g.home)]; }
   /* v4: the diagonal hero takes the raw kit colours, the alternates and the full names (QK.color.blockPair makes the
      blocks and resolves a clash); the lifted pair `cols` stays for the factors and the charts */
@@ -238,10 +242,16 @@ function forecastBlock(g, pre) {
     rows.map((r, i) => '<tr><td>' + esc(r[0]) + '</td><td class="num gi-ours-cell">' + esc(r[1]) + '</td><td class="num qk-muted" style="text-align:left"' + (i === 0 && mkSrc ? ' data-tip="' + esc(mkSrc) + '" tabindex="0"' : '') + '>' + esc(r[2]) + '</td></tr>').join('') + '</tbody></table></div>' +
     (mkSrc ? '<p class="gi-cap">Market: ' + esc(mkSrc) + '.</p>' : '');
 }
-/* Tale of the tape: the two teams' season profile from the team-strength ratings (season.json ratings[team].values). */
-function tape(season, g) {
+/* Tale of the tape: the two teams' profile, [away, home] value objects: before kickoff the season to date (team-strength
+   ratings and EPA units, season.json ratings[team].values: seasonSides), once it has started the teams going in (the
+   game file's tape_pre). */
+function seasonSides(season, g) {
   const R = (season && season.ratings) || {};
-  const a = (R[g.away] || {}).values || {}, h = (R[g.home] || {}).values || {};
+  return [(R[g.away] || {}).values || {}, (R[g.home] || {}).values || {}];
+}
+function tape(sides, g) {
+  if (!sides) return '';
+  const a = sides[0] || {}, h = sides[1] || {};
   const rows = [
     { label: 'Team rating (points a game)', a: a.rating, b: h.rating, fmt: v => GI.signed(v, 1), tip: 'Our rating: points a game better than an average team on a neutral field' },
     { label: 'Offence rating', a: a.off_rating, b: h.off_rating, fmt: v => GI.signed(v, 1) },
@@ -328,6 +338,9 @@ function rankPct(r) { return isNum(r) ? Math.max(2, Math.min(100, (33 - Number(r
 function matchupsBlock(g) {
   const m = g.matchups;
   if (!m || Array.isArray(m) || !(m.home_off || m.away_off)) return '';
+  /* the no-look-ahead rule: once the game has started only the matchups going in (written with tape_pre) are shown */
+  const gi = GI.gameState(g) === 'pre' ? null : GI.goingIn(g);
+  if (GI.gameState(g) !== 'pre' && !(gi && m.going_in)) return '';
   const rows = [];
   [['away_off', g.away, g.home], ['home_off', g.home, g.away]].forEach(x => {
     const o = m[x[0]];
@@ -335,7 +348,7 @@ function matchupsBlock(g) {
     ['pass', 'rush'].forEach(u => { const v = o[u]; if (v) rows.push({ label: GI.teamAbbr(x[1]) + ' ' + u + ' O v ' + GI.teamAbbr(x[2]) + ' ' + u + ' D', off: v.off, offR: v.off_rank, def: v.def, defR: v.def_rank, t: x[1], o: x[2] }); });
   });
   if (!rows.length) return '';
-  return GI.card('Unit matchups', 'opponent-adjusted EPA per play and league rank (1 = best)', GI.chartBox('gm-units', Math.max(200, rows.length * 44 + 40), 'Unit matchups by league percentile') +
+  return GI.card(gi ? 'Unit matchups going in' : 'Unit matchups', (gi ? 'Before ' + esc(GI.goingDate(gi.before)) + ': ' : '') + 'opponent-adjusted EPA per play and league rank (1 = best)', GI.chartBox('gm-units', Math.max(200, rows.length * 44 + 40), 'Unit matchups by league percentile') +
     GI.tableHTML([{ label: 'Matchup', sortable: false }, { label: 'Offence', align: 'right', sortable: false }, { label: 'Rank', align: 'right', sortable: false }, { label: 'Defence allows', align: 'right', sortable: false }, { label: 'Rank', align: 'right', sortable: false }],
       rows.map(r => [esc(r.label), { html: GI.signed(r.off, 3) }, { html: GI.ordinal(r.offR) }, { html: GI.signed(r.def, 3) }, { html: GI.ordinal(r.defR) }])), { span: 12 }) +
     '<script type="application/json" id="gm-units-data">' + JSON.stringify(rows).replace(/</g, '\\u003c') + '</script>';
@@ -375,12 +388,18 @@ function previewTab(g, pre) {
       exp: isNum(GI.homeLine(m)) ? -GI.homeLine(m) : null, actual: GI.isFinal(g) && isNum(g.hs) ? g.hs - g.as : null, unit: 'pts', xName: GI.teamAbbr(g.home) + ' margin (pts)', yName: 'Chance' });
     if (m.total_dist && root.querySelector('#gm-td')) GI.ch.distBars('gm-td', m.total_dist, { exp: m.total, actual: GI.isFinal(g) && isNum(g.hs) ? Number(g.hs) + Number(g.as) : null, unit: 'pts', xName: 'Total points', yName: 'Chance' });
     drawUnits(root);
-    /* tale of the tape: the season ratings */
+    /* tale of the tape: before kickoff the season ratings; once started the teams going in (tape_pre), or nothing */
+    if (GI.gameState(g) !== 'pre') {
+      const gi = GI.goingIn(g), n = root.querySelector('#gm-tape');
+      const tp = gi ? tape([gi.away, gi.home], g) : '';
+      if (n && tp) n.innerHTML = GI.card(GI.goingTitle(gi), esc(GI.goingSub(gi, g.away, g.home)) + '. The stronger side of each bar is solid.', tp);
+      return;
+    }
     GI.loadYear('season.json', GI.gameSeason(g.game_id)).then(season => {
       const n = root.querySelector('#gm-tape');
       if (!n || !n.isConnected || !GI.ok(season)) return;
-      const tp = tape(season, g);
-      if (tp) n.innerHTML = GI.card('Tale of the tape', 'Season so far, opponent-adjusted: the stronger side of each bar is solid', tp);
+      const tp = tape(seasonSides(season, g), g);
+      if (tp) n.innerHTML = GI.card('Tale of the tape', 'Season to date, opponent-adjusted: the stronger side of each bar is solid', tp);
     });
   } };
 }

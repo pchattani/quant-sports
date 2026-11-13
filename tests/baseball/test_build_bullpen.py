@@ -221,3 +221,95 @@ def test_featured_prefers_the_big_game_over_the_closest(built):
     ids = [r["id"] for r in f["today"]]
     assert ids[:1] == ["2"] and "3" not in ids and "1" not in ids
     assert any("Game 7" in w for w in f["today"][0]["why"])
+
+
+def test_tape_pre_going_in_unit():
+    """tape_pre (the no-look-ahead rule for game pages): the computed rows count only regular-season games final before
+    the start (never the game itself or a later one, nor a postseason game); an upcoming game gets the snapshot with the
+    published ratings; once it starts the snapshot is kept unchanged, unless it counts other games than the rows going
+    in."""
+    from oddsmarkets.baseball.analytics import games as GM
+
+    class Ctx:
+        games = {"1": {"gpk": "1", "start": "2026-04-01T17:05:00Z", "status": "final", "gtype": "R", "home": "10", "away": "20", "hs": 5, "as": 1},
+                 "2": {"gpk": "2", "start": "2026-04-02T17:05:00Z", "status": "final", "gtype": "R", "home": "30", "away": "10", "hs": 2, "as": 3},
+                 "3": {"gpk": "3", "start": "2026-04-03T17:05:00Z", "status": "final", "gtype": "R", "home": "10", "away": "30", "hs": 0, "as": 9},
+                 "4": {"gpk": "4", "start": "2026-10-03T17:05:00Z", "status": "final", "gtype": "D", "home": "10", "away": "20", "hs": 4, "as": 4},
+                 "5": {"gpk": "5", "start": "2026-04-05T17:05:00Z", "status": "pre", "gtype": "R", "home": "20", "away": "10", "hs": None, "as": None}}
+    gi = GM.GoingIn(Ctx, {"10": {"rating": 0.42, "off_rpg": 0.3, "pit_rpg": 0.1, "def_rpg": 0.02}, "20": {"rating": -0.1}})
+    # game 3, final: club 10 going in = games 1 and 2 only (8 scored, 3 allowed), not game 3 (0-9) nor the postseason
+    c = gi.rows(Ctx.games["3"], "computed")
+    assert c["home"] == {"gp": 2, "rs_g": 4.0, "ra_g": 1.5} and c["away"]["gp"] == 1 and c["before"] == "2026-04-03T17:05:00Z"
+    assert "rating" not in c["home"]                    # no rating history: computed rows carry runs only
+    assert gi.rows(Ctx.games["1"], "computed")["home"] == {"gp": 0}
+    # game 5, upcoming: the snapshot (three games of club 10, the published ratings)
+    now = "2026-04-04T12:00:00Z"
+    snap = GM.tape_pre(gi, Ctx.games["5"], None, now)
+    assert snap["source"] == "snapshot" and snap["away"]["gp"] == 3 and snap["away"]["rating"] == 0.42 and snap["away"]["pitch"] == 0.1
+    # it starts: the snapshot is kept unchanged (a marker proves it is not recomputed), live or final
+    snap["away"]["rating"] = 9.99
+    for st in ("live", "final"):
+        assert GM.tape_pre(gi, dict(Ctx.games["5"], status=st), {"tape_pre": snap}, "2026-04-05T20:00:00Z") is snap
+    # first pitch passed counts as started before the store says so; a postponement does not
+    assert GM.tape_pre(gi, Ctx.games["5"], {"tape_pre": snap}, "2026-04-05T20:00:00Z") is snap
+    assert GM.tape_pre(gi, dict(Ctx.games["5"], status="postponed"), {"tape_pre": snap}, "2026-04-05T20:00:00Z")["away"]["rating"] == 0.42
+    # a snapshot counting other games than the rows going in (a missed build) gives way to the computed rows
+    stale = {"before": snap["before"], "source": "snapshot", "home": {"gp": 0}, "away": {"gp": 1, "rating": 9.99}}
+    got = GM.tape_pre(gi, dict(Ctx.games["5"], status="final"), {"tape_pre": stale}, "2026-04-05T20:00:00Z")
+    assert got["source"] == "computed" and got["away"] == {"gp": 3, "rs_g": 2.667, "ra_g": 4.0}
+    # no table and no snapshot: nothing (the page drops the rows)
+    assert GM.tape_pre(None, dict(Ctx.games["5"], status="final"), None, now) is None
+
+
+def test_tape_pre_in_game_pages(synthetic_world):
+    """End to end: a final game's page carries the rows going in (its own result left out); an upcoming game's page the
+    snapshot, kept unchanged once it is played; a page that predates the rows gets them from the once-a-season
+    backfill, the rest of the page untouched."""
+    bb = _load("build_bullpen")
+    roots, store = synthetic_world["roots"], synthetic_world["store"]
+    s = roots["data"] / "mlb" / "2025"
+    g0 = store["games"][next(iter(store["games"]))]
+    nxt = {**g0, "gpk": 899999, "date": "2025-10-02", "start": "2025-10-02T23:05:00Z", "status": "pre", "hs": None, "as": None,
+           "decisions": None, "innings": None}
+    store["games"]["899999"] = nxt
+    (s / "store.json").write_text(json.dumps(store, default=str), encoding="utf-8")
+    from oddsmarkets.baseball import analytics as an
+    an._STORES.clear()
+    assert bb.main(_args(roots, "--seasons", "2025", "--no-careers")) == 0
+    fin = sorted((g for g in store["games"].values() if g["status"] == "final"), key=lambda g: (g["date"], str(g["gpk"])))
+    last = fin[-1]
+    tp = _read(s / "games" / f"{last['gpk']}.json")["tape_pre"]
+    h = str(last["home"])
+    prior = [g for g in fin if g["date"] < last["date"] and h in (str(g["home"]), str(g["away"]))]
+    assert tp["source"] == "computed" and tp["home"]["gp"] == len(prior)
+    rs = sum(g["hs"] if str(g["home"]) == h else g["as"] for g in prior)
+    assert abs(tp["home"]["rs_g"] - rs / len(prior)) < 1e-3
+    p = s / "games" / "899999.json"
+    snap = _read(p)["tape_pre"]
+    hn = str(nxt["home"])
+    assert snap["source"] == "snapshot" and snap["home"]["gp"] == len([g for g in fin if hn in (str(g["home"]), str(g["away"]))])
+    assert _read(s / "manifest.json").get("tape") == 1
+    # the game is played: its page is rewritten (the status moved) and keeps the snapshot as written (marker)
+    doc = _read(p)
+    doc["tape_pre"]["home"]["rs_g"] = 99.0
+    p.write_text(json.dumps(doc), encoding="utf-8")
+    store["games"]["899999"].update(status="final", hs=4, **{"as": 3})
+    # and a finished page from before the rows: the backfill (once a season) gives it them
+    q = s / "games" / f"{fin[30]['gpk']}.json"
+    old = _read(q)
+    old.pop("tape_pre")
+    q.write_text(json.dumps(old), encoding="utf-8")
+    m = _read(s / "manifest.json")
+    m.pop("tape")
+    (s / "manifest.json").write_text(json.dumps(m), encoding="utf-8")
+    (s / "store.json").write_text(json.dumps(store, default=str), encoding="utf-8")
+    an._STORES.clear()
+    args = _args(roots, "--seasons", "2025", "--no-careers")
+    args[args.index("2025-10-01")] = "2025-10-03"
+    assert bb.main(args) == 0
+    kept = _read(p)["tape_pre"]
+    assert kept["home"]["rs_g"] == 99.0 and kept["source"] == "snapshot" and kept["home"]["gp"] == snap["home"]["gp"]
+    back = _read(q)
+    assert back["tape_pre"]["source"] == "computed" and back["tape_pre"]["home"]["gp"] >= 0
+    assert {k: v for k, v in back.items() if k != "tape_pre"} == old
+    assert _read(s / "manifest.json").get("tape") == 1

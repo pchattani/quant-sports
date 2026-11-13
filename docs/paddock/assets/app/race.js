@@ -289,7 +289,7 @@ function overviewDone(host, race, season, teams) {
   PD.grid(
     PD.card('Result', (race.sprint && race.sprint.length ? 'Sprint result below. ' : '') + (race.updated_at ? 'Race file as of ' + esc(PD.asOf(race.updated_at)) + '.' : ''), '<div id="rc-res"></div>', { span: 7, flush: true }) +
     PD.card('Forecast v result', 'Where we expected each driver to finish (blue) against where they did (ring).', PD.chartBox('rc-eva', 560), { span: 5 }) +
-    (tp ? PD.card('Tale of the tape: ' + esc(PD.driverSurname(res[0].driver)) + ' v ' + esc(PD.driverSurname(res[1].driver)), 'The top two: our numbers before the race, then the race itself. The better side of each row is solid.', tp, { span: 6 }) : '') +
+    (tp ? PD.card('Tale of the tape: ' + esc(PD.driverSurname(res[0].driver)) + ' v ' + esc(PD.driverSurname(res[1].driver)), 'The top two: going in (our numbers before ' + esc(PD.fmtDate(race.date, { year: false, weekday: false })) + '), then in this race. The better side of each row is solid.', tp, { span: 6 }) : '') +
     PD.card('Win chance through the race', '<span id="rc-wp-s">Our chance of winning after every lap.</span>', PD.chartBox('rc-wp', tp ? 540 : 380, 'Win chance after every lap'), { span: tp ? 6 : 12 }) +
     PD.card('Positions lap by lap', 'Team colours; a team’s second driver is dashed. Bands: safety car (amber), red flag.', PD.chartBox('rc-pos-mini', 420), { span: 12, foot: '<a href="' + PD.raceHref(race.year, race.round, 'laps') + '">Gaps, lap times, overtakes and race control →</a>' }) +
     (race.sprint && race.sprint.length ? PD.card('Sprint result', '', '<div id="rc-sprint"></div>', { span: 12, flush: true }) : ''), 'pd-mt') +
@@ -325,8 +325,9 @@ function sureDone(pre, post, fav, winner) {
 
 /* The tale of the tape for a finished race (QK.tape, the kit's team-colour blocks; team-mates: the second driver on
    slate with the constructor colour as the rule): the winner against the runner-up, first on our numbers before the
-   race (win chance before and after qualifying, expected finish, grid), then on the race (finish, corrected pace, laps
-   led, overtakes, fastest lap, points against our expectation). Everything from the race file. */
+   race (win chance before and after qualifying, expected finish, grid: "Going in", walk-forward, nothing from the race),
+   then on the race itself ("In this race": corrected pace, laps led, overtakes, fastest lap, points against our
+   expectation). Everything from the race file. */
 function tapeDone(race, res, teams, pre, post) {
   var w = res[0], r2 = res[1];
   if (!w || !r2 || w.pos !== 1 || r2.pos !== 2) return '';
@@ -344,12 +345,12 @@ function tapeDone(race, res, teams, pre, post) {
   var vexp = function (d) { var e = eva[d]; return e && isNum(e.points) && isNum(e.exp_points) ? e.points - e.exp_points : null; };
   var row = function (label, a, b, better, f, tip) { return { label: label, a: a, b: b, better: better, fmt: f, tip: tip }; };
   return QK.tape({ left: A, right: B, wins: true, groups: [
-    { label: 'Our numbers before the race', rows: [
+    { label: 'Going in · before ' + PD.fmtDate(race.date, { year: false, weekday: false }), rows: [
       row('Win chance, before qualifying', get(pre, w.driver, 'p_win'), get(pre, r2.driver, 'p_win'), 'high', pc, 'Our simulator’s win chance before qualifying'),
       row('Win chance, grid set', get(post, w.driver, 'p_win'), get(post, r2.driver, 'p_win'), 'high', pc, 'Our win chance after qualifying'),
       row('Expected finish', get(ex, w.driver, 'exp_pos'), get(ex, r2.driver, 'exp_pos'), 'low', P, 'Our average finishing position across the simulated races'),
       row('Grid', w.grid > 0 ? w.grid : null, r2.grid > 0 ? r2.grid : null, 'low', P)] },
-    { label: 'The race', rows: [
+    { label: 'In this race', rows: [
       row('Race pace v field, s/lap', get(pace, w.driver, 'pace'), get(pace, r2.driver, 'pace'), 'low', function (v) { return isNum(v) ? PD.signed(v, 3) : '—'; }, 'Seconds a lap against the field, corrected for fuel, tyres and traffic (negative is faster)'),
       row('Laps led', led(w.driver), led(r2.driver), 'high', function (v) { return isNum(v) ? String(v) : '—'; }),
       row('Overtakes made', made(w.driver), made(r2.driver), 'high', function (v) { return isNum(v) ? String(v) : '—'; }, 'On-track passes, pit stops and safety-car periods left out (tracked from 2023)'),

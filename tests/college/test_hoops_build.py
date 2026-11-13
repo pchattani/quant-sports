@@ -105,6 +105,42 @@ def test_season_files(built):
     assert set(bx["names"]) <= {str(r[0]) for r in bx["players"]} | {str(x[0]) for x in bx["dnp"]}
 
 
+def test_game_pages_going_in_tape_and_line_score(built):
+    """No look-ahead on a played game's page (13 Nov 2026): `tape_pre` holds each team's ratings from the games on
+    earlier days only (the walk-forward's own pregame ratings for that game) and its record from those games; absent
+    before the start; `line` passes the store's line score through."""
+    out, _res = built
+    ctx = B.context("mbb")
+    s = 2026
+    tab, W = ctx["state"]["tabs"][s], ctx["state"]["walks"][s]
+    gi = {g: i for i, g in enumerate(tab["g"]["gid"])}
+    st = D.load("mbb", s)
+    pages = [load(p) for p in sorted((out / "mbb" / str(s) / "games").glob("*.json"))]
+    assert pages and all(p.get("tape_pre") and p["tape_pre"]["teams"] for p in pages)
+    checked = 0
+    for p in pages:
+        tp = p["tape_pre"]
+        day = D.local_day(p["date"])
+        assert tp["day"] == day.isoformat()
+        k = gi.get(p["id"])
+        for side, key in (("home", "net_h"), ("away", "net_a")):
+            row = tp["teams"].get(p[side])
+            if row is not None and k is not None:
+                assert row["rating"] == pytest.approx(W[key][k], abs=0.006)
+                checked += 1
+        for t, row in tp["teams"].items():
+            n = sum(1 for g in st["games"].values() if g.get("status") == "post" and g.get("stype") in D.COUNTED
+                    and g.get("hs") is not None and t in (str(g["home"]), str(g["away"]))
+                    and D.local_day(g["date"]) < day)
+            assert row["w"] + row["l"] == n
+    assert checked
+    g = dict(next(g for g in st["games"].values() if g.get("status") == "post"))
+    g["line"] = {"home": [30, 41], "away": [33, 29]}
+    assert B.game_page(ctx, s, g)["line"] == g["line"]
+    assert B.line_score({"line": {"home": [30], "away": []}}) is None
+    assert B.tape_pre(ctx, s, dict(g, status="pre")) is None
+
+
 def test_lab_rows_carry_role_and_qualified(built):
     """The Lab's "Compare within: Position" (guards / wings / bigs, the spec's peer groups): lab_players.json rows carry
     the role and the qualified flag players.json has."""

@@ -117,10 +117,11 @@ function boxTable(node, L, g, tid, S) {
 
 /* v4 (Broadcast) hero: QK.previewCard, the diagonal split — away "at" home with records, the clock when live, our
    chance for the favourite, a plain-English note (the margin and total we expect), the market as a quiet reference
-   line before tip-off (game detail is one of the two places it may appear), and how the teams match up. The hero
+   line before tip-off (game detail is one of the two places it may appear), and how the teams match up (the season to
+   date before tip-off; once the game has started, the teams going in: the game file's tape_pre, U.goingIn). The hero
    takes the raw kit colours, the alternates and the full names (QK.color.blockPair makes them blocks with white type
    and resolves a clash; the city line comes from the full name); the charts keep the lifted pair [ca, ch]. */
-function headHTML(L, g, S, season) {
+function headHTML(L, g, S, season, sch) {
   const st = U.status(g);
   const fin = st === 'final', live = st === 'live', pre = st === 'pre';
   const pc = U.pair(L, g.away, g.home), ca = pc[0], ch = pc[1];
@@ -130,7 +131,9 @@ function headHTML(L, g, S, season) {
   const m = (g.pregame || {}).model || {}, mk = (g.pregame || {}).market || (card && card.market) || {};
   const wpl = ((g.wp || {}).model || []);
   const pLive = live && wpl.length ? wpl[wpl.length - 1][1] : null;
-  const recs = U.records(season);
+  /* the records: today's standings before tip-off; once the game has started, the regular-season records going in
+     (the season's schedule, games final before the tip), or none (today's would count this game and the ones after) */
+  const recs = pre ? U.records(season) : U.recordsBefore(sch, g);
   const rec = t => recs[String(t)] || '';
   const A = Object.assign(U.team(L, g.away), { colour: HW.teamColourRaw(L, g.away) || ca, record: rec(g.away) }), H = Object.assign(U.team(L, g.home), { colour: HW.teamColourRaw(L, g.home) || ch, record: rec(g.home) });
   const tag = g.series && (g.series.summary || g.series.round) ? (g.series.summary || g.series.round) + (g.series.game ? ' · Game ' + g.series.game : '') : (g.stype && g.stype !== 'reg' ? HW.stypeLabel(g.stype) : '');
@@ -142,13 +145,10 @@ function headHTML(L, g, S, season) {
     period: isNum(g.period) ? Number(g.period) : (isNum(g.periods) ? Number(g.periods) : null), clock: g.clock, note: fin && Number(g.periods) > 4 ? 'OT' : '' };
   const G = QK.settle ? QK.settle(G0) : G0;
   if (G.status === 'awaiting') G.market_home = null;
-  const R = (season && season.ratings) || {};
-  const ra = R[String(g.away)] || {}, rh = R[String(g.home)] || {};
-  const fx = [];
-  const add = (label, a, b, f, low) => { if (isNum(a) && isNum(b)) fx.push({ label: label, a: f(a), b: f(b), better: Math.abs(a - b) < 1e-9 ? null : ((a > b) !== !!low ? 'a' : 'b') }); };
-  add('Net rating, per 100 trips', ra.net, rh.net, v => U.signed(v, 1));
-  add('Points scored per 100', ra.off, rh.off, v => U.f(v, 1));
-  add('Points allowed per 100', ra.def, rh.def, v => U.f(v, 1), true);
+  /* the no-look-ahead rule: before tip-off the season to date; once started, the teams going in or no rows */
+  const gi = pre ? null : U.goingIn(g);
+  const sides = pre ? seasonSides(L, g, season) : gi ? [gi.away, gi.home] : null;
+  const fx = sides ? U.clubRows(sides[0], sides[1]) : [];
   const extra = [];
   if (pre && isNum(m.margin)) extra.push('we expect ' + esc(HW.teamAbbr(L, m.margin >= 0 ? g.home : g.away)) + ' by about ' + Math.max(1, Math.round(Math.abs(m.margin))) + (isNum(m.sd) ? ', give or take ' + Math.round(m.sd) + ' points' : ''));
   if (pre && isNum(m.total)) extra.push('about ' + Math.round(m.total) + ' points in all');
@@ -156,9 +156,19 @@ function headHTML(L, g, S, season) {
   const meta = [HW.fmtDate(g.date, { time: true }), g.venue && typeof g.venue === 'object' && g.venue.city ? [g.venue.name, g.venue.city].filter(Boolean).join(', ') : '',
     isNum(g.attendance) && g.attendance > 0 ? Number(g.attendance).toLocaleString('en-GB') + ' fans' : ''].filter(Boolean);
   return '<div class="hw-preview">' + QK.previewCard(G, { kicker: tag ? (tag.indexOf(HW.leagueName(L)) === 0 ? tag : HW.leagueName(L) + ' · ' + tag) : HW.leagueName(L) + (venue ? ' · ' + venue : ''), nick: t => U.nick(L, t === A ? g.away : g.home), colors: [ca, ch], factors: fx,
-    factorsTitle: 'How they match up this season', noteExtra: extra.length ? 'This time ' + extra.join(', and ') + '.' : '',
+    factorsTitle: gi ? U.goingTitle(gi) : 'How they match up this season', noteExtra: extra.length ? 'This time ' + extra.join(', and ') + '.' : '',
     market: 'quiet' }) +
     '<div class="hw-hero-meta">' + meta.map(x => '<span>' + esc(x) + '</span>').join('') + '</div></div>';
+}
+/* The season to date for both teams, [away, home]: season.json's ratings and the standings' win % and point
+   differential (what an upcoming game compares; a started game reads its tape_pre instead). */
+function seasonSides(L, g, season) {
+  const R = (season && season.ratings) || {};
+  const st = {}; const sd = (season && season.standings) || {};
+  Object.keys(sd).forEach(c => (sd[c] || []).forEach(r => { st[String(r.team)] = r; }));
+  const one = t => { const r = R[String(t)] || {}, x = st[String(t)] || {}, n = (x.w || 0) + (x.l || 0);
+    return { net: r.net, off: r.off, def: r.def, pct: n > 0 ? x.pct : null, pd: n > 0 ? x.pd : null }; };
+  return [one(g.away), one(g.home)];
 }
 
 function pregameKpis(L, g) {
@@ -206,19 +216,17 @@ function forecastTable(L, g) {
     rows.map(r => '<tr><td>' + esc(r[0]) + '</td><td class="num" style="text-align:left;color:var(--ink-1);font-weight:600">' + esc(r[1]) + '</td><td class="num qk-muted" style="text-align:left">' + esc(r[2]) + '</td></tr>').join('') + '</tbody></table></div>';
 }
 
-/* Tale of the tape: the two teams' season profile (season.json ratings and standings). */
-function tape(L, g, season) {
-  const R = (season && season.ratings) || {};
-  const a = R[String(g.away)] || {}, h = R[String(g.home)] || {};
-  const st = {}; const sd = (season && season.standings) || {};
-  Object.keys(sd).forEach(c => (sd[c] || []).forEach(r => { st[String(r.team)] = r; }));
-  const sa = st[String(g.away)] || {}, sh = st[String(g.home)] || {};
+/* Tale of the tape: the two teams' profile, [away, home] value objects {net, off, def, pct, pd} (seasonSides before
+   tip-off, the game file's tape_pre once the game has started). */
+function tape(L, g, sides) {
+  if (!sides) return '';
+  const a = sides[0] || {}, h = sides[1] || {};
   const rows = [
     { label: 'Net rating (per 100 possessions)', a: a.net, b: h.net, fmt: v => U.signed(v, 1), tip: 'Our opponent-adjusted net rating: points per 100 possessions better than an average team' },
     { label: 'Offensive rating', a: a.off, b: h.off, fmt: v => U.f(v, 1), tip: 'Points scored per 100 possessions, opponent-adjusted' },
     { label: 'Defensive rating', a: a.def, b: h.def, fmt: v => U.f(v, 1), better: 'low', tip: 'Points allowed per 100 possessions, opponent-adjusted (lower is better)' },
-    { label: 'Win %', a: sa.w + sa.l > 0 ? sa.pct : null, b: sh.w + sh.l > 0 ? sh.pct : null, fmt: v => U.pct(v, 1) },
-    { label: 'Point differential', a: sa.w + sa.l > 0 ? sa.pd : null, b: sh.w + sh.l > 0 ? sh.pd : null, fmt: v => U.signed(v, 0) }
+    { label: 'Win %', a: a.pct, b: h.pct, fmt: v => U.pct(v, 1) },
+    { label: 'Point differential', a: a.pd, b: h.pd, fmt: v => U.signed(v, 0) }
   ];
   if (!rows.some(r => isNum(r.a) && isNum(r.b))) return '';
   const pc = U.pair(L, g.away, g.home);
@@ -332,7 +340,7 @@ function renderGame(el, params) {
     const tabs = [{ key: 'summary', label: 'Summary', href: HW.gameHref(L, gid, S) }, { key: 'detail', label: 'Lineups, rotations and plays', href: HW.gameHref(L, gid, S) + (HW.sq(L, S) ? '&' : '?') + 'tab=detail' }];
     const fc = forecastTable(L, g);
     let h = '<nav class="hw-crumb" aria-label="Breadcrumb"><a href="' + esc(HW.href(L, 'games/' + HW.localDay(g.date), S)) + '">← ' + esc(HW.fmtDate(g.date, { year: false })) + ' games</a></nav>' +
-      '<div class="hw-gtop">' + headHTML(L, g, S, res.season) + '<div class="hw-gside hw-stack2">' + pregameKpis(L, g) +
+      '<div class="hw-gtop">' + headHTML(L, g, S, res.season, res.sch) + '<div class="hw-gside hw-stack2">' + pregameKpis(L, g) +
       (fc ? U.card2(st === 'pre' ? 'Our forecast' : 'Our pre-game forecast', 'Chances from our game model; the market column is a reference, not our forecast' + (g.updated_at ? ' · game file as of ' + esc(HW.fmtStamp(g.updated_at)) : ''), fc, { flush: true }) : '') +
       formPairHTML(L, g, res.sch) + '</div></div>' +
       '<div style="margin-top:var(--sp-6)">' + U.tabsHTML(tabs, tab) + '</div>';
@@ -373,8 +381,11 @@ function renderGame(el, params) {
         U.card2(HW.teamName(L, H) + ' shots', esc(sqTxt(H)) + (sqTxt(H) ? ' · ' : '') + 'size is expected points', '<div id="gm-sh-h"></div>', { cls: 'qk-span-6' });
     }
     h += availabilityHTML(L, g, S);
-    const tp = tape(L, g, res.season);
-    if (tp) h += U.card2('Tale of the tape', 'Season so far: the stronger side of each bar is solid', tp, { cls: 'qk-span-12' });
+    /* the no-look-ahead rule: the tape of a started game is the teams going in (tape_pre), or nothing */
+    const gi = st === 'pre' ? null : U.goingIn(g);
+    const tp = tape(L, g, st === 'pre' ? seasonSides(L, g, res.season) : gi ? [gi.away, gi.home] : null);
+    if (tp) h += gi ? U.card2(U.goingTitle(gi), esc(U.goingSub(L, gi, A, H)) + '. The stronger side of each bar is solid.', tp, { cls: 'qk-span-12' })
+      : U.card2('Tale of the tape', 'Season to date: the stronger side of each bar is solid', tp, { cls: 'qk-span-12' });
     h += awardsHTML(L, g, S);
     if (hasBox) {
       h += U.card2('Box score', 'Advanced columns where play-by-play exists. Sort any column.', '<div class="qk-seg hw-boxtabs" id="gm-bx-seg" role="group" aria-label="Team">' +

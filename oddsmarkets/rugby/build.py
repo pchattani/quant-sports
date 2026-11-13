@@ -26,7 +26,7 @@ import logging
 import math
 import os
 import random
-from bisect import bisect_right
+from bisect import bisect_left, bisect_right
 from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -153,36 +153,85 @@ def card(S: Scope, m: dict, fc: dict | None = None) -> dict:
 
 # ── the walk: forecasts on every finished match, the final state, rating histories ─────────────────────────
 
+class RankTrack:
+    """Our ratings rank going into each test (pages.ratings_payload's rule: a side is ranked with five or more tests
+    rated, a test in the last four years, and a tier-one or tier-two side or three or more tests against one in those
+    four years; invitational sides are never ranked). The ranks of a day come from the ratings at the start of that day,
+    before any of its results, so a test never sees a result from its own day."""
+
+    def __init__(self, S: Scope, mdl: Model):
+        self.S, self.mdl = S, mdl
+        self.inv = {}
+        self.conn: dict[str, list] = defaultdict(list)     # dates of tests against a tier-one or tier-two side
+        self.day, self.cut, self.elig = None, "", []
+
+    def _tier(self, tid: str) -> int:
+        return (self.S.teams.get(tid) or {}).get("tier") or 3
+
+    def _ok(self, t: str) -> bool:
+        if t not in self.inv:
+            self.inv[t] = nations.invitational(self.S.name(t))
+        if self.inv[t] or (self.mdl.last.get(t) or "") < self.cut or self.mdl.n.get(t, 0) < 5:
+            return False
+        if self._tier(t) <= 2:
+            return True
+        c = self.conn.get(t) or []
+        return len(c) - bisect_left(c, self.cut) >= 3
+
+    def at(self, day: str) -> tuple[dict, int]:
+        """{team id: rank} and the number ranked, at the start of `day` (YYYY-MM-DD)."""
+        if day != self.day:
+            self.day = day
+            self.cut = (date.fromisoformat(day) - timedelta(days=4 * 365)).isoformat()
+            rated = sorted(((self.mdl.rating(t), t) for t in self.mdl.n if self._ok(t)), reverse=True)
+            self.elig = {t: i + 1 for i, (_r, t) in enumerate(rated)}
+        return self.elig, len(self.elig)
+
+    def played(self, m: dict) -> None:
+        h, a = m["home"]["id"], m["away"]["id"]
+        d = m["date"][:10]
+        if self._tier(a) <= 2:
+            self.conn[h].append(d)
+        if self._tier(h) <= 2:
+            self.conn[a].append(d)
+
+
 def walk(S: Scope) -> dict:
     mdl, tot = Model(S.p), Model(S.pt)
     mdl.wr_fit = S.fit.get("wr_logistic")
     fc, hist = {}, defaultdict(list)
+    rt = RankTrack(S, mdl)
     for m in S.finals:
         y = int(m["date"][:4])
         mdl.new_year(y)
         tot.new_year(y)
+        ranks, n_ranked = rt.at(m["date"][:10])
         e = mdl.expect(m)
         et = tot.expect(m)
         mg = e["margin"]
         total = et["total"]
         fc[m["id"]] = {"p_home": e["p_home"], "p_draw": e["p_draw"], "p_away": e["p_away"], "margin": mg, "total": total,
                        "exp_h": (total + mg) / 2, "exp_a": (total - mg) / 2, "edge": e["edge"],
-                       "r_h": mdl.rating(m["home"]["id"]), "r_a": mdl.rating(m["away"]["id"]), "ctx": e["ctx"], "sd": e.get("sd")}
+                       "r_h": mdl.rating(m["home"]["id"]), "r_a": mdl.rating(m["away"]["id"]), "ctx": e["ctx"], "sd": e.get("sd"),
+                       "rank": [ranks.get(m["home"]["id"]), ranks.get(m["away"]["id"])], "of": n_ranked}
         mdl.update(m, e)
         tot.update(m, et)
+        rt.played(m)
         for t in (m["home"]["id"], m["away"]["id"]):
             hist[t].append((m["date"][:10], round(mdl.rating(t), 2)))
     y = S.now.year
     mdl.new_year(y) if mdl.year is not None and y > mdl.year else None
     tot.new_year(y) if tot.year is not None and y > tot.year else None
     up = {}
+    rt.day = None                          # every finished result counts for the tests still to come
+    ranks, n_ranked = rt.at(S.today)
     for m in S.upcoming + S.live:
         e = mdl.expect(m)
         et = tot.expect(m)
         up[m["id"]] = {"p_home": e["p_home"], "p_draw": e["p_draw"], "p_away": e["p_away"], "margin": e["margin"],
                        "total": et["total"], "exp_h": (et["total"] + e["margin"]) / 2, "exp_a": (et["total"] - e["margin"]) / 2,
                        "edge": e["edge"], "ctx": e["ctx"], "r_h": mdl.rating(m["home"]["id"]), "r_a": mdl.rating(m["away"]["id"]),
-                       "sd": e.get("sd")}
+                       "sd": e.get("sd"), "rank": [ranks.get(m["home"]["id"]), ranks.get(m["away"]["id"])], "of": n_ranked}
     return {"model": mdl, "total": tot, "fc": fc, "up": up, "hist": hist}
 
 

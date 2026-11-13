@@ -339,16 +339,18 @@ function draw(el, L, S, pid, career, cat, sv, val, asked, tab, params, mv) {
       if (!box || !U.alive(box)) return;
       const season = U.ok(sn) ? sn : null;
       const g = U.game(nxt, L, { records: U.records(season) });
-      const R = (season && season.ratings) || {}, ra = R[String(nxt.away)] || {}, rh = R[String(nxt.home)] || {};
-      const fx = [];
-      const add = (label, a, b, f, low) => { if (isNum(a) && isNum(b)) fx.push({ label: label, a: f(a), b: f(b), better: Math.abs(a - b) < 1e-9 ? null : ((a > b) !== !!low ? 'a' : 'b') }); };
-      add('Net rating, per 100 trips', ra.net, rh.net, x => U.signed(x, 1));
-      add('Points scored per 100', ra.off, rh.off, x => U.f(x, 1));
-      add('Points allowed per 100', ra.def, rh.def, x => U.f(x, 1), true);
+      const R = (season && season.ratings) || {};
+      const live = U.status(nxt) !== 'pre';
+      /* before tip-off the season to date; live, the teams going in (the game file's tape_pre) or no rows */
+      const fx = live ? [] : U.clubRows(R[String(nxt.away)] || {}, R[String(nxt.home)] || {});
       const m = nxt.model || {};
       const extra = U.status(nxt) === 'pre' && isNum(m.margin) ? 'We expect ' + HW.teamAbbr(L, m.margin >= 0 ? nxt.home : nxt.away) + ' by about ' + Math.max(1, Math.round(Math.abs(m.margin))) + (isNum(m.total) ? ', with about ' + Math.round(m.total) + ' points in all' : '') + '.' : '';
       /* no market here: it sits quietly on the game page only (as the Rink's player page) */
       box.innerHTML = QK.previewCard(g, { layout: 'bug', nick: t => t.short || t.name, factors: fx, factorsTitle: 'How they match up this season', noteExtra: esc(extra) });
+      if (live) GC().loadGame(L, S, nxt.id).then(res => {
+        const gi = U.goingIn(res && U.ok(res.d) ? res.d : null);
+        if (gi && U.alive(box)) box.innerHTML = QK.previewCard(g, { layout: 'bug', nick: t => t.short || t.name, factors: U.clubRows(gi.away, gi.home), factorsTitle: U.goingTitle(gi), noteExtra: esc(extra) });
+      });
     });
   }
 

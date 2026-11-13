@@ -98,9 +98,15 @@ only: no "TBD" slots, no exhibition guests).
  "lineups": {tid: [{"players":[5],"sec","poss","pts_for","pts_against","net"}]} | null,
  "rotation": {tid: {pid: [[t0,t1]...]}} | null,
  "plays": [{"t","period","clock","team","text","score","wpa","dwp_home","wp","li","players":[...],"credit":[...]}] | null,   # top-leverage 60 plus all scoring in the 4th/OT
- "awards": {"player_of_game": AW, "biggest_swing": AW, "shot_maker": AW, "unluckiest": AW, "stopper": AW, "excitement": number, "comeback": number}
+ "awards": {"player_of_game": AW, "biggest_swing": AW, "shot_maker": AW, "unluckiest": AW, "stopper": AW, "excitement": number, "comeback": number},
+ "tape_pre": {"before": tip-off, "source": "snapshot"|"computed", "home"|"away": {"gp","w","l","pct","pd","net","off","def"}}
 }
 ```
+`tape_pre` is the two teams going into the game: record and point differential from regular-season games final before the
+tip, and the ratings. "snapshot": written on every page write while the game is upcoming (the season's current ratings, as
+season.json shows them) and kept unchanged once it starts; "computed": rebuilt going in for a game that started before
+snapshots (ratings fitted on games strictly before the game day). The game page shows it for started games instead of
+today's season numbers.
 AW = `{"player","team","value","label","why"}` (any AW may be null; "unluckiest" has player null). Box-only seasons (no pbp):
 flow/wp/shots/lineups/rotation/plays null; a pbp-era game whose raw play-by-play is not on the building machine keeps shots,
 lineups and rotation (from the derived inputs) with flow/wp/plays null.

@@ -123,6 +123,33 @@ U.game = (c, o) => {
 };
 U.card = (c, o) => QK.matchCard(U.game(c, o), { sport: false });
 
+/* Going in (the no-look-ahead rule for game pages, 13 Nov 2026). A game that has started (live or final) compares the
+   clubs as they stood before it, from the game file's tape_pre: regular-season games final before the start, written
+   while the game was upcoming and kept once it started ("snapshot"), or computed going in for a game that started before
+   snapshots ("computed"). Never today's season numbers in their place: those count the game and everything after it,
+   so a started game without tape_pre shows no comparison rows.
+     goingIn(d) -> tape_pre or null              goingTitle(t) -> 'Going in · before 12 Nov 2026'
+     goingSub(t, away, home) -> the sample line
+     clubRows(a, h, keys) -> previewCard factor rows from two value objects {gf_g, ga_g, xgf_pct5, xgf_g, rating} */
+U.goingIn = d => { const t = d && d.tape_pre; return t && t.home && t.away ? t : null; };
+U.goingDate = iso => QK.fmt.date(iso, { day: 'numeric', month: 'short', year: 'numeric' });
+U.goingTitle = t => 'Going in · before ' + U.goingDate(t.before);
+U.goingSub = (t, away, home) => 'Regular-season games final before this one (' + RK.teamAbbr(away) + ' ' + ((t.away || {}).gp || 0) + ', ' + RK.teamAbbr(home) + ' ' + ((t.home || {}).gp || 0) + ')' +
+  (t.source === 'computed' && t.rating_asof && (isNum((t.away || {}).rating) || isNum((t.home || {}).rating)) ? '; team rating as it stood on ' + U.goingDate(t.rating_asof + 'T12:00:00Z') : '');
+U.clubRows = (a, h, keys) => {
+  const fx = [];
+  const add = (label, x, y, f, low) => { if (isNum(x) && isNum(y)) fx.push({ label: label, a: f(x), b: f(y), better: Math.abs(x - y) < 1e-9 ? null : ((x > y) !== !!low ? 'a' : 'b') }); };
+  const K = {
+    gf_g: () => add('Goals for per game', a.gf_g, h.gf_g, v => U.f(v, 1)),
+    ga_g: () => add('Goals against per game', a.ga_g, h.ga_g, v => U.f(v, 1), true),
+    xgf_pct5: () => add('Chance share, 5-on-5', a.xgf_pct5, h.xgf_pct5, v => U.pct(v, 1)),
+    xgf_g: () => add('Expected goals for per game', a.xgf_g, h.xgf_g, v => U.f(v, 2)),
+    rating: () => add('Team rating', a.rating, h.rating, v => U.signed(v, 2))
+  };
+  (keys || ['gf_g', 'ga_g', 'xgf_pct5', 'xgf_g', 'rating']).forEach(k => { if (K[k]) K[k](); });
+  return fx;
+};
+
 /* ── charts and numbers ────────────────────────────────────────────────── */
 U.chart = (id, h, label) => '<div id="' + esc(id) + '" class="qk-chart" style="--h:' + (h || 280) + 'px"' + (label ? ' role="img" aria-label="' + esc(label) + '"' : '') + '></div>';
 U.f = (v, d) => (isNum(v) ? Number(v).toFixed(d === undefined ? 1 : d) : '—');

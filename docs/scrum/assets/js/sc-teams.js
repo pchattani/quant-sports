@@ -205,6 +205,9 @@ function wrChart(el, S, T) {
 
 SC.route('team', function (page, P) {
   var S = P.S, tid = P.id;
+  /* a second id a side once had (index.json "alias": ESPN gave Spain, Zimbabwe and Cote d'Ivoire two) goes to the one kept */
+  var al = (SC.info(S).alias || {})[String(tid)];
+  if (al && String(al) !== String(tid)) { window.location.replace(SC.teamHref(S, al)); return; }
   page.innerHTML = QK.skeleton('card', 2);
   return Promise.all([SC.load(S + '/teams/' + tid + '.json'), SC.load(S + '/teams.json'), SC.load(S + '/players.json')]).then(function (res) {
     var T = res[0], all = res[1], bd = res[2];

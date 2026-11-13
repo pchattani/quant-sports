@@ -154,7 +154,7 @@ function board(T, d, p1) {
     });
     if (extra) cells += '<span class="mt-set cur">' + lv.games[side] + '</span>';
     const lost = fin && d.winner && d.winner !== pid;
-    const cc = TA.playerCountry(T, pid), rk = TA.playerRank(T, pid);
+    const cc = TA.playerCountry(T, pid), rk = TA.rankAt(d, T, pid, side);
     return '<div class="mt-pl' + (lost ? ' lost' : '') + '"><span class="mt-sw" style="background:' + (side ? 'var(--wp-b)' : 'var(--wp-a)') + '"></span><span class="mt-name">' +
       (rk ? '<span class="seed">' + rk + '</span>' : '') + TA.playerLink(T, pid) + (cc ? '<span class="ctry">' + esc(cc) + '</span>' : '') + (fin && d.winner === pid ? ' ✓' : '') + '</span></div>' +
       '<div class="mt-sets">' + cells + '</div><span class="mt-p" title="Our pre-match win chance">' + (isNum(p) ? TA.pct(p, 0) : '') + '</span>';
@@ -191,7 +191,8 @@ function hero(T, d, p1, ev, surface) {
   const G = TA.kitGame(d, T, { initials: true });
   G.p_home = isNum(p1) ? 1 - p1 : null;
   if (live && isNum(d.wp_now)) { G.wp_home = 1 - d.wp_now; G.pre_only = undefined; }
-  const rec = pid => { const rk = TA.playerRank(T, pid), cc = TA.playerCountry(T, pid); return [isNum(rk) ? 'No. ' + rk : 'Unranked', cc].filter(Boolean).join(' · '); };
+  /* the ranking under each name: today's before the first ball, the one held going in once it has started */
+  const rec = pid => { const rk = TA.rankAt(d, T, pid), cc = TA.playerCountry(T, pid); return [isNum(rk) ? 'No. ' + rk + (pre ? '' : ' going in') : (pre ? 'Unranked' : ''), cc].filter(Boolean).join(' · '); };
   G.away.record = rec(d.p1); G.home.record = rec(d.p2);
   // how they match up: ratings and the inferred serve numbers, the better side in blue
   const e = (d.pre || {}).elo || {}, ea = e.p1 || {}, eb = e.p2 || {};
@@ -205,7 +206,7 @@ function hero(T, d, p1, ev, surface) {
   if (sf) add(TA.surfaceLabel(sf) + ' Elo', sa, sb, v => TA.num(v, 0));
   add('Hold % (inferred)', hold[0], hold[1], v => TA.pct(v, 0));
   add('Serve points won (inferred)', spw[0], spw[1], v => TA.pct(v, 1));
-  add('Ranking', TA.playerRank(T, d.p1), TA.playerRank(T, d.p2), v => 'No. ' + v, true);
+  add(pre ? 'Ranking' : 'Ranking going in', TA.rankAt(d, T, d.p1), TA.rankAt(d, T, d.p2), v => 'No. ' + v, true);
   const dist = ((d.pre || {}).model || {}).dist || {};
   const top = Object.keys(dist.sets || {}).sort((x, y) => dist.sets[y] - dist.sets[x])[0];
   // the kit writes the "How sure are we?" note ("loses a match like this") and the pre-match call once it is over;
@@ -289,9 +290,13 @@ function render(el, params) {
     // ── the tale of the tape (ratings, serve and return, the season so far) beside recent form and the head to head
     const nmA = TA.playerSurname(T, d.p1), nmB = TA.playerSurname(T, d.p2);
     const infNote = '<b>How sure are we?</b> Elo is the rating before this match. Hold, break and serve points won are the model’s serve and return strengths against this opponent' +
-      (surface ? ' on ' + esc(TA.surfaceLabel(surface, ev.indoor).toLowerCase()) : '') + ', inferred from game and set scores across each player’s matches: estimates, not measurements' +
+      (surface ? ' on ' + esc(TA.surfaceLabel(surface, ev.indoor).toLowerCase()) : '') + ', inferred from game and set scores across each player’s ' + (st === 'pre' ? '' : 'earlier ') + 'matches: estimates, not measurements' +
       (d.stats && d.stats.p1 ? '. The real point-by-point numbers for this match are below.' : (TA.state.tour === 'atp' ? ' (the ATP publishes no point-by-point numbers we can use).' : '.'));
-    html += '<section class="qk-section ta-mt-tape"><div class="qk-g75"><div>' + QK.sectionHead({ kicker: 'Tale of the tape', title: nmA + ' or ' + nmB + '?', sub: 'Before the first ball: ratings, serve and return against each other, and the season so far. The side we favour is in blue.' }) +
+    /* once play starts, the tape is "Going in": every row is from before the match day (no-look-ahead rule, 13 Nov 2026) */
+    const day0 = String(d.date || '').slice(0, 10);
+    const tapeKick = st === 'pre' ? 'Tale of the tape' : 'Going in';
+    const tapeSub = (st === 'pre' ? 'Before the first ball' : 'Before ' + (day0 ? QK.fmt.date(day0 + 'T12:00:00') : 'the match')) + ': ratings, serve and return against each other, and the season so far. The side we favour is in blue.';
+    html += '<section class="qk-section ta-mt-tape"><div class="qk-g75"><div>' + QK.sectionHead({ kicker: tapeKick, title: nmA + ' or ' + nmB + '?', sub: tapeSub }) +
       '<div id="mt-tape">' + tapeHTML(T, d, surface, p1, null, null) + '</div>' + QK.explain(infNote) + '</div>' +
       '<div class="ta-stack">' + QK.sectionHead({ kicker: 'Form', title: 'Coming in', tag: 'h3' }) + '<div id="mt-form">' + QK.skeleton('lines', 3) + '</div>' + h2hCard(T, d) + '</div></div></section>';
     // ── stats, the charting deep dive and the awards: a section of their own under the tape
@@ -401,7 +406,8 @@ function tapeHTML(T, d, surface, p1, c1, c2) {
       { label: 'Won–lost', a: s1 ? s1.wp : null, b: s2 ? s2.wp : null, ta: s1 ? s1.w + '–' + s1.l : '—', tb: s2 ? s2.w + '–' + s2.l : '—', tip: 'Tour-level matches this year before this one (qualifying included); the bar is the win share.' },
       { label: 'Wins over expected', a: s1 ? s1.woe : null, b: s2 ? s2.woe : null, fmt: v => (isNum(v) ? TA.signed(v, 1) : '—'), tip: 'Wins minus the sum of our pre-match chances in those matches: above zero, winning more than our numbers said. Season to season it barely repeats, so read it as form and luck.' }] });
   }
-  const side = pid => { const rk = TA.playerRank(T, pid), cc = TA.playerCountry(T, pid); return { name: TA.playerName(T, pid), short: TA.playerSurname(T, pid), sub: [isNum(rk) ? 'No. ' + rk : 'Unranked', cc].filter(Boolean).join(' · '), href: TA.playerHref(T, pid) }; };
+  const started = TA.matchState(d) !== 'pre';
+  const side = pid => { const rk = TA.rankAt(d, T, pid), cc = TA.playerCountry(T, pid); return { name: TA.playerName(T, pid), short: TA.playerSurname(T, pid), sub: [isNum(rk) ? 'No. ' + rk + (started ? ' going in' : '') : (started ? '' : 'Unranked'), cc].filter(Boolean).join(' · '), href: TA.playerHref(T, pid) }; };
   return QK.tape({ left: side(d.p1), right: side(d.p2), fav: isNum(p1) ? (p1 >= 0.5 ? 'a' : 'b') : undefined, groups: groups, wins: true });
 }
 function formHTML(T, d, c1, c2) {

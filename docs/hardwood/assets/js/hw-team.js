@@ -110,16 +110,13 @@ function nextAndLast(L, S, tid, upcoming, log, season) {
   let h = '<section class="qk-section hw-sec1"><div class="qk-g2">';
   if (nxt) {
     const st0 = U.status(nxt);
-    const R = (season && season.ratings) || {}, ra = R[String(nxt.away)] || {}, rh = R[String(nxt.home)] || {};
-    const fx = [];
-    const add = (label, a, b, f, low) => { if (isNum(a) && isNum(b)) fx.push({ label: label, a: f(a), b: f(b), better: Math.abs(a - b) < 1e-9 ? null : ((a > b) !== !!low ? 'a' : 'b') }); };
-    add('Net rating, per 100 trips', ra.net, rh.net, x => U.signed(x, 1));
-    add('Points scored per 100', ra.off, rh.off, x => U.f(x, 1));
-    add('Points allowed per 100', ra.def, rh.def, x => U.f(x, 1), true);
+    const R = (season && season.ratings) || {};
+    /* before tip-off the season to date; live, the teams going in (fillNext, the game file's tape_pre) or no rows */
+    const fx = st0 === 'pre' ? U.clubRows(R[String(nxt.away)] || {}, R[String(nxt.home)] || {}) : [];
     const m = nxt.model || {};
     const extra = st0 === 'pre' && isNum(m.margin) ? 'We expect ' + HW.teamAbbr(L, m.margin >= 0 ? nxt.home : nxt.away) + ' by about ' + Math.max(1, Math.round(Math.abs(m.margin))) + (isNum(m.total) ? ', with about ' + Math.round(m.total) + ' points in all' : '') + '.' : '';
     h += '<div>' + QK.sectionHead({ kicker: st0 === 'live' ? 'Live now' : (QK.fmt.relDay(nxt.date) === 'Today' ? 'What to watch tonight' : 'Next up'), title: U.nick(L, nxt.away) + ' at ' + U.nick(L, nxt.home) }) +
-      QK.previewCard(U.game(nxt, L, { records: U.records(season) }), { layout: 'bug', nick: t => t.short || t.name, factors: fx, factorsTitle: 'How they match up this season', noteExtra: esc(extra) }) + '</div>';
+      '<div id="tp-next-bug">' + QK.previewCard(U.game(nxt, L, { records: U.records(season) }), { layout: 'bug', nick: t => t.short || t.name, factors: fx, factorsTitle: 'How they match up this season', noteExtra: esc(extra) }) + '</div></div>';
   }
   if (last) {
     const me = HW.teamAbbr(L, tid), op = HW.teamAbbr(L, last.opp), won = String(last.res).charAt(0) === 'W';
@@ -138,6 +135,15 @@ function nextAndLast(L, S, tid, upcoming, log, season) {
       '<article class="qk-card"><div class="qk-card-body">' + body + '</div></article></div>';
   }
   return h.replace('<div class="qk-g2">', nxt && last ? '<div class="qk-g2">' : '<div>') + '</div></section>';
+}
+/* A live next game: the bug again with the teams going in (the game file's tape_pre), when the file has it. */
+function fillNext(el, L, S, nxt, season) {
+  if (!nxt || U.status(nxt) !== 'live' || !el.querySelector('#tp-next-bug')) return;
+  HW.gameCentre.loadGame(L, S, nxt.id).then(res => {
+    const gi = U.goingIn(res && U.ok(res.d) ? res.d : null), box = el.querySelector('#tp-next-bug');
+    if (!gi || !box || !U.alive(box)) return;
+    box.innerHTML = QK.previewCard(U.game(nxt, L, { records: U.records(season) }), { layout: 'bug', nick: t => t.short || t.name, factors: U.clubRows(gi.away, gi.home), factorsTitle: U.goingTitle(gi) });
+  });
 }
 function fillLast(el, L, S, tid, last) {
   if (!last || !last.game || !el.querySelector('#tp-box')) return;
@@ -302,6 +308,7 @@ function render(el, params) {
     if (lo) QKL.team(document.getElementById('tp-league'), lo, tid);
     if (window.QKL && QKL.performers) topPerformers(document.getElementById('tp-top'), L, S, tid, cat);
     fillLast(el, L, S, tid, games.length ? games[games.length - 1] : null);
+    fillNext(el, L, S, upcoming[0] || null, season);
 
     // rating path with the se band and results
     if (document.getElementById('tp-path')) {

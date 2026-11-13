@@ -220,3 +220,86 @@ def test_featured_prefers_the_big_game_over_the_closest():
     assert [r["id"] for r in f["today"]][:1] == ["2"]
     assert "1" not in [r["id"] for r in f["today"]]
     assert "two title contenders" in f["today"][0]["why"]
+
+
+def test_tape_pre_going_in_unit():
+    """tape_pre (the no-look-ahead rule for game pages): the computed rows count only regular-season games final before
+    the start (never the game itself or a later one); an upcoming game gets the snapshot with the published rating;
+    once it starts the snapshot is kept unchanged, unless it counts other games than the rows going in."""
+    import pandas as pd
+    from oddsmarkets.nhl.analytics import games as GM
+
+    class Ctx:
+        games = {"1": {"game_id": "1", "start": "2026-10-09T23:00:00Z", "date": "2026-10-09", "status": "final", "home": "BOS", "away": "TOR"},
+                 "2": {"game_id": "2", "start": "2026-10-11T23:00:00Z", "date": "2026-10-11", "status": "final", "home": "MTL", "away": "BOS"},
+                 "3": {"game_id": "3", "start": "2026-10-13T23:00:00Z", "date": "2026-10-13", "status": "final", "home": "BOS", "away": "MTL"},
+                 "4": {"game_id": "4", "start": "2026-10-15T23:00:00Z", "date": "2026-10-15", "status": "scheduled", "home": "TOR", "away": "BOS"}}
+    rows = []
+    for gid, h, a, gh, ga in (("1", "BOS", "TOR", 4, 1), ("2", "MTL", "BOS", 2, 3), ("3", "BOS", "MTL", 0, 5)):
+        for t, gf, gag in ((h, gh, ga), (a, ga, gh)):
+            rows.append({"game_id": gid, "team": t, "gt": "REG", "gf_all": gf, "ga_all": gag, "xgf_all": gf * 0.9, "xga_all": gag * 0.9,
+                         "xgf_5v5": gf * 0.6, "xga_5v5": gag * 0.6})
+    gi = GM.GoingIn(Ctx, pd.DataFrame(rows), {"BOS": 0.42, "TOR": -0.1, "MTL": 0.0},
+                    {"ok": True, "weeks": ["2026-10-12"], "teams": {"BOS": [0.3], "TOR": [-0.2], "MTL": [0.1]}})
+    # game 3, final: BOS going in = games 1 and 2 only (7 for, 3 against), not game 3 (0-5)
+    c = gi.rows(Ctx.games["3"], "computed")
+    assert c["home"]["gp"] == 2 and c["home"]["gf_g"] == 3.5 and c["home"]["ga_g"] == 1.5 and c["away"]["gp"] == 1
+    assert c["home"]["rating"] == 0.3 and c["rating_asof"] == "2026-10-12" and c["before"] == "2026-10-13T23:00:00Z"
+    # game 1, the season opener: nobody had played
+    assert gi.rows(Ctx.games["1"], "computed")["home"]["gp"] == 0
+    # game 4, upcoming: the snapshot (three BOS games, the published rating)
+    now = "2026-10-14T12:00:00Z"
+    snap = GM.tape_pre(gi, Ctx.games["4"], None, now)
+    assert snap["source"] == "snapshot" and snap["away"]["gp"] == 3 and snap["away"]["rating"] == 0.42
+    # it starts: the snapshot is kept unchanged (a marker proves it is not recomputed), live or final
+    snap["away"]["rating"] = 9.99
+    for st in ("live", "final"):
+        g4 = dict(Ctx.games["4"], status=st)
+        assert GM.tape_pre(gi, g4, {"tape_pre": snap}, "2026-10-16T01:00:00Z") is snap
+    # a start time passed counts as started even before the store says so
+    assert GM.tape_pre(gi, Ctx.games["4"], {"tape_pre": snap}, "2026-10-16T01:00:00Z") is snap
+    # a snapshot counting other games than the rows going in (a missed build) gives way to the computed rows
+    stale = {"before": snap["before"], "source": "snapshot", "home": {"gp": 0}, "away": {"gp": 1, "rating": 9.99}}
+    got = GM.tape_pre(gi, dict(Ctx.games["4"], status="final"), {"tape_pre": stale}, "2026-10-16T01:00:00Z")
+    assert got["source"] == "computed" and got["away"]["gp"] == 3 and got["away"]["rating"] == 0.3
+    # no snapshot and no table: nothing (the page drops the rows)
+    assert GM.tape_pre(None, dict(Ctx.games["4"], status="final"), None, now) is None
+
+
+def test_tape_pre_in_game_pages(site):
+    """End to end: every page of the current season carries tape_pre; a final game's rows exclude the game itself
+    (games final before its start, from the events); an upcoming game's snapshot survives its start unchanged."""
+    B = load_build()
+    assert B.main(site["args"] + ["--no-light", "--no-careers", "--no-history"]) == 0
+    d = site["data"] / "20262027"
+    sched = rj(d / "schedule.json")["games"]
+    store = rj(d / "store.json")
+    ev = __import__("pandas").read_parquet(site["raw"] / "derived" / "20262027" / "events.parquet")
+    fin = sorted((g for g in store["games"].values() if g["status"] == "final"), key=lambda g: g["start"])
+    last = fin[-1]
+    page = rj(d / "games" / f"{last['game_id']}.json")
+    tp = page["tape_pre"]
+    assert tp["source"] == "computed" and tp["before"] == last["start"]
+    h = last["home"]
+    prior = [g for g in fin if g["start"] < last["start"] and h in (g["home"], g["away"])]
+    assert tp["home"]["gp"] == len(prior)
+    goals = ev[(ev["type"] == "goal") & ev["game_id"].isin([g["game_id"] for g in prior]) & (ev["team"] == h)]
+    assert abs(tp["home"]["gf_g"] - len(goals) / len(prior)) < 1e-3
+    up = next(g for g in sorted(store["games"].values(), key=lambda g: g["start"]) if g["status"] == "scheduled" and g["start"] > f"{TODAY}T23:59:59Z")
+    p = d / "games" / f"{up['game_id']}.json"
+    snap = rj(p)["tape_pre"]
+    assert snap["source"] == "snapshot" and {"home", "away", "before"} <= set(snap)
+    assert snap["home"]["gp"] == len([g for g in fin if up["home"] in (g["home"], g["away"])])
+    # the game starts and ends: the page is rewritten (its status moved) and keeps the snapshot as written (marker)
+    doc = rj(p)
+    doc["tape_pre"]["home"]["rating"] = 9.99
+    p.write_text(json.dumps(doc), encoding="utf-8")
+    store["games"][str(up["game_id"])].update(status="final", hs=3, **{"as": 2}, period=3, ot=False, so=False)
+    (d / "store.json").write_text(json.dumps(store), encoding="utf-8")
+    an._STORES.clear()
+    day = up["date"]
+    args = [a if a != TODAY else day for a in site["args"]]
+    assert B.main(args + ["--no-light", "--no-careers", "--no-history"]) == 0
+    kept = rj(p)["tape_pre"]
+    assert kept["home"]["rating"] == 9.99 and kept["source"] == "snapshot" and kept["home"]["gp"] == snap["home"]["gp"]
+    assert len(sched) == len(list((d / "games").glob("*.json")))

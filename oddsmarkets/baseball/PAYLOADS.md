@@ -197,6 +197,11 @@ away: [{pid, name, ip "6.1", outs, bf, h, r, bb, so, hr, pitches, strikes, whiff
 xwoba_savant, wpa}]}, totals}` (no earned runs: R is runs while he pitched), `arsenal {pitcher: {pt: {n, velo, velo_max, ivb, hb,
 spin, stuff, whiffs, csw, d_velo, d_ivb, d_hb, d_spin, d_stuff}}}` (`d_*` = that day minus his season norm), `wpa_leaders [{ab,
 inning, batter, pitcher, wpa}]`. Without pitch data on the machine an existing page keeps its pitch-level blocks.
+- `tape_pre` = the two clubs going into the game, from regular-season games final before the start: `{before (the start),
+  source "snapshot" (written while upcoming, kept unchanged once the game starts) | "computed" (rebuilt going in for a game
+  that started before snapshots), home / away {gp, rs_g, ra_g, rating, off, pitch, def}}`; computed rows carry runs a game
+  only (the ratings are season-to-date catalogue sums with no history). The game page shows it for started games instead of
+  today's season numbers.
 - Pitch columns: PAYLOADS' list plus `balls, strikes, outs, pitching`. **`call` is the pitch result** (Savant `description`, e.g.
   `called_strike`); **`desc` is the play text, on the last pitch of each PA only**; `event` and `wpa` (ours, batting side) are on
   the last pitch only; `xwoba_plus` on the PA's last pitch when the ball was in play; `re24` is Savant's `delta_run_exp` per pitch;

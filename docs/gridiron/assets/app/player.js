@@ -371,16 +371,26 @@ GI.route('player', function (el, params) {
         (season.standings || []).forEach(d => (d.teams || []).forEach(t => { rows[GI.canonTeam(t.team)] = t; }));
         const G = GI.qkGame(nxt, rows);
         G.league = GI.weekLabel(nxt.week, GI.gameSeason(nxt.game_id));
-        const Rt = season.ratings || {}, ua = (Rt[nxt.away] || {}).values || {}, uh = (Rt[nxt.home] || {}).values || {};
-        const fx = [];
-        const add = (lab, a, b, f, low) => { if (isNum(a) && isNum(b)) fx.push({ label: lab, a: f(a), b: f(b), better: Math.abs(a - b) < 1e-9 ? null : ((a > b) !== !!low ? 'a' : 'b') }); };
-        add('Team rating, points a game', ua.rating, uh.rating, v => GI.signed(v, 1));
-        add('Offence rating', ua.off_rating, uh.off_rating, v => GI.signed(v, 1));
-        add('Defence rating', ua.def_rating, uh.def_rating, v => GI.signed(v, 1));
-        add('Pass offence, EPA a dropback', ua.off_pass_epa, uh.off_pass_epa, v => GI.signed(v, 2));
+        const Rt = season.ratings || {};
+        const rowsOf = (ua, uh) => {
+          const fx = [];
+          const add = (lab, a, b, f, low) => { if (isNum(a) && isNum(b)) fx.push({ label: lab, a: f(a), b: f(b), better: Math.abs(a - b) < 1e-9 ? null : ((a > b) !== !!low ? 'a' : 'b') }); };
+          add('Team rating, points a game', ua.rating, uh.rating, v => GI.signed(v, 1));
+          add('Offence rating', ua.off_rating, uh.off_rating, v => GI.signed(v, 1));
+          add('Defence rating', ua.def_rating, uh.def_rating, v => GI.signed(v, 1));
+          add('Pass offence, EPA a dropback', ua.off_pass_epa, uh.off_pass_epa, v => GI.signed(v, 2));
+          return fx;
+        };
         const m = nxt.model || {};
         const extra = isNum(m.home_pts) && isNum(m.away_pts) ? 'Our projected score: ' + GI.teamAbbr(nxt.away) + ' ' + GI.num(m.away_pts, 0) + ', ' + GI.teamAbbr(nxt.home) + ' ' + GI.num(m.home_pts, 0) + '.' : '';
-        box.innerHTML = QK.previewCard(G, { layout: 'bug', nick: t => t.name, factors: fx, factorsTitle: 'How they match up this season', noteExtra: esc(extra) });
+        const paint = (fx, title) => { box.innerHTML = QK.previewCard(G, { layout: 'bug', nick: t => t.name, factors: fx, factorsTitle: title, noteExtra: esc(extra) }); };
+        if (!GI.isLive(nxt)) { paint(rowsOf((Rt[nxt.away] || {}).values || {}, (Rt[nxt.home] || {}).values || {}), 'How they match up this season'); return; }
+        /* live: the teams going in (the game file's tape_pre); today's season numbers would count this game */
+        paint([], '');
+        GI.loadGame(nxt.game_id).then(d => {
+          const gi = GI.goingIn(GI.ok(d) ? d : null);
+          if (gi && box.isConnected) paint(rowsOf(gi.away, gi.home), GI.goingTitle(gi));
+        });
       });
     }
     /* the last game: the score by quarter with the team totals (yards, EPA a play, turnovers) and the player's team's

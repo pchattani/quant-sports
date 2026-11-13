@@ -139,6 +139,76 @@ def test_travel_counts_distance_and_time_zones():
     assert nations.travel("England", (51.46, -0.34, 0)) == (0.0, 0)
 
 
+# ── venues and who is at home (13 Nov 2026) ──────────────────────────────────────────────────────────────────
+
+def _v(h, a, name, city, neutral=False, date="2026-11-08T15:10Z"):
+    m = _m(h, a, date=date, neutral=neutral)
+    m["venue"] = {"name": name, "city": city, "country": ""}
+    return m
+
+
+def test_allianz_stadium_is_three_grounds_told_apart_by_the_city():
+    # ESPN names Twickenham "Allianz Stadium, London" for every test since 1991; Sydney's and Turin's grounds share it
+    lon = nations.place(_v("England", "Australia", "Allianz Stadium", "London"))
+    syd = nations.place(_v("Australia", "Ireland", "Allianz Stadium", "Sydney"))
+    tur = nations.place(_v("Italy", "South Africa", "Allianz Stadium", ""))         # no address in the feed
+    assert lon[3] == "ENG" and abs(lon[0] - 51.46) < 0.1
+    assert syd[3] == "AUS" and abs(syd[0] + 33.89) < 0.1
+    assert tur[3] == "ITA" and abs(tur[0] - 45.1) < 0.1
+    assert nations.place(_v("Wales", "Australia", "Allianz Stadium", "", neutral=True)) is None   # unknown: no guess
+
+
+def test_ambiguous_cities_follow_the_ground_name():
+    assert nations.place(_v("Ireland", "Scotland", "Optus Stadium", "Perth"))[3] == "AUS"       # not Perth, Scotland
+    assert nations.place(_v("Scotland", "Japan", "McDiarmid Park", "Perth"))[3] == "SCO"
+    assert nations.place(_v("Australia", "South Africa", "Patersons Stadium", "Perth (WA)"))[3] == "AUS"
+    assert nations.place(_v("Bermuda", "Bahamas", "National Sports Centre", "Hamilton"))[3] == "BER"
+    assert set(nations.CITY_UNION) == set(nations.CITIES)                      # every city in our table has a country
+
+
+def test_a_side_is_at_home_in_its_own_country_and_nowhere_else():
+    mdl = Model(Params(H=5.0, split=False))
+    ctx = lambda m: mdl.context(m)["side"]
+    assert ctx(_v("England", "Australia", "Allianz Stadium", "London")) == 1            # was neutral: "Allianz" was Sydney
+    assert ctx(_v("Australia", "Hong Kong", "Optus Stadium", "Perth", date="2027-10-01T10:00Z")) == 1   # 3,277 km from Sydney
+    assert ctx(_v("Australia", "Chile", "Queensland Country Bank Stadium", "Townsville")) == 1
+    assert ctx(_v("New Zealand", "Australia", "Accor Stadium", "Sydney")) == -1           # the host listed second
+    assert ctx(_v("Ireland", "Scotland", "Optus Stadium", "Perth")) == 0                  # both abroad
+    assert ctx(_v("Japan", "Ireland", "McDonald Jones Stadium", "Newcastle")) == 0         # a "home" test abroad
+    assert ctx(_v("England", "Tonga", "Kobe Misaki Stadium", "Kobe")) == 0                  # someone else's World Cup
+    assert ctx(_v("France", "Argentina", "Métropole", "Lille", neutral=True)) == 1          # the venue's country wins
+    assert ctx(_v("Romania", "Georgia", "Some Ground", "Somewhere")) == 1                 # unknown venue: the feed's flag
+    e = mdl.expect(_v("New Zealand", "Australia", "Accor Stadium", "Sydney"))
+    assert e["edge"] == pytest.approx(-5.0) and e["margin"] < 0
+
+
+def test_unify_ids_keeps_the_first_id_of_a_side():
+    from oddsmarkets.rugby import store
+    ms = [_m("Spain", "Scotland", 3, 48, date="1999-10-16T15:00Z"), _m("Spain", "Tonga", 13, 13, date="2016-11-12T15:00Z")]
+    ms[0]["home"]["id"], ms[1]["home"]["id"] = "18", "289211"
+    alias = store.unify_ids(ms)
+    assert alias == {"289211": "18"} and ms[1]["home"]["id"] == "18" and ms[1]["away"]["id"] == "Tonga"
+
+
+# ── a game page going in: nothing from the test itself or after it ─────────────────────────────────────────
+
+def test_going_in_uses_only_tests_before_the_start():
+    from types import SimpleNamespace
+    from oddsmarkets.rugby import pages
+    ms = [_m("England", "France", 20, 10, date="2025-02-01T15:00Z"), _m("France", "England", 30, 10, date="2025-03-01T15:00Z"),
+          _m("England", "Wales", 40, 0, date="2025-03-08T15:00Z"), _m("England", "France", 10, 25, date="2025-08-01T15:00Z"),
+          _m("France", "England", 12, 9, date="2025-09-01T15:00Z")]
+    S = SimpleNamespace(finals=ms, now=datetime(2026, 1, 1, tzinfo=timezone.utc))
+    rep = {"exchange": {ms[3]["id"]: {"before": [85.1, 86.2], "x": -1.0}}, "live": SimpleNamespace(points={})}
+    gi = pages.GoingIn(S, {}, rep)
+    b = gi.block(ms[3], {"rank": [4, 3], "of": 20})
+    assert b["form"] == ["WLW", "LW"]                       # England W, L, W; France L, W: the test itself left out
+    assert (b["h2h"]["p"], b["h2h"]["w"], b["h2h"]["l"], b["h2h"]["pf"], b["h2h"]["pa"]) == (2, 1, 1, 30, 40)
+    assert b["h2h"]["last"]["date"] == "2025-03-01" and b["rank"] == [4, 3] and b["wr"] == [85.1, 86.2]
+    assert "profile" not in b                              # no team statistics in these rows
+    assert pages.started(S, ms[3]) and not pages.started(S, _m("England", "France", date="2026-02-01T15:00Z"))
+
+
 # ── the World Rugby replica (the published formula) ─────────────────────────────────────────────────────────
 
 def test_points_exchange_matches_the_published_formula():

@@ -19,9 +19,11 @@ Game page: the card plus
   (missed calls against the rulebook zone, each with its run-expectancy cost and the team it favoured); ABS
   challenges; a box score with expected stats; each pitcher's arsenal that day against his season norm; WPA
   leaders of the game.
+Every page also carries `tape_pre`, the two clubs going into the game (see tape_pre below).
 """
 from __future__ import annotations
 
+import bisect
 import hashlib
 import json
 import logging
@@ -278,9 +280,99 @@ def game_pitches(ctx: SeasonContext, gpks: list[str]) -> pd.DataFrame:
     return df
 
 
+# ---------------------------------------------------------------------------------------------- going in (tape_pre)
+
+# The no-look-ahead rule for game pages (13 Nov 2026): a game that has started compares the two clubs going in, never
+# with today's season numbers (which count the game itself and everything after it). The page's `tape_pre` holds the
+# comparison rows: {"before": the start, "source": "snapshot" | "computed", "home" / "away": {"gp", "rs_g", "ra_g",
+# "rating", "off", "pitch", "def"}}. While the game is upcoming every page write takes the snapshot (runs a game from
+# the regular-season games final before the start, the ratings as teams.json publishes them); once it starts the
+# snapshot is kept unchanged (like the pre-game forecast). A game that started before snapshots were written gets the
+# rows computed going in ("computed"): runs a game only, since the ratings are season-to-date sums of the player
+# catalogues with no history to read them back from. The front end drops the rows when the page has neither.
+TAPE_VERSION = 1
+_RATING_KEYS = (("rating", "rating"), ("off", "off_rpg"), ("pitch", "pit_rpg"), ("def", "def_rpg"))
+
+
+def started(g: dict, now: str | None = None) -> bool:
+    """A game that has begun: live or final in the store, or its first pitch time passed (cancelled, postponed and
+    suspended games aside)."""
+    st = str(g.get("status") or "")
+    if st in ("live", "final"):
+        return True
+    if st not in ("pre", "scheduled", ""):
+        return False
+    s = str(g.get("start") or "")
+    return bool(s and now and s <= now)
+
+
+class GoingIn:
+    """Each club going into a game: runs scored and allowed a game over its regular-season games final before the start
+    (the store's results, as teams.records counts them), so a game never counts itself or anything after it; and, for
+    the snapshot of an upcoming game, the published ratings (`ratings_now`: {tid: teams.json values})."""
+
+    def __init__(self, ctx, ratings_now: dict | None = None):
+        self.ratings_now = ratings_now or {}
+        rows: dict[str, list] = {}
+        for g in ctx.games.values():
+            if (g or {}).get("gtype") != "R" or g.get("status") != "final" or g.get("hs") is None or g.get("as") is None:
+                continue
+            t0 = str(g.get("start") or g.get("date") or "")
+            if not t0:
+                continue
+            h, a, hs, as_ = str(g["home"]), str(g["away"]), int(g["hs"]), int(g["as"])
+            rows.setdefault(h, []).append((t0, hs, as_))
+            rows.setdefault(a, []).append((t0, as_, hs))
+        self.by: dict[str, tuple[list[str], np.ndarray]] = {}
+        for t, r in rows.items():
+            r.sort(key=lambda x: x[0])
+            cs = np.vstack([np.zeros(2), np.cumsum(np.array([[x[1], x[2]] for x in r], dtype=float), axis=0)])
+            self.by[t] = ([x[0] for x in r], cs)
+
+    def side(self, team: str, before: str) -> dict:
+        x = self.by.get(str(team))
+        n = bisect.bisect_left(x[0], before) if x else 0
+        if not n:
+            return {"gp": 0}
+        rs, ra = (float(v) for v in x[1][n])
+        return {"gp": n, "rs_g": an.rnd(rs / n, 3), "ra_g": an.rnd(ra / n, 3)}
+
+    def rows(self, g: dict, source: str) -> dict | None:
+        before = str(g.get("start") or g.get("date") or "")
+        if not before or not g.get("home") or not g.get("away"):
+            return None
+        out: dict = {"before": before, "source": source}
+        for s in ("home", "away"):
+            r = self.side(g[s], before)
+            if source == "snapshot":
+                v = self.ratings_now.get(str(g[s])) or {}
+                for k, src in _RATING_KEYS:
+                    if v.get(src) is not None:
+                        r[k] = an.rnd(v.get(src), 3)
+            out[s] = r
+        return out
+
+
+def tape_pre(gi: GoingIn | None, g: dict, old: dict | None, now: str | None) -> dict | None:
+    """The page's tape_pre: the snapshot while the game is upcoming; once it has started, the snapshot written before
+    the start, kept unchanged while it counts the same games as the rows computed going in (a snapshot left behind by a
+    missed build is replaced), else the computed rows; None when neither exists."""
+    prev = (old or {}).get("tape_pre")
+    ok_prev = isinstance(prev, dict) and isinstance(prev.get("home"), dict) and isinstance(prev.get("away"), dict)
+    if gi is None:
+        return prev if ok_prev and started(g, now) else None
+    if not started(g, now):
+        return gi.rows(g, "snapshot")
+    comp = gi.rows(g, "computed")
+    if ok_prev and (comp is None or all(prev[s].get("gp") == comp[s].get("gp") for s in ("home", "away"))):
+        return prev
+    return comp
+
+
 def build_page(ctx: SeasonContext, g: dict, gp: pd.DataFrame | None, card_: dict, pregame: dict | None, old: dict | None,
                season_arsenal: dict | None = None, umps: dict | None = None, re_info: dict | None = None,
-               parks: dict | None = None, fl: pd.DataFrame | None = None, pa: pd.DataFrame | None = None) -> dict:
+               parks: dict | None = None, fl: pd.DataFrame | None = None, pa: pd.DataFrame | None = None,
+               going_in: GoingIn | None = None, now: str | None = None) -> dict:
     gpk = str(g.get("gpk"))
     page: dict[str, Any] = {"ok": True, "version": PAGE_VERSION, "level": ctx.level, "season": ctx.season, "updated_at": an.now(),
                             **card_, "teams": {s: an.team_info(ctx.store, g.get(s)) for s in ("home", "away")},
@@ -288,6 +380,9 @@ def build_page(ctx: SeasonContext, g: dict, gp: pd.DataFrame | None, card_: dict
                             "decisions": g.get("decisions"), "abs_summary": g.get("abs"), "mound_visits": g.get("mound_visits"),
                             "linescore": g.get("innings"), "lines": g.get("lines")}
     page["pregame"] = pregame or (old or {}).get("pregame")
+    tp = tape_pre(going_in, g, old, now or an.now())
+    if tp:
+        page["tape_pre"] = tp
     page["lineups"] = _lineups(ctx, g)
     if g.get("status") != "final" or (old or {}).get("lineup_strength") is None:
         page["lineup_strength"] = _lineup_strength(ctx, g, page["lineups"], ((page.get("pregame") or {}).get("model") or {}).get("p_home"))
