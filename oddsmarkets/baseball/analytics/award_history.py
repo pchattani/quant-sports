@@ -3,8 +3,8 @@ data/mlb/award_history.json: the award winners against our pre-vote calls (round
 
 Past seasons come from the committed walk-forward calls (models/fitted/award_calls_mlb.json, scripts/mlb_award_calls.py:
 each season's award model fitted only on the earlier seasons' verified winners, scoring that season's full regular-season
-lines). The current season adds our call from its awards.json once its regular season is over (the winners are announced
-in November: until then the entry has no winner).
+lines). The current season adds our call from its awards.json once its regular season is over, with the winner once it is
+announced (awards.json carries it from the Stats API in November; until then the entry has no winner).
 
 {"ok", "updated_at", "method", "source", "labels": {key: label},
  "seasons": {S: {key: {winner: {pid, name, p, rank} | null, pick: {pid, name, p}, top: [[pid, name, p]], n}}},
@@ -40,7 +40,9 @@ def build(current: int | None = None, current_awards: dict | None = None, regula
             if not rows:
                 continue
             top = [[str(r.get("pid")), r.get("name"), round(float(r.get("p") or 0), 4)] for r in rows[:5]]
-            cur[key] = {"winner": None, "pick": {"pid": top[0][0], "name": top[0][1], "p": top[0][2]}, "top": top, "n": len(rows)}
+            w = (rec or {}).get("winner")
+            win = {"pid": str(w["pid"]), "name": w.get("name"), "p": round(float(w.get("p") or 0), 4), "rank": w.get("rank")} if w and w.get("pid") else None
+            cur[key] = {"winner": win, "pick": {"pid": top[0][0], "name": top[0][1], "p": top[0][2]}, "top": top, "n": len(rows)}
         if cur:
             seasons[str(current)] = cur
     n = hit = top3 = 0

@@ -33,7 +33,7 @@ function probsOf(x) {
 function render(el, params, state) {
   const k = K();
   const L = 'mlb';   // the award models are MLB only
-  el.innerHTML = QK.sectionHead({ kicker: 'Award races · MLB', title: 'Who wins the awards', sub: 'Our chance for every candidate from the season so far: a conditional logit on value and the features voters reward, fitted on the 2015–2025 winners.' }) +
+  el.innerHTML = '<div id="aw-head">' + QK.sectionHead({ kicker: 'Award races · MLB', title: 'Who wins the awards', sub: 'Our chance for every candidate from the season so far: a conditional logit on value and the features voters reward, fitted on the 2015–2025 winners.' }) + '</div>' +
     '<p class="bp-note" id="aw-sub"></p><div id="aw-body"></div>';
   return k.ready().then(() => {
     const S = k.S(params, state);
@@ -45,7 +45,14 @@ function render(el, params, state) {
     const keys = A ? Object.keys(A).filter(x => A[x] && typeof A[x] === 'object' && (A[x].model || A[x].probs || A[x].candidates)) : [];
     if (!keys.length) { body.innerHTML = k.card('Awards', '', k.notBuilt('The ' + S + ' award model', d)); document.getElementById('aw-sub').textContent = ''; histHost(el); return; }
     keys.sort((a, b) => (ORDER.indexOf(a) < 0 ? 99 : ORDER.indexOf(a)) - (ORDER.indexOf(b) < 0 ? 99 : ORDER.indexOf(b)));
-    document.getElementById('aw-sub').textContent = keys.length + ' races · ' + S + (d.updated_at ? ' · updated ' + k.fmtDate(d.updated_at, { year: false }) : '');
+    const won = keys.filter(x => A[x].winner && A[x].winner.pid);
+    if (won.length) {
+      const tops = won.filter(x => A[x].winner.rank === 1).length;
+      document.getElementById('aw-head').innerHTML = QK.sectionHead({ kicker: 'Award races · MLB · ' + S, title: won.length === keys.length ? 'Who won the awards' : 'The awards so far',
+        sub: 'The BBWAA winners against the chance we gave each candidate before the vote, from the full regular season with a model fitted on the 2015–' + (Number(S) - 1) + ' winners. ' +
+          tops + ' of ' + won.length + ' winners were our top pick.' });
+    }
+    document.getElementById('aw-sub').textContent = keys.length + ' races · ' + S + (won.length ? ' · ' + won.length + ' decided' : '') + (d.updated_at ? ' · updated ' + k.fmtDate(d.updated_at, { year: false }) : '');
     let h = '<div class="grid-2 gq-awards">';
     histHost(el);
     keys.forEach((key, i) => { h += '<div class="qk-card"><div class="qk-card-head"><div><div class="qk-card-title">' + k.esc(awardLabel(key, A[key])) + '</div><div class="qk-card-sub" id="aw-s-' + i + '"></div></div></div><div class="qk-card-body"><div id="aw-c-' + i + '"></div><div id="aw-t-' + i + '" style="margin-top:12px"></div></div></div>'; });
@@ -111,14 +118,25 @@ function race(L, S, a, i) {
     return [{ v: k.name(pid), html: k.playerLink(L, pid, (f.name || null), S, pitch ? 'pitcher' : null) + (f.team ? ' ' + k.teamChip(L, f.team, S) : '') }, { v: m, html: k.isNum(m) ? '<strong>' + k.pct(m, 1) + '</strong>' : '—' }]
       .concat(fkeys.map(fk => ({ v: f[fk], html: k.isNum(f[fk]) ? (/win|wpct/.test(fk) ? k.rate3(f[fk]) : /woba/.test(fk) ? k.rate3(f[fk]) : /ra9|era|fip/.test(fk) ? k.num(f[fk], 2) : /value|war/.test(fk) ? k.num(f[fk], 1) : /^ip$/.test(fk) ? k.fmtV(f[fk], 'ip') : k.int(f[fk])) : '—' }))); }), { compact: true })
     : k.muted('No candidates yet.');
+  const W = a.winner && a.winner.pid ? a.winner : null, wid = W ? String(W.pid) : null;
+  if (W) {
+    k.learn(wid, { name: W.name });
+    const rk = W.rank === 1 ? 'our top pick' : W.rank ? 'our ' + ordinal(W.rank) + ' pick' : 'not among the candidates we scored';
+    const tb = document.getElementById('aw-t-' + i);
+    document.getElementById('aw-c-' + i).insertAdjacentHTML('beforebegin', '<div id="aw-w-' + i + '" style="margin:0 0 12px">' + QK.stats([
+      { label: 'Winner', value: W.name || k.name(wid), text: true, sub: (W.date ? 'Announced ' + QK.fmt.date(W.date + 'T12:00:00Z') : 'Announced') + ' · ' + rk, href: BP.playerHref(wid, { level: L, role: pitch ? 'pitcher' : null }) },
+      { label: 'Our chance before the vote', value: k.isNum(W.p) ? k.pct(W.p, 1) : '—', signal: W.rank === 1,
+        sub: W.rank === 1 ? 'The call came in.' : (ids[0] && ids[0] !== wid ? 'Our pick was ' + k.esc(k.name(ids[0])) + ' at ' + k.pct(model[ids[0]] || 0, 1) + '.' : ''), html: true }]) + '</div>');
+    tb.querySelectorAll('tbody tr').forEach(tr => { const a0 = tr.querySelector('a[href*="' + wid + '"]'); if (a0) { tr.classList.add('hl'); a0.insertAdjacentHTML('afterend', ' <span class="qk-tag" style="margin-left:6px">Won</span>'); } });
+  }
   const s = document.getElementById('aw-s-' + i);
   const FN = { value: 'value (WAR)', hr: 'home runs', team: 'team win %', woba: 'wOBA', k: 'strikeouts', ip: 'innings', ra9: 'RA9', pa_ip: 'playing time' };
-  if (s) s.innerHTML = 'our chance · ' + ids.length + ' candidates' +
+  if (s) s.innerHTML = (W ? 'decided · our chance before the vote · ' : 'our chance · ') + ids.length + ' candidates' +
     (Array.isArray(a.features) ? ' · weighs ' + a.features.map(f => FN[f] || f).join(', ') : '') + (a.reason ? ' · ' + k.esc(a.reason) : '');
   const node = document.getElementById('aw-c-' + i);
   const bars = top.slice(0, 8);
   if (!bars.length) { node.style.display = 'none'; return; }
-  node.innerHTML = QK.chances(bars.map(pid => ({ label: k.name(pid), p: model[pid] || 0, href: BP.playerHref(pid, { level: L, role: pitch ? 'pitcher' : null }) })));
+  node.innerHTML = QK.chances(bars.map(pid => ({ label: k.name(pid) + (pid === wid ? ' · won' : ''), p: model[pid] || 0, href: BP.playerHref(pid, { level: L, role: pitch ? 'pitcher' : null }) })));
 }
 
 if (typeof BP.route === 'function') { BP.route('awards', render); try { BP.route('#/awards', render); } catch (e) { /* bound */ } }

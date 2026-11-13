@@ -15,7 +15,10 @@ from oddsmarkets.baseball.analytics.context import SeasonContext
 LABEL = {"mvp": "Most Valuable Player", "cy": "Cy Young Award", "roy": "Rookie of the Year"}
 
 
-def build(ctx: SeasonContext, hitters: dict | None = None, pitchers: dict | None = None) -> dict:
+def build(ctx: SeasonContext, hitters: dict | None = None, pitchers: dict | None = None, winners: dict | None = None) -> dict:
+    """winners: {al_mvp: {pid, name, date}} once announced (mlbapi.award_winners); each such race then carries
+    winner {pid, name, date, p (our pre-vote chance, 0 when not among our candidates), rank (in our order)} and
+    decided: true. Our chances stay as they were made: the model never sees the vote."""
     if ctx.level != "mlb":
         return {"ok": False, "reason": "awards are MLB only", "level": ctx.level, "season": ctx.season}
     r = ctx.model("awards")
@@ -42,6 +45,13 @@ def build(ctx: SeasonContext, hitters: dict | None = None, pitchers: dict | None
                     "model": {str(x["pid"]): x["p"] for x in rows if x.get("pid") is not None},
                     "rows": rows, "market": rec.get("market"), "vs_market": rec.get("vs_market"), "features": feats.get(aw),
                     "fit": rec.get("fit"), "reason": rec.get("reason")}
+        w = (winners or {}).get(key)
+        if w and w.get("pid"):
+            order = [str(x.get("pid")) for x in sorted(rows, key=lambda x: -(x.get("p") or 0))]
+            pid = str(w["pid"])
+            out[key]["winner"] = {"pid": pid, "name": w.get("name"), "date": w.get("date"),
+                                  "p": float(out[key]["model"].get(pid) or 0.0), "rank": order.index(pid) + 1 if pid in order else None}
+            out[key]["decided"] = True
     return {"ok": True, "level": ctx.level, "season": ctx.season, "updated_at": an.now(), "awards": out,
             "source": r.get("source"), "verified_winners": r.get("verified_winners"), "value_source": r.get("value_source")}
 

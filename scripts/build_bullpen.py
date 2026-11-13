@@ -256,7 +256,16 @@ def build_season(b: Build, level: str, season: int, full: bool, cfg: dict, share
     b.write_or_fail(d + "lab.json", f"lab {level} {season}", lambda: LD.lab(ctx, hit, pit), level=level, season=season)
     awards = None
     if level == "mlb" and (full or cfg["light_awards"]):
-        awards = b.write_or_fail(d + "awards.json", f"awards {level} {season}", lambda: AW.build(ctx, hit, pit), level=level, season=season)
+        def _awards():
+            # the announced winners (November) from the Stats API, cached; offline builds read the cache only
+            from oddsmarkets.baseball.analytics import mlbapi
+            try:
+                won = mlbapi.award_winners(season, mlbapi.client(8) if cfg.get("statsapi") else None)
+            except Exception as exc:                             # noqa: BLE001
+                logger.info("award winners unavailable: %s", exc)
+                won = {}
+            return AW.build(ctx, hit, pit, won)
+        awards = b.write_or_fail(d + "awards.json", f"awards {level} {season}", _awards, level=level, season=season)
     if level in ("aaa", "aa", "hia", "a"):
         mlb = (shared.get("mlb_full", {}).get(season) or {}) if level == "aaa" else {}
         b.write_or_fail(d + "prospects.json", f"prospects {season}", lambda: PR.build(ctx, hit, pit, mlb.get("proj"), mlb.get("hitters"),

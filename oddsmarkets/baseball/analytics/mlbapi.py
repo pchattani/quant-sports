@@ -15,6 +15,9 @@ clubs, players, the kind of move, counting stats in our tables), never MLBAM's t
                    final once fetched after 15 November of the season
     range lines    <cache>/statsapi/lines/<level>/range_<group>_<start>_<end>.json (weeks for the fantasy backtests)
     people         <cache>/statsapi/people.json   {pid: person record} for players the crosswalk lacks (trade pieces)
+    award winners  <cache>/statsapi/awards/<S>.json  {"fetched_at", "season", "rows": {al_mvp: {pid, name, date}, ...}}
+                   the six BBWAA awards (/v1/awards/<id>/recipients); final once all six are announced, otherwise
+                   refetched when older than `max_age_h` hours, and only from 1 October of the season on
 
 Offline (client None: `--no-statsapi`, or BULLPEN_OFFLINE set, as the tests do): only what is cached is read.
 
@@ -111,6 +114,34 @@ def transactions(level: str, lo: date, hi: date, c=None, max_age_h: float = 3.0,
         out.extend(r for r in rows if r.get("d") and lo.isoformat() <= r["d"] <= hi.isoformat())
     out.sort(key=lambda r: (r.get("d") or "", r.get("id") or 0))
     return out
+
+
+# ── award winners ───────────────────────────────────────────────────────────
+
+AWARD_IDS = {"al_mvp": "ALMVP", "nl_mvp": "NLMVP", "al_cy": "ALCY", "nl_cy": "NLCY", "al_roy": "ALROY", "nl_roy": "NLROY"}
+
+
+def award_winners(season: int, c=None, max_age_h: float = 6.0, today: date | None = None) -> dict[str, dict]:
+    """{al_mvp: {pid, name, date}, ...} for the awards announced so far (the BBWAA votes, November), cached; {} before
+    any. One call per award while any is missing, at most every `max_age_h` hours; final once all six are in."""
+    p = root() / "awards" / f"{int(season)}.json"
+    got = an.read_json(p) or {}
+    rows = dict(got.get("rows") or {})
+    today = today or _now().date()
+    if len(rows) == len(AWARD_IDS) or c is None or today < date(int(season), 10, 1) or _age_h(got.get("fetched_at")) < max_age_h:
+        return rows
+    from oddsmarkets.baseball.sources import statsapi
+    for key, aid in AWARD_IDS.items():
+        if key in rows:
+            continue
+        d = c.get(f"{statsapi.API}/v1/awards/{aid}/recipients", {"season": int(season)})
+        for r in ((d or {}).get("awards") or []):
+            pl = r.get("player") or {}
+            if str(r.get("season") or season) == str(season) and pl.get("id"):
+                rows[key] = {"pid": str(pl["id"]), "name": pl.get("nameFirstLast") or pl.get("fullName"), "date": r.get("date")}
+                break
+    an.write_json(p, {"fetched_at": an.now(), "season": int(season), "rows": rows})
+    return rows
 
 
 # ── stat lines ──────────────────────────────────────────────────────────────
