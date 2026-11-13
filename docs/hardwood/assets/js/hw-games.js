@@ -175,7 +175,13 @@ function pregameKpis(L, g) {
     const p = wpl.length ? wpl[wpl.length - 1][1] : null;
     if (isNum(p)) out.push({ label: 'Live win chance', value: (p >= 0.5 ? H : A) + ' ' + U.pct(Math.max(p, 1 - p)), signal: true, sub: 'our live model, every possession' });
   }
-  if (isNum(m.margin)) out.push({ label: 'Projected margin', value: (m.margin >= 0 ? H : A) + ' by ' + U.f(Math.abs(m.margin), 1), sub: isNum(m.sd) ? '± ' + U.f(m.sd, 1) + ' points (one standard deviation)' : '', tip: 'Our expected winning margin; games vary around it by the standard deviation shown' });
+  if (isNum(m.margin)) {
+    /* the model's own spread (one standard deviation) as the likely-range bar, in the favourite's points */
+    const fav = m.margin >= 0 ? H : A, dog = m.margin >= 0 ? A : H, M = Math.abs(m.margin);
+    const side = v => (v < 0 ? dog + ' by ' + U.f(-v, 1) : v > 0 ? fav + ' by ' + U.f(v, 1) : 'level');
+    out.push({ label: 'Projected margin', value: fav + ' by ' + U.f(M, 1), sub: isNum(m.sd) ? '± ' + U.f(m.sd, 1) + ' points (one standard deviation)' : '', tip: 'Our expected winning margin; games vary around it by the standard deviation shown, and about two games in three land inside the bar',
+      range: isNum(m.sd) && m.sd > 0 ? { lo: M - m.sd, hi: M + m.sd, mid: M, fmt: v => side(v), label: 'Projected margin, one standard deviation', caption: side(M - m.sd) + ' to ' + side(M + m.sd) } : null });
+  }
   if (isNum(m.total)) out.push({ label: 'Projected total', value: U.f(m.total, 1), unit: 'pts', sub: isNum(m.pts_home) ? A + ' ' + U.f(m.pts_away, 0) + ' · ' + H + ' ' + U.f(m.pts_home, 0) : '' });
   if (isNum(pre.elo_p_home)) out.push({ label: 'Elo alone', value: (pre.elo_p_home >= 0.5 ? H : A) + ' ' + U.pct(Math.max(pre.elo_p_home, 1 - pre.elo_p_home)), sub: 'a simpler rating, for comparison', tip: 'The win chance from our Elo ratings alone (results only, no box score or availability)' });
   return out.length ? '<div class="hw-kpis">' + QK.stats(out) + '</div>' : '';
@@ -292,13 +298,28 @@ function withSchedule(g, sch) {
   return out;
 }
 
+/* Recent form for the two sides (QK.formPair): each team's last five results before this game's start, oldest first,
+   from the season's schedule.json (already loaded for the status); preseason games left out. Nothing after the tip is
+   used, so a finished game shows the form the teams brought into it. */
+function formPairHTML(L, g, sch) {
+  if (!sch || !(sch.games || []).length) return '';
+  const t0 = Date.parse(g.date);
+  const done = sch.games.filter(x => x && String(x.id) !== String(g.id) && x.status === 'post' && x.stype !== 'pre' && isNum(x.hs) && isNum(x.as) && Date.parse(x.date) < t0)
+    .sort((x, y) => String(x.date).localeCompare(String(y.date)));
+  const form = tid => done.filter(x => String(x.home) === tid || String(x.away) === tid).slice(-5).map(x => ((String(x.home) === tid ? x.hs > x.as : x.as > x.hs) ? 'W' : 'L'));
+  const side = tid => ({ name: HW.teamShort(L, tid), abbr: HW.teamAbbr(L, tid), colour: HW.teamColourRaw(L, tid), form: form(String(tid)) });
+  const fp = QK.formPair({ left: side(String(g.away)), right: side(String(g.home)), n: 5, title: U.status(g) === 'pre' ? 'Form, last 5' : 'Form before this game, last 5' });
+  return fp ? '<section class="qk-card hw-form-card"><div class="qk-card-body">' + fp + '</div></section>' : '';
+}
+
 function renderGame(el, params) {
   const L = U.L(params), gid = params.id;
   const tab = U.tab(params, ['summary', 'detail'], 'summary');
   el.innerHTML = QK.skeleton('lines', 6);
   return GC().loadGame(L, params.season, gid).then(res => (res && U.ok(res.d) ? Promise.all([HW.load(HW.path('season.json', L, res.s)), HW.load(HW.path('schedule.json', L, res.s))]).then(a => {
     res.season = U.ok(a[0]) ? a[0] : null;
-    res.d = withSchedule(res.d, U.ok(a[1]) ? a[1] : null);
+    res.sch = U.ok(a[1]) ? a[1] : null;
+    res.d = withSchedule(res.d, res.sch);
     return res;
   }) : res)).then(res => {
     if (!U.alive(el)) return;
@@ -312,7 +333,8 @@ function renderGame(el, params) {
     const fc = forecastTable(L, g);
     let h = '<nav class="hw-crumb" aria-label="Breadcrumb"><a href="' + esc(HW.href(L, 'games/' + HW.localDay(g.date), S)) + '">← ' + esc(HW.fmtDate(g.date, { year: false })) + ' games</a></nav>' +
       '<div class="hw-gtop">' + headHTML(L, g, S, res.season) + '<div class="hw-gside hw-stack2">' + pregameKpis(L, g) +
-      (fc ? U.card2(st === 'pre' ? 'Our forecast' : 'Our pre-game forecast', 'Chances from our game model; the market column is a reference, not our forecast', fc, { flush: true }) : '') + '</div></div>' +
+      (fc ? U.card2(st === 'pre' ? 'Our forecast' : 'Our pre-game forecast', 'Chances from our game model; the market column is a reference, not our forecast' + (g.updated_at ? ' · game file as of ' + esc(HW.fmtStamp(g.updated_at)) : ''), fc, { flush: true }) : '') +
+      formPairHTML(L, g, res.sch) + '</div></div>' +
       '<div style="margin-top:var(--sp-6)">' + U.tabsHTML(tabs, tab) + '</div>';
     if (tab === 'detail') {
       el.innerHTML = h + '<div class="hw-sub"></div>';

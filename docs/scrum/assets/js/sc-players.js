@@ -61,11 +61,51 @@ function seasonChart(el, Pp) {
   QKC.bar(el, { cats: cats, series: [{ name: 'Tests', data: Pp.caps_by_year.map(function (x) { return x[1]; }), color: 'var(--c-1)' }], valName: 'Tests played', catName: 'Year', labels: true });
 }
 
+/* The next test and the last one. Next: the side's next test as the scoreboard bug (QK.previewCard layout 'bug'), only
+   when the player played in one of the side's last three tests (a recent pick, said to be the side's fixture, not a
+   named 23). Last: the player's last test titled with the score, home first, as the kit's game card with our pre-test
+   call (the team file's results), the player's line and game value. */
+function nextLast(S, Pp, T) {
+  var L0 = (Pp.log || [])[0];
+  var res = ((T || {}).results || []).filter(function (r) { return isNum(r.hs); });
+  var cut = res.length ? String((res[Math.min(2, res.length - 1)] || {}).date || '').slice(0, 10) : '';
+  var nx = T && L0 && cut && String(L0.date).slice(0, 10) >= cut ? (T.next || [])[0] : null;
+  var out = '';
+  if (nx) {
+    var rel = QK.fmt.relDay ? QK.fmt.relDay(nx.date) : '';
+    out += '<div>' + QK.sectionHead({ kicker: rel === 'Today' ? 'What to watch today' : 'Next up · ' + SC.tname(S, Pp.team), title: esc(SC.tname(S, nx.home) + ' v ' + SC.tname(S, nx.away)), sub: esc(SC.compName(nx.comp) + (nx.venue ? ' · ' + nx.venue : '')), html: true }) +
+      QK.previewCard(SC.game(S, nx), { layout: 'bug', homeFirst: true, noun: 'test', note: SC.howSure(S, nx) }) +
+      U.note('The side’s next test: ' + esc(QK.surname(Pp.name)) + ' played in ' + (String(L0.date).slice(0, 10) === String(res[0].date).slice(0, 10) ? 'the last one' : 'one of the last three') + '; the matchday 23 is named a few days before.' +
+        (isNum(nx.m) ? ' We expect ' + esc(SC.margin(S, nx)) + (isNum(nx.t) ? ', about ' + Math.round(nx.t) + ' points in all' : '') + '.' : '') + ' <a href="' + esc(SC.matchHref(S, nx.id)) + '">The match page →</a>') + '</div>';
+  }
+  if (L0) {
+    var c = res.filter(function (r) { return String(r.id) === String(L0.id); })[0];
+    var ts = L0.sc || [];
+    if (!c && isNum(ts[0])) c = { id: L0.id, date: L0.date, comp: L0.comp, status: 'final', home: L0.h ? Pp.team : L0.opp, away: L0.h ? L0.opp : Pp.team, hs: L0.h ? ts[0] : ts[1], as: L0.h ? ts[1] : ts[0] };
+    var ls = L0.s || {}, bits = [];
+    [['pts', 'points'], ['tries', 'tries'], ['m', 'metres'], ['car', 'carries'], ['cb', 'clean breaks'], ['tk', 'tackles'], ['mt', 'missed tackles'], ['pc', 'penalties']].forEach(function (k) { if (ls[k[0]]) bits.push(ls[k[0]] + ' ' + k[1]); });
+    var ttl = c && isNum(c.hs) ? SC.tabbr(S, c.home) + ' ' + SC.scoreText(c.hs, c.as, c.ro) + ' ' + SC.tabbr(S, c.away) : SC.tabbr(S, Pp.team) + ' ' + (L0.h ? 'v ' : 'at ') + SC.tname(S, L0.opp);
+    var pc = c && c.p ? (String(c.home) === String(Pp.team) ? c.p[0] : c.p[2]) : null;
+    var line = '<p class="sc-last"><span class="sc-res ' + L0.res + '">' + L0.res + '</span> ' + esc(Pp.name) + ': ' + (L0.st ? 'started in the ' + L0.j + ' shirt' : 'off the bench') + ', ' + L0.min + ' minutes' +
+      (bits.length ? '; ' + esc(bits.join(', ')) : '') + (isNum(L0.gv) ? '. Game value <b class="sc-ours ' + SC.cls(L0.gv) + '">' + SC.signed(L0.gv, 1) + '</b> points of margin above a replacement-level ' + esc(SC.GROUP1[Pp.grp] || 'player') + '.' : '.') + '</p>';
+    /* alone (no next test), the card runs the page width with the game card and the player's line side by side */
+    out += '<div>' + QK.sectionHead({ kicker: 'Last test', title: esc(ttl), sub: esc(SC.date(L0.date) + ' · ' + SC.compName(L0.comp)), html: true }) +
+      U.card('', '', '<div class="sc-nl-gc">' + (c ? QK.gameCard(SC.game(S, c), { sport: false, homeFirst: true, why: false, market: false, form: false }) : '') + '</div><div>' + line +
+        (isNum(pc) ? QK.explain('<b>Our pre-test call.</b> We gave ' + esc(SC.tname(S, Pp.team)) + ' ' + SC.pct(pc) + (L0.res === 'W' ? (pc >= 0.5 ? ': as expected.' : ': an upset win.') : L0.res === 'L' ? (pc >= 0.5 ? ': an upset defeat.' : ': as expected.') : ': a draw.')) : '') +
+        '<p class="sc-note"><a href="' + esc(SC.matchHref(S, L0.id)) + '">The match page: the score race, the stat lines and both 23s →</a></p></div>', { cls: nx ? '' : 'sc-nl1' }) + '</div>';
+  }
+  return out ? '<div class="' + (nx && L0 ? 'qk-g2 ' : '') + 'sc-gap sc-nl">' + out + '</div>' : '';
+}
+
 SC.route('player', function (page, P) {
   var S = P.S, pid = P.id;
   page.innerHTML = QK.skeleton('card', 2);
   return Promise.all([SC.load(S + '/players/' + pid + '.json'), BOARD_META ? Promise.resolve(BOARD_META) : SC.load(S + '/players.json')]).then(function (res) {
-    var Pp = res[0], bd = res[1];
+    var Pp = res[0];
+    /* the side's team file (its next test and the last one's pre-test call), a file the site already publishes */
+    return (SC.ok(Pp) && Pp.team ? SC.load(S + '/teams/' + Pp.team + '.json') : Promise.resolve(null)).then(function (T) { return draw(res[0], res[1], SC.ok(T) ? T : null); });
+  });
+  function draw(Pp, bd, TM) {
     if (SC.ok(bd)) BOARD_META = bd;
     if (!SC.ok(Pp)) { page.innerHTML = U.head('Player', '', SC.SNAME[S]) + U.missing('This player page', Pp); return; }
     var M = {};
@@ -97,11 +137,23 @@ SC.route('player', function (page, P) {
       short = Pp.name + ' stands out among ' + gname.toLowerCase() + ' on ' + best.join(' and ') + ', and is weakest on ' + worst + '. Scrum value ' + SC.signed(val, 1) + ' points per 80 above a replacement ' + (SC.GROUP1[Pp.grp] || 'player') + ' (' + QK.ordinal(Math.round(C.pc.val80 || 50)) + ' percentile).';
     } else short = Pp.name + ' has ' + Pp.caps + ' tests in our data' + (C ? ', ' + C.min + ' minutes in the last two years: under the ' + ((bd && bd.min_q) || 160) + ' minutes for percentiles.' : ', none in the last two years.');
     var html = '<nav class="sc-crumb"><a href="' + esc(SC.href(S, 'scout', null, 'grp=' + (Pp.grp || 'back_row'))) + '">Scouting Room</a> / ' + esc(Pp.name) + '</nav>';
+    /* the black strip, as the Rink's player page: the value and the position's two key rates per 80, each with its
+       percentile among the position's regulars, then the caps and the record. Career points and the span move to the
+       chips; a player under the minutes for percentiles keeps the counting numbers instead. */
+    var capsT = { label: Pp.wcaps && isNum(Pp.wcaps.caps) ? 'Career caps' : 'Tests', value: String(Pp.wcaps && isNum(Pp.wcaps.caps) ? Pp.wcaps.caps : Pp.caps), sub: Pp.wcaps && isNum(Pp.wcaps.caps) ? Pp.caps + ' in our data, ' + Pp.starts + ' starts' : Pp.starts + ' starts' };
+    var wonT = { label: 'Won', value: Pp.wdl ? Pp.wdl[0] + ' of ' + Pp.caps : '—', sub: Pp.wdl ? Pp.wdl.join('–') + ' · ' + SC.pct(Pp.wdl[0] / Math.max(1, Pp.caps)) + ' of tests' : '' };
+    var ptsT = { label: 'Points', value: String(Pp.pts), sub: Pp.tries + ' tries' }, spanT = { label: 'Span', value: SC.year(Pp.first) + '–' + SC.year(Pp.last).slice(2), sub: fmt.num(Pp.min) + ' minutes' };
+    var strip;
+    var peerTxt = C ? fmt.num(C.min) + ' min since ' + SC.date(C.from) + ' · v ' + gname.toLowerCase() : '';
+    if (C && C.q && isNum(val)) {
+      var keys = (HEAD[Pp.grp] || HEAD.back_row).filter(function (k) { return k !== 'val80' && isNum(C.v[k]) && isNum(C.pc[k]); }).slice(0, 2);
+      strip = [{ label: 'Scrum value per 80', value: SC.signed(val, 1), unit: 'pts', pctl: C.pc.val80, signal: true, sub: peerTxt, tip: 'Our value model: points of margin per 80 minutes above a replacement-level player of the position; the percentile is among the position\'s regulars' }]
+        .concat(keys.map(function (k) { var m = M[k] || {}; return { label: m.label || k, value: SC.vfmt(k, C.v[k]), pctl: C.pc[k], sub: 'v ' + gname.toLowerCase() + ', last two years', tip: (m.label || k) + (m.dir === 'lower' ? ': lower is better (the percentile is turned so higher is better)' : '') }; }))
+        .concat([capsT, wonT]);
+      meta.push(['Points', Pp.pts + ' (' + Pp.tries + ' tries)'], ['Span', SC.year(Pp.first) + '–' + SC.year(Pp.last)]);
+    } else strip = (isNum(val) ? [{ label: 'Scrum value per 80', value: SC.signed(val, 1), unit: 'pts', signal: true, sub: C ? peerTxt + ': under the minutes for a percentile' : '' }] : []).concat([capsT, ptsT, wonT, spanT]).slice(0, 5);
     html += QK.playerHeader({ name: Pp.name, number: num, pos: SC.posName(Pp.pos), kicker: SC.SNAME[S] + ' · ' + gname, team: { name: t.name, abbr: t.abbr, colour: t.colour, alt: t.alt, href: SC.teamHref(S, Pp.team) },
-      meta: meta, strip: [{ label: 'Scrum value per 80', value: isNum(val) ? SC.signed(val, 1) : '—', pctl: C && C.q ? C.pc.val80 : null, signal: true },
-        { label: Pp.wcaps && isNum(Pp.wcaps.caps) ? 'Career caps' : 'Tests', value: String(Pp.wcaps && isNum(Pp.wcaps.caps) ? Pp.wcaps.caps : Pp.caps), sub: Pp.wcaps && isNum(Pp.wcaps.caps) ? Pp.caps + ' in our data, ' + Pp.starts + ' starts' : Pp.starts + ' starts' }, { label: 'Points', value: String(Pp.pts), sub: Pp.tries + ' tries' },
-        { label: 'Won', value: Pp.wdl ? Pp.wdl[0] + ' of ' + Pp.caps : '—', sub: Pp.wdl ? Pp.wdl.join('–') : '' }, { label: 'Span', value: SC.year(Pp.first) + '–' + SC.year(Pp.last).slice(2), sub: fmt.num(Pp.min) + ' minutes' }],
-      short: short });
+      meta: meta, strip: strip, short: short });
     if (SC.cmpHref) {
       var simId = (Pp.similar || [])[0] ? String(Pp.similar[0].id) : null;
       html += '<div class="qk-chips sc-gap sc-jump"><a class="qk-chip" href="' + esc(SC.cmpHref(S, 'p', simId ? [String(Pp.id), simId] : [String(Pp.id)])) + '">Compare' + (simId ? ' with ' + esc(Pp.similar[0].n) : '') + ' →</a>' +
@@ -126,20 +178,12 @@ SC.route('player', function (page, P) {
         QK.explain('<b>How sure are we?</b> ' + fmt.num(C.min) + ' minutes is ' + (C.min < 400 ? 'a small sample: rates are pulled toward the position average (as if 240 more minutes at the average had been played), and a dashed box marks a percentile still settling.' : 'a solid sample for most rates; tries and turnovers still swing a lot from test to test.')) +
         '</div><div id="pl-tape"></div></div>';
     }
+    // the next test and the last one (v4, as the Rink's player page: the scoreboard bug beside the last test, titled with its score)
+    html += nextLast(S, Pp, TM);
     html += '<div class="qk-g2 sc-gap">' + U.card('Tests, year by year', 'Appearances in our data (older tests are missing).', U.chart('pl-caps', 260, 'Tests per year')) +
       U.card('Most similar ' + (SC.GROUP1[Pp.grp] || 'player') + 's', 'Closest on the percentile profile over the last two years.', (Pp.similar || []).length ? '<ul class="sc-list">' + Pp.similar.map(function (s) {
         return '<li>' + U.playerEnt(S, s.id, s.n, s.team, SC.tabbr(S, s.team)) + '<span class="v" title="Average gap in percentile points">' + SC.f(s.d, 0) + ' pts apart</span></li>';
       }).join('') + '</ul>' : QK.empty('Not enough minutes to compare', '')) + '</div>';
-    // the last test
-    var L0 = (Pp.log || [])[0];
-    if (L0) {
-      var ls = L0.s || {}, bits = [];
-      [['pts', 'points'], ['tries', 'tries'], ['m', 'metres'], ['car', 'carries'], ['cb', 'clean breaks'], ['tk', 'tackles'], ['mt', 'missed tackles'], ['pc', 'penalties']].forEach(function (k) { if (ls[k[0]]) bits.push(ls[k[0]] + ' ' + k[1]); });
-      html += U.sec('Last test', esc(SC.tabbr(S, Pp.team) + ' ' + (L0.sc[0] === null ? '' : L0.sc[0] + '–' + L0.sc[1]) + ' ' + (L0.h ? 'v ' : 'at ') + SC.tname(S, L0.opp)), esc(SC.date(L0.date) + ' · ' + SC.compName(L0.comp)),
-        U.card('', '', '<p class="sc-last"><span class="sc-res ' + L0.res + '">' + L0.res + '</span> ' + esc(Pp.name) + ': ' + (L0.st ? 'started in the ' + L0.j + ' shirt' : 'off the bench') + ', ' + L0.min + ' minutes' +
-          (bits.length ? '; ' + esc(bits.join(', ')) : '') + (isNum(L0.gv) ? '. Game value <b class="sc-ours ' + SC.cls(L0.gv) + '">' + SC.signed(L0.gv, 1) + '</b> points of margin above a replacement-level ' + esc(SC.GROUP1[Pp.grp] || 'player') + '.' : '.') +
-          ' <a class="qk-link" href="' + esc(SC.matchHref(S, L0.id)) + '">The match page</a></p>'), '');
-    }
     html += '<div class="qk-g2 sc-gap">' + U.card('Test by test', 'Game value each test (our value model on the player’s own numbers, above a replacement-level player over the same minutes): blue when the side won, red when it lost.', U.chart('pl-gv', 280, 'Game value test by test')) +
       U.card('Among the position', 'Every regular ' + esc(gname.toLowerCase()) + ' on one metric (160+ minutes in the last two years), with ' + esc(QK.surname(Pp.name)) + ' marked.', '<div class="qk-seg" id="pl-pk" role="group" aria-label="Metric" style="margin-bottom:10px">' +
         (HEAD[Pp.grp] || HEAD.back_row).slice(0, 5).map(function (k, i) { return '<button type="button" data-value="' + k + '" aria-pressed="' + (i === 0) + '">' + esc(((M[k] || {}).short) || k) + '</button>'; }).join('') + '</div>' + U.chart('pl-peer', 240, 'Peer distribution')) + '</div>';
@@ -193,6 +237,6 @@ SC.route('player', function (page, P) {
             })) : '');
       });
     }
-  });
+  }
 });
 })();

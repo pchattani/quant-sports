@@ -917,8 +917,10 @@ function matchCard(c, opts) {
   const sub = pid => { const rk = playerRank(T, pid), cc = playerCountry(T, pid); return [isNum(rk) ? 'No. ' + rk : '', cc].filter(Boolean).join(' · '); };
   g.away.record = sub(c.p1) + '\u0001a'; g.home.record = sub(c.p2) + '\u0001h';
   const why = o.why ? (QK.whyLine ? QK.whyLine(g) : '') : false;
-  /* round 6: the market's chance small and grey under ours before the first ball (o.market: false hides it) */
-  let h = QK.gameCard(g, { sport: false, form: false, why: why || false, market: o.market === false ? false : 'quiet' });
+  /* round 6: the market's chance small and grey under ours before the first ball, only where a page asks for it
+     (o.market: 'quiet'); sweep (12 Nov 2026): off by default, since the market sits quietly on the match centre and the
+     Model pages only, never on overview, player or tournament cards */
+  let h = QK.gameCard(g, { sport: false, form: false, why: why || false, market: o.market === 'quiet' || o.market === true ? 'quiet' : false });
   ['a', 'h'].forEach((k, side) => {
     const mark = '\u0001' + k + '</small></span><span></span>';
     h = h.replace(mark, '</small></span>' + (nSets ? cells(side) : '<span></span>'));
@@ -1214,11 +1216,13 @@ function updateHeader() {
   if (document.body) TOURS.forEach(t => document.body.classList.toggle('tour-' + t, t === T));
 }
 function markNav(key) { if (SHELL) SHELL.setSection(key); }
+/* The page's context line. Freshness is the kit's stamp now (QK.stamp in init), so the line no longer repeats
+   "Updated ..."; without the kit it falls back to the old line. */
 function setMeta(html) {
   const el = document.getElementById('meta-line');
   if (!el) return;
   const d = INDEX.data;
-  const base = d && d.updated_at ? 'Updated ' + esc(fmtStamp(d.updated_at)) : '';
+  const base = !(window.QK && QK.stamp) && d && d.updated_at ? 'Updated ' + esc(fmtStamp(d.updated_at)) : '';
   el.innerHTML = [html, base].filter(Boolean).join(' · ');
 }
 
@@ -1267,6 +1271,8 @@ function init() {
   }
   load('index.json').then(idx => {
     INDEX.data = idx;
+    /* the data-freshness line (kit 4.3): the build time of index.json, the first file every page reads */
+    if (window.QK && QK.stamp && idx && idx.updated_at) QK.stamp(idx.updated_at, { what: 'Draws, results and our chances come with each data build; live scores update in between.' });
     initHeader();
     if (SHELL) SHELL.setLive({ tennis: liveAny() });
     booted = true;

@@ -600,3 +600,12 @@ input[type=number],
 .hw-ser-m b { font: 400 1.5rem/1 var(--font-display); color: var(--volt); text-transform: uppercase; text-align: center; }
 @media (max-width: 600px) { .hw-ser { grid-template-columns: minmax(0, 1fr); } .hw-ser-m { padding: 10px; } }
 .card > .hw-br-wrap, .card .hw-br-wrap { padding: 4px 16px 12px; }
+/* sweep 12 Nov 2026: the team hero's form chip (the last ten results on black, so the kit's form squares keep their
+   contrast on any team colour) */
+.hw-ph-form { display: inline-flex; align-items: center; gap: 8px; padding: 5px 10px; background: var(--block); font: 700 13px/1 var(--font-cond); text-transform: uppercase; letter-spacing: 0.06em; color: var(--block-ink-2); }
+.hw-ph-form b { font: 700 14px/1 var(--font-cond); color: #fff; letter-spacing: 0.02em; }
+.hw-ph-form .qk-form i { width: 18px; height: 18px; }
+/* the game page's form card (QK.formPair) */
+.hw-gside .qk-fpair { padding: 0; }
+/* the standings' form column: five squares, then the streak */
+.hw-formcell { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }

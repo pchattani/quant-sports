@@ -178,7 +178,7 @@ function findFixture(c, id) {
   return FB.compFiles(c.slug, ['fixtures', 'teams']).then(function (d) {
     var ids = teamIds(d.teams);
     var f = (((d.fixtures || {}).matches) || []).filter(function (m) { return String(m.id) === String(id); })[0];
-    if (f) return { f: f, ids: ids, season: FB.currentSeason(c).season, past: false };
+    if (f) return { f: f, ids: ids, season: FB.currentSeason(c).season, past: false, asof: (d.fixtures || {}).updated_at || null };
     return FB.seasonsOf(c).then(function (list) {
       var past = list.filter(function (s) { return s.source !== 'live' && (s.source === 'store' || s.path) && (s.matches || s.finished || s.detail); });
       function next(i) {
@@ -247,12 +247,15 @@ function renderMatch(el, c, f, m, mk, hit, side) {
   var pre = f.status !== 'finished' && f.status !== 'live';
   var back = '<div class="qk-kicker fb-mx-back"><a href="' + esc(FB.href.matches({ c: c.slug })) + '">← ' + esc(c.name) + ' fixtures</a></div>';
   var right = '';
-  if (pre && f.model) right = kpiStrip(f) + forecastCard(f, mk);
+  if (pre && f.model) right = kpiStrip(f) + forecastCard(f, mk, false, hit.asof);
   else if (f.model) right = forecastCard(f, null, true);
   var html = back + '<div class="fb-mx-top' + (right ? '' : ' solo') + '">' + hero(c, f, m, hit, mk, side) + (right ? '<div class="fb-mx-stack">' + right + '</div>' : '') + '</div>';
-  var tape = pre ? tapeCard(c, f, side) : '';
+  /* v4 (as the Rink's game page): the tale of the tape (QK.matchupBar: the season so far from strength.json and
+     team_stats.json) beside each side's recent form before kick-off (QK.formPair, from the club files) */
+  var tape = tapeCard(c, f, side, !pre);
   var hasDetail = !!(m && (m.shots || m.lineups || m.team_stats));
-  if (tape && hasDetail) html += '<div class="fb-mt">' + FB.grid(tape) + '</div>';
+  var formBox = f.home_id && f.away_id ? '<div class="qk-span-' + (tape ? 5 : 12) + ' fb-mx-stack" id="mx-recent"></div>' : '';
+  if (tape || formBox) html += '<div class="fb-mt">' + FB.grid(tape + formBox) + '</div>';
   if (f.status !== 'finished' && f.xi) html += xiCard(f);
   if (m && (m.shots || m.lineups || m.team_stats)) {
     html += '<section class="qk-section">' + QK.sectionHead({ kicker: f.status === 'live' ? 'In play' : 'After the whistle', title: 'How the match was won', sub: 'What the chances were worth, where the shots came from, the line-ups and every player’s line.' }) + '<div id="mx-detail"></div></section>';
@@ -263,8 +266,55 @@ function renderMatch(el, c, f, m, mk, hit, side) {
   }
   el.innerHTML = html;
   if (m && (m.shots || m.lineups || m.team_stats)) detail(el, c, f, m);
-  else preview(el, c, f, tape);
+  else preview(el, c, f, '');
+  recentForm(el, f, hasDetail);
   absences(el, c, f, m);
+}
+
+/* Each side's last five before kick-off, every competition (the club files: results dated before this match only, so
+   a past match shows the form it was played on), and, when the page has no preview below, the head to head before it. */
+function recentForm(el, f, h2h) {
+  var box = el.querySelector('#mx-recent');
+  if (!box) return;
+  box.innerHTML = FB.loading('lines', 3);
+  FB.clubsIndex().then(function (ci) {
+    var ok = function (t) { return !!ci.byId[String(t)]; };
+    return Promise.all([ok(f.home_id) ? FB.load('clubs/' + f.home_id + '.json') : null, ok(f.away_id) ? FB.load('clubs/' + f.away_id + '.json') : null]);
+  }).then(function (docs) {
+    if (!FB.alive(box)) return;
+    var before = function (doc) {
+      return ((doc || {}).matches || []).filter(function (x) { return x.status === 'finished' && isNum(x.gf) && isNum(x.ga) && String(x.id) !== String(f.id) && String(x.date) < String(f.date); })
+        .sort(function (a, b) { return String(a.date).localeCompare(String(b.date)); });
+    };
+    var res = function (x) { return x.gf > x.ga ? 'W' : x.gf < x.ga ? 'L' : 'D'; };
+    var H = before(docs[0]), A = before(docs[1]);
+    var codeH = FB.clubCode(f.home, f.away), codeA = FB.clubCode(f.away, f.home);
+    if (codeA === codeH) codeA += '2';
+    var fp = QK.formPair({ left: { name: f.home, abbr: codeH, colour: FB.clubColour(f.home_id), form: H.slice(-5).map(res) },
+      right: { name: f.away, abbr: codeA, colour: FB.clubColour(f.away_id), form: A.slice(-5).map(res) }, n: 5, title: 'Last five before kick-off' });
+    var line = '';
+    if (h2h) {
+      var met = H.filter(function (x) { return String(x.opp_tid) === String(f.away_id); });
+      if (met.length) {
+        var hw = met.filter(function (x) { return x.gf > x.ga; }).length, dr = met.filter(function (x) { return x.gf === x.ga; }).length;
+        var last = met[met.length - 1], lh = last.home === 1 || last.home === true;
+        line = QK.explain('<b>Head to head before this match.</b> ' + met.length + ' meeting' + (met.length === 1 ? '' : 's') + ' on record since ' + esc(FB.fmtDate(met[0].date, { weekday: false, year: true })) + ': ' +
+          hw + ' ' + esc(f.home) + ' win' + (hw === 1 ? '' : 's') + ', ' + dr + ' draw' + (dr === 1 ? '' : 's') + ', ' + (met.length - hw - dr) + ' ' + esc(f.away) + ' win' + (met.length - hw - dr === 1 ? '' : 's') +
+          '. The last: ' + esc(lh ? f.home + ' ' + last.gf + '–' + last.ga + ' ' + f.away : f.away + ' ' + last.ga + '–' + last.gf + ' ' + f.home) + ', ' + esc(FB.fmtDate(last.date, { year: true })) + '.');
+      }
+    }
+    /* each side's last five as one-line rows, newest first: the result from that side's view, the opponent, where and when */
+    var list = function (L, name) {
+      return L.length ? '<div class="qk-kicker fb-mt">' + esc(name) + ' · last ' + Math.min(5, L.length) + ', newest first</div><ul class="fb-mx-lf">' + L.slice(-5).reverse().map(function (x) {
+        var r = res(x), hm = x.home === 1 || x.home === true;
+        var sc = '<span class="fb-pl-res ' + r.toLowerCase() + '">' + r + ' ' + x.gf + '–' + x.ga + '</span>';
+        return '<li>' + (x.detail ? '<a href="' + esc(FB.href.match(x.comp, x.id)) + '" title="Match centre">' + sc + '</a>' : sc) +
+          '<span class="o">' + (hm ? 'v ' : 'at ') + (x.opp_tid && FB.clubRow(x.opp_tid) ? FB.clubLink(x.opp_tid, x.opp, { size: 'sm' }) : esc(x.opp || '')) + '</span>' +
+          '<span class="m">' + esc(FB.compName(x.comp, true)) + ' · ' + esc(FB.fmtDate(x.date, { weekday: false })) + '</span></li>';
+      }).join('') + '</ul>' : '';
+    };
+    box.innerHTML = fp ? FB.card('Form', 'Every competition; results before kick-off only.', fp + line + list(H, f.home) + list(A, f.away)) : '';
+  });
 }
 
 /* Round 9, Phase 4: who is missing and what it costs. A match with line-ups lists each side's injured, suspended and
@@ -322,31 +372,36 @@ function hero(c, f, m, hit, mk, side) {
   g.href = null;
   var rows = {};
   var tbl = side && side.table && Array.isArray(side.table.standings) ? side.table.standings : [];
-  tbl.forEach(function (r) { rows[r.team] = r; });
+  var cf = (side && side.table && side.table.conferences) || {};
+  Object.keys(cf).forEach(function (k) { tbl = tbl.concat(cf[k] || []); });   /* MLS: the two conference tables */
+  tbl.forEach(function (r) { if (r && !rows[r.team]) rows[r.team] = r; });
   var st = {};
   (((side && side.strength) || {}).rows || []).forEach(function (r) { st[r.team] = r; });
   var rec = function (n) { var r = rows[n]; return r && isNum(r.w) ? r.w + '–' + r.d + '–' + r.l + (isNum(r.pts) ? ' · ' + r.pts + ' pts' : '') : ''; };
   var form = function (n) { var r = st[n]; return r && (r.form_results || []).length ? r.form_results.slice(-5).join('') : null; };
-  g.home.record = rec(f.home); g.away.record = rec(f.away);
-  if (f.status !== 'finished') { g.home.form = form(f.home); g.away.form = form(f.away); }
+  /* today's records and form describe the match only before it is played: after it, the tape below carries today's
+     numbers, labelled as today's */
+  if (f.status !== 'finished') { g.home.record = rec(f.home); g.away.record = rec(f.away); g.home.form = form(f.home); g.away.form = form(f.away); }
   var md = f.model || {};
   var extra = [];
   if (!live && f.status !== 'finished' && isNum(md.lh) && isNum(md.la)) extra.push('We expect about ' + num(md.lh + md.la, 1) + ' goals in all' + (md.score ? ', and ' + esc(md.score) + ' is the likeliest score' + (isNum(md.p_score) ? ' (' + pct(md.p_score) + ')' : '') : ''));
   if (md.lineups && f.status !== 'finished') extra.push('the forecast includes the confirmed line-ups');
   var note;
   if (live) note = '<b>Our pre-match chance.</b> We have no live model for football, so this is the call from before kick-off; the score has not moved it yet.';
-  var ts = (((side && side.team_stats) || {}).teams) || {};
-  var th = (ts[f.home] || {}).season || {}, ta = (ts[f.away] || {}).season || {};
-  var h = st[f.home] || {}, a = st[f.away] || {};
-  var fx = [];
-  var add = function (label, av, bv, fm, low) { if (isNum(av) && isNum(bv)) fx.push({ label: label, a: fm(av), b: fm(bv), better: Math.abs(av - bv) < 1e-9 ? null : ((av > bv) !== !!low ? 'a' : 'b') }); };
-  /* before kick-off the tale of the tape below carries these: the hero keeps them only after it */
-  if (f.status !== 'finished' && !live) add = function () {};
-  add('Our rating (points a game)', a.strength_ppg, h.strength_ppg, function (v) { return num(v, 2); });
-  add('Points a game', a.ppg, h.ppg, function (v) { return num(v, 2); });
-  add('xG for a match', isNum(ta.xg) ? ta.xg : null, isNum(th.xg) ? th.xg : null, function (v) { return num(v, 2); });
-  add('xG against a match', isNum(ta.xga) ? ta.xga : null, isNum(th.xga) ? th.xga : null, function (v) { return num(v, 2); }, true);
-  add('Elo', a.elo, h.elo, function (v) { return num(v, 0); });
+  /* after the whistle: "How sure are we?" says what our pre-match call meant against the result, and what the chances
+     made were worth (every shot replayed at its xG, the expected result below); one match is one draw */
+  if (f.status === 'finished' && isNum(hs) && isNum(as)) {
+    var rk = hs > as ? 'h' : hs < as ? 'a' : 'd', bits = [];
+    var who = function (k) { return k === 'h' ? esc(f.home) : esc(f.away); };
+    if (isNum(md.h) && isNum(md[rk])) {
+      var pr = md[rk];
+      bits.push('Before kick-off we gave ' + (rk === 'd' ? 'a draw' : who(rk) + ' the win') + ' a ' + pct(pr) + ' chance' + (pr >= 0.5 ? ': the likeliest result came in.' : pr >= 0.3 ? ': a live outcome, not the likeliest.' : rk === 'd' ? ': one of the less likely results.' : ': an upset on our numbers.'));
+    }
+    var sim = m && (m.shots || []).length ? simOf(m) : null;
+    if (sim) bits.push('On the chances made (every shot replayed 20,000 times at its xG), ' + esc(f.home) + ' win ' + Math.round(sim.h * 100) + ' times in 100, ' + esc(f.away) + ' ' + Math.round(sim.a * 100) + ', and ' + Math.round(sim.d * 100) + ' end level.');
+    if (bits.length) note = '<b>How sure are we?</b> ' + bits.join(' ') + ' One match is a single draw from those chances.';
+  }
+  var fx = [];   /* v4: the match-up moved to the tale of the tape under the hero (tapeCard, QK.matchupBar) */
   /* round 6: the market's home / draw / away chance in one small grey line under the hero (kit market: 'quiet'), the
      source on hover; before kick-off only, and only from a snapshot under three days old at the page clock */
   var mkAt = mk ? FB.parseDate(mk._at) : null, mkFresh = !!mkAt && QK.now() - mkAt.getTime() <= 3 * 864e5;
@@ -365,7 +420,9 @@ function hero(c, f, m, hit, mk, side) {
   if (xg && isNum(xg[0]) && f.status !== 'scheduled') meta.push('xG ' + FB.esc(f.home) + ' ' + num(xg[0], 2) + ' – ' + num(xg[1], 2) + ' ' + FB.esc(f.away));
   var links = '<div class="fb-mx-hmeta">' + meta.filter(Boolean).map(function (x) { return '<span>' + x + '</span>'; }).join('') +
     (f.home_id ? '<a href="' + esc(FB.href.club(f.home_id, { c: c.slug })) + '">' + esc(f.home) + ' →</a>' : '') + (f.away_id ? '<a href="' + esc(FB.href.club(f.away_id, { c: c.slug })) + '">' + esc(f.away) + ' →</a>' : '') + '</div>';
-  return '<div class="fb-mx-hero">' + QK.previewCard(g, o) + links + '</div>';
+  /* the kit's hero draws a finished match's note only beside a pre-match call: without one, the strip goes under it */
+  var own = note && f.status === 'finished' && !isNum(g.p_home) ? QK.explain(note) : '';
+  return '<div class="fb-mx-hero">' + QK.previewCard(g, o) + own + links + '</div>';
 }
 
 /* Stat tiles before kick-off: ours first. */
@@ -381,15 +438,15 @@ function kpiStrip(f) {
 }
 
 /* Our forecast, with the market as a quiet reference column named by its source (never a gap or a headline). */
-function forecastCard(f, mk, done) {
+function forecastCard(f, mk, done, asof) {
   var md = f.model;
   if (!done) mk = null;
   var src = mk ? (mk._src || []).map(function (k) { return k === 'kalshi' ? 'Kalshi' : k === 'polymarket' ? 'Polymarket' : k; }) : [];
   var mlab = 'Market' + (src.length ? ' (' + src.join(' / ') + ')' : '');
   var mv = function (k) { return mk && mk.market && isNum(mk.market[k]) ? pct(mk.market[k], 0) : ''; };
-  /* before kick-off the hero carries the home / draw / away chance (and the market's, quietly): the table keeps the
-     other questions; after the whistle it is the record of our call */
-  var rows = done ? [
+  /* the forecast panel beside the hero (as the Rink, Hardwood and Campus game pages): win, draw and loss first, then
+     the goals; after the whistle it is the record of our call. The market stays a quiet line under the hero. */
+  var rows = isNum(md.h) ? [
     [esc(f.home) + ' win', pct(md.h, 0), mv('home')],
     ['Draw', pct(md.d, 0), mv('draw')],
     [esc(f.away) + ' win', pct(md.a, 0), mv('away')]
@@ -420,11 +477,11 @@ function forecastCard(f, mk, done) {
   var cap = '<p class="fb-cap">Ours: Dixon-Coles on goals and xG, with past closing lines as an input' + (md.lineups ? ' and the confirmed line-ups' : '') + '. ' +
     (mk ? esc(mlab) + ': the margin removed' + (mk.books > 1 ? ', the average of ' + mk.books + ' venues' : '') + (mk._at ? ', read ' + esc(FB.fmtStamp(mk._at)) : '') + '; shown for reference, it is not part of our forecast. ' : '') +
     '<a href="#/model/calibration">How our forecasts score →</a></p>';
-  return FB.card(done ? 'Our pre-match call' : 'Our forecast', done ? 'What we said before kick-off, against what happened.' : 'Goals, the likeliest score and both sides scoring; the win chances are in the hero.', table + shift + cap, { flush: false });
+  return FB.card(done ? 'Our pre-match call' : 'Our forecast', done ? 'What we said before kick-off, against what happened.' : 'Win, draw and loss, the goals, the likeliest score and both sides scoring' + (asof ? '. As of ' + esc(FB.fmtStamp(asof)) + '; it moves with results, ratings and confirmed line-ups until kick-off' : '') + '.', table + shift + cap, { flush: false });
 }
 
 /* The tale of the tape: our rating, Elo and the season's xG for both clubs (strength.json, team_stats.json). */
-function tapeCard(c, f, side) {
+function tapeCard(c, f, side, after) {
   if (!side) return '';
   var st = {}, ts = ((side.team_stats || {}).teams) || {};
   (((side.strength || {}).rows) || []).forEach(function (r) { st[r.team] = r; });
@@ -440,11 +497,15 @@ function tapeCard(c, f, side) {
     { label: 'Possession', a: th.poss, b: ta.poss, fmt: function (v) { return Math.round(v) + '%'; } }
   ].filter(function (r) { return isNum(r.a) && isNum(r.b); });   // home on the left, as in the hero ("Home v Away")
   if (rows.length < 2) return '';
-  var form = function (r) { return (r.form_results || []).length ? QK.formDots(r.form_results.join('')) : ''; };
-  var team = function (tid, name) { return { name: name, logo: FB.crestUrl(tid), colour: FB.clubColour(tid), alt: FB.clubAlt(tid) }; };
-  return FB.card('Tale of the tape', 'This season in ' + esc(c.name) + '; the better side\'s bar is solid.',
-    QK.matchupBar({ left: team(f.home_id, f.home), right: team(f.away_id, f.away), rows: rows }) +
-    (form(h) || form(a) ? '<div class="fb-mx-tform"><span>' + form(h) + '</span><span class="qk-muted">League form, oldest first</span><span>' + form(a) + '</span></div>' : ''), { span: 6 });
+  var tr = {}, tb = side.table || {};
+  var conf = tb.conferences || {};
+  ((tb.standings || tb.overall || []).concat(Object.keys(conf).reduce(function (a, k) { return a.concat(conf[k] || []); }, []))).forEach(function (r) { if (r && !tr[r.team]) tr[r.team] = r; });
+  var rec = function (n) { var r = tr[n]; return r && isNum(r.w) ? r.w + '–' + r.d + '–' + r.l + (isNum(r.pts) ? ' · ' + r.pts + ' pts' : '') : (c.short_name || c.name); };
+  var team = function (tid, name) { return { name: name, abbr: FB.clubCode(name, name === f.home ? f.away : f.home), logo: FB.crestUrl(tid), colour: FB.clubColour(tid), alt: FB.clubAlt(tid), sub: rec(name) }; };
+  /* after kick-off the season numbers are today's (this match and any since included): said so, never passed off as the
+     numbers the match was played on */
+  return FB.card('Tale of the tape', (after ? 'This season in ' + esc(c.name) + ' as it stands today, this match included' : 'This season in ' + esc(c.name) + ' so far') + '; the better side\'s bar is solid.',
+    QK.matchupBar({ left: team(f.home_id, f.home), right: team(f.away_id, f.away), rows: rows }), { span: 7 });
 }
 
 // Percentage points, signed: 0.034 -> "+3.4" (the column header says pts).
@@ -493,23 +554,15 @@ function preview(el, c, f, tape) {
     return Promise.all([ok(f.home_id) ? FB.load('clubs/' + f.home_id + '.json') : null, ok(f.away_id) ? FB.load('clubs/' + f.away_id + '.json') : null]);
   }).then(function (docs) {
     if (!FB.alive(el)) return;
-    var h = docs[0], a = docs[1];
-    function recent(doc) { return ((doc || {}).matches || []).filter(function (x) { return x.status === 'finished' && isNum(x.gf); }).slice(0, 6); }
-    function form(doc, tid, name) {
-      var list = recent(doc);
-      if (!list.length) return FB.muted('No recent results.');
-      return '<div class="fb-mx-formhead">' + FB.formChips(list.map(function (x) { return x.res || (x.gf > x.ga ? 'W' : x.gf < x.ga ? 'L' : 'D'); })) + '<span class="qk-muted">last ' + list.length + ', every competition</span></div>' +
-        '<div class="fb-fxlist">' + list.map(function (x) { return clubMatchRow(x, tid, name); }).join('') + '</div>';
-    }
-    var h2h = ((h || {}).matches || []).filter(function (x) { return String(x.opp_tid) === String(f.away_id) && x.status === 'finished'; }).slice(0, 8);
+    var h = docs[0];
+    /* the form card above carries each side's recent results (QK.formPair and the last five): here, every meeting */
+    var h2h = ((h || {}).matches || []).filter(function (x) { return String(x.opp_tid) === String(f.away_id) && x.status === 'finished' && String(x.date) < String(f.date); }).slice(0, 8);
     var hw = 0, dr = 0, aw = 0;
     h2h.forEach(function (x) { if (x.gf > x.ga) hw++; else if (x.gf === x.ga) dr++; else aw++; });
-    box.innerHTML = '<section class="qk-section">' + QK.sectionHead({ kicker: 'Before kick-off', title: 'Form and history', sub: 'How both sides have been playing across every competition, and every meeting on record.' }) + FB.grid(
+    box.innerHTML = '<section class="qk-section">' + QK.sectionHead({ kicker: 'Before kick-off', title: 'Head to head', sub: 'Every meeting on record before this one, newest first, across every competition.' }) + FB.grid(
       (tape || '') +
       FB.card('Head to head', h2h.length ? hw + ' ' + esc(f.home) + ' wins · ' + dr + ' draws · ' + aw + ' ' + esc(f.away) + ' wins in the last ' + h2h.length + ' meetings on record' : 'No meeting on record.',
-        h2h.length ? '<div class="fb-fxlist">' + h2h.map(function (x) { return clubMatchRow(x, f.home_id, f.home); }).join('') + '</div>' : '', { span: tape ? 6 : 12 }) +
-      FB.card(FB.clubLink(f.away_id, f.away), 'Last six, every competition', form(a, f.away_id, f.away), { span: 6 }) +
-      FB.card(FB.clubLink(f.home_id, f.home), 'Last six, every competition', form(h, f.home_id, f.home), { span: 6 })
+        h2h.length ? '<div class="fb-fxlist">' + h2h.map(function (x) { return clubMatchRow(x, f.home_id, f.home); }).join('') + '</div>' : '', { span: tape ? 6 : 12 })
     ) + '</section>';
   });
 }
@@ -631,10 +684,12 @@ function simulate(m, n) {
   }
   return { h: hw / n, d: dr / n, a: aw / n, grid: grid.map(function (r) { return r.map(function (v) { return v / n; }); }) };
 }
+/* the expected result, simulated once per page (the hero's "How sure are we?" and the card below share it) */
+function simOf(m) { if (!m._sim) m._sim = simulate(m, 20000); return m._sim; }
 function drawExpected(el, m, hasShots) {
   var box = el.querySelector('#mx-exp');
   if (!hasShots) { box.innerHTML = FB.muted('No shot data for this match.'); return; }
-  var sim = simulate(m, 20000);
+  var sim = simOf(m);
   var actual = m.hs > m.as ? 'h' : m.hs === m.as ? 'd' : 'a';
   var p = sim[actual];
   var verdict = !isNum(m.hs) ? '' : p >= 0.5 ? 'The result matched the chances.' : p >= 0.25 ? 'The result was plausible on the chances, not the most likely outcome.' : 'The result went against the run of the chances.';

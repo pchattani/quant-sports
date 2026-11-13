@@ -40,7 +40,7 @@ function titleRows(idx, post) {
 }
 /* Who's hot: one card per leaderboard, the leader with the next best behind. */
 const HOT = [['h_war', 'Best hitter', 'Bullpen WAR', 'Wins above a replacement player: batting, running, fielding and position.', v => BP.num(v, 1), 'hitter'],
-  ['h_hr', 'Most home runs', 'home runs', 'The season total so far.', v => String(v), 'hitter'],
+  ['h_hr', 'Most home runs', 'home runs', 'Home runs this season.', v => String(v), 'hitter'],
   ['h_xwoba_plus', 'Best contact', 'xwOBA+', 'Our expected wOBA from how hard and at what angle the ball was hit: .320 is about average.', v => BP.fmtAvg(v), 'hitter'],
   ['p_war', 'Best pitcher', 'Bullpen WAR', 'Wins above a replacement-level arm, from the runs allowed.', v => BP.num(v, 1), 'pitcher'],
   ['p_stuff_plus', 'Nastiest stuff', 'Stuff+', 'The physics of the pitches alone: 100 is league average, 110 is excellent.', v => String(Math.round(v)), 'pitcher']];
@@ -260,6 +260,36 @@ function aaaFill(el, post, L, S) {
 }
 /* The recap of a finished season (round 9): the champion as the spotlight (our calls for them, the World Series), our
    favourite and how it went, and the award winners against our pre-vote calls (data/mlb/award_history.json). */
+/* Next season (round 11, the off-season landing): the rosters as they stand, from BP.nextSeasonWins (value.json: every
+   player's projected WAR next season, added up by today's club, against an average club of 81 wins). Three tiles (the
+   strongest roster, the biggest climb and the biggest fall on this season's wins), then the ten strongest rosters. */
+function nextFill(host, L, S, rows) {
+  if (!host) return;
+  const nS = Number(S) + 1;
+  BP.nextSeasonWins(L, S, Object.keys(rows || {})).then(N => {
+    if (!host.isConnected) return;
+    if (!N) { host.innerHTML = QK.empty('No projections yet', 'Next season’s projections appear once the player values are built.'); return; }
+    const W = N.W, ids = N.ids.slice().sort((a, b) => W(b) - W(a));
+    const won = t => { const r = (rows || {})[t] || {}; return isNum(r.w) ? r.w : null; };
+    const ch = ids.filter(t => isNum(won(t))).map(t => ({ t: t, d: W(t) - won(t) })).sort((a, b) => b.d - a.d);
+    const up = ch[0], dn = ch[ch.length - 1], best = ids[0];
+    const names = t => (N.top[t] || []).slice(0, 2).map(x => x[0]).filter(Boolean).join(', ');
+    const tiles = [
+      { label: 'Strongest roster for ' + nS, value: BP.teamAbbr(best) + ' ' + Math.round(W(best)), signal: true, href: BP.teamHref(best, L, S), sub: 'projected wins · ' + U.signed(N.tot[best], 1) + ' WAR' + (names(best) ? ', led by ' + names(best) : '') },
+      up ? { label: 'Biggest climb', value: BP.teamAbbr(up.t) + ' ' + U.signed(up.d, 0), href: BP.teamHref(up.t, L, S), sub: 'wins: ' + won(up.t) + ' in ' + S + ', ' + Math.round(W(up.t)) + ' projected for ' + nS } : null,
+      dn ? { label: 'Biggest fall', value: BP.teamAbbr(dn.t) + ' ' + U.signed(dn.d, 0), href: BP.teamHref(dn.t, L, S), sub: 'wins: ' + won(dn.t) + ' in ' + S + ', ' + Math.round(W(dn.t)) + ' projected for ' + nS } : null
+    ].filter(Boolean);
+    host.innerHTML = QK.stats(tiles) + '<div style="margin-top:var(--sp-4)">' + U.card2('The ten strongest rosters', 'Projected ' + nS + ' wins from the players each club has today; ' + S + ' for comparison', '<div id="ov-next-t"></div>',
+      { flush: true, foot: '<span>An average club is 81 wins</span>' + U.more(BP.href('standings', L, S), 'All ' + ids.length + ' clubs') }) + '</div>';
+    QK.leaderboard(host.querySelector('#ov-next-t'), { dense: true, rank: true, rowHref: r => BP.teamHref(r.t, L, S), columns: [
+      { key: 'name', label: 'Club', type: 'entity', sub: 'sub', mark: r => U.team(r.t, L, S), href: r => BP.teamHref(r.t, L, S) },
+      { key: 'w', label: 'Proj. ' + nS, num: true, fmt: x => '<b>' + Math.round(x) + '–' + (162 - Math.round(x)) + '</b>', tip: 'Projected wins and losses from today’s roster' },
+      { key: 'war', label: 'Roster WAR', num: true, fmt: x => U.signed(x, 1), tip: 'Projected WAR for ' + nS + ', the whole roster' },
+      { key: 'now', label: String(S), num: true, fmt: (x, r) => r.rec, tip: 'This season’s record' },
+      { key: 'd', label: 'Change', num: true, fmt: x => (isNum(x) ? U.signed(x, 0) : '—'), tip: 'Projected wins minus this season’s wins' }],
+    rows: ids.slice(0, 10).map(t => { const r = (rows || {})[t] || {}; return { t: t, name: BP.teamShort(t), sub: names(t), w: W(t), war: N.tot[t], now: r.w, rec: isNum(r.w) ? r.w + '–' + r.l : '—', d: isNum(r.w) ? W(t) - r.w : null }; }) });
+  });
+}
 function recapFill(host, post, season, L, S, o) {
   if (!host) return;
   o = o || {};
@@ -435,6 +465,7 @@ function render(el, params) {
     const played = sp ? BP.charts.asPlayed(sp) : null;
     const champ = L === 'mlb' && played && played.actual ? played.champion : null;
     const decided = isCurrent && !!champ;
+    const offSeason = decided && L === 'mlb' && /off|complete/.test(phase) && !!BP.nextSeasonWins;
     const titles = L === 'mlb' && !decided ? titleRows(idx, post) : [];
     const inPost = !decided && phase === 'postseason' && post && post.series && post.series.length;
     const round = inPost && post.round ? BP.roundLabel(post.round) : '';
@@ -471,7 +502,12 @@ function render(el, params) {
             : inPost ? { label: 'Bracket', sub: 'Every series and path', href: BP.ghref('postseason') } : { label: 'Standings', sub: 'The race for October', href: BP.href('standings', L, S) },
           { label: 'Scouting Room', sub: 'Every player, every metric', href: BP.href('scout', L, S) }] });
       h += FOLLOW_SLOT;
-      h += '<section class="qk-section ql-week">' + QK.sectionHead({ kicker: 'This week in MLB', title: '<span id="ov-wk">The week so far</span>', html: true, sub: esc(stageLine(dig.stage, phase)) }) +
+      /* round 11: the off-season has no week to tell; next season leads instead (the rosters as they stand, from our
+         projections), after the recap of the season just played */
+      if (offSeason) h += '<section class="qk-section ql-week">' + QK.sectionHead({ kicker: 'Next season', title: (Number(S) + 1) + ' as the rosters stand',
+        sub: 'The ' + (Number(S) + 1) + ' season starts in the spring. Until then, every player’s projected WAR for ' + (Number(S) + 1) + ' from our five-season projections, added up by the club they are with today and set against an average club (81 wins). Before free agency, trades and signings: the starting point of the winter, not a forecast.',
+        actions: '<a class="qk-more" href="' + BP.href('standings', L, S) + '">Every club, by division</a>' }) + '<div id="ov-next">' + QK.skeleton('card', 1) + '</div></section>';
+      else h += '<section class="qk-section ql-week">' + QK.sectionHead({ kicker: 'This week in MLB', title: '<span id="ov-wk">The week so far</span>', html: true, sub: esc(stageLine(dig.stage, phase)) }) +
         '<div id="ov-week"></div><div id="ov-feat" class="ql-feat"></div></section>';
     } else if (isCurrent && today.length + next.length > 0) {
       h += intro({ tag: kicker, title: BP.levelLong(L) + ', by the numbers.', lede: sub,
@@ -551,7 +587,8 @@ function render(el, params) {
     if (L !== 'mlb') aaaFill(el, sp, L, S);
 
     // this week: the top lines, then the game that matters most (or the World Series race when nothing big is on)
-    if (landing) {
+    if (landing && offSeason) nextFill(el.querySelector('#ov-next'), L, S, rows);
+    else if (landing) {
       const T = weekTiles(dig, feat, titles, L, S, decided ? played : null);
       el.querySelector('#ov-week').innerHTML = T.length ? QK.stats(T) : '';
       if (T.length >= 3) el.querySelector('#ov-wk').textContent = 'The week in ' + WORDS[T.length].toLowerCase() + ' lines';

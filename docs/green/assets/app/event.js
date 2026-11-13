@@ -20,6 +20,8 @@ function boardCols(e) {
           var s = p.r[k], th = p.thru[k];
           if (isNum(s)) return String(s);
           if (isNum(th) && th > 0) return GR.toParHTML(p.rtp[k]) + ' <span class="gr-muted">thru ' + th + '</span>';
+          /* some feeds carry only the round against par: show that rather than a blank */
+          if (isNum((p.rtp || [])[k])) return GR.toParHTML(p.rtp[k]);
           return '';
         } });
       })(k);
@@ -184,25 +186,52 @@ GR.page('event', function (el, params) {
     var winner = fin ? e.players.filter(function (p) { return p.pos === 1 && p.st === 'finish'; })[0] : null;
     var fav = e.players.filter(function (p) { return p.pid === e.fav; })[0];
     var leader = e.live ? e.players.slice().sort(function (a, b) { return (b.lwin || 0) - (a.lwin || 0); })[0] : null;
-    var meta = [GR.dates(e.start, e.end), c.name ? c.name + (c.par ? ', par ' + c.par : '') + (c.yards ? ', ' + fmt.num(c.yards) + ' yards' : '') : null,
-      e.purse ? GR.money(e.purse) + ' purse' : null, e.courses && e.courses.length > 1 ? e.courses.length + ' courses' : null].filter(Boolean);
-    var stats = [
-      { label: 'Field', value: String(e.players.length), sub: e.cut ? 'cut: top ' + e.cut.count + ' and ties after ' + e.cut.round + (isNum(e.cut.score) ? ', fell at ' + GR.toPar(e.cut.score) : '') : 'no cut' },
-      winner ? { label: 'Winner', value: winner.name, text: true, sub: GR.toPar(winner.tp) + (e.playoff ? ' in a playoff' : '') + ', our pre-event chance ' + GR.pct(winner.win) } : null,
-      leader ? { label: 'Live favourite', value: leader.name, text: true, sub: GR.pct(leader.lwin) + ' to win from ' + GR.toPar(leader.tp), signal: true } : null,
-      fav ? { label: 'Our pre-event favourite', value: fav.name, text: true, sub: GR.pct(fav.win) + ' to win' + (fin ? ', finished ' + GR.position(fav) : ''), signal: !fin } : null
-    ];
+    var pl = e.players;
+    /* where a player's pre-event chance ranked in the field (1 = our favourite) */
+    var rankIn = function (p) { return 1 + pl.filter(function (q) { return (q.win || 0) > (p.win || 0); }).length; };
+    var rated = pl.filter(function (p) { return isNum(p.rt); }).map(function (p) { return p.rt; }).sort(function (a, b) { return b - a; });
+    var mean = function (a) { return a.length ? a.reduce(function (s, x) { return s + x; }, 0) / a.length : null; };
+    var avgRt = mean(rated), top20 = rated.length >= 30 ? mean(rated.slice(0, 20)) : null;
+    var thin = pl.filter(function (p) { return isNum(p.wt) && p.wt < GR.THIN; }).length;
+    var beat = fin ? pl.filter(function (p) { return isNum(p.beat) && p.st === 'finish'; }).sort(function (a, b) { return b.beat - a.beat; })[0] : null;
+    var scale = GR.scaleOf(e.stream);
+    /* the cut line: "fell at" once it has been made, "projected at" while the event is live before it (ESPN's line) */
+    var cutMade = pl.some(function (p) { return p.st === 'cut'; });
+    var cutTxt = e.cut ? 'cut: top ' + e.cut.count + ' and ties after round ' + e.cut.round + (isNum(e.cut.score) && (cutMade || e.live) ? (cutMade ? ', fell at ' : ', projected at ') + GR.toPar(e.cut.score) : '') : 'no cut';
+    /* the black strip: the field, how strong it was, the winner (or the live leader) against our pre-event chance, our
+       favourite and how they did, and who beat our forecast by most. Every chance is the one we published before the start. */
+    var strip = [
+      { label: 'Field', value: String(pl.length), unit: 'players', sub: cutTxt },
+      isNum(avgRt) ? { label: 'Field strength', value: GR.signed(avgRt, 2), sub: 'the average rating coming in, strokes a round v ' + scale + (isNum(top20) ? '; the top 20 average ' + GR.signed(top20, 2) : ''),
+        tip: 'Each player’s rating before the event (rounds played before it only), averaged over the field' } : null,
+      winner ? { label: 'Winner', value: winner.name, text: true, href: GR.playerHref(winner.pid), sub: GR.toPar(winner.tp) + (e.playoff ? ' in a playoff' : '') + ' · our pre-event chance ' + GR.pct(winner.win) + ', ' + GR.nthBest(rankIn(winner)) + ' in the field' } : null,
+      leader ? { label: 'Live favourite', value: leader.name, text: true, href: GR.playerHref(leader.pid), signal: true, sub: GR.pct(leader.lwin) + ' to win now, from ' + (GR.toPar(leader.tp) || 'level') + ' (' + GR.pct(leader.win) + ' before the start)' } : null,
+      fav ? { label: fin ? 'Our favourite' : 'Our pre-event favourite', value: fav.name, text: true, href: GR.playerHref(fav.pid), signal: !fin && !leader,
+        sub: GR.pct(fav.win) + ' to win before the start' + (fin ? ' · finished ' + (GR.position(fav) || 'out') + (isNum(fav.xr) ? ' (expected ' + QK.ordinal(Math.round(fav.xr)) + ')' : '') : (e.status === 'live' && GR.position(fav) ? ' · ' + GR.position(fav) + ' now' : '')) } : null,
+      beat && beat.beat >= 1 ? { label: 'Beat our forecast most', value: beat.name, text: true, href: GR.playerHref(beat.pid), sub: GR.signed(beat.beat, 0) + ' places: expected ' + QK.ordinal(Math.round(beat.xr)) + ', finished ' + GR.position(beat) } : null
+    ].filter(Boolean);
+    /* How sure are we? what the favourite's chance means, the winner against it, and the sample behind every chance */
+    var sure = '';
+    if (leader) sure = 'Live chances start from each player’s score and the holes left, ' + esc(GR.asOf(e.live.at)) + '. ' + esc(leader.name) + '’s ' + GR.pct(leader.lwin) + ' comes off ' + GR.oneIn(leader.lwin) + '. ';
+    if (fav) sure += (fin ? 'Our favourite, ' + esc(fav.name) + ', had ' : 'Our pre-event favourite, ' + esc(fav.name) + ', ' + (e.status === 'live' ? 'had ' : 'has ')) + GR.pct(fav.win) + ': a chance like that comes off ' + GR.oneIn(fav.win) + ', so in golf even the favourite usually loses. ';
+    if (winner) { var wr = rankIn(winner); sure += esc(winner.name) + ' won from ' + GR.pct(winner.win) + ', ' + GR.nthBest(wr) + ' chance in the field' + (wr === 1 ? ': our favourite came through. ' : wr <= 3 ? '. ' : wr <= 10 ? ': near the top of our list. ' : winner.win < 0.01 ? ': a long shot. ' : ': outside our top ten. '); }
+    sure += 'Every chance comes from ' + fmt.num(e.sims) + ' simulated tournaments, with ratings built only from rounds played before the event' + (thin ? '; ' + thin + ' of the ' + pl.length + ' players had fewer than ' + GR.THIN + ' recent rounds behind their rating, so their chances are rougher.' : '.');
+    var chips = [GR.dates(e.start, e.end),
+      c.name ? (e.course_id ? '<a href="#/course/' + encodeURIComponent(e.course_id) + '">' + esc(c.name) + '</a>' : c.name) : null,
+      c.par ? ['Par', String(c.par)] : null, c.yards ? fmt.num(c.yards) + ' yards' : null,
+      e.purse ? GR.money(e.purse, true) + ' purse' : null, e.courses && e.courses.length > 1 ? e.courses.length + ' courses' : null];
     var avail = TABS.filter(function (t) { return t[0] !== 'holes' || (e.holes || []).length; })
       .filter(function (t) { return t[0] !== 'course' || e.course_id || e.players.some(function (p) { return p.ch; }); })
       .filter(function (t) { return e.status !== 'upcoming' || t[0] === 'forecast' || t[0] === 'course'; });
     if (!avail.some(function (t) { return t[0] === tab; })) tab = avail[0][0];
-    el.innerHTML = QK.sectionHead({ tag: 'h1', size: 'lg', kicker: e.tour_name + ' · ' + e.season + (e.major ? ' · Major' : ''), title: e.name,
-        sub: meta.join(' · '), actions: GR.statusTag(e.status), html: false }) +
-      '<p class="gr-meta">' + (e.course_id ? GR.courseLink(e.course_id, c.name ? 'The course: ' + c.name : 'The course page') + ' · ' : '') + '<a href="#/fixtures/' + e.tour + '/' + e.season + '">' + esc(e.season + ' ' + e.tour_name) + '</a></p>' +
-      QK.stats(stats.filter(Boolean)) +
-      (e.live ? QK.note('Live chances start from each player\u2019s score and the holes left, updated ' + fmt.ago(e.live.at) + '.') : '') +
+    el.innerHTML = '<nav class="gr-crumb"><a href="#/fixtures/' + e.tour + '/' + e.season + '">' + esc(e.season + ' ' + e.tour_name) + '</a> / ' + esc(e.name) + '</nav>' +
+      QK.playerHeader({ name: GR.shortEvent(e.name), face: String(e.season), kicker: [e.tour_name, e.major ? 'Major' : 'Tour event', String(e.season)].join(' · '),
+        team: { name: e.tour_name, abbr: GR.tourShort(e.tour), colour: GR.TOUR_COL[e.tour], href: '#/fixtures/' + e.tour + '/' + e.season },
+        meta: chips, tags: [GR.statusTag(e.status)].filter(Boolean), strip: strip, short: { title: 'How sure are we?', html: sure } }) +
+      '<p class="gr-meta gr-asof">Every number on this page comes from the event file, ' + esc(GR.asOf(e.updated_at)) + '.' + (e.course_id ? ' ' + GR.courseLink(e.course_id, 'The course page: every edition, who plays it best →') : '') + '</p>' +
       (avail.length > 1 ? '<div class="gr-controls" style="margin-top:var(--sp-4)">' + GR.seg('gr-tab', avail, tab, 'View') + '</div>' : '') +
       '<div id="gr-body"></div>';
+    document.title = e.name + ' ' + e.season + ' · The Quant Green';
     var body = el.querySelector('#gr-body');
     var seg = el.querySelector('#gr-tab');
     if (seg) QK.seg(seg, function (v) { location.replace('#/event/' + encodeURIComponent(e.id) + '/' + v); });

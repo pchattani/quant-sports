@@ -124,7 +124,7 @@ function heroMeta(g) {
 /* v4 (Broadcast) hero: QK.previewCard, the diagonal split, with the records and form from the standings, our chance (the live chance once it
    starts, our pre-game call after it ends), a how-sure note with the projected score, the market as a quiet reference
    line before kickoff (game detail is one of the two places it may appear) and how the teams match up so far. */
-function hero(g, pre, season) {
+function hero(g, pre, season, recs) {
   const st = GI.gameState(g), live = st === 'live' || st === 'half', fin = st === 'final';
   const m = (pre && pre.model) || g.model || {};
   const mk = (pre && pre.market) || g.market || {};
@@ -132,6 +132,8 @@ function hero(g, pre, season) {
   ((season && season.standings) || []).forEach(d => (d.teams || []).forEach(t => { rows[GI.canonTeam(t.team)] = t; }));
   const cols = GI.pair(g.away, g.home);
   const G = GI.qkGame(Object.assign({}, g, { model: m }), rows);
+  /* round 11: recs, the records going in (formGoingIn), replace today's standings once the game has started */
+  if (recs) { if (recs[GI.canonTeam(g.away)]) G.away.record = recs[GI.canonTeam(g.away)]; if (recs[GI.canonTeam(g.home)]) G.home.record = recs[GI.canonTeam(g.home)]; }
   /* v4: the diagonal hero takes the raw kit colours, the alternates and the full names (QK.color.blockPair makes the
      blocks and resolves a clash); the lifted pair `cols` stays for the factors and the charts */
   G.home.colour = GI.teamInfo(g.home).colour || cols[1]; G.away.colour = GI.teamInfo(g.away).colour || cols[0];
@@ -141,11 +143,17 @@ function hero(g, pre, season) {
   const extra = [];
   if (!fin && !live && isNum(m.home_pts) && isNum(m.away_pts)) extra.push('Our projected score is ' + GI.teamShort(g.away) + ' ' + GI.num(m.away_pts, 0) + ', ' + GI.teamShort(g.home) + ' ' + GI.num(m.home_pts, 0));
   if (!fin && !live && isNum(m.total)) extra.push('we expect about ' + Math.round(m.total) + ' points in all');
+  /* round 11: a final keeps the pre-game call and its verdict (the kit's note) and adds what that chance meant */
+  let sure = '';
+  if (fin && isNum(m.p_home)) {
+    const fh = m.p_home >= 0.5, pf = fh ? Number(m.p_home) : 1 - Number(m.p_home), miss = Math.max(1, Math.round(10 * (1 - pf)));
+    sure = ' <b>How sure are we?</b> ' + esc(GI.pct(pf, 0) + ' means the ' + GI.teamShort(fh ? g.home : g.away) + ' lose a game like this about ' + miss + ' time' + (miss === 1 ? '' : 's') + ' in 10, so one result says little about the forecast.');
+  }
   const src = (mk.sources || []).map(GI.titleCase).join(' / ') || 'Kalshi / Polymarket';
   const venue = g.stadium_name || g.stadium || '';
   return '<div class="gi-preview">' + QK.previewCard(G, { kicker: 'NFL' + (venue ? ' · ' + venue : ''), nick: t => t.name, colors: cols, factors: [],   /* round 9: the match-up lives in the Tale of the tape below */
     /* round 6: the market quiet under the hero (small and grey, the sources on hover) */
-    noteExtra: extra.length ? esc(extra.join(', and ') + '.') : '', market: st === 'pre' && isNum(mk.p_home) ? { p: Number(mk.p_home), src: mk.sources || null, label: src, quiet: true } : null }) + '</div>';
+    noteExtra: (extra.length ? esc(extra.join(', and ') + '.') : '') + sure, market: st === 'pre' && isNum(mk.p_home) ? { p: Number(mk.p_home), src: mk.sources || null, label: src, quiet: true } : null }) + '</div>';
 }
 /* Before kickoff: what a win or a loss does to each team's playoff chance (season.json next_game, the simulation). */
 function stakes(g, season) {
@@ -570,6 +578,44 @@ function boxTab(g) {
     '<p class="gi-cap">EPA is our expected points added. Columns with an NGS tooltip are NFL Next Gen Stats; charting columns are FTN Data via nflverse (CC BY-SA 4.0).</p>' };
 }
 
+/* Form going in (round 11): each team's last five results before this game, oldest first, as QK.formPair. Before
+   kickoff the standings' last five (season.json, already loaded) are the form going in; once the game has started the
+   team schedules (teams.json, after the first paint) are cut at this kickoff, so a past game shows the form it was
+   played on, not today's. Ties count as D. */
+function formGoingIn(node, g, st, season, onRecords) {
+  if (!node) return;
+  const side = (t, form) => ({ name: GI.teamShort(t), abbr: GI.teamAbbr(t), colour: GI.teamInfo(t).colour || GI.tc(t), form: form });
+  const paint = (fa, fh) => {
+    if (!node.isConnected) return;
+    const html = QK.formPair({ left: side(g.away, fa), right: side(g.home, fh), n: 5, title: 'Last five, going in' });
+    node.innerHTML = html || QK.empty('No games yet', 'Neither team had played before this game.');
+  };
+  if (st === 'pre') {
+    const rows = {};
+    ((season && season.standings) || []).forEach(d => (d.teams || []).forEach(t => { rows[GI.canonTeam(t.team)] = t; }));
+    const f = t => { const r = rows[GI.canonTeam(t)]; return r && Array.isArray(r.last5) ? r.last5 : []; };
+    paint(f(g.away), f(g.home));
+    return;
+  }
+  const S = GI.gameSeason(g.game_id) || GI.state.season;
+  const t0 = String(g.kickoff || '');
+  GI.load(GI.ypath('teams.json', S)).then(tj => {
+    const T = (GI.ok(tj) && tj.teams) || {};
+    const before = t => (((T[GI.canonTeam(t)] || {}).schedule) || []).filter(x => x && GI.isFinal(x) && isNum(x.hs) && isNum(x.as) && String(x.kickoff || '') < t0 && x.game_id !== g.game_id)
+      .sort((a, b) => String(a.kickoff).localeCompare(String(b.kickoff)));
+    const res = (x, t) => { const mine = x.home === GI.canonTeam(t) ? x.hs - x.as : x.as - x.hs; return mine > 0 ? 'W' : mine < 0 ? 'L' : 'D'; };
+    const f = t => before(t).slice(-5).map(x => res(x, t));
+    paint(f(g.away), f(g.home));
+    /* the regular-season records going in, for the hero of a game that has started (the standings would count this
+       game and every one after it) */
+    if (onRecords && Object.keys(T).length) {
+      const recOf = t => { const r = before(t).filter(x => !x.gtype || x.gtype === 'REG').map(x => res(x, t)); return GI.record(r.filter(z => z === 'W').length, r.filter(z => z === 'L').length, r.filter(z => z === 'D').length); };
+      const recs = {}; recs[GI.canonTeam(g.away)] = recOf(g.away); recs[GI.canonTeam(g.home)] = recOf(g.home);
+      onRecords(recs);
+    }
+  }).catch(() => paint([], []));
+}
+
 // ── page ──────────────────────────────────────────────────────────────────
 
 GI.route('game', function (el, params) {
@@ -624,12 +670,17 @@ GI.route('game', function (el, params) {
     const m = pre.model || {};
     const hasModel = isNum(m.p_home) || isNum(m.total) || isNum(GI.homeLine(m));
     const qsx = GI.ch.quartersOf(g);
-    const fc = hasModel ? GI.card(st === 'pre' ? 'Our forecast' : 'Our pre-game forecast', (pre.priced_at || m.priced_at ? 'made ' + esc(GI.fmtStamp(pre.priced_at || m.priced_at)) + (st === 'pre' ? '' : ', frozen at kickoff') + '. ' : '') + 'The market column is a reference, not our forecast',
+    const fc = hasModel ? GI.card(st === 'pre' ? 'Our forecast' : 'Our pre-game forecast', (pre.priced_at || m.priced_at ? 'as of ' + esc(GI.fmtStamp(pre.priced_at || m.priced_at)) + (st === 'pre' ? '' : ', frozen at kickoff') + '. ' : (g0.updated_at ? 'game file as of ' + esc(GI.fmtStamp(g0.updated_at)) + '. ' : '')) + 'The market column is a reference, not our forecast',
       forecastBlock(g, pre) + QK.note('Our chances come from the game model: team ratings, the quarterbacks, starters out, rest, weather and home field. How it has done since 2006 is on the <a href="#/calibration">Model page</a>.'), { flush: false }) : '';
     el.innerHTML = '<div class="qk-kicker" style="margin-bottom:10px"><a href="' + GI.weekHref(GI.gameSeason(id), GI.gameWeek(id)) + '">← ' + esc(GI.weekLabel(GI.gameWeek(id), GI.gameSeason(id))) + ' games</a></div>' +
-      '<div class="gi-gtop"><div class="gi-stack">' + hero(g, pre, season) + heroMeta(g) + (live ? fieldStrip(g) : '') + (qsx.length ? '<div class="gi-hero-ls">' + GI.ch.linescore(g) + '</div>' : '') + '</div>' +
+      '<div class="gi-gtop"><div class="gi-stack">' + hero(g, pre, season) + heroMeta(g) + (live ? fieldStrip(g) : '') + (qsx.length ? '<div class="gi-hero-ls">' + GI.ch.linescore(g) + '</div>' : '') +
+      GI.card('Form going in', 'Each team’s last five results before this game' + (st === 'pre' ? ', from the standings' : ', from the season schedule'), '<div id="gm-form">' + QK.skeleton('lines', 2) + '</div>') + '</div>' +
       '<div class="gi-stack">' + tiles(g, pre, plays) + fc + (st === 'pre' ? stakes(g, season) : '') + '</div></div>' +
       '<div class="qk-tabs" role="tablist" aria-label="Game centre" style="margin-top:var(--sp-6)">' + tabs.map(t => '<button type="button" class="qk-tab" role="tab" data-tab="' + t[0] + '" aria-selected="' + (t[0] === tab) + '">' + esc(t[1]) + '</button>').join('') + '</div><div id="gm-body" class="gi-page" style="margin-top:var(--sp-4)"></div>';
+    formGoingIn(el.querySelector('#gm-form'), g, st, season, st === 'pre' ? null : recs => {
+      const node = el.querySelector('.gi-preview');
+      if (node && node.isConnected) node.outerHTML = hero(g, pre, season, recs);
+    });
     const body = el.querySelector('#gm-body');
     const show = k => {
       tab = k; TAB[id] = k;

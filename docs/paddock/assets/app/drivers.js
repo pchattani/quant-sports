@@ -97,12 +97,26 @@ function draw(el, id, y, cat, career, elo, askedY) {
   }
 
   var crumb = '<nav class="pd-crumb" aria-label="Breadcrumb"><a href="#/scout' + (y !== PD.currentSeason() ? '?s=' + y : '') + '">Scouting Room</a><span aria-hidden="true">›</span>' + (curT ? '<a href="' + PD.teamHref(curT) + '">' + esc(PD.teamName(curT)) + '</a><span aria-hidden="true">›</span>' : '') + esc(name) + '</nav>';
+  /* The driver model's estimate and its standard error (season.json driver_effects: % of a lap against the team-mate,
+     the car taken out, negative = faster). The rating is a share of a lap, so it is small: a tenth of a percent is about
+     0.09 s on a 90 s lap. The ± band is one standard error, about two chances in three; when it crosses zero the gap to
+     the team-mate is not yet clear. */
+  var effOf = function (kind) { var e = ((((season || {}).driver_effects || {})[kind] || {})[id]) || null; return e && isNum(e.se) && e.se > 0 ? e : null; };
+  var effTile = function (label, key, kind) {
+    var v = (d.values || {})[key], e = effOf(kind);
+    if (!isNum(v)) return PD.kpi(label, '—', 'not rated yet this season');
+    var lo = v - (e ? e.se : 0), hi = v + (e ? e.se : 0), cross = e && lo < 0 && hi > 0;
+    var f3 = function (x) { return PD.signed(x, 3) + '%'; };
+    return PD.kpi(label, PD.signed(v, 3) + '%', 'of a lap v the team-mate' + (e ? ' · ± ' + PD.num(e.se, 3) + ' (1 se)' : '') + ' · lower is faster',
+      { pctl: pc[key], tip: V.tip(meta, key) + (e ? ' The band is our driver model’s estimate plus or minus one standard error (about two chances in three).' : ''),
+        range: e ? { lo: lo, hi: hi, mid: v, min: Math.min(lo, 0) - e.se / 2, max: Math.max(hi, 0) + e.se / 2, fmt: f3, label: 'Plus or minus one standard error', caption: f3(lo) + ' to ' + f3(hi) + (cross ? ': crosses zero, not yet clear' : ': clear of zero') } : null });
+  };
   /* v4 (Broadcast): the five numbers sit in the black strip under the hero, "The short version" under that */
   var strip = d ? [
     ch && ch.eliminated ? PD.kpi('Title chance', 'Out', 'can no longer catch the leader', { text: true }) : ch ? PD.kpi('Title chance', PD.titlePct(ch, 1), 'expected ' + PD.num(ch.exp_points, 0) + ' pts (90%: ' + PD.num(ch.p05, 0) + '–' + PD.num(ch.p95, 0) + ')', { signal: true, tip: 'Our chance of the drivers’ title, from the season simulation' })
       : PD.kpi('Championship', stand.pos ? PD.ordinal(stand.pos) : '—', isNum(stand.points) ? PD.pts(stand.points) + ' points' : ''),
-    PD.kpi('Race driver rating', isNum((d.values || {}).driver_effect) ? PD.signed(d.values.driver_effect, 3) + '%' : '—', 'of a lap · lower is faster', { pctl: pc.driver_effect, tip: V.tip(meta, 'driver_effect') }),
-    PD.kpi('Qualifying v team-mate', isNum((d.values || {}).quali_driver_effect) ? PD.signed(d.values.quali_driver_effect, 3) + '%' : '—', 'of a lap · lower is faster', { pctl: pc.quali_driver_effect, tip: V.tip(meta, 'quali_driver_effect') }),
+    effTile('Race driver rating', 'driver_effect', 'race'),
+    effTile('Qualifying driver rating', 'quali_driver_effect', 'quali'),
     PD.kpi('Points per race', isNum((d.values || {}).points_per_race) ? PD.num(d.values.points_per_race, 2) : '—', (stand.wins || 0) + ' wins · ' + (stand.podiums || 0) + ' podiums · ' + (stand.poles || 0) + ' poles', { pctl: pc.points_per_race }),
     PD.kpi('Ahead of the team-mate', isNum((d.values || {}).race_h2h) ? PD.pct(d.values.race_h2h, 0) : '—', mate ? 'of races ahead of ' + esc(PD.driverSurname(mate)) : 'of races ahead of the team-mate', { pctl: pc.race_h2h, tip: V.tip(meta, 'race_h2h') })
   ] : null;
@@ -123,7 +137,10 @@ function draw(el, id, y, cat, career, elo, askedY) {
     var small = races < 8;
     var nums = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven'];
     var sampleWords = races ? (small ? nums[races] + ' start' + (races === 1 ? ' is' : 's is') + ' a small sample.' : races + ' starts: the picture is settling.') : 'No starts yet this season.';
-    var settleNote = '<b>How sure are we?</b> ' + esc(sampleWords) + ' Team-mate numbers settle fastest because the car is the same.' +
+    var er = effOf('race'), dev = (d.values || {}).driver_effect;
+    var effLine = er && isNum(dev) ? ' The race driver rating is ' + PD.signed(dev, 3) + '% of a lap ± ' + PD.num(er.se, 3) + ' (one standard error): ' +
+      (dev - er.se < 0 && dev + er.se > 0 ? 'the band crosses zero, so the gap to the team-mate is not yet clear.' : 'the band is clear of zero, so the gap to the team-mate holds at one standard error.') : '';
+    var settleNote = '<b>How sure are we?</b> ' + esc(sampleWords) + ' Team-mate numbers settle fastest because the car is the same.' + effLine +
       (settle.length ? ' Half the season-to-season noise is gone for ' + settle.join(', ').replace(/, ([^,]*)$/, ', and $1') + '.' : '') + ' <span id="dv-prev-note"></span>';
     var sureCard = '<article class="qk-card cream"><div class="qk-card-body"><div class="qk-kicker">How sure are we?</div><h3 style="margin:8px 0 6px">' + esc(sampleWords.replace(/\.$/, '')) + '</h3>' +
       '<p style="margin:0;color:var(--ink-2);font-size:15px">Team-mate numbers settle fastest because the car is the same.</p>' + (settle.length ? QK.note('Half the season-to-season noise is gone for ' + settle.join(', ').replace(/, ([^,]*)$/, ', and $1') + '.') : '') + '</div></article>';
@@ -146,7 +163,10 @@ function draw(el, id, y, cat, career, elo, askedY) {
     /* 3. the race log: every race this season, the best weekend highlighted */
     var logR = (d.log || []).slice();
     var bestR = logR.slice().sort(function (a, b) { return ((b.points || 0) - (a.points || 0)) || ((a.pos || 99) - (b.pos || 99)); })[0];
-    h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'Race log', title: 'Every race this season', sub: bestR && bestR.points > 0 ? PD.pts(bestR.points) + ' points in ' + esc(PD.shortRace(bestR.name || ('Round ' + bestR.round))) + ' is the best weekend so far (highlighted). Pace is the race-pace effect in seconds a lap against the field (negative is faster); deg is tyre wear by compound.' : 'Every round, newest first.' }) +
+    var hasExp = logR.some(function (r) { return isNum(r.exp_points); }), hasPw = logR.some(function (r) { return isNum(r.p_win); });
+    h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'Race log', title: 'Every race this season', html: true, sub: (bestR && bestR.points > 0 ? PD.pts(bestR.points) + ' points in ' + esc(PD.shortRace(bestR.name || ('Round ' + bestR.round))) + ' is the best weekend so far (highlighted). ' : 'Every round, newest first. ') +
+      (hasExp ? 'Our numbers before each race (' + (hasPw ? 'win and podium chance, ' : '') + 'expected points) come from the forecast after qualifying, built only from data published before the race; “v exp.” is the Grand Prix’s points against that expectation. ' : '') +
+      'Pace is the race-pace effect in seconds a lap against the field (negative is faster); deg is tyre wear by compound, seconds a lap per lap.' }) +
       PD.card('', '', '<div id="dv-log"></div>', { flush: true }) + '</section>';
     /* 4. race by race and their type */
     h += '<section class="qk-section"><div class="qk-gside"><div>' + rbr + '</div><div>' + (tapeOn ? typeCard : '') + '</div></div></section>';
@@ -279,7 +299,8 @@ function nextLast(id, d, y, team, mateId, D) {
     if (nx) {
       var rs = ((nx.sessions || {}).race) || nx.date;
       var nd = PD.parseDate(rs), soon = nd && nd.getTime() - QK.now() < 7 * 864e5;
-      out += '<div>' + QK.sectionHead({ kicker: soon ? 'What to watch this weekend' : 'Next up', title: PD.shortRace(nx.name) + ' Grand Prix', sub: 'Round ' + nx.round + ' · ' + esc(((nx.circuit || {}).name) || '') + ' · ' + esc(PD.fmtDate(rs, { year: false, time: true })) + ', your time', html: true }) + '<div id="dv-next">';
+      var fAt = f && (f.generated_at || (race.forecast || {}).generated_at);
+      out += '<div>' + QK.sectionHead({ kicker: soon ? 'What to watch this weekend' : 'Next up', title: PD.shortRace(nx.name) + ' Grand Prix', sub: 'Round ' + nx.round + ' · ' + esc(((nx.circuit || {}).name) || '') + ' · ' + esc(PD.fmtDate(rs, { year: false, time: true })) + ', your time' + (me && fAt ? ' · our forecast ' + (f === race.forecast.post_quali ? 'after qualifying' : 'before qualifying') + ', as of ' + esc(PD.asOf(fAt)) : ''), html: true }) + '<div id="dv-next">';
       if (me) {
         var ids = Object.keys(ds).filter(function (k) { return isNum(ds[k].p_win); }).sort(function (a, b) { return ds[b].p_win - ds[a].p_win; });
         var opp = ids[0] === id ? ids[1] : ids[0];
@@ -297,37 +318,43 @@ function nextLast(id, d, y, team, mateId, D) {
     if (last) {
       var fin = PD.finished(last.status);
       var where = PD.shortRace(last.name || ('Round ' + last.round));
-      out += '<div>' + QK.sectionHead({ kicker: 'Last race', title: (fin ? 'P' + last.pos : 'DNF') + ' in ' + where, sub: (isNum(last.grid) && last.grid > 0 ? 'From P' + last.grid + ' on the grid' : 'From the pit lane') + ', ' + PD.pts(last.points || 0) + ' point' + (last.points === 1 ? '' : 's') + (isNum(last.exp_points) ? ' against the ' + PD.num(last.exp_points, 1) + ' we expected' : '') + '.', html: true }) +
+      out += '<div>' + QK.sectionHead({ kicker: y < PD.currentSeason() ? 'Last race of ' + y : 'Last race', title: (fin ? 'P' + last.pos : 'DNF') + ' at the ' + where + ' GP', sub: (isNum(last.grid) && last.grid > 0 ? 'From P' + last.grid + ' on the grid' : 'From the pit lane') + ', ' + PD.pts(last.points || 0) + ' point' + (last.points === 1 ? '' : 's') + (isNum(last.exp_points) ? ' against the ' + PD.num(last.exp_points, 1) + ' we expected' : '') + '.', html: true }) +
         '<article class="qk-card"><div class="qk-card-body"><div id="dv-box"></div><div id="dv-race"></div><p class="qk-caption"><a class="qk-link" href="' + PD.raceHref(y, last.round) + '">Race centre: laps, strategy and awards</a></p></div></article></div>';
     }
     if (!out) return;
-    g.innerHTML = out; wrap.hidden = false;
+    /* both blocks side by side; one alone (a past season: no next race) runs the full width */
+    g.innerHTML = out; g.className = nx && out.indexOf('Last race') >= 0 ? 'qk-g2' : ''; wrap.hidden = false;
     if (last) lastBox(id, last, y, team, mateId, D);
   });
 }
-function lastBox(id, last, y, team, mateId, D) {
+/* pfx: the element ids' prefix (<pfx>-box, <pfx>-race; 'dv' here, 'tm' on the constructor page through PD.raceBox) */
+function lastBox(id, last, y, team, mateId, D, pfx) {
   D = D || {};
+  var P = pfx || 'dv';
   var mrow = mateId && D[mateId] ? (D[mateId].log || []).filter(function (r) { return r.round === last.round; })[0] : null;
+  var hasE = isNum(last.exp_points) || !!(mrow && isNum(mrow.exp_points));   /* no forecast stored (older seasons): no column */
   var row = function (did, r, hl) {
     var t = function (v) { return isNum(v) ? String(v) : '—'; };
     return '<tr' + (hl ? ' class="hl"' : '') + '><td>' + PD.driverLink(did, { code: true, team: team }) + '</td><td class="num">' + t(r.quali_pos) + '</td><td class="num">' + (r.grid === 0 ? 'PL' : t(r.grid)) + '</td><td class="num">' + PD.posHTML(r.pos, r.status) + '</td>' +
       '<td class="num">' + PD.deltaHTML(r.pos_gained) + '</td><td class="num">' + PD.deltaHTML(r.lap1_gain) + '</td><td class="num">' + t(r.overtakes) + '</td><td class="num">' + t(r.pit_stops) + '</td><td class="num">' + t(r.pace_rank) + '</td>' +
-      '<td class="num"><b>' + PD.pts(r.points || 0) + '</b></td><td class="num">' + (isNum(r.exp_points) ? PD.num(r.exp_points, 1) : '—') + '</td></tr>';
+      '<td class="num"><b>' + PD.pts(r.points || 0) + '</b></td>' + (hasE ? '<td class="num">' + (isNum(r.exp_points) ? PD.num(r.exp_points, 1) : '—') + '</td>' : '') + '</tr>';
   };
-  PD.set('dv-box', '<div class="qk-table-wrap"><table class="qk-table dense"><thead><tr><th>Driver</th><th class="num">Quali</th><th class="num">Grid</th><th class="num">Finish</th><th class="num" data-tip="Places gained from the grid">Gained</th><th class="num" data-tip="Places gained on the opening lap">Lap 1</th><th class="num">Overtakes</th><th class="num">Stops</th><th class="num" data-tip="Our lap-time model’s race-pace rank (1 = fastest)">Pace rank</th><th class="num">Pts</th><th class="num" data-tip="Our expected points before the race">Exp. pts</th></tr></thead><tbody>' +
+  PD.set(P + '-box', '<div class="qk-table-wrap"><table class="qk-table dense"><thead><tr><th>Driver</th><th class="num">Quali</th><th class="num">Grid</th><th class="num">Finish</th><th class="num" data-tip="Places gained from the grid">Gained</th><th class="num" data-tip="Places gained on the opening lap">Lap 1</th><th class="num">Overtakes</th><th class="num">Stops</th><th class="num" data-tip="Our lap-time model’s race-pace rank (1 = fastest)">Pace rank</th><th class="num">Pts</th>' + (hasE ? '<th class="num" data-tip="Our expected points before the race">Exp. pts</th>' : '') + '</tr></thead><tbody>' +
     row(id, last, true) + (mrow ? row(mateId, mrow, false) : '') + '</tbody></table></div>');
-  PD.load(y + '/races/' + last.round + '.json').then(function (race) {
-    var host = document.getElementById('dv-race');
-    if (!host || !PD.ok(race)) return;
-    var P = (race.laps || {}).positions || {};
-    var pick = {}; [id, mateId].forEach(function (k) { if (k && P[k]) pick[k] = P[k]; });
-    if (!Object.keys(pick).length) return;
-    var n = Object.keys(P).length || 20;
-    host.innerHTML = PD.chartBox('dv-race-c', 240, 'Positions lap by lap in the last race');
+  return PD.load(y + '/races/' + last.round + '.json').then(function (race) {
+    var host = document.getElementById(P + '-race');
+    if (!host || !PD.ok(race)) return race;
+    var pos = (race.laps || {}).positions || {};
+    var pick = {}; [id, mateId].forEach(function (k) { if (k && pos[k]) pick[k] = pos[k]; });
+    if (!Object.keys(pick).length) return race;
+    var n = Object.keys(pos).length || 20;
+    host.innerHTML = PD.chartBox(P + '-race-c', 240, 'Positions lap by lap in the last race');
     var tm = {}; tm[id] = team; if (mateId) tm[mateId] = team;
-    PD.ch.lapLines('dv-race-c', pick, { order: [id, mateId].filter(Boolean), teams: tm, control: race.control, invert: true, yMin: 1, yMax: n, interval: n > 12 ? 4 : 2, yName: 'Position', fmt: function (v) { return 'P' + v; }, yFmt: function (v) { return 'P' + v; }, label: 'Positions lap by lap: the driver and the team-mate' });
+    PD.ch.lapLines(P + '-race-c', pick, { order: [id, mateId].filter(Boolean), teams: tm, control: race.control, invert: true, yMin: 1, yMax: n, interval: n > 12 ? 4 : 2, yName: 'Position', fmt: function (v) { return 'P' + v; }, yFmt: function (v) { return 'P' + v; }, label: 'Positions lap by lap: ' + (P === 'dv' ? 'the driver and the team-mate' : 'both cars') });
+    return race;
   });
 }
+PD.raceBox = lastBox;
 
 /* Movement: our expected final points after each recorded round, with the 5th-95th percentile band (title_history). */
 function movement(season, id, team) {
@@ -381,21 +408,32 @@ function season_(d, id, y, metrics, D, mate, ms, tcol, team, dP, bestR) {
       { key: 'pb', label: nB, num: true, fmt: function (v, r) { return PD.posHTML(v, r.sb); } }
     ], hh.rows.map(function (p) { return { round: p[0].round, name: p[0].name || '', qa: p[0].quali_pos, qb: p[1].quali_pos, pa: p[0].pos, pb: p[1].pos, sa: p[0].status, sb: p[1].status }; }), { sort: { key: 'round', dir: 'desc' }, maxHeight: 360 });
   } else PD.set('dv-h2h', PD.muted('No team-mate in the catalogue this season.'));
+  /* the race log: the weekend, then our numbers before it (the walk-forward forecast after qualifying: win and podium
+     chance when the build carries them, expected points) and the Grand Prix's points against that expectation, then
+     the racecraft and pace columns */
+  var hasExp = log.some(function (r) { return isNum(r.exp_points); }), hasPw = log.some(function (r) { return isNum(r.p_win); }), hasPp = log.some(function (r) { return isNum(r.p_podium); });
+  var vExp = function (r) { var rp = isNum(r.race_points) ? r.race_points : r.points; return isNum(r.exp_points) && isNum(rp) ? rp - r.exp_points : null; };
+  var FC = { name: 'Race forecast', about: 'Our pre-race forecast of every finishing position, and the points it expects.' };
+  var pcol = function (key, label, tip) { return { key: key, label: label, num: true, tip: tip, ours: FC, fmt: function (v) { return isNum(v) ? '<span class="pd-ours">' + PD.pct(v, v < 0.1 ? 1 : 0) + '</span>' : '—'; } }; };
   PD.table('dv-log', [
     { key: 'round', label: 'Rd', num: true },
     { key: 'name', label: 'Race', sticky: true, fmt: function (v, r) { return PD.raceLink(y, r.round, PD.shortRace(v || 'Round ' + r.round)); } },
     { key: 'quali_pos', label: 'Quali', num: true }, { key: 'grid', label: 'Grid', num: true },
     { key: 'fpos', label: 'Finish', num: true, fmt: function (v, r) { return PD.posHTML(r.pos, r.status); } },
+    { key: 'points', label: 'Pts', num: true, tip: 'Points from the weekend, the sprint included', fmt: function (v) { return v ? '<b>' + PD.pts(v) + '</b>' : '0'; } }
+  ].concat(hasPw ? [pcol('p_win', 'Win', 'Our win chance before the race, from the forecast after qualifying')] : [])
+    .concat(hasPp ? [pcol('p_podium', 'Podium', 'Our podium chance before the race, from the forecast after qualifying')] : [])
+    .concat(hasExp ? [{ key: 'exp_points', label: 'Exp. pts', num: true, ours: FC, tip: 'Our expected points for the Grand Prix before the race (forecast after qualifying)', fmt: function (v) { return isNum(v) ? '<span class="pd-ours">' + PD.num(v, 1) + '</span>' : '—'; } },
+      { key: 'vexp', label: 'v exp.', num: true, tip: 'Grand Prix points minus our expected points: above zero beat our forecast', fmt: function (v) { return PD.deltaHTML(v, 1); } }] : [])
+    .concat([
     { key: 'pos_gained', label: 'Gained', num: true, fmt: function (v) { return PD.deltaHTML(v); } },
     { key: 'lap1_gain', label: 'Lap 1', num: true, fmt: function (v) { return PD.deltaHTML(v); } },
     { key: 'overtakes', label: 'Overtakes', num: true }, { key: 'pit_stops', label: 'Stops', num: true },
-    { key: 'pace', label: 'Pace', num: true, fmt: function (v) { return isNum(v) ? PD.signed(v, 3) : '—'; } },
+    { key: 'pace', label: 'Pace', num: true, tip: 'Race pace against the field, seconds a lap (negative is faster)', fmt: function (v) { return isNum(v) ? PD.signed(v, 3) : '—'; } },
     { key: 'pace_rank', label: 'Pace rank', num: true },
-    { key: 'degm', label: 'Deg', num: true, fmt: function (v, r) { var deg = r.deg; if (!deg || typeof deg !== 'object') return isNum(deg) ? PD.num(deg, 3) : '—'; return Object.keys(deg).filter(function (k) { return isNum(deg[k]); }).map(function (k) { return '<span title="' + esc(k) + '" style="color:' + PD.compoundColour(k) + '">●</span>' + PD.num(deg[k], 3); }).join(' ') || '—'; } },
-    { key: 'points', label: 'Pts', num: true, fmt: function (v) { return v ? '<b>' + PD.pts(v) + '</b>' : '0'; } }
-  ], log.map(function (r) { var deg = r.deg; var dm = deg && typeof deg === 'object' ? PD.mean(Object.keys(deg).map(function (k) { return deg[k]; })) : deg; return Object.assign({}, r, { fpos: PD.finished(r.status) ? r.pos : 99, degm: dm }); }),
-    { sort: { key: 'round', dir: 'desc' }, rowClass: function (r) { return bestR && r.round === bestR.round && (bestR.points || 0) > 0 ? 'hl' : ''; } });
-  var style = metrics.filter(function (m) { return /telemetry|style/i.test(m.group || ''); });
+    { key: 'degm', label: 'Deg', num: true, tip: 'Tyre wear by compound: seconds a lap lost per lap of tyre age', fmt: function (v, r) { var deg = r.deg; if (!deg || typeof deg !== 'object') return isNum(deg) ? PD.num(deg, 3) : '—'; return Object.keys(deg).filter(function (k) { return isNum(deg[k]); }).map(function (k) { return '<span class="pd-deg" title="' + esc(PD.titleCase(k.toLowerCase())) + '"><i class="pd-cdot" style="background:' + PD.compoundColour(k) + '" aria-hidden="true"></i><span class="qk-sr">' + esc(k.charAt(0)) + ' </span>' + PD.num(deg[k], 3) + '</span>'; }).join(' ') || '—'; } }
+  ]), log.map(function (r) { var deg = r.deg; var dm = deg && typeof deg === 'object' ? PD.mean(Object.keys(deg).map(function (k) { return deg[k]; })) : deg; return Object.assign({}, r, { fpos: PD.finished(r.status) ? r.pos : 99, degm: dm, vexp: vExp(r) }); }),
+    { sort: { key: 'round', dir: 'desc' }, rowClass: function (r) { return bestR && r.round === bestR.round && (bestR.points || 0) > 0 ? 'hl' : ''; } });  var style = metrics.filter(function (m) { return /telemetry|style/i.test(m.group || ''); });
   PD.set('dv-style', style.length && style.some(function (m) { return isNum((d.values || {})[m.key]); }) ? PD.kpis(style.map(function (m) {
     var v = (d.values || {})[m.key], p = (d.pct || {})[m.key];
     return PD.kpi(m.label, PD.fmtVal(v, m.fmt) + ' ' + PD.pctl(p), esc(m.desc || ''), { tip: m.desc });

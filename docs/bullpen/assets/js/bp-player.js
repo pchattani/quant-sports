@@ -87,6 +87,15 @@ function logSection(cur, kind, L, S) {
     '</div></article></section>';
 }
 
+/* The player's last game from the game log (round 11): { gpk, date, t, opp, home, res } of the newest row, or null. */
+function lastLogRow(cur, kind) {
+  const lg = ((cur && cur.log) || {})[kind === 'pitcher' ? 'pitching' : 'hitting'];
+  if (!lg || !Array.isArray(lg.cols) || !Array.isArray(lg.rows) || !lg.rows.length) return null;
+  const ix = {}; lg.cols.forEach((c, i) => { ix[c] = i; });
+  const r = lg.rows[lg.rows.length - 1], g = k => (ix[k] === undefined ? null : r[ix[k]]);
+  return { gpk: g('gpk') ? String(g('gpk')) : null, date: g('date'), t: g('t'), opp: g('opp'), home: !!g('home'), res: g('res') };
+}
+
 function render(el, params, state, route) {
   const pid = String(params.id || '');
   const L = params.level, S = params.season;
@@ -241,6 +250,11 @@ function draw(el, c) {
   const mine = x => x && (String(x.home) === String(tid) || String(x.away) === String(tid));
   const nxt = isCur ? [].concat(src.today || [], src.upcoming || []).filter(x => mine(x) && !BP.isFinal(x) && U.fresh(x)).sort((x, y) => String(x.start).localeCompare(String(y.start)))[0] : null;
   const lastG = isCur ? (src.recent || []).filter(x => mine(x) && BP.isFinal(x)).sort((x, y) => String(y.start).localeCompare(String(x.start)))[0] : null;
+  /* round 11: no next or recent game (the off-season, or a player whose club has not played lately): the player's last
+     game from the game log, and next season's projection in the slot the next game would take */
+  const pj = cur.projection;
+  const lgRow = !nxt && !lastG ? lastLogRow(cur, kind) : null;
+  const projUp = !!(lgRow && pj && pj.components);
   if (nxt || lastG) {
     h += '<section class="qk-section"><div class="qk-g2">';
     if (nxt) {
@@ -269,6 +283,17 @@ function draw(el, c) {
         '<article class="qk-card"><div class="qk-card-body"><div id="pp-box">' + BP.gameCard(lastG, { level: L, date: true }) + '</div><div id="pp-race"></div></div></article></div>';
     }
     h += '</div></section>';
+  } else if (lgRow) {
+    const post = { F: 'Wild Card', D: 'Division Series', L: 'LCS', W: 'World Series' };
+    const ttl = U.scoreTitle(tid, lgRow.opp, lgRow.res) || ((lgRow.home ? 'v ' : 'at ') + lgRow.opp);
+    const nextS = Number(S) + 1;
+    const offs = /off|complete/.test(String(BP.phase ? BP.phase(L) : '') || '') || !isCur;
+    h += '<section class="qk-section"><div' + (projUp ? ' class="qk-g2"' : '') + '>' +
+      (projUp ? '<div>' + QK.sectionHead({ kicker: 'Next season', title: 'What we expect in ' + (pj.season || nextS), sub: 'Our projection with its 80% range (10th to 90th percentile).' + (offs && isCur ? ' The ' + nextS + ' season starts in the spring.' : '') }) +
+        '<article class="qk-card"><div class="qk-card-body flush"><div id="pp-proj"></div></div></article></div>' : '') +
+      '<div>' + QK.sectionHead({ kicker: 'Last game', title: ttl, html: true, sub: esc([BP.fmtDate(lgRow.date, { year: false }), lgRow.home ? 'at home' : 'away', L === 'mlb' ? post[lgRow.t] || '' : (lgRow.t && lgRow.t !== 'R' ? 'Postseason' : ''), offs && isCur ? 'the player’s last game of ' + S : ''].filter(Boolean).join(' · ')),
+        actions: lgRow.gpk ? '<a class="qk-more" href="' + esc(BP.gameHref(lgRow.gpk, L, S)) + '">The game centre</a>' : '' }) +
+      '<article class="qk-card"><div class="qk-card-body"><div id="pp-box">' + QK.skeleton('lines', 3) + '</div><div id="pp-lgnote"></div><div id="pp-race"></div></div></article></div></div></section>';
   }
   /* the game log: every game this season (current.log, written by the build), newest first, the best one highlighted */
   h += logSection(cur, kind, L, S);
@@ -276,15 +301,22 @@ function draw(el, c) {
   if (tapeOn && formCard && typeCard) h += '<section class="qk-section"><div class="qk-gside"><div>' + formCard + '</div><div>' + typeCard + '</div></div></section>';
   else if (tapeOn && (formCard || typeCard)) h += '<section class="qk-section">' + formCard + typeCard + '</section>';
   // ── more on the player
-  h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'More on the player', title: 'Peers, projection and the long view', sub: 'Where the player sits among ' + esc(peerShort) + ', what we expect next season, the splits and every season in the data.' }) +
-    U.card2('Among peers', 'Every ' + esc(peerShort) + ' past the floor this season; bars coloured by percentile', '<div id="pp-dist-m" style="margin-bottom:10px">' + U.seg('pp-dseg', 'Metric', DIST[kind], '') + '</div><div id="pp-dist">' +
-      QK.empty('Pick a metric', 'The peer group loads on request (the season catalogue is several megabytes).') + '</div>');
-  h += '<div class="qk-grid" style="margin-top:var(--sp-4)">';
-  const pj = cur.projection;
-  if (pj && pj.components) h += '<div class="qk-span-6">' + U.card2('Next season', 'Our ' + (pj.season || '') + ' projection with its 80% range (10th to 90th percentile)', '<div id="pp-proj"></div>', { flush: true }) + '</div>';
+  /* round 11: the headline metric is drawn by default (peers.json first, so no catalogue load); the chips switch */
+  const peersCard = U.card2('Among peers', 'Every ' + esc(peerShort) + ' past the floor this season; bars coloured by percentile', '<div id="pp-dist-m" style="margin-bottom:10px">' + U.seg('pp-dseg', 'Metric', DIST[kind], DIST[kind][0][0]) + '</div><div id="pp-dist">' +
+    QK.skeleton('chart', 1) + '</div>');
   const sp = (cur.splits || {})[pit ? 'pitcher' : 'batter'];
-  if (sp) h += '<div class="qk-span-6">' + U.card2('Splits', 'This season' + (pit ? ', batters faced' : ''), '<div id="pp-splits"></div>', { flush: true }) + '</div>';
-  h += '</div></section>';
+  const projLow = pj && pj.components && !projUp;
+  h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'More on the player', title: projUp ? 'Peers and the long view' : 'Peers, projection and the long view', sub: 'Where the player sits among ' + esc(peerShort) + (projUp ? '' : ', what we expect next season') + ', the splits and every season in the data.' });
+  /* the projection moved up (the off-season): the peers and the splits share the row */
+  if (projUp && sp) h += '<div class="qk-grid"><div class="qk-span-7">' + peersCard + '</div><div class="qk-span-5">' + U.card2('Splits', 'This season' + (pit ? ', batters faced' : ''), '<div id="pp-splits"></div>', { flush: true }) + '</div></div>';
+  else h += peersCard;
+  if (!(projUp && sp) && (projLow || sp)) {
+    h += '<div class="qk-grid" style="margin-top:var(--sp-4)">';
+    if (projLow) h += '<div class="qk-span-' + (sp ? 6 : 12) + '">' + U.card2('Next season', 'Our ' + (pj.season || '') + ' projection with its 80% range (10th to 90th percentile)', '<div id="pp-proj"></div>', { flush: true }) + '</div>';
+    if (sp) h += '<div class="qk-span-' + (projLow ? 6 : 12) + '">' + U.card2('Splits', 'This season' + (pit ? ', batters faced' : ''), '<div id="pp-splits"></div>', { flush: true }) + '</div>';
+    h += '</div>';
+  }
+  h += '</section>';
   h += '<section class="qk-section" id="pp-mv"></section>';
   h += '<section class="qk-section">' + U.card2('Season by season', 'Every ' + (pit ? 'pitching' : 'hitting') + ' season in the data, all levels', '<div id="pp-career"></div>', { flush: true }) + '</section>';
   el.innerHTML = h;
@@ -360,42 +392,27 @@ function draw(el, c) {
   }), '0px 0px -160px 0px', 2500);
 
   // the last game: the line score by inning (runs, hits, errors) and our win chance through it (the game file)
-  if (lastG && el.querySelector('#pp-race')) {
-    BP.loadGame(lastG.gpk, L, S).then(d => {
-      if (!BP.ok(d) || !U.alive(el)) return;
-      const ls = Array.isArray(d.linescore) ? d.linescore : (d.linescore && d.linescore.innings) || [];
-      if (ls.length) {
-        const tot = d.linescore_totals || {};
-        const n9 = Math.max(9, ls.length);
-        const mine = String(tid);
-        const row = (t, kx, runs) => '<tr' + (String(t) === mine ? ' class="hl"' : '') + '><td>' + BP.teamMark(t, 'sm') + '</td>' +
-          Array.apply(null, Array(n9)).map((_, i) => '<td class="num">' + (ls[i] && isNum(ls[i][kx]) ? ls[i][kx] : (ls[i] ? 'x' : '')) + '</td>').join('') +
-          '<td class="num"><b>' + (isNum(runs) ? runs : '–') + '</b></td>' + (tot.h ? '<td class="num">' + (isNum(tot.h[kx]) ? tot.h[kx] : '–') + '</td>' : '') + (tot.e ? '<td class="num">' + (isNum(tot.e[kx]) ? tot.e[kx] : '–') + '</td>' : '') + '</tr>';
-        el.querySelector('#pp-box').innerHTML = '<div class="qk-table-wrap"><table class="qk-table dense bp-ls"><thead><tr><th>Club</th>' + Array.apply(null, Array(n9)).map((_, i) => '<th class="num">' + (i + 1) + '</th>').join('') +
-          '<th class="num" data-tip="Runs">R</th>' + (tot.h ? '<th class="num" data-tip="Hits">H</th>' : '') + (tot.e ? '<th class="num" data-tip="Errors">E</th>' : '') + '</tr></thead><tbody>' + row(d.away, 0, d.as) + row(d.home, 1, d.hs) + '</tbody></table></div>';
-      }
-      /* wp.ours rows [play, inning, half (0 top, 1 bottom), our home win chance]: placed by inning and half */
-      const wr = (((d.wp || {}).ours) || (Array.isArray(d.wp) ? d.wp : [])).filter(r => Array.isArray(r) && isNum(r[1]) && isNum(r[3]));
-      if (wr.length > 4) {
-        const cnt = {}, seen = {};
-        wr.forEach(r => { const kk = r[1] + ':' + (r[2] ? 1 : 0); cnt[kk] = (cnt[kk] || 0) + 1; });
-        const t = wr.map(r => { const kk = r[1] + ':' + (r[2] ? 1 : 0); const j = seen[kk] = (seen[kk] || 0) + 1; return (r[1] - 1) + (r[2] ? 0.5 : 0) + 0.5 * (j - 1) / cnt[kk]; });
-        const innN = Math.max(9, Math.ceil(t[t.length - 1]));
-        const per = []; for (let i = 1; i < innN; i++) per.push(i);
-        const hc = U.pair(d.home, d.away);
-        el.querySelector('#pp-race').innerHTML = U.chart('pp-race-c', 230, 'Our win chance through the last game');
-        QKC.winProb('#pp-race-c', { t: t, p: wr.map(r => r[3]), step: true, tMin: 0, tMax: innN, interval: 1, periods: per,
-          home: { name: BP.teamName(d.home), abbr: BP.teamAbbr(d.home), colour: hc[0] }, away: { name: BP.teamName(d.away), abbr: BP.teamAbbr(d.away), colour: hc[1] },
-          tFmt: x => (x < innN ? String(Math.round(x) + 1) : ''), tLabel: x => (x % 1 >= 0.5 ? 'Bottom ' : 'Top ') + (Math.floor(x) + 1),
-          tName: 'Inning', yName: BP.teamAbbr(d.home) + ' win chance (ours)' });
-      }
+  if (lastG && el.querySelector('#pp-race')) U.lastGame(el.querySelector('#pp-box'), el.querySelector('#pp-race'), 'pp-race-c', lastG.gpk, L, S, tid);
+  /* round 11: the last game from the log (the off-season): the line score and our win chance through it from the game
+     file, and our pre-game chance for the player's club with the result in plain words */
+  if (lgRow && !lgRow.gpk && el.querySelector('#pp-box')) el.querySelector('#pp-box').innerHTML = QK.empty('No game file', 'The line score for this game is not on the site.');
+  if (lgRow && lgRow.gpk && el.querySelector('#pp-box')) {
+    const box = el.querySelector('#pp-box');
+    U.lastGame(box, el.querySelector('#pp-race'), 'pp-race-c', lgRow.gpk, L, S, tid).then(d => {
+      if (!U.alive(el)) return;
+      if (!d) { box.innerHTML = QK.empty('No game file', 'The line score for this game is not on the site.'); return; }
+      const m = ((d.pregame || {}).model) || d.model || {};
+      const home = String(d.home) === String(tid), pW = isNum(m.p_home) ? (home ? m.p_home : 1 - m.p_home) : null;
+      const won = isNum(d.hs) && isNum(d.as) ? (home ? d.hs > d.as : d.as > d.hs) : null;
+      if (isNum(pW) && won !== null) el.querySelector('#pp-lgnote').innerHTML = QK.explain(esc('We gave the ' + BP.teamShort(tid) + ' a ' + U.pct(pW) + ' chance before the game' +
+        (won ? (pW < 0.4 ? ': an upset win.' : pW < 0.5 ? ': a win as the slight underdog.' : ': a win, as expected.') : (pW > 0.6 ? ': a loss as the clear favourite.' : pW > 0.5 ? ': a loss as the slight favourite.' : ': a loss, as expected.'))));
     });
   }
 
-  // where the player sits: the peer group loads on request
+  // where the player sits: the headline metric by default (round 11), the chips switch
   let PEERS = null;   // <L>/<S>/peers.json once fetched (false: not built)
   const dseg = el.querySelector('#pp-dseg');
-  QK.seg(dseg, key => {
+  const drawDist = key => {
     const box = el.querySelector('#pp-dist');
     box.innerHTML = QK.skeleton('chart', 1);
     const slim = peerValues(blk, cur, key);
@@ -415,7 +432,10 @@ function draw(el, c) {
       QKC.distribution('#pp-dist-c', { values: vals, binCount: 22, lowerBetter: m.lower, fmt: x => U.fmtBy(m, x).replace(' mph', ''), xName: m.label + ' · ' + vals.length + ' ' + peer,
         yName: 'Players', marks: (isNum(mineV) ? [{ x: mineV, label: sur }] : []).concat([{ x: med, label: 'Median' }]), label: 'Distribution of ' + m.label });
     });
-  });
+  };
+  QK.seg(dseg, drawDist);
+  /* the default draws once the card nears the screen (peers.json is small; the catalogue only for a metric it lacks) */
+  onView(el.querySelector('#pp-dist'), () => drawDist(DIST[kind][0][0]), '300px', 4000);
 
   if (pit) pitchMix(el, cur, v);
   else rollingChart(el, cur);

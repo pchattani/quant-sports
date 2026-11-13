@@ -90,22 +90,25 @@ function oddsCell(p, colour) {
   if (p <= 0.0005) return { html: '<span class="qk-muted">0%</span>', v: 0 };
   return { html: GI.probBar(p, colour), v: p };
 }
+/* round 11: the last five results (season.json last5, oldest first) as the kit's form squares, the streak in the tooltip */
+const FORM_COL = { label: 'Form', sortable: false, title: 'The last five results, oldest first (W win, L loss, D tie)' };
+function formCell(r) { return Array.isArray(r.last5) && r.last5.length ? { html: QK.formDots(r.last5), v: r.last5.join(''), title: r.streak ? 'Streak ' + r.streak : '' } : { html: '<span class="qk-muted">—</span>', v: '' }; }
 function doneTable(rows, S) {
-  return GI.tableHTML([{ label: 'Team' }, { label: 'W-L', align: 'right' }, { label: 'Diff', align: 'right', title: 'Points for minus points against' },
+  return GI.tableHTML([{ label: 'Team' }, { label: 'W-L', align: 'right' }, FORM_COL, { label: 'Diff', align: 'right', title: 'Points for minus points against' },
     { label: 'Rating', align: 'right', title: 'Our team rating at the end of the season' }, { label: 'Seed', align: 'right', title: 'Playoff seed at the end of the regular season' }],
-  rows.map(r => ({ _href: GI.teamHref(r.team, S), cells: [{ html: GI.teamLink(r.team, { short: true, season: S }) + clinchTag(r) + GI.followStar(r.team), v: r.team }, { html: GI.record(r.w, r.l, r.t), v: pctW(r) },
+  rows.map(r => ({ _href: GI.teamHref(r.team, S), cells: [{ html: GI.teamLink(r.team, { short: true, season: S }) + clinchTag(r) + GI.followStar(r.team), v: r.team }, { html: GI.record(r.w, r.l, r.t), v: pctW(r) }, formCell(r),
     { html: GI.deltaHTML(r.diff, 0), v: r.diff }, { html: isNum(r.rating) ? GI.signed(r.rating, 1) : '—', v: r.rating }, { html: isNum(r.seed) ? '<b>' + r.seed + '</b>' : '<span class="qk-muted">—</span>', v: isNum(r.seed) ? r.seed : 99 }] })), { sticky: true });
 }
 function divTable(rows, S, lo, done) {
   if (done) return doneTable(rows, S);
-  return GI.tableHTML([{ label: 'Team' }, { label: 'W-L', align: 'right' }, { label: 'Diff', align: 'right', title: 'Points for minus points against' },
+  return GI.tableHTML([{ label: 'Team' }, { label: 'W-L', align: 'right' }, FORM_COL, { label: 'Diff', align: 'right', title: 'Points for minus points against' },
     { label: 'Rating', align: 'right', title: 'Our team rating: points better than an average team on a neutral field' },
     { label: 'Rem SOS', align: 'right', title: 'Strength of the remaining schedule (average opponent rating; played so far in the tooltip)' },
     { label: 'Playoffs', align: 'right', title: 'Our chance of making the playoffs (season simulation)' }, { label: 'Div', align: 'right', title: 'Our chance of winning the division' }, { label: 'Bye', align: 'right', title: 'Our chance of the No. 1 seed and the bye' },
     { label: 'SB', align: 'right', title: 'Our chance of winning the Super Bowl' }, { label: 'Magic', align: 'right', title: 'Magic numbers: P to clinch a playoff place, D to win the division' }].concat(lo ? [PROFILE_COL] : []),
   rows.map(r => ({ _href: GI.teamHref(r.team, S), cells: [
     { html: toggle(lo, r.team) + GI.teamLink(r.team, { short: true, season: S }) + clinchTag(r) + GI.followStar(r.team), v: r.team },
-    { html: GI.record(r.w, r.l, r.t), v: pctW(r) },
+    { html: GI.record(r.w, r.l, r.t), v: pctW(r) }, formCell(r),
     { html: '<span title="' + esc((isNum(r.pf) ? r.pf + ' for, ' + r.pa + ' against' : '')) + '">' + GI.deltaHTML(r.diff, 0) + '</span>', v: r.diff }, { html: isNum(r.rating) ? GI.signed(r.rating, 1) : '—', v: r.rating },
     { html: '<span title="' + esc(isNum(r.sos) ? 'played so far ' + GI.signed(r.sos, 1) : '') + '">' + (isNum(r.sos_rem) ? GI.signed(r.sos_rem, 1) : '—') + '</span>', v: r.sos_rem },
     oddsCell(r.p_playoffs, GI.tc(r.team)), { html: GI.pct(r.p_div, 0), v: r.p_div }, { html: GI.pct(r.p_bye, 0), v: r.p_bye },

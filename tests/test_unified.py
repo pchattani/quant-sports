@@ -176,6 +176,24 @@ def test_clubs_carry_kit_colours_from_the_committed_table(world) -> None:
     assert len(next(r for r in idx["rows"] if r[0] == 4698)) == f.index("colour")   # no colour columns at all
 
 
+def test_club_pool_block_carries_the_rated_peer_count(tmp_path) -> None:
+    """The club file's pool block carries n_rated (pool.json's model.n_rated) beside rank_rated, so the club page can
+    turn the rank into a percentile among the rated clubs without reading pool.json; a national team gets no block."""
+    league = _store(
+        [_m("1", "Boca Juniors", "River Plate", 3202, 3211, 2, 1, "2026-09-01T20:00:00Z", 300)],
+        {"1": {**_lineup("Boca Juniors", "77", "Boca Seven"), **_lineup("River Plate", "9", "River Nine")}}, current=300)
+    seasons = {"premier-league": {"tournament_id": 17, "seasons": [{"season_id": 300, "name": "PL 26/27", "year": "26/27"}]}}
+    pool = {"model": {"n_rated": 2}, "clubs": [
+        {"team_id": 3202, "strength": 1.9, "rank": 1, "rank_rated": 1, "rated": True, "comp": "premier-league"},
+        {"team_id": 3211, "strength": 1.1, "rank": 2, "rank_rated": 2, "rated": True, "comp": "premier-league"}]}
+    u = U.Unified(tmp_path, seasons, pool=pool, today=TODAY)
+    u.add_store("premier-league", league)
+    u.finish()
+    boca = _j(tmp_path / "clubs" / "3202.json")
+    assert boca["pool"]["rank_rated"] == 1 and boca["pool"]["n_rated"] == 2
+    assert _j(tmp_path / "clubs" / "3211.json")["pool"]["n_rated"] == 2
+
+
 def test_squad_without_roster_lists_only_players_whose_latest_club_it_is(world) -> None:
     d, _, _ = world
     river = _j(d / "clubs" / "3211.json")

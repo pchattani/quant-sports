@@ -16,7 +16,10 @@ function weekCard(w) {
   });
   var sub = '<b>' + esc(GR.tourName(w.tour)) + '</b> · ' + esc(GR.dates(w.start, w.end)) + (w.course ? ' · ' + esc(w.course) : '') +
     ' · ' + w.field + ' players' + (w.purse ? ' · ' + GR.money(w.purse, true) : '');
-  var body = QK.chances(rows, { limit: 6, oursName: live ? 'Our live chance to win' : 'Our chance to win', key: true }) +
+  var why = '';
+  if (live && w.leader && isNum(w.leader.lwin)) why = w.leader.name + ' leads at ' + (GR.toPar(w.leader.tp) || 'level') + ', our live chance ' + GR.pct(w.leader.lwin) + '.' + (w.fav ? ' Before the start our favourite was ' + w.fav.name + ' at ' + GR.pct(w.fav.win) + '.' : '');
+  else if (w.fav && isNum(w.fav.win)) why = 'Our favourite, ' + w.fav.name + ', has ' + GR.pct(w.fav.win) + ' in a field of ' + w.field + ': a chance that comes off ' + GR.oneIn(w.fav.win) + '.';
+  var body = QK.chances(rows, { limit: 6, oursName: live ? 'Our live chance to win' : 'Our chance to win', key: true }) + (why ? QK.aside(why, { cls: 'gr-why' }) : '') +
     '<p class="gr-meta"><a href="#/event/' + encodeURIComponent(w.id) + '">' + (live ? 'Live leaderboard and chances' : 'Every player’s chances') + ' →</a>' +
     (w.course_id ? ' · <a href="#/event/' + encodeURIComponent(w.id) + '/course">Course fit →</a>' : '') + '</p>';
   return GR.card(w.name, sub, body, { html: true, cls: 'accent-top', right: GR.statusTag(w.status) });
@@ -36,8 +39,8 @@ function digestTiles(d, idx) {
   var t = [];
   var n = d.events.length;
   t.push({ label: 'Events', value: String(n), sub: GR.date(d.from) + (d.to && d.to !== d.from ? ' to ' + GR.date(d.to) : '') });
-  t.push({ label: 'Our favourite won', value: d.fav_won + ' of ' + n, signal: true, sub: 'Even a strong favourite usually loses in golf: a field of 150 is a long list of ways to lose.' });
-  if (d.longshot && d.longshot.winner) t.push({ label: 'Longest odds', value: d.longshot.winner.name, text: true, href: '#/event/' + encodeURIComponent(d.longshot.id),
+  /* our record (favourites won) lives on the Model page, not here (STYLE_GUIDE §3, round 6) */
+  if (d.longshot && d.longshot.winner) t.push({ label: 'Biggest upset', value: d.longshot.winner.name, text: true, href: '#/event/' + encodeURIComponent(d.longshot.id),
     sub: 'We gave them ' + GR.pct(d.longshot.winner.win) + ' to win the ' + d.longshot.name + '.' });
   if (d.low) t.push({ label: 'Round of the week', value: d.low.name, text: true, href: GR.playerHref(d.low.pid),
     sub: d.low.strokes + ' in round ' + d.low.round + ' of the ' + d.low.ev + ': ' + GR.signed(d.low.sg, 1) + ' strokes on an average field (' + fmt.num(d.low.field, 1) + ').' });
@@ -78,7 +81,7 @@ function stories(list) {
         text: s.name + (s.kind === 'riser' ? ' is ' + fmt.num(Math.abs(s.d), 2) + ' strokes a round better than 90 days ago in our numbers, now ' + GR.rating(s.rt) + '.' : ' has dropped ' + fmt.num(Math.abs(s.d), 2) + ' strokes a round in 90 days, now ' + GR.rating(s.rt) + '.') };
     }
     if (s.kind === 'hot') return { sport: 'golf', kicker: who + 'Running hot', name: s.name, sub: 'Last eight events against the rating', value: GR.signed(s.form - s.rt, 2), unit: 'strokes a round',
-      href: GR.playerHref(s.pid), text: s.name + ' has gained ' + GR.signed(s.form, 2) + ' a round over the last eight events against a rating of ' + GR.rating(s.rt) + ': the best run against expectation among the regulars.' };
+      href: GR.playerHref(s.pid), text: s.name + ' has averaged ' + GR.signed(s.form, 2) + ' strokes gained a round over the last eight events, ' + fmt.num(s.form - s.rt, 2) + ' better than a rating of ' + GR.rating(s.rt) + ': the best run against expectation among the regulars.' };
     if (s.kind === 'cuts') return { sport: 'golf', kicker: who + 'Cut machine', name: s.name, sub: 'Cuts made in a row', value: String(s.n), unit: 'events', href: GR.playerHref(s.pid),
       text: s.name + ' has made the last ' + s.n + ' cuts in a row, the longest current run among the ranked players.' };
     return null;
@@ -144,10 +147,9 @@ function followBoard(rk, idx) {
 }
 
 GR.page('overview', function (el) {
-  return Promise.all([GR.load('index.json'), GR.maybe('overview.json'), GR.maybe('model.json'), GR.maybe('rankings.json')]).then(function (r) {
+  return Promise.all([GR.load('index.json'), GR.maybe('overview.json'), GR.maybe('rankings.json')]).then(function (r) {
     if (!el.isConnected) return;
-    var ix = r[0], ov = r[1] || {}, m = r[2], rk = r[3];
-    var ev = m && m.events;
+    var ix = r[0], ov = r[1] || {}, rk = r[2];
     var html = QK.greeting({ date: 'Golf · PGA Tour, DP World Tour, LIV, Korn Ferry and LPGA',
       title: 'Golf, ' + QK.mark('by the numbers') + '.', lede: 'Every round since 2001 measured against the field that played it: ratings in strokes a round, chances for every event from 20,000 simulated tournaments, the Scouting Room, courses and a Lab. Updated ' + fmt.ago(ix.updated_at) + '.',
       ctas: [{ label: 'This week’s chances', href: '#/fixtures' }, { label: 'Scouting Room', href: '#/scout', ghost: true }, { label: 'Rankings', href: '#/standings', ghost: true }],
@@ -156,7 +158,7 @@ GR.page('overview', function (el) {
     var week = (ix.week || []).length ? '<div class="gr-week">' + ix.week.map(weekCard).join('') + '</div>' : QK.empty('No event this week', 'The next events appear here once their fields are set.');
     html += GR.sec('This week', (ix.week || []).length === 1 ? 'One event. Our call.' : (ix.week || []).length + ' events. Our calls.', 'Live events show chances from the scores so far; upcoming ones, our pre-event chances for the field as entered.', week, '<a class="qk-more" href="#/fixtures">Every event</a>');
     var dg = ov.digest;
-    if (dg && (dg.events || []).length) html += GR.sec('The week in golf', 'The last ' + (NW[dg.events.length] || dg.events.length) + (dg.events.length === 1 ? ' event' : ' events'), 'Winners, what we gave them before the event, the longest odds and the round of the week against the field.', digestTiles(dg, ix) + results(dg));
+    if (dg && (dg.events || []).length) html += GR.sec('The week in golf', 'The last ' + (NW[dg.events.length] || dg.events.length) + (dg.events.length === 1 ? ' event' : ' events'), 'Winners, what we gave them before the event, the biggest upset and the round of the week against the field.', digestTiles(dg, ix) + results(dg));
     var pw = ov.power || {};
     html += GR.sec('Power board', 'Who is best right now?', 'Our rating is strokes a round better than an average PGA Tour player. For the men, the bar splits it into what the PGA Tour’s season statistics explain (our estimate: off the tee, approach, short game and putting) and the rest. Players without PGA Tour statistics show the rating alone. Star a player to follow them.',
       powerBoard(pw.men, 'men'), '<a class="qk-more" href="#/standings">Every ranked player</a>');
@@ -167,11 +169,8 @@ GR.page('overview', function (el) {
       '</div><div>' + QK.newHere({ items: ['A <b>chance</b> is how often we think something happens. A 20% favourite still loses four times in five.',
         'A <b>rating</b> is strokes a round better than an average tour player: +2 beats an average field by eight shots over four rounds.',
         'A <b>percentile</b> ranks a player against the regulars of the last two years. <a class="qk-link" href="#/model">How it all works</a>.'] }) + '</div></div>');
-    if (ev) html += GR.sec('How we’re doing', 'Scored on seasons the model never saw', 'PGA Tour events of ' + ev.years[0] + '–' + ev.years[1] + ', the sealed test.', QK.stats([
-      { label: 'Favourite won', value: GR.pct(ev.favourite_won), sub: 'of ' + ev.events + ' events', tip: 'How often our pre-event favourite won.' },
-      { label: 'Win skill', value: GR.pct(ev.win.skill), sub: 'better log loss than an even draw', signal: true },
-      { label: 'Top-10 skill', value: GR.pct(ev.top10.skill), sub: 'than 10 in the field', signal: true },
-      { label: 'Cut skill', value: GR.pct(ev.cut.skill), sub: 'than the field’s cut rate', signal: true }]), '<a class="qk-more" href="#/model?tab=doing">The full test</a>');
+    /* our record lives on the Model page (STYLE_GUIDE §3, round 6): a small link from the foot, no record tiles here */
+    html += '<p class="gr-meta gr-foot-link"><a href="#/model?tab=doing">How our forecasts have done on seasons the model never saw →</a></p>';
     el.innerHTML = html;
     var fl = el.querySelector('#gr-follow');
     if (fl && QK.followSection) QK.followSection(fl, { site: 'green', full: true, feed: false, title: 'Your players', noun: 'player',

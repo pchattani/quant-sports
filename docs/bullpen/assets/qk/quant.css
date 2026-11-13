@@ -1788,3 +1788,12 @@ a.qk-fc-next:hover { background: var(--s-3); color: var(--ink-1); }
 .qk-fpair-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 10px; }
 .qk-fpair-nm { font: 700 14px/1.2 var(--font-cond); text-transform: uppercase; letter-spacing: .03em; color: var(--ink-1); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .qk-fpair-rec { font: 600 13px/1 var(--font-cond); color: var(--ink-2); min-width: 44px; text-align: right; }
+
+/* form squares on a team-colour hero (QK.playerHeader chips): solid, so they keep their contrast on any kit colour */
+.qk-ph .qk-form i { width: 19px; height: 19px; font-size: 11px; background: #3a4150; color: #fff; }
+.qk-ph .qk-form i.w { background: #5a69b7; color: #fff; }
+.qk-ph .qk-form i.l { background: #c92d17; color: #fff; }
+
+/* round 11c: the range bar's reference rule; long values on the tale of the tape set smaller, never cut off */
+.qk-range-ref { position: absolute; top: -2px; bottom: -2px; width: 1px; background: rgba(255, 255, 255, 0.75); }
+.qk-tape-r .v.long { font-size: 1.15rem; letter-spacing: 0; }

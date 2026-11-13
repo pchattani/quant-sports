@@ -756,9 +756,9 @@ QK.tableTools = function (el) {
 /* ─────────────────────────────────────── data freshness: "Updated 14 min ago" */
 /* QK.stamp(iso, { what }) once a site knows when its data was built (index.json): a quiet line at the right of the
  * section bar (wide screens) and under the brand in the footer (every width), redrawn each minute. Over three hours old
- * it turns amber and says so. The tooltip gives the clock time (the viewer's own) and what updates when (o.what, else
- * the default line). Calling it again with a newer time moves it on; an older or bad time is ignored. */
-var stampAt = null, stampWhat = '', stampTimer = null;
+ * it turns amber and says so (o.stale: the hours before that, default 3; a site built from a weekly archive passes
+ * more). The tooltip gives the clock time (the viewer's own) and what updates when (o.what, else the default line). Calling it again with a newer time moves it on; an older or bad time is ignored. */
+var stampAt = null, stampWhat = '', stampTimer = null, stampStale = 3;
 function stampAgo(ms) {
   var m = Math.max(0, Math.round(ms / 60000));
   if (m < 1) return 'just now';
@@ -768,7 +768,7 @@ function stampAgo(ms) {
 }
 function stampPaint() {
   if (stampAt === null) return;
-  var age = QK.now() - stampAt, old = age > 3 * 3600e3;
+  var age = QK.now() - stampAt, old = age > stampStale * 3600e3;
   var txt = 'Updated ' + stampAgo(age) + (old ? ' · may be behind' : '');
   var tip = 'Data built ' + fmt.date(stampAt) + ' ' + fmt.time(stampAt) + ' (your time). ' + (stampWhat || 'The site rebuilds about once an hour; live scores update on their own feed.');
   var bar = $('.qk-secnav-in');
@@ -789,6 +789,7 @@ QK.stamp = function (iso, o) {
   if (!isFinite(t) || t <= 0 || t > QK.now() + 6 * 3600e3) return;
   if (stampAt !== null && t < stampAt) return;
   stampAt = t; if (o && o.what) stampWhat = o.what;
+  if (o && isNum(o.stale) && o.stale > 0) stampStale = o.stale;
   stampPaint();
   if (!stampTimer) stampTimer = setInterval(stampPaint, 60000);
 };
@@ -1806,7 +1807,8 @@ QK.stats = function (list) {
 /* QK.rangeBar({ lo, hi, mid, min, max, label, caption }) -> the likely-range bar: a track from min to max, our likely
  * range (lo to hi) as a cobalt band, a volt tick at mid. Only for intervals the payload already has ("9 seasons in 10:
  * 68-96"); never invent one (STYLE_GUIDE §6). min and max default to the range padded by a quarter each side.
- * caption: a short line under it (plain text). statTile takes it as k.range. */
+ * caption: a short line under it (plain text). ref: a value marked by a thin white rule (0 for a rating ± its error,
+ * so the reader sees the band cross zero). statTile takes it as k.range. */
 QK.rangeBar = function (o) {
   if (!o || !isNum(o.lo) || !isNum(o.hi) || o.hi < o.lo) return '';
   var pad = (o.hi - o.lo) * 0.25 || Math.abs(o.hi) * 0.1 || 1;
@@ -1814,24 +1816,40 @@ QK.rangeBar = function (o) {
   if (!(mx > mn)) return '';
   var f = o.fmt || function (v) { return fmt.num(v); };
   var pos = function (v) { return Math.max(0, Math.min(100, (v - mn) / (mx - mn) * 100)); };
-  var a = pos(o.lo), b = pos(o.hi), m = isNum(o.mid) ? pos(o.mid) : null;
+  var a = pos(o.lo), b = pos(o.hi), m = isNum(o.mid) ? pos(o.mid) : null, rf = isNum(o.ref) && o.ref > mn && o.ref < mx ? pos(o.ref) : null;
   var lab = (o.label || 'Likely range') + ': ' + f(o.lo) + ' to ' + f(o.hi) + (m !== null ? ', most likely ' + f(o.mid) : '');
   return '<div class="qk-range" role="img" aria-label="' + esc(lab) + '"><div class="qk-range-track"><span class="qk-range-band" style="left:' + a.toFixed(1) + '%;width:' + Math.max(1.5, b - a).toFixed(1) + '%"></span>' +
+    (rf !== null ? '<span class="qk-range-ref" style="left:' + rf.toFixed(1) + '%"></span>' : '') +
     (m !== null ? '<span class="qk-range-mid" style="left:' + m.toFixed(1) + '%"></span>' : '') + '</div>' +
     (o.caption ? '<div class="qk-range-cap">' + esc(o.caption) + '</div>' : '') + '</div>';
 };
+/* QK.missWords(p) -> how often a p chance misses, in words: 'about 3 times in 10' down to a 15% miss, then 'about 1 time
+ * in 10 / 20 / 50 / 100 ...', and 'fewer than 1 time in 1,000'. For "How sure are we?" lines. */
+QK.missWords = function (p) {
+  if (!isNum(p)) return '';
+  var q = 1 - Math.max(0, Math.min(1, p));
+  if (q >= 0.15) { var m = Math.round(10 * q); return 'about ' + m + ' time' + (m === 1 ? '' : 's') + ' in 10'; }
+  if (q < 0.001) return 'fewer than 1 time in 1,000';
+  var n = 1 / q, nice = [7, 8, 10, 12, 15, 20, 25, 30, 40, 50, 75, 100, 150, 200, 250, 300, 400, 500, 750, 1000], best = nice[0];
+  nice.forEach(function (x) { if (Math.abs(Math.log(x / n)) < Math.abs(Math.log(best / n))) best = x; });
+  return 'about 1 time in ' + (best >= 1000 ? '1,000' : String(best));
+};
 /* QK.formPair({ left: { name, abbr, colour, form }, right: {...}, n, title }) -> recent form for the two sides of a
  * game, each a row of QK.formDots (oldest first, the newest at the right) with the record over them, for game pages.
- * form: 'WWLDW' or an array of 'W'/'D'/'L' (as QK.formDots). Sides with no form are left out; nothing at all -> ''. */
+ * form: 'WWLDW' or an array of letters: W, D (draw), L, T (tie) or O (overtime or shootout loss). The record reads
+ * W-D-L with draws, else W-L, then -T and -O when there are any (hockey's W-L-OTL). Sides with no form are left out;
+ * nothing at all -> ''. */
 QK.formPair = function (o) {
   o = o || {};
   var n = o.n || 5;
   var side = function (s) {
     if (!s || !s.form || !s.form.length) return '';
     var f = (typeof s.form === 'string' ? s.form.replace(/[^A-Za-z]/g, '').split('') : s.form.slice()).map(function (x) { return String(x).toUpperCase().charAt(0); }).slice(-n);
-    var w = f.filter(function (x) { return x === 'W'; }).length, d = f.filter(function (x) { return x === 'D'; }).length, l = f.filter(function (x) { return x === 'L'; }).length;
+    var cnt = function (k) { return f.filter(function (x) { return x === k; }).length; };
+    var w = cnt('W'), d = cnt('D'), l = cnt('L'), t = cnt('T'), ot = cnt('O');
+    var rec = d ? w + '–' + d + '–' + l : w + '–' + l + (t ? '–' + t : '') + (ot ? '–' + ot : '');
     return '<div class="qk-fpair-row">' + (s.abbr ? QK.teamMark({ abbr: s.abbr, colour: s.colour }, 'sm') : '') + '<span class="qk-fpair-nm">' + esc(s.name || s.abbr || '') + '</span>' +
-      QK.formDots(f.join(''), n) + '<span class="qk-fpair-rec num">' + w + '–' + (d ? d + '–' : '') + l + '</span></div>';
+      QK.formDots(f.join(''), n) + '<span class="qk-fpair-rec num">' + rec + '</span></div>';
   };
   var rows = side(o.left) + side(o.right);
   if (!rows) return '';
@@ -2072,12 +2090,12 @@ QK.tape = function (o) {
       wa = Math.max(3, Math.min(100, wa)); wb = Math.max(3, Math.min(100, wb));
       var ta = r.ta !== undefined ? r.ta : f(r.a), tb = r.tb !== undefined ? r.tb : f(r.b);
       var aria = r.label + ': ' + (L.short || L.name || 'left') + ' ' + ta + (isNum(r.pa) ? ' (' + QK.ordinal(Math.round(r.pa)) + ' percentile)' : '') + ', ' + (R.short || R.name || 'right') + ' ' + tb + (isNum(r.pb) ? ' (' + QK.ordinal(Math.round(r.pb)) + ' percentile)' : '');
-      return '<div class="qk-tape-r" role="group" aria-label="' + esc(aria) + '"><span class="v num' + (win === 'b' ? ' lose' : '') + '">' + esc(ta) + '</span>' +
+      return '<div class="qk-tape-r" role="group" aria-label="' + esc(aria) + '"><span class="v num' + (win === 'b' ? ' lose' : '') + (String(ta).length > 6 ? ' long' : '') + '">' + esc(ta) + '</span>' +
         '<span class="b lft" aria-hidden="true"><i class="' + (win === 'b' ? 'dim' : '') + '" style="width:' + wa.toFixed(1) + '%;background:' + bl + '"></i></span>' +
         '<span class="lb"' + (r.tip ? ' data-tip="' + esc(r.tip) + '" tabindex="0"' : '') + '>' + esc(r.label) +
         (o.gap && isNum(r.pa) && isNum(r.pb) ? '<small class="gap">' + (Math.round(Math.abs(r.pa - r.pb)) === 0 ? 'Level' : '+' + Math.round(Math.abs(r.pa - r.pb)) + ' ' + esc(r.pa > r.pb ? (L.short || QK.surname(L.name || '')) : (R.short || QK.surname(R.name || ''))) + ' pts') + '</small>' : '') + '</span>' +
         '<span class="b" aria-hidden="true"><i class="' + (win === 'a' ? 'dim' : '') + '" style="width:' + wb.toFixed(1) + '%;background:' + br + '"></i></span>' +
-        '<span class="v rt num' + (win === 'a' ? ' lose' : '') + '">' + esc(tb) + '</span></div>';
+        '<span class="v rt num' + (win === 'a' ? ' lose' : '') + (String(tb).length > 6 ? ' long' : '') + '">' + esc(tb) + '</span></div>';
     }).join('');
   }).join('');
   function side(e, i, cls) {
@@ -2402,8 +2420,7 @@ QK.splitHero = function (g, o) {
       var pre = QK.preP(g);
       note = '<b>What’s that number?</b> Our live chance updates with the score and the clock.' + (isNum(pre) ? ' Before the start it was ' + fmt.pct(f.t === H ? pre : 1 - pre) + ' for ' + esc(nmOf(g, f.t)) + (Math.abs(f.p - 0.5) < 0.1 ? ': a game this close still sits near a coin flip.' : '.') : '');
     } else if (f && !fin && !live) {
-      var miss = Math.max(1, Math.round(10 * (1 - f.p)));
-      note = '<b>How sure are we?</b> ' + fmt.pct(f.p) + ' means ' + (f.d > 0.02 ? 'a ' + noun + ' like this goes another way' : esc(nmOf(g, f.o)) + ' win' + (solo(g) ? 's' : '') + ' a ' + noun + ' like this') + ' about ' + miss + ' time' + (miss === 1 ? '' : 's') + ' in 10.';
+      note = '<b>How sure are we?</b> ' + fmt.pct(f.p) + ' means ' + (f.d > 0.02 ? 'a ' + noun + ' like this goes another way' : esc(nmOf(g, f.o)) + ' win' + (solo(g) ? 's' : '') + ' a ' + noun + ' like this') + ' ' + QK.missWords(f.p) + '.';
     }
   }
   var link = g.href && o.link !== false;
@@ -2727,8 +2744,7 @@ QK.previewCard = function (g, o) {
   var hf = o.homeFirst !== undefined ? !!o.homeFirst : !!dw.homeFirst;
   var f = favOf(g), note = '';
   if (f && !fin) {
-    var miss = Math.max(1, Math.round(10 * (1 - f.p)));
-    note = o.note !== undefined ? o.note : '<b>How sure are we?</b> ' + fmt.pct(f.p) + ' means ' + (f.d > 0.02 ? 'a ' + noun + ' like this goes another way' : (THE_SPORTS[g.sport] && !g.players ? 'the ' : '') + esc(nk(f.t)) + ' lose' + (solo(g) ? 's' : '') + ' a ' + noun + ' like this') + ' about ' + miss + ' time' + (miss === 1 ? '' : 's') + ' in 10.' + (o.noteExtra ? ' ' + o.noteExtra : '');
+    note = o.note !== undefined ? o.note : '<b>How sure are we?</b> ' + fmt.pct(f.p) + ' means ' + (f.d > 0.02 ? 'a ' + noun + ' like this goes another way' : (THE_SPORTS[g.sport] && !g.players ? 'the ' : '') + esc(nk(f.t)) + ' lose' + (solo(g) ? 's' : '') + ' a ' + noun + ' like this') + ' ' + QK.missWords(f.p) + '.' + (o.noteExtra ? ' ' + o.noteExtra : '');
   } else if (fin) {
     var pp = QK.preP(g);
     if (isNum(pp)) { var pa = 1 - pp - (isNum(g.p_draw) ? g.p_draw : 0); note = o.note !== undefined ? o.note : 'Our pre-' + noun + ' call: <b>' + esc(nk(pa > pp ? A : H)) + ' ' + fmt.pct(Math.max(pa, pp)) + '</b>. ' + esc(QK.whyLine(g)) + (o.noteExtra ? ' ' + o.noteExtra : ''); }

@@ -364,7 +364,7 @@
 .pd-ours { margin-top: 16px; }
 
 /* Constructor page: top performers against the grid (constructors.js topPerformers) */
-.pd-top { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: var(--sp-3); }
+.pd-top { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: var(--sp-3); }
 .pd-top-card { padding: 14px 16px; border-top: 4px solid var(--tc, var(--signal)); }
 .pd-top-k { font: 700 var(--fs-2xs)/1.2 var(--font-cond); text-transform: uppercase; letter-spacing: 0.08em; color: var(--volt); }
 .pd-top-n { display: block; margin-top: 2px; font: 400 var(--fs-xl)/1.05 var(--font-display); color: var(--ink-1); text-decoration: none; }
@@ -435,3 +435,10 @@
 .pd-hall-c .v { font: 400 1.6rem/1 var(--font-display); color: var(--volt); }
 .pd-hall-c small { grid-column: 2 / -1; font-size: var(--fs-2xs); color: var(--block-ink-3); }
 .pd-hall-c:hover { box-shadow: inset 0 3px 0 var(--volt); }
+
+/* 12 Nov 2026 sweep: the race log's compound dots (drawn in CSS, so the table's CSV reads "S 0.038"); the constructor
+   page's season-end range card and its tape column */
+.pd-deg { white-space: nowrap; }
+.pd-cdot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: 1px; }
+.pd-sec1 .pd-stack .qk-tape { margin-top: 0; }
+.pd-wk.pd-wk-1 { grid-template-columns: minmax(0, 1fr); }

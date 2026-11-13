@@ -12,16 +12,29 @@ function teamCell(S, name) {
   return id ? { v: name, html: U.teamEnt(S, id) + SC.followStar(S, id) } : { v: name, html: esc(name) };
 }
 
+/* each side's results in this competition, oldest first (W/D/L), from the payload's results: the table's form column */
+function formMap(results) {
+  var m = {};
+  (results || []).filter(function (r) { return r && isNum(r.hs) && isNum(r.as); }).slice().sort(function (a, b) { return String(a.date).localeCompare(String(b.date)); }).forEach(function (r) {
+    (m[r.home] = m[r.home] || []).push(r.hs > r.as ? 'W' : r.hs < r.as ? 'L' : 'D');
+    (m[r.away] = m[r.away] || []).push(r.as > r.hs ? 'W' : r.as < r.hs ? 'L' : 'D');
+  });
+  return m;
+}
 function tableHTML(S, rows, o) {
   o = o || {};
+  var form = o.form || {};
+  var hasForm = (rows || []).some(function (r) { return (form[r.team] || []).length; });
   var cols = [{ label: '#' }, { label: 'Team', align: 'left', sticky: true }, { label: 'P' }, { label: 'W' }, { label: 'D' }, { label: 'L' },
-    { label: 'PF' }, { label: 'PA' }, { label: 'PD' }, { label: 'TF' }, { label: 'TA' }, { label: 'TB' }, { label: 'LB' }].concat(o.gs ? [{ label: 'GS' }] : []).concat([{ label: 'Pts' }]);
+    { label: 'PF' }, { label: 'PA' }, { label: 'PD' }, { label: 'TF' }, { label: 'TA' }, { label: 'TB' }, { label: 'LB' }].concat(o.gs ? [{ label: 'GS' }] : []).concat([{ label: 'Pts' }])
+    .concat(hasForm ? [{ label: 'Form', align: 'left', sortable: false, title: 'The last five results in this competition, oldest first' }] : []);
   var trs = (rows || []).map(function (r) {
     var c = [{ v: r.pos, html: String(r.pos) }, teamCell(S, r.team), { v: r.p, html: String(r.p) }, { v: r.w, html: String(r.w) }, { v: r.d, html: String(r.d) },
       { v: r.l, html: String(r.l) }, { v: r.pf, html: String(r.pf) }, { v: r.pa, html: String(r.pa) }, { v: r.pd, html: '<span class="' + SC.cls(r.pd) + '">' + SC.signed(r.pd, 0) + '</span>' },
       { v: r.tf, html: String(r.tf) }, { v: r.ta, html: String(r.ta) }, { v: r.tb, html: String(r.tb) }, { v: r.lb, html: String(r.lb) }];
     if (o.gs) c.push({ v: r.gs, html: String(r.gs || 0) });
     c.push({ v: r.pts, html: '<b>' + r.pts + '</b>' });
+    if (hasForm) { var f = (form[r.team] || []).slice(-5); c.push({ v: f.join(''), html: f.length ? QK.formDots(f, 5) : '<span class="qk-muted">—</span>' }); }
     return c;
   });
   return U.table(cols, trs, { cls: 'sc-table' });
@@ -125,8 +138,8 @@ SC.route('standings', function (page, P) {
     if (tab === 'nc') {
       var sim = d.sim || { teams: [] };
       if (view === 'table') {
-        html += '<div class="qk-g2">' + U.card('Northern conference', 'The Six Nations sides. Each plays the six southern sides once.', tableHTML(S, d.north), { flush: true }) +
-          U.card('Southern conference', 'The Rugby Championship sides with Fiji and Japan.', tableHTML(S, d.south), { flush: true }) + '</div>' +
+        html += '<div class="qk-g2">' + U.card('Northern conference', 'The Six Nations sides. Each plays the six southern sides once.', tableHTML(S, d.north, { form: formMap(d.results) }), { flush: true }) +
+          U.card('Southern conference', 'The Rugby Championship sides with Fiji and Japan.', tableHTML(S, d.south, { form: formMap(d.results) }), { flush: true }) + '</div>' +
           U.note('Standard World Rugby points: 4 a win, 2 a draw, a try bonus for 4+ tries, a losing bonus for losing by 7 or fewer. Level on points: points difference, then tries scored.');
       } else if (view === 'chances') {
         html += '<div class="qk-g2">' + U.card('Who wins it?', 'Our chance to win the final at Twickenham on 29 November.', chanceBars(S, sim.teams, 'champion', 'Our title chance')) +
@@ -155,13 +168,13 @@ SC.route('standings', function (page, P) {
       } else if (view === 'history') {
         html += U.card('Champions', 'Each Six Nations in our data (Five Nations before 2000).', history(S, d.winners, 'six'), { flush: true });
       } else {
-        html += U.card(d.season + ' Six Nations: final table', 'Bonus points as the championship awards them (since 2017), including 3 for a Grand Slam.', tableHTML(S, d.table, { gs: true }), { flush: true }) +
+        html += U.card(d.season + ' Six Nations: final table', 'Bonus points as the championship awards them (since 2017), including 3 for a Grand Slam.', tableHTML(S, d.table, { gs: true, form: formMap(d.results) }), { flush: true }) +
           U.card('Results', '', U.table([{ label: 'Date', align: 'left' }, { label: 'Home', align: 'left' }, { label: 'Score' }, { label: 'Away', align: 'left' }, { label: 'Tries' }, { label: 'Our home chance' }],
             (d.results || []).map(function (r) { return [{ v: r.date, html: esc(SC.date(r.date)) }, teamCell(S, r.home), { v: r.hs - r.as, html: '<a href="' + esc(SC.matchHref(S, r.id)) + '">' + r.hs + '–' + r.as + '</a>' }, teamCell(S, r.away), { v: r.ht, html: isNum(r.ht) ? r.ht + '–' + r.at : '—' }, { v: r.p, html: SC.pct(r.p) }]; }), { cls: 'sc-table' }), { flush: true });
       }
     } else if (tab === 'trc') {
       if (view === 'history') html += U.card('Champions', 'Tri Nations (to 2011) and The Rugby Championship (since 2012), as our table computes them.', history(S, d.winners, 'trc'), { flush: true });
-      else html += U.card(d.season + ' Rugby Championship: table', 'Bonus points throughout.', tableHTML(S, d.table), { flush: true }) +
+      else html += U.card(d.season + ' Rugby Championship: table', 'Bonus points throughout.', tableHTML(S, d.table, { form: formMap(d.results) }), { flush: true }) +
         (d.next && d.next.sim ? U.card('Chances', '', chancesTable(S, d.next.sim, [['title', 'Title'], ['last', 'Last']]), { flush: true }) : '');
     } else if (tab === 'rwc') {
       var rs = d.sim || { teams: [] };
@@ -177,12 +190,12 @@ SC.route('standings', function (page, P) {
       else html += U.card('World Cup winners', 'Every final in our data.', history(S, d.winners, 'rwc'), { flush: true });
     } else if (tab === 'w6n') {
       if (view === 'history') html += U.card('Champions', 'Each Women’s Six Nations in our data (Wikipedia’s season pages), as our table computes them.', history(S, d.winners, 'six'), { flush: true });
-      else html += U.card(d.season + ' Women’s Six Nations: final table', 'Bonus points as the championship awards them (since 2017), including 3 for a Grand Slam. Results from Wikipedia (CC BY-SA 4.0).', tableHTML(S, d.table, { gs: true }), { flush: true }) +
+      else html += U.card(d.season + ' Women’s Six Nations: final table', 'Bonus points as the championship awards them (since 2017), including 3 for a Grand Slam. Results from Wikipedia (CC BY-SA 4.0).', tableHTML(S, d.table, { gs: true, form: formMap(d.results) }), { flush: true }) +
         U.card('Results', '', U.table([{ label: 'Date', align: 'left' }, { label: 'Home', align: 'left' }, { label: 'Score' }, { label: 'Away', align: 'left' }, { label: 'Our home chance' }],
           (d.results || []).map(function (r) { return [{ v: r.date, html: esc(SC.date(r.date)) }, teamCell(S, r.home), { v: r.hs - r.as, html: '<a href="' + esc(SC.matchHref(S, r.id)) + '">' + r.hs + '–' + r.as + '</a>' }, teamCell(S, r.away), { v: r.p, html: SC.pct(r.p) }]; }), { cls: 'sc-table' }), { flush: true });
     } else if (tab === 'wxv') {
       html += (d.tiers || []).map(function (t) {
-        return U.card(d.season + ' ' + t.label, 'Each side plays three matches against the other group in its tier; a win is 4 points, with the standard bonus points. Results from Wikipedia (CC BY-SA 4.0).', tableHTML(S, t.table), { flush: true });
+        return U.card(d.season + ' ' + t.label, 'Each side plays three matches against the other group in its tier; a win is 4 points, with the standard bonus points. Results from Wikipedia (CC BY-SA 4.0).', tableHTML(S, t.table, { form: formMap(t.results) }), { flush: true });
       }).join('') + U.note('The tiers are labelled by the strength of their sides in our ratings today.');
     } else if (tab === 'wrwc') {
       html += U.card('Women’s World Cup winners', 'Every final in our data.', history(S, d.winners, 'rwc'), { flush: true });

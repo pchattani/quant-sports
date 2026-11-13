@@ -224,7 +224,8 @@ function draw(el, L, S, pid, career, cat, sv, val, asked, tab, params, mv) {
     const bR = log[bi];
     const shot = (m, a) => (isNum(m) && isNum(a) ? m + '–' + a : '—');
     h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'Game log', title: U.isCur(L, S) ? 'Every game this season' : 'Every game of ' + HW.seasonLabel(L, S),
-      sub: bR ? esc((bR.pts || 0) + ' points ' + (bR.home ? 'against ' : 'at ') + HW.teamName(L, bR.opp) + ' is the best night so far (game score ' + U.f(bR.game_score, 1) + ', highlighted). Game score is Hollinger’s one-number box score: 10 is a solid night, 20 a big one.') : '', html: true }) +
+      sub: (bR ? esc((bR.pts || 0) + ' points ' + (bR.home ? 'against ' : 'at ') + HW.teamName(L, bR.opp) + ' is the best night so far (game score ' + U.f(bR.game_score, 1) + ', highlighted). Game score is Hollinger’s one-number box score: 10 is a solid night, 20 a big one.') : '') +
+        (career && career.updated_at ? ' <span class="qk-muted">Player file as of ' + esc(HW.fmtStamp(career.updated_at)) + '.</span>' : ''), html: true }) +
       '<article class="qk-card"><div class="qk-card-body flush"><div class="qk-table-wrap hw-logwrap"><table class="qk-table hw-gamelog"><thead><tr><th>Date</th><th>Opp</th><th class="num">Min</th><th class="num">Pts</th><th class="num">Reb</th><th class="num">Ast</th><th class="num" data-tip="Field goals made–attempted">FG</th><th class="num" data-tip="Threes made–attempted">3P</th><th class="num" data-tip="Free throws made–attempted">FT</th><th class="num" data-tip="The team’s points margin with the player on the floor">+/-</th><th class="num" data-tip="Hollinger’s game score: one number for the box-score line">Game score</th></tr></thead><tbody>' +
       log.map((r, i) => [r, i]).reverse().map(x => { const r = x[0];
         return '<tr' + (x[1] === bi ? ' class="hl"' : '') + '><td>' + (r.game ? '<a class="hw-link" href="' + esc(HW.gameHref(L, r.game, S)) + '">' + esc(HW.fmtDate(r.date, { year: false })) + '</a>' : esc(HW.fmtDate(r.date, { year: false }))) + '</td><td>' + (r.home ? 'v ' : '@ ') + esc(HW.teamAbbr(L, r.opp)) + '</td>' +
@@ -346,7 +347,8 @@ function draw(el, L, S, pid, career, cat, sv, val, asked, tab, params, mv) {
       add('Points allowed per 100', ra.def, rh.def, x => U.f(x, 1), true);
       const m = nxt.model || {};
       const extra = U.status(nxt) === 'pre' && isNum(m.margin) ? 'We expect ' + HW.teamAbbr(L, m.margin >= 0 ? nxt.home : nxt.away) + ' by about ' + Math.max(1, Math.round(Math.abs(m.margin))) + (isNum(m.total) ? ', with about ' + Math.round(m.total) + ' points in all' : '') + '.' : '';
-      box.innerHTML = QK.previewCard(g, { layout: 'bug', nick: t => t.short || t.name, factors: fx, factorsTitle: 'How they match up this season', noteExtra: esc(extra), market: 'quiet' });
+      /* no market here: it sits quietly on the game page only (as the Rink's player page) */
+      box.innerHTML = QK.previewCard(g, { layout: 'bug', nick: t => t.short || t.name, factors: fx, factorsTitle: 'How they match up this season', noteExtra: esc(extra) });
     });
   }
 

@@ -85,6 +85,106 @@ function trankCard(L, S, tid, tr, cat) {
   return U.section('Another view: T-Rank', 'Bart Torvik\u2019s ratings for the same season, a reference beside ours (' + (CC.isCur(L, S) ? 'to date' : 'end of season') + '). They are not used by our model.',
     tiles + '<p class="cc-note">Source: <a href="https://barttorvik.com" target="_blank" rel="noopener">' + esc(TRANK_CREDIT) + '</a>. Shown with credit; removed if its owner asks.</p>', '', 'Reference');
 }
+/* ── sweep, 12 Nov 2026: the Rink's team-page pattern ─────────────────── */
+/* "about 3 in 10" for a chance, in hundreds near the ends (1% is about 1 in 100, never "1 in 10") */
+function freqWords(p) {
+  if (p >= 0.995) return 'nearly all';
+  if (p <= 0.005) return 'almost none';
+  return p < 0.095 || p > 0.905 ? 'about ' + Math.round(p * 100) + ' in 100' : 'about ' + Math.round(p * 10) + ' in 10';
+}
+/* The team's finished games, oldest first, with its result in each (CC.resultOf: W, L, or a hockey tie T). */
+function playedOf(L, sched, tid) {
+  return (sched || []).filter(function (c) { return c && c.status === 'post' && c.stype !== 'exh' && c.stype !== 'pre'; })
+    .map(function (c) { return { c: c, r: CC.resultOf(L, c, tid) }; }).filter(function (x) { return !!x.r; })
+    .sort(function (a, b) { return String(a.c.date).localeCompare(String(b.c.date)); });
+}
+/* The hero's form chip: the last results as the kit's form squares on black (they keep their contrast on any team
+   colour), oldest first, with the record over them; football's season is short, so its last five. */
+function formChip(L, played) {
+  var n = CC.fb(L) ? 5 : 10, f = played.slice(-n).map(function (x) { return x.r; });
+  if (!f.length) return '';
+  var c = function (x) { return f.filter(function (r) { return r === x; }).length; };
+  return '<span class="cc-ph-form" tabindex="0" data-tip="The last ' + f.length + ' results, oldest first' + (c('T') ? ' (T: a tie)' : '') + '">Last ' + f.length + ' ' + QK.formDots(f, f.length) +
+    '<b class="num">' + c('W') + '–' + c('L') + (c('T') ? '–' + c('T') : '') + '</b></span>';
+}
+/* 9 seasons in 10 from the simulation's own win distribution (w_dist[k] = the chance of k wins): the 5th and 95th
+   percentiles, read off the payload's distribution (no interval is assumed). null without one. */
+function winRange(dist) {
+  if (!Array.isArray(dist) || dist.length < 2) return null;
+  var cum = 0, lo = null, hi = null;
+  for (var i = 0; i < dist.length; i++) { cum += isNum(dist[i]) ? dist[i] : 0; if (lo === null && cum >= 0.05) lo = i; if (hi === null && cum >= 0.95) { hi = i; break; } }
+  return lo !== null && hi !== null ? { lo: lo, hi: hi, max: dist.length - 1 } : null;
+}
+/* Our season chances as the kit's bars (QK.chances), in the team colour: the level's milestones, ours only. */
+function chanceRows(L, o, colour) {
+  if (!o) return [];
+  var pr = o.p_round || {};
+  var rows = CC.fb(L) ? [['Make the playoff', o.p_cfp], ['First-round bye', o.p_bye], ['Reach the conference title game', o.p_conf_game], ['Win the conference', o.p_conf], ['Win the title', o.p_title], ['Bowl eligible', isNum(o.p_cfp) ? null : o.p_bowl]]
+    : CC.hk(L) ? [['Make the NCAA tournament', o.p_ncaa], ['Win the conference tournament', o.p_conf_tourney], ['Win the regular-season conference title', o.p_conf_reg], ['Reach the Frozen Four', o.p_f4], ['Win the title', o.p_title]]
+    : [['Make the NCAA tournament', o.p_ncaa], ['Win the conference tournament', o.p_conf_tourney], ['Win the regular-season conference title', o.p_conf_reg], ['Reach the Sweet 16', pr.s16], ['Reach the Final Four', pr.f4], ['Win the title', o.p_title]];
+  return rows.filter(function (x, i) { return isNum(x[1]) && (i === 0 || x[1] > 0); }).map(function (x) { return { label: x[0], p: x[1], color: colour || undefined }; });
+}
+/* How the two teams of a game match up this season (season.json ratings), as the game page's hero. */
+function matchup(L, c, season) {
+  var R = (season && season.ratings) || {}, ra = R[String(c.away)] || {}, rh = R[String(c.home)] || {}, fb = CC.fb(L), hk = CC.hk(L), fx = [];
+  var add = function (label, x, y, f, low) { if (isNum(x) && isNum(y)) fx.push({ label: label, a: f(x), b: f(y), better: Math.abs(x - y) < 1e-9 ? null : ((x > y) !== !!low ? 'a' : 'b') }); };
+  add(hk ? 'Rating, goals v average' : fb ? 'Rating, points v average' : 'Rating, margin per 100', ra.rating, rh.rating, function (v) { return CC.signed(v, hk ? 2 : 1); });
+  if (hk) { add('Attack, goals a game above average', ra.off, rh.off, function (v) { return CC.signed(v, 2); }); add('Defence, goals a game kept out', ra.def, rh.def, function (v) { return CC.signed(v, 2); }); }
+  else { add(fb ? 'Offence, points a game' : 'Offence, points per 100', ra.off, rh.off, function (v) { return CC.f(v, 1); }); add(fb ? 'Defence, points prevented' : 'Defence, allowed per 100', ra.def, rh.def, function (v) { return CC.f(v, 1); }, !fb); }
+  return fx;
+}
+/* What to watch next (the scoreboard bug and how the teams match up) beside the last game (the score as the title, our
+   pre-game chance against the result, the box and our win chance through it from the game file), as the Rink's
+   team page. No market here: it sits on the game page only. */
+function nextAndLast(L, S, tid, sched, played, season) {
+  var hk = CC.hk(L), nowT = QK.now();
+  var nxt = (sched || []).filter(function (c) { return c && (c.status === 'in' || (c.status === 'pre' && Date.parse(c.date) > nowT - 4 * 3600e3)); })
+    .sort(function (a, b) { return (a.status === 'in' ? -1 : 0) - (b.status === 'in' ? -1 : 0) || String(a.date).localeCompare(String(b.date)); })[0] || null;
+  var last = played.length ? played[played.length - 1] : null;
+  if (!nxt && !last) return { html: '', last: null };
+  var h = '';
+  if (nxt) {
+    var G = CC.game(nxt, L);
+    G.home.record = CC.rec(L, S, nxt.home); G.away.record = CC.rec(L, S, nxt.away);
+    var live = nxt.status === 'in', rel = QK.fmt.relDay(CC.gameDate(nxt));
+    h += '<div>' + QK.sectionHead({ kicker: live ? 'Live now' : (rel === 'Today' ? 'What to watch tonight' : 'Next up'), title: CC.tshort(L, nxt.away) + (nxt.neutral ? ' v ' : ' at ') + CC.tshort(L, nxt.home) }) +
+      (hk ? CC.tieWords : String)(QK.previewCard(G, { layout: 'bug', nick: function (x) { return x.name; }, factors: matchup(L, nxt, season), factorsTitle: 'How they match up this season', vs: nxt.neutral ? 'v' : undefined })) + '</div>';
+  }
+  if (last) {
+    var c = last.c, home = String(c.home) === String(tid), my = home ? c.hs : c.as, op = home ? c.as : c.hs, oid = home ? c.away : c.home;
+    var me = CC.tabbr(L, tid), ab = CC.tabbr(L, oid);
+    var ttl = (my >= op ? me + ' ' + my + ', ' + ab + ' ' + op : ab + ' ' + op + ', ' + me + ' ' + my) + (last.r === 'T' ? ' (tie)' : '');
+    var m = c.model || {}, pw = null, po = null;
+    if (isNum(m.p_home)) { var pa = isNum(m.p_away) ? m.p_away : 1 - m.p_home - (isNum(m.p_tie) && hk ? m.p_tie : 0); pw = home ? m.p_home : pa; po = home ? pa : m.p_home; }
+    var pre = '';
+    if (isNum(pw)) {
+      var nm = CC.tshort(L, tid), fav = pw >= po;
+      pre = 'We gave ' + nm + ' a ' + CC.pct(pw) + ' chance to win before the game' + (hk && isNum(m.p_tie) ? ' (a tie ' + CC.pct(m.p_tie) + ')' : '') + ': ' +
+        (last.r === 'T' ? 'it ended level.' : Math.abs(pw - po) < 0.1 ? 'close to a coin flip, ' + (last.r === 'W' ? 'and they won.' : 'and they lost.') : fav === (last.r === 'W') ? 'the favourite won.' : (last.r === 'W' ? 'an upset win.' : 'an upset loss.'));
+    }
+    var hasPage = CC.hasPage(L, Object.assign({ season: S }, c), S);
+    var where = c.neutral ? 'neutral site' : home ? 'at home' : 'away';
+    var inner = '<div id="tp-box"></div>' + (pre ? QK.explain(esc(pre)) : '');
+    h += '<div>' + QK.sectionHead({ kicker: 'Last game', title: esc(ttl), html: true, sub: esc(CC.date(CC.gameDate(c)) + ' · ' + where + (CC.roundLabel(c) ? ' · ' + CC.roundLabel(c) : '')),
+      actions: '<a class="qk-more" href="' + esc(CC.gameHref(L, c.id, S)) + '">' + (hasPage ? 'The game centre' : 'The recap') + '</a>' }) +
+      '<article class="qk-card cc-card"><div class="qk-card-body">' + (nxt ? inner + '<div id="tp-race"></div>' : '<div class="qk-g2"><div>' + inner + '</div><div id="tp-race"></div></div>') + '</div></article></div>';
+  }
+  return { html: '<section class="qk-section cc-sec cc-nl">' + (nxt && last ? '<div class="qk-g2">' + h + '</div>' : h) + '</section>', last: last && CC.hasPage(L, Object.assign({ season: S }, last.c), S) ? last.c : null };
+}
+function fillLast(el, L, S, tid, c) {
+  if (!c || !QK.$('#tp-box', el)) return;
+  CC.load(CC.path(L, S, 'games/' + c.id + '.json')).then(function (gf) {
+    if (!CC.ok(gf) || !U.alive(el)) return;
+    if (!gf.season) gf.season = S;
+    var box = QK.$('#tp-box', el), race = QK.$('#tp-race', el);
+    if (box) box.innerHTML = CC.lastBox(L, gf, tid);
+    if (race && CC.wpChart) {
+      race.innerHTML = U.chart('tp-race-c', 240, 'Our win chance through the last game');
+      if (!CC.wpChart('#tp-race-c', L, gf)) race.innerHTML = '';
+    }
+  });
+}
+
 CC.route('team', function (el, p) {
   var L = p.L, S = p.S, tid = p.id, fb = CC.fb(L);
   el.innerHTML = QK.skeleton('lines', 8);
@@ -117,13 +217,15 @@ CC.route('team', function (el, p) {
     var shortTxt = (isNum(rec.w) ? nm + ' ' + (CC.isCur(L, S) ? 'are' : 'went') + ' ' + recS(rec) + (isNum(rec.conf_w) ? ' (' + recS({ w: rec.conf_w, l: rec.conf_l, t: rec.conf_t }) + ' in the conference)' : '') + '. ' : '') +
       (isNum(R.rating) ? 'We rate them ' + CC.f(Math.abs(R.rating), hk ? 2 : 1) + (fb ? ' points' : hk ? ' goals a game' : ' points per 100 possessions') + ' ' + (R.rating >= 0 ? 'better' : 'worse') + ' than an average ' + (fb ? 'FBS' : 'D-I') + ' team' + (isNum(R.rank) ? ', ' + QK.ordinal(R.rank) + ' in the country' : '') + (isNum(R.se) ? ', give or take ' + CC.f(R.se, hk ? 2 : 1) : '') + '. ' : '') +
       (sim && isNum(sim.p_title) && sim.p_title >= 0.005 ? 'Our simulations give them a ' + CC.pct(sim.p_title) + ' chance to win the title.' : (isNum(R.sos_rank) ? 'Their schedule ranks ' + QK.ordinal(R.sos_rank) + ' for strength.' : ''));
+    var sched = (d && d.schedule) || [];
+    var played = playedOf(L, sched, tid), fchip = formChip(L, played);
     var html = '<nav class="cc-crumb" aria-label="Breadcrumb"><a href="' + esc(CC.href(L, 'teams', null, S)) + '">' + esc(CC.LNAME[L]) + '</a><span aria-hidden="true">›</span>' + esc(conf ? (conf.short || conf.name) : 'Independent') + '<span aria-hidden="true">›</span>' + esc(t ? t.name : 'Team ' + tid) + '</nav>';
     html += QK.playerHeader({ name: t ? t.name : 'Team ' + tid, split: false, pos: conf ? (conf.name || conf.short) : 'Independent', kicker: CC.LNAME[L] + ' · ' + CC.seasonLabel(L, S), face: t && t.abbr ? t.abbr : null,
       team: t ? { name: '', abbr: t.abbr, colour: t.colour, alt: CC.talt(L, tid) || undefined } : null,
       meta: [['Record', recS(rec)], isNum(rec.conf_w) ? ['Conference', recS({ w: rec.conf_w, l: rec.conf_l, t: rec.conf_t }) + (hk && isNum(rec.conf_pts) ? ' · ' + rec.conf_pts + ' pts' : '')] : null, rec.streak ? ['Streak', rec.streak] : null, isNum(R.games) ? ['Games rated', String(R.games)] : null],
-      short: null,
+      tags: fchip ? [fchip] : [], short: null,
       /* round 12 (My Teams): follow the team from the hero; it then leads Home and this site's overview */
-      follow: CC.followItem(L, tid) }) + '%STRIP_HTML%' + (shortTxt.trim() ? '<div class="qk-ph-short">' + QK.shortVersion(shortTxt.trim()) + '</div>' : '');
+      follow: CC.followItem(L, tid) }) + '%STRIP_HTML%' + (shortTxt.trim() ? '<div class="qk-ph-short">' + QK.shortVersion(shortTxt.trim()) + '</div>' : '') + '%SURE_HTML%';
     if (!d) html += '<p class="cc-note">The full team page has not been built for this season; ratings come from the season file.</p>';
     var dm = ((cat && cat.metrics) || []).filter(function (m0) { return m0.key === 'def'; })[0];
     var defLow = dm ? !!dm.lower : !fb;
@@ -131,9 +233,28 @@ CC.route('team', function (el, p) {
       tip: (fb ? 'Expected margin against an average FBS team on a neutral field' : hk ? 'Expected goal difference a game against an average Division I team on neutral ice' : 'Adjusted efficiency margin per 100 possessions') + '; ± is one standard error; the chip is the national percentile' }];
     if (isNum(R.off)) k.push({ label: hk ? 'Attack' : 'Offence', value: hk ? CC.signed(R.off, 2) : CC.f(R.off, 1), pctl: pc('off'), sub: fb ? 'points a game added' : hk ? 'goals a game above average' : 'adjusted points per 100' });
     if (isNum(R.def)) k.push({ label: 'Defence', value: hk ? CC.signed(R.def, 2) : CC.f(R.def, 1), pctl: pc('def'), sub: hk ? 'goals a game kept out' : defLow ? 'points allowed per 100 (lower is better)' : 'points a game prevented' });
-    if (CC.isCur(L, S)) k = k.concat(chanceTiles(L, sim));
+    var cur = CC.isCur(L, S), nSims = season && season.sim && isNum(season.sim.n_sims) ? season.sim.n_sims : null;
+    if (cur) {
+      var ct = chanceTiles(L, sim), wr = sim ? winRange(sim.w_dist) : null;
+      /* projected wins carries the simulation's 9-in-10 range as the likely-range bar; the headline chance follows */
+      ct.forEach(function (x) {
+        if (x.label === 'Projected wins' && wr) { x.sub = '9 seasons in 10: ' + wr.lo + '–' + wr.hi + ' wins'; x.range = { lo: wr.lo, hi: wr.hi, mid: sim.exp_w, min: 0, max: wr.max, label: 'Projected wins, nine seasons in ten', fmt: function (v) { return CC.f(v, 0); } }; x.tip = 'The mean of our simulated seasons; the bar holds nine seasons in ten, from the simulation’s own win distribution'; }
+      });
+      var head = ct.filter(function (x) { return /playoff|tournament/i.test(x.label) && !/conference/i.test(x.label); })[0];
+      k = k.concat(ct.filter(function (x) { return x.label === 'Projected wins'; })).concat(head ? [Object.assign({}, head, { signal: true, sub: head.sub || (nSims ? 'from ' + QK.fmt.num(nSims) + ' simulated seasons' : 'our chance') })] : []);
+      if (k.length < 5) k = k.concat(ct.filter(function (x) { return x.label !== 'Projected wins' && x !== head; }).slice(0, 5 - k.length));
+    }
     /* v4: the numbers are the black strip under the team-colour hero (QK.playerHeader strip), "The short version" after */
-    html = html.replace('%STRIP_HTML%', QK.statStrip(k.slice(0, 6)));
+    html = html.replace('%STRIP_HTML%', QK.statStrip(k.slice(0, 5)));
+    /* "How sure are we?": what the headline chance means, and the sample behind the rating (its standard error) */
+    var hp = cur && sim ? (CC.fb(L) ? sim.p_cfp : sim.p_ncaa) : null, gpR = isNum(R.games) ? R.games : (isNum(rec.w) ? rec.w + rec.l + (rec.t || 0) : 0), sure = [];
+    if (isNum(hp)) sure.push('<b>' + CC.pct(hp) + '</b> to make the ' + (CC.fb(L) ? 'playoff' : 'NCAA tournament') + ' means ' + esc(nm) + ' made it in ' + freqWords(hp) + ' of our ' + (nSims ? QK.fmt.num(nSims) + ' ' : '') + 'simulated seasons.');
+    if (isNum(R.rating)) sure.push((gpR ? (cur ? gpR + ' game' + (gpR === 1 ? '' : 's') + ' in' : 'Over ' + gpR + ' game' + (gpR === 1 ? '' : 's')) + ', our' : 'Before the first game our') + ' rating is <b>' + CC.signed(R.rating, hk ? 2 : 1) + (isNum(R.se) ? ' ± ' + CC.f(R.se, hk ? 2 : 1) : '') + '</b> ' + (fb ? 'points' : hk ? 'goals a game' : 'points per 100 possessions') + ' against an average team' + (isNum(R.se) ? ' (one standard error)' : '') + '.' +
+      (gpR && gpR < 8 ? ' ' + gpR + ' game' + (gpR === 1 ? ' is' : 's is') + ' a small sample, hence the wide ±.' : ''));
+    html = html.replace('%SURE_HTML%', sure.length ? '<div style="margin-top:var(--sp-3)">' + QK.explain(sure.join(' '), { title: 'How sure are we?' }) + '</div>' : '');
+    /* what to watch next beside the last game (the Rink's team page) */
+    var NL = nextAndLast(L, S, tid, sched, played, season);
+    html += NL.html;
     // percentile card (every team in the country) beside the rating path and rank history
     var groups = [];
     if (cat && cat.metrics) {
@@ -167,12 +288,16 @@ CC.route('team', function (el, p) {
       note: 'Opponent-adjusted where the metric says so; lower-is-better metrics are flipped so 100 is always best.', emptyText: 'Percentiles appear after the first games.' });
     var path = (d && d.rating_path) || (season && season.rating_paths && season.rating_paths[tid]) || [];
     var rh = (d && d.rank_history) || [];
-    html += '<div class="qk-grid cc-grid"><div class="qk-span-5">' + pcard + '</div><div class="qk-span-7"><div class="qk-stack">' +
+    var crow = cur ? chanceRows(L, sim, t ? t.colour : null) : [];
+    var chCard = crow.length ? U.card('Season chances', 'Ours, from ' + (nSims ? QK.fmt.num(nSims) + ' ' : '') + 'simulated seasons' + (isNum(sim.n_rem) ? ' (' + sim.n_rem + ' regular-season game' + (sim.n_rem === 1 ? '' : 's') + ' left)' : '') + '.', QK.chances(crow, { sort: false, max: 1, key: false })) : '';
+    html += '<div class="qk-grid cc-grid"><div class="qk-span-5">' + pcard + '</div><div class="qk-span-7"><div class="qk-stack">' + chCard +
       U.card('Rating through the season', 'Re-fitted after each week' + (isNum(R.se) ? '; today’s rating is ± ' + CC.f(R.se, 1) + ' (one standard error)' : '') + '.', path.length > 1 ? U.chart('tp-path', 240, 'Rating through the season') : QK.empty('Not enough games yet', 'The path starts after the first games.')) +
-      U.card(hk ? 'USCHO rank v our rank' : 'AP rank v our rank', 'Week by week; 1 is the top.', rh.length > 1 ? U.chart('tp-rank', 220, 'AP and our rank by week') : QK.empty('No rank history', 'The polls and our ranking appear once the season starts.')) + '</div></div></div>';
+      U.card(hk ? 'USCHO rank v our rank' : 'AP rank v our rank', 'Week by week; 1 is the top.', rh.length > 1 ? U.chart('tp-rank', 220, 'AP and our rank by week') : QK.empty('No rank history', 'The polls and our ranking appear once the season starts.')) +
+      /* the season distributions sit in this column too, beside the long percentile card (they were a row of their own) */
+      (cur && sim && sim.w_dist && sim.w_dist.length ? U.card('Final win total', 'Our chance of each number of regular-season wins, from the simulated seasons.', U.chart('tp-wd', 220, 'Distribution of final wins')) : '') +
+      (cur && sim && sim.seed_dist && Object.keys(sim.seed_dist).length ? U.card(fb ? 'Playoff seed' : 'Tournament seed', 'Our chance of each seed, from the simulated seasons.', U.chart('tp-sd', 220, 'Distribution of seeds')) : '') + '</div></div></div>';
     if (bb && CC.ok(a[4])) html += trankCard(L, S, tid, a[4], cat);
     // schedule
-    var sched = (d && d.schedule) || [];
     if (hk) html += CC.hkCredit(true);
     if (sched.length) html += U.section('Schedule', 'Every game with our pre-game win chance for ' + esc(CC.tshort(L, tid)) + '.', U.card('', '', U.lb('tp-sched'), { flush: true, cls: 'cc-bare' }), '', 'Games');
     // roster + units
@@ -196,13 +321,9 @@ CC.route('team', function (el, p) {
     }
     html += U.section('Transfers', (hk ? 'The same College Hockey News player on a new team since last season. ' : 'The same ESPN athlete on a new team since last season. ') + QK.tag(hk ? 'Inferred from player lines, not the official transfer portal' : INFERRED),
       '<div class="qk-grid cc-grid"><div class="qk-span-6">' + U.card('In', '', mvT(mv['in'], 'in')) + '</div><div class="qk-span-6">' + U.card('Out', '', mvT(mv.out, 'out')) + '</div></div>', '', 'Moves');
-    // season distributions
-    if (CC.isCur(L, S) && sim && (sim.w_dist || sim.seed_dist)) {
-      html += '<div class="qk-grid cc-grid">' + (sim.w_dist && sim.w_dist.length ? '<div class="qk-span-6">' + U.card('Final win total', 'Our chance of each number of regular-season wins, from the simulated seasons.', U.chart('tp-wd', 220, 'Distribution of final wins')) + '</div>' : '') +
-        (sim.seed_dist && Object.keys(sim.seed_dist).length ? '<div class="qk-span-6">' + U.card(fb ? 'Playoff seed' : 'Tournament seed', 'Our chance of each seed, from the simulated seasons.', U.chart('tp-sd', 220, 'Distribution of seeds')) + '</div>' : '') + '</div>';
-    }
     el.innerHTML = html;
     U.wire(el);
+    fillLast(el, L, S, tid, NL.last);
     var col = t && QK.color.parse(t.colour) ? QK.color.team(t.colour) : null;
     if (path.length > 1) {
       var xs = path.map(function (x0) { return String(x0[0]).slice(0, 10); });

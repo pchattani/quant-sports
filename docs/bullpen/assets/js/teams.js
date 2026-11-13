@@ -132,6 +132,127 @@ function chart(L, S, list, T, rows) {
 
 // ── team page ──────────────────────────────────────────────────────────────
 
+/* Round 11 (the sweep: "The short version", the last game, next season, "How sure are we?", form). */
+function lc(x) { return /^[A-Z][a-z]/.test(x) ? x.charAt(0).toLowerCase() + x.slice(1) : x; }
+/* How a finished season ended for the club, from season.json postseason (teams[tid].reached, champion). */
+function endedOf(post, tid, r, info, L) {
+  const k = K();
+  if (!post) return null;
+  const mlb = L === 'mlb';
+  /* text: the sentence (the short version); short: the strip's value (Bebas, so a few words); sub: the line under it.
+     The round names are MLB's; a minor league's postseason reads as champions, qualified or missed. */
+  if (String(post.champion) === String(tid)) return { text: mlb ? 'Won the World Series' : 'Won the title', short: 'Champions', won: true, sub: (mlb ? 'won the World Series' : 'won the postseason') + (k.isNum(r.seed) ? ' as the ' + k.ordinal(r.seed) + ' seed in the ' + (info.league || r.league || 'league') : '') };
+  const x = (post.teams || {})[String(tid)];
+  if (x && !mlb) return { text: 'Made the postseason', short: 'Qualified', sub: 'made the postseason' };
+  if (x) {
+    const rr = x.reached;
+    const text = rr === 'WS' ? 'Lost the World Series' : rr === 'CS' ? 'Lost the LCS' : rr === 'DS' ? 'Out in the Division Series' : rr === 'WC' ? 'Out in the Wild Card round' : 'Made the postseason';
+    return { text: text, short: { WS: 'Lost the WS', CS: 'Lost the LCS', DS: 'Out in the DS', WC: 'Out in the WC' }[rr] || 'Qualified',
+      sub: text.toLowerCase() + (k.isNum(x.seed) ? ' · the ' + k.ordinal(x.seed) + ' seed in the ' + (x.league || info.league || 'league') : '') };
+  }
+  return { text: 'Missed the postseason', short: 'Missed', sub: 'no postseason' + (k.isNum(r.gb) && r.gb > 0 ? ' · ' + (r.gb % 1 ? k.num(r.gb, 1) : String(r.gb)) + ' games back in the ' + (info.division || r.division || 'division') : '') };
+}
+/* "The short version": the record and run differential (and the gap to the Pythagorean record), the rating's percentile,
+   our chances (in season) or how it ended (after it), our call after the first week, and the best and weakest of the
+   team profile's numbers. */
+function shortTeam(o) {
+  const k = K();
+  if (!k.isNum(o.w) || !k.isNum(o.l)) return null;
+  const nm = BP.teamShort(o.tid), g = o.w + o.l;
+  let s = 'The ' + nm + (o.over ? ' finished ' : ' are ') + o.w + '-' + o.l + (k.isNum(o.rd) ? ' with a ' + k.signed(o.rd, 0) + ' run differential' : '') + '.';
+  if (k.isNum(o.pw) && g >= 20) {
+    const gap = o.w - o.pw;
+    if (Math.abs(gap) >= 3) s += ' Their runs scored and allowed point to ' + Math.round(o.pw) + ' wins, so they won ' + Math.round(Math.abs(gap)) + ' ' + (gap > 0 ? 'more' : 'fewer') + ' games than their runs suggest.';
+  }
+  if (k.isNum(o.pc.rating) && g >= 20) s += ' Our team rating puts them in the ' + QK.ordinal(Math.round(o.pc.rating)) + ' percentile of the ' + o.nT + ' clubs.';
+  if (o.over && o.ended) s += ' ' + o.ended.text + '.';
+  else if (!o.over && k.isNum(o.od.p_playoffs)) s += ' We give them ' + k.pct(o.od.p_playoffs, 0) + ' to reach the postseason' + (k.isNum(o.od.p_ws) && o.od.p_ws >= 0.01 ? ' and ' + k.pct(o.od.p_ws, 0) + ' to win the World Series' : '') + '.';
+  const c1 = o.calls && o.calls.first && o.calls.first.p_ws ? o.calls.first.p_ws[String(o.tid)] : null;
+  if (o.over && k.isNum(c1)) s += ' After the first week we gave them ' + k.pct(c1, 1) + ' to win it all.';
+  const rows = [];
+  (o.groups || []).forEach(gr => (gr.rows || []).forEach(x => { if (k.isNum(x.pctl) && x.key !== 'rating') rows.push(x); }));
+  if (rows.length && g >= 20) {
+    const top = rows.slice().sort((a, b) => b.pctl - a.pctl)[0], low = rows.slice().sort((a, b) => a.pctl - b.pctl)[0];
+    if (top.pctl >= 70) s += ' Best at ' + lc(top.label) + ' (' + QK.ordinal(Math.round(top.pctl)) + ' percentile).';
+    if (low.pctl <= 30 && low.key !== top.key) s += ' The weak spot: ' + lc(low.label) + ', in the ' + QK.ordinal(Math.round(low.pctl)) + ' percentile.';
+  } else if (g < 20) s += ' ' + g + ' game' + (g === 1 ? ' is' : 's is') + ' a small sample, so the ranks start after 20.';
+  return s;
+}
+/* "How sure are we?" under the club's numbers: in season, what the postseason chance means and the sample; after it,
+   the full sample, the luck in the record (against the Pythagorean one) and what next season's projection is. */
+function howSureTeam(o) {
+  const k = K();
+  const bits = [];
+  if (o.over) {
+    if (k.isNum(o.tg)) bits.push(o.tg >= 160 ? 'A full season of ' + o.tg + ' games: the record and our ratings have settled.' : o.tg + ' games: the season is over.');
+    if (k.isNum(o.pw) && k.isNum(o.w)) { const gap = o.w - o.pw; bits.push(Math.abs(gap) < 2 ? 'The record matches the runs (Pythagorean ' + Math.round(o.pw) + ' wins): little of it looks like luck.' : 'The ' + Math.round(Math.abs(gap)) + '-win gap between the record and the runs (Pythagorean ' + Math.round(o.pw) + ') is the part most likely to be luck in close games.'); }
+    if (o.nextOn) bits.push('Next season’s number adds up each player’s projected WAR before free agency, trades and signings: a starting point, not a forecast.');
+  } else {
+    const p = o.od.p_playoffs;
+    if (k.isNum(p) && p > 0.005 && p < 0.995) { const q = p >= 0.5 ? 1 - p : p, per = q < 0.1 ? 100 : 10, n = Math.max(1, Math.round(per * q)); bits.push('A ' + k.pct(p, 0) + ' postseason chance ' + (p >= 0.5 ? 'still misses' : 'still gets in') + ' about ' + n + ' time' + (n === 1 ? '' : 's') + ' in ' + per + ': it comes from simulating the rest of the season.'); }
+    if (k.isNum(o.tg)) bits.push(o.tg < 20 ? o.tg + ' game' + (o.tg === 1 ? ' is' : 's are') + ' a small sample: the ranks start after 20.' : o.tg + ' of 162 games played.');
+  }
+  return bits.length ? QK.explain('<b>How sure are we?</b> ' + K().esc(bits.join(' '))) : '';
+}
+/* What to watch next, or next season, beside the last game. In season: the club's next game from index.json as the
+   scoreboard bug. After the season (MLB, the current season): next season as the rosters stand (value.json through
+   BP.nextSeasonWins). The last game: the newest finished row of the team log, its line score and our win chance through
+   it from the game file. Returns { html, fill(el), nextSeason }. */
+function nextLast(L, S, tid, played, over, isCurS) {
+  const k = K(), U = BP.ui;
+  const idx = BP.index() || {}, src = L === 'mlb' ? idx : BP.levelInfo(L);
+  const mine = x => x && (String(x.home) === String(tid) || String(x.away) === String(tid));
+  const nxt = isCurS && !over ? [].concat(src.today || [], src.upcoming || []).filter(x => mine(x) && !BP.isFinal(x) && U.fresh(x)).sort((a, b) => String(a.start).localeCompare(String(b.start)))[0] : null;
+  const nextOn = !nxt && over && isCurS && L === 'mlb' && !!BP.nextSeasonWins;
+  const last = played.length ? played[played.length - 1] : null;
+  if (!nxt && !nextOn && !last) return { html: '', fill: () => {}, nextSeason: false };
+  const nS = Number(S) + 1;
+  const GT = { F: 'Wild Card', D: 'Division Series', L: 'LCS', W: 'World Series' };
+  let h = '<section class="qk-section">' + ((nxt || nextOn) && last ? '<div class="qk-g2">' : '<div>');
+  if (nxt) h += '<div>' + QK.sectionHead({ kicker: BP.isLive(nxt) ? 'Live now' : (QK.fmt.relDay(nxt.start || nxt.date) === 'Today' ? 'What to watch tonight' : 'Next up'), title: BP.teamShort(nxt.away) + ' at ' + BP.teamShort(nxt.home) }) + '<div id="tm-next"></div></div>';
+  else if (nextOn) h += '<div>' + QK.sectionHead({ kicker: 'Next season', title: nS + ' as the rosters stand', sub: 'The ' + nS + ' season starts in the spring. Until then, every player’s projected WAR for ' + nS + ', added up by the club they are with today.' }) + '<div id="tm-nextS">' + QK.skeleton('card', 1) + '</div></div>';
+  if (last) {
+    const ttl = U.scoreTitle(tid, last.opp, last.res, last.rs, last.ra) || ((last.home ? 'v ' : 'at ') + BP.teamShort(last.opp));
+    /* the round codes are MLB's; a minor-league postseason game is just "Postseason" */
+    const rnd = L === 'mlb' ? GT[last.gtype] || '' : (last.gtype && last.gtype !== 'R' ? 'Postseason' : '');
+    h += '<div>' + QK.sectionHead({ kicker: 'Last game', title: ttl, html: true, sub: k.esc([BP.fmtDate(last.date, { year: false }), last.home ? 'at home' : 'away', rnd, over && isCurS ? 'the last game of the ' + S + ' season' : ''].filter(Boolean).join(' · ')),
+      actions: last.gpk ? '<a class="qk-more" href="' + k.esc(BP.gameHref(last.gpk, L, S)) + '">The game centre</a>' : '' }) +
+      '<article class="qk-card"><div class="qk-card-body"><div id="tm-lbox">' + QK.skeleton('lines', 3) + '</div>' +
+      (k.isNum(last.p) ? QK.explain(k.esc('We gave the ' + BP.teamShort(tid) + ' a ' + U.pct(last.p) + ' chance before the game' + (last.res === 'W' ? (last.p < 0.4 ? ': an upset win.' : last.p < 0.5 ? ': a win as the slight underdog.' : ': a win, as expected.') : (last.p > 0.6 ? ': a loss as the clear favourite.' : last.p > 0.5 ? ': a loss as the slight favourite.' : ': a loss, as expected.')))) : '') +
+      '<div id="tm-lrace"></div></div></article></div>';
+  }
+  h += '</div></section>';
+  const fill = el => {
+    if (nxt && el.querySelector('#tm-next')) {
+      const g = BP.kitGame(nxt, L);
+      g.league = BP.levelLong(L);
+      g.home.record = BP.RECORDS[String(nxt.home)] || ''; g.away.record = BP.RECORDS[String(nxt.away)] || '';
+      el.querySelector('#tm-next').innerHTML = QK.previewCard(g, { layout: 'bug', nick: t => t.short || t.name });
+    }
+    if (nextOn && el.querySelector('#tm-nextS')) {
+      const ids = Object.keys(BP.RECORDS || {});
+      BP.nextSeasonWins(L, S, ids.length >= 20 ? ids : null).then(N => {
+        const box = el.querySelector('#tm-nextS');
+        if (!box || !box.isConnected) return;
+        if (!N || !k.isNum(N.tot[String(tid)])) { box.innerHTML = QK.empty('No projection yet', 'Next season’s projections appear once the player values are built.'); return; }
+        const me = String(tid), W = N.W, rank = 1 + N.ids.filter(x => W(x) > W(me)).length;
+        const pct = N.ids.length > 1 ? 100 * (N.ids.length - rank) / (N.ids.length - 1) : 50;
+        const top = (N.top[me] || []).slice(0, 3);
+        box.innerHTML = QK.stats([
+          { label: 'Projected ' + nS + ' wins', value: String(Math.round(W(me))), signal: true, pctl: pct, sub: k.ordinal(rank) + ' of ' + N.ids.length + ' rosters · ' + Math.round(W(me)) + '-' + (162 - Math.round(W(me))), tip: 'An average roster is 81 wins: the club’s projected WAR against the league average, a win of WAR a win' },
+          { label: 'Roster WAR for ' + nS, value: U.signed(N.tot[me], 1), sub: 'the league average is ' + U.signed(N.mean, 1) }]) +
+          (top.length ? '<ul class="bp-list bp-nexttop">' + top.map(x => '<li><span>' + k.esc(x[0] || '') + '</span><span class="v">' + U.signed(x[1], 1) + ' WAR</span></li>').join('') + '</ul>' : '') +
+          '<p class="bp-note">The most projected WAR for ' + nS + ' on today’s roster. <a class="qk-link" href="' + k.esc(k.href(L, 'standings', S)) + '">Every club →</a></p>';
+      });
+    }
+    if (last && last.gpk && el.querySelector('#tm-lbox')) {
+      const box = el.querySelector('#tm-lbox');
+      U.lastGame(box, el.querySelector('#tm-lrace'), 'tm-lrace-c', last.gpk, L, S, tid).then(d => { if (!d && box.isConnected) box.innerHTML = QK.empty('No game file', 'The line score for this game is not on the site.'); });
+    }
+  };
+  return { html: h, fill: fill, nextSeason: nextOn };
+}
+
 function renderTeam(el, params, state) {
   const k = K();
   const U = BP.ui;
@@ -162,27 +283,46 @@ function renderTeam(el, params, state) {
     const xw = [r.exp_w, v.exp_w].find(k.isNum), xl = k.isNum(xw) && k.isNum(w) ? w + l - xw : null, pw = [r.pythag_w, v.pythag_w].find(k.isNum);
     const rt = { off: [r.off, v.off_rpg].find(k.isNum), def: [r.def, v.def_rpg].find(k.isNum), pit: [r.pit, v.pit_rpg].find(k.isNum), tot: [r.rating, v.rating].find(k.isNum) };
     document.title = k.teamName(tid) + ' · ' + BP.SITE;
+    /* round 11: once the season is over (the off-season, or a past season) its chances are results (0 or 1), not
+       forecasts: the strip shows how the season ended instead, and the simulation card gives way */
+    const phase = String((res[1] && res[1].phase) || BP.phase(L) || '');
+    const isCurS = Number(S) === Number(BP.currentSeason(L));
+    const over = !isCurS || /off|complete/.test(phase);
+    const post = res[1] && res[1].postseason && res[1].postseason.teams ? res[1].postseason : null;
+    const ended = over ? endedOf(post, tid, r, info, L) : null;
     const tiles = [];
-    if (k.isNum(od.p_ws)) tiles.push({ label: 'World Series chance', value: k.pct(od.p_ws, 1), signal: true, sub: k.isNum(od.p_pennant) ? 'pennant ' + k.pct(od.p_pennant, 1) : 'season simulation', tip: 'Our chance from simulating the rest of the season and the bracket' });
-    if (k.isNum(od.p_playoffs)) tiles.push({ label: 'Postseason chance', value: k.pct(od.p_playoffs, 1), signal: !k.isNum(od.p_ws), sub: k.isNum(od.p_division) ? 'division ' + k.pct(od.p_division, 1) : (r.clinched ? 'clinched' : '') });
+    if (ended) tiles.push({ label: 'Postseason', value: ended.short, text: true, signal: ended.won, sub: ended.sub });
+    if (!over && k.isNum(od.p_ws)) tiles.push({ label: 'World Series chance', value: k.pct(od.p_ws, 1), signal: true, sub: k.isNum(od.p_pennant) ? 'pennant ' + k.pct(od.p_pennant, 1) : 'season simulation', tip: 'Our chance from simulating the rest of the season and the bracket' });
+    if (!over && k.isNum(od.p_playoffs)) tiles.push({ label: 'Postseason chance', value: k.pct(od.p_playoffs, 1), signal: !k.isNum(od.p_ws), sub: k.isNum(od.p_division) ? 'division ' + k.pct(od.p_division, 1) : (r.clinched ? 'clinched' : '') });
     tiles.push({ label: 'Team rating', value: k.isNum(rt.tot) ? k.signed(rt.tot, 2) : '—', pctl: pc.rating, sub: 'offence ' + k.signed(rt.off, 2) + ' · pitching ' + k.signed(rt.pit, 2) + ' · fielding ' + k.signed(rt.def, 2), tip: 'Runs a game better than an average club' });
     tiles.push({ label: 'Expected record', value: k.isNum(xw) ? k.num(xw, 0) + '-' + k.num(xl, 0) : '—', sub: 'from our ratings' });
     if (k.isNum(v.war)) tiles.push({ label: 'Roster WAR', value: k.signed(v.war, 1), pctl: pc.war, sub: 'Bullpen WAR, hitters and pitchers' });
+    /* round 11: the club's last ten results (the team log, the postseason included), oldest first */
+    const log = (t.log || []).map(x => (Array.isArray(x) ? { gpk: String(x[0]), date: x[1], gtype: x[2], opp: x[3], home: !!x[4], rs: x[5], ra: x[6], res: x[7], p: x[8] } : x));
+    const played = log.filter(x => x.res === 'W' || x.res === 'L');
+    const f10 = played.slice(-10).map(x => x.res);
+    const formChip = f10.length ? '<span class="bp-phform" tabindex="0" data-tip="Last ' + f10.length + ' results, oldest first (W win, L loss)' + (over ? ', to the end of the season' : '') + '">Last ' + f10.length + ' ' + QK.formDots(f10, 10) + '</span>' : null;
+    const tGroups = U.pctGroups({ values: v, pct_role: pc, n: { g: v.g } }, 'team', 'TEAM', gl, 'head');
     /* v4: the full-bleed club-colour hero (the alternate colour on the diagonal, the abbreviation outlined) with the
-       black strip: the record and run differential, then our chances and rating */
+       black strip: the record and run differential, then our chances and rating; round 11: "The short version" */
     const hero = QK.playerHeader({ name: k.teamName(tid), split: false, face: k.teamAbbr(tid), pos: [info.league, info.division].filter(Boolean).join(' · '), kicker: k.LN(L) + ' · ' + S + (k.isNum(r.div_rank) ? ' · ' + k.ordinal(r.div_rank) + ' in the division' : ''),
       team: { name: k.teamAbbr(tid), abbr: k.teamAbbr(tid), colour: U.raw(tid), alt: U.alt(tid) },
-      meta: [vid ? ['Home park', k.parkName(vid)] : null, k.isNum(pw) ? ['Pythagorean', k.num(pw, 0) + ' wins'] : null],
+      meta: [vid ? ['Home park', k.parkName(vid)] : null, k.isNum(pw) ? ['Pythagorean', k.num(pw, 0) + ' wins'] : null, formChip],
       strip: [{ label: 'Record', value: k.isNum(w) ? w + '-' + l : '—', sub: k.isNum(rd) ? 'run differential ' + k.signed(rd, 0) : '' }].concat(tiles).slice(0, 5),
+      short: shortTeam({ tid: tid, L: L, S: S, w: w, l: l, rd: rd, pw: pw, rt: rt, pc: pc, od: od, over: over, ended: ended, groups: tGroups, calls: res[1] && res[1].calls, nT: Object.keys(T).length || 30 }),
       /* round 12 (My Teams): follow the club from the hero; it then leads Home and this site's overview */
       follow: U.followItem(tid, L) });
-    const stages = [['p_playoffs', 'Postseason'], ['p_division', 'Win the division'], ['p_bye', 'A first-round bye'], ['p_pennant', 'Win the pennant'], ['p_ws', 'Win the World Series']].filter(x => k.isNum(od[x[0]]));
-    const tGroups = U.pctGroups({ values: v, pct_role: pc, n: { g: v.g } }, 'team', 'TEAM', gl, 'head');
+    const stages = over ? [] : [['p_playoffs', 'Postseason'], ['p_division', 'Win the division'], ['p_bye', 'A first-round bye'], ['p_pennant', 'Win the pennant'], ['p_ws', 'Win the World Series']].filter(x => k.isNum(od[x[0]]));
     const links = '<a class="qk-btn" href="' + k.compareHref('t' + tid, '') + '?view=classic">Compare</a>' + (vid ? '<a class="qk-btn" href="' + k.parkHref(vid) + '">' + k.esc(k.parkName(vid)) + '</a>' : '') + '<a class="qk-btn" href="' + k.href(L, 'teams', S) + '">All teams</a>';
     /* the section bar above already links back to every team */
     let h = hero + '<div class="bp-flexrow" style="justify-content:flex-end;margin-top:var(--sp-4)">' + links + '</div>';
+    /* round 11: what to watch next (the scoreboard bug, in season) or next season (the off-season, MLB: the rosters as they
+       stand) beside the last game (the line score and our win chance through it, from the game file) */
+    const NL = nextLast(L, S, tid, played, over, isCurS);
+    h += NL.html;
     h += '<div class="qk-grid"><div class="qk-span-5"><div class="bp-stack">' +
       (stages.length ? U.card2('Season simulation', 'Our chance of reaching each stage' + (k.isNum(r.magic) ? ' · magic number ' + k.esc(r.magic) : ''), QK.chances(stages.map(x => ({ label: x[1], p: od[x[0]], color: (BP.teamInfo(tid) || {}).colour })), { sort: false, max: 1, key: false })) : '') +
+      howSureTeam({ w: w, l: l, pw: pw, od: od, over: over, tg: k.isNum(v.g) ? v.g : (k.isNum(w) ? w + l : null), L: L, S: S, nextOn: NL.nextSeason }) +
       QK.pctCard({ title: 'Team profile', peer: 'MLB clubs', sample: k.isNum(v.g) ? v.g + ' games' : '', groups: tGroups, foot: '<span class="bp-fn">Percentiles among the ' + Object.keys(T).length + ' clubs; 100 = best</span><a href="' + k.compareHref('t' + tid, '') + '?view=classic">Every metric →</a>' }) +
       '</div></div><div class="qk-span-7">' + U.card2('Roster value', 'Bullpen WAR this season for everyone who played for the club (latest team), with the 40-man roster and injured list where recorded', '' + BP.ui.chart('tm-war', 330, 'Roster WAR') + '<div id="tm-roster" style="margin-top:12px"></div>') + '</div></div>';
     /* strengths, weaknesses and the race (docs/_design/league.js: the chips, the race facts and our chances over the season;
@@ -200,6 +340,7 @@ function renderTeam(el, params, state) {
     h += '<div class="card"><div class="card-header">Home park <span class="card-sub">Our park factors (100 = neutral) by batter hand and batted-ball type.</span></div><div id="tm-park"></div></div>';
     h += U.card2('Schedule and results', 'Every game with our pre-game win chance; the line is wins minus the wins we expected', U.chart('tm-logc', 260, 'Wins minus expected wins') + '<div id="tm-log"></div>');
     el.innerHTML = h;
+    NL.fill(el);
     if (document.getElementById('tm-league')) QKL.team(document.getElementById('tm-league'), Object.assign({}, lo, { meters: false }), tid);
     topPerformers(document.getElementById('tm-top'), L, S, T, tid, v);
     dropTargets(document.getElementById('tm-mv'));

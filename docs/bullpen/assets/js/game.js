@@ -196,7 +196,11 @@ function normalise(raw, P) {
       }
     });
   }
-  g._pre = { model: pr.model || g.model || {}, market: pr.market || g.market || pr.store_market || null, line: pr.line || g.lines || g.line || null,
+  /* round 11: a pre-game block priced after the first pitch (seen on postseason games) carries in-game prediction-market
+     prices (a 4% that was 45% before the start): then the market reference is the sportsbook's closing line (store_market,
+     taken before the start), never the in-game one. */
+  const late = !!(pr.priced_at && g.start && Date.parse(pr.priced_at) > Date.parse(g.start));
+  g._pre = { model: pr.model || g.model || {}, market: (late ? (pr.store_market || null) : (pr.market || g.market || pr.store_market)) || null, line: pr.line || g.lines || g.line || null,
     lineups: lineups, projected: projected, starters: pr.starters || g.starters || null, priced_at: pr.priced_at || null,
     sources: L0 && !Array.isArray(L0.home) ? { home: (L0.home || {}).source || null, away: (L0.away || {}).source || null } : {},
     strength: g.lineup_strength || null, status: g.starters_status || null, lineups_at: g.lineups_at || null, probables_log: g.probables_log || null };
@@ -214,7 +218,7 @@ function normalise(raw, P) {
 
 // ── header ─────────────────────────────────────────────────────────────────
 
-function header(g, L, S, season) {
+function header(g, L, S, season, recs) {
   const U = BP.ui;
   const st = BP.gameState(g);
   const pre = preOf(g);
@@ -228,7 +232,9 @@ function header(g, L, S, season) {
      type and resolves a clash; a club without a colour falls to the kit's cobalt v slate); the charts keep the lifted pair */
   const A = U.team(g.away, L, S), H = U.team(g.home, L, S);
   A.colour = U.raw(g.away) || pair[0]; H.colour = U.raw(g.home) || pair[1];
-  const rec = t => BP.RECORDS[String(t)] || '';
+  /* round 11: recs, the regular-season records going in (formGoingIn), replace the season's final record once the game
+     has started */
+  const rec = t => (recs && recs[String(t)]) || BP.RECORDS[String(t)] || '';
   A.record = rec(g.away); H.record = rec(g.home);
   const tag = g.series ? BP.seriesText(g.series) : (g.gtype && g.gtype !== 'R' ? BP.roundLabel(g.gtype) : '');
   const G = { sport: 'baseball', id: g.gpk, start: g.start || g.date, status: live ? 'live' : fin ? 'final' : 'pre', league: BP.levelLong(L) + (tag ? ' · ' + tag : ''),
@@ -247,6 +253,12 @@ function header(g, L, S, season) {
   const tot = isNum((m.runs || {}).total) ? m.runs.total : m.total;
   if (!started && isNum(tot)) extra.push('we expect about ' + Math.round(tot) + ' runs in all');
   if (!started && isNum(m.extra_innings) && m.extra_innings > 0.02) extra.push('about 1 game in ' + Math.max(2, Math.round(1 / m.extra_innings)) + ' like this goes to extra innings');
+  /* round 11: a final keeps the pre-game call and its verdict (the kit's note) and adds what that chance meant */
+  let sure = '';
+  if (fin && isNum(pH)) {
+    const fh = pH >= 0.5, pf = fh ? pH : 1 - pH, miss = Math.max(1, Math.round(10 * (1 - pf)));
+    sure = ' <b>How sure are we?</b> ' + esc(U.pct(pf) + ' means the ' + BP.teamShort(fh ? g.home : g.away) + ' lose a game like this about ' + miss + ' time' + (miss === 1 ? '' : 's') + ' in 10, so one result says little about the forecast.');
+  }
   const sp = g.probables || {};
   const spLine = !started && (sp.home || sp.away) ? '<div class="bp-sp-line"><span>Probable starters</span>' + (sp.away ? BP.playerLink(sp.away, { role: 'pitcher', level: L, surname: true }) : 'TBD') + ' <span class="qk-muted">v</span> ' + (sp.home ? BP.playerLink(sp.home, { role: 'pitcher', level: L, surname: true }) : 'TBD') + '</div>' : '';
   const lvlWord = BP.levelLong(L), tagShort = g.series ? BP.seriesText(g.series, true) : tag;
@@ -254,7 +266,7 @@ function header(g, L, S, season) {
   const card = QK.previewCard(G, { kicker: tag ? (tagShort.indexOf(lvlWord) === 0 ? tagShort : lvlWord + ' · ' + tagShort) : lvlWord + (g._park && g._park.name ? ' · ' + g._park.name : ''),
     nick: t => t.short || t.name,
     colors: pair, factors: fx, factorsTitle: 'How they match up this season',
-    noteExtra: extra.length ? esc(extra.join('; ').replace(/^we/, 'We')) + '.' : '',
+    noteExtra: (extra.length ? esc(extra.join('; ').replace(/^we/, 'We')) + '.' : '') + sure,
     /* round 6: the market quiet under the hero (small and grey, the source on hover) */
     market: !started && isNum(mk.p_home) ? { p: Number(mk.p_home), src: mk.sources || mk.source || null, label: U.srcName(mk.sources) || '', quiet: true } : null });
   const ump = g._ump || {};
@@ -335,9 +347,9 @@ function forecastTable(g) {
   if (!rows.length) return BP.muted('Our forecast appears once the probable starters are known.');
   const src = BP.ui.srcName((pre.market && pre.market.sources) || []);
   const anyM = rows.some(r => r.mk);
-  return '<div class="qk-table-wrap"><table class="qk-table dense"><thead><tr><th>Question</th><th>Our forecast</th>' + (anyM ? '<th><span data-tip="The de-vigged prediction-market number, shown as a reference">Market' + (src ? ' (' + esc(src) + ')' : '') + '</span></th>' : '') + '</tr></thead><tbody>' +
+  return '<div class="qk-table-wrap"><table class="qk-table dense"><thead><tr><th>Question</th><th>Our forecast</th>' + (anyM ? '<th><span data-tip="The de-vigged market number before the first pitch (a prediction market or the sportsbook line), shown as a reference">Market' + (src ? ' (' + esc(src) + ')' : '') + '</span></th>' : '') + '</tr></thead><tbody>' +
     rows.map(r => '<tr><td>' + esc(r.q) + '</td><td class="num" style="text-align:left;color:var(--ink-1);font-weight:600">' + esc(r.ours) + '</td>' + (anyM ? '<td class="num qk-muted" style="text-align:left">' + esc(r.mk || '—') + '</td>' : '') + '</tr>').join('') + '</tbody></table></div>' +
-    '<div class="bp-note">Ours: ' + (isNum((pre.model || {}).sims) ? BP.int(pre.model.sims) + ' ' : '') + 'plate-appearance simulations with the lineups, starters, bullpens, park, weather and umpire.' + (anyM ? ' Market: the de-vigged prediction-market number, for reference.' : '') + '</div>';
+    '<div class="bp-note">Ours: ' + (isNum((pre.model || {}).sims) ? BP.int(pre.model.sims) + ' ' : '') + 'plate-appearance simulations with the lineups, starters, bullpens, park, weather and umpire.' + (anyM ? ' Market: the de-vigged market number before the first pitch' + (src ? ' (' + esc(src) + ')' : '') + ', for reference.' : '') + '</div>';
 }
 function lineupTable(list, L, side, g) {
   const rows = (list || []).map(x => {
@@ -476,7 +488,9 @@ function tape(g, season) {
 function previewPanel(el, g, L, season) {
   const pre = preOf(g);
   const m = pre.model || {};
-  const tp = tape(g, season);
+  /* round 11: once the game has started the tape sits above the tabs */
+  const st0 = BP.gameState(g);
+  const tp = st0 === 'live' || st0 === 'final' ? '' : tape(g, season);
   el.innerHTML = '<div class="qk-grid"><div class="qk-span-7">' + BP.ui.card2('Probable pitchers', esc(BP.teamAbbr(g.away)) + ' v ' + esc(BP.teamAbbr(g.home)) + ' · the matchup our forecast uses', matchupCard(g, L)) + '</div>' +
     '<div class="qk-span-5">' + BP.ui.card2('Total runs', 'our distribution of the total; the dashed line is the expected total', '<div id="gm-tot" class="chart-box"></div>' +
       (isNum((m.runs || {}).home) ? QK.note('Expected runs: ' + esc(BP.teamAbbr(g.away)) + ' <b>' + BP.num(m.runs.away, 2) + '</b>, ' + esc(BP.teamAbbr(g.home)) + ' <b>' + BP.num(m.runs.home, 2) + '</b>' +
@@ -752,6 +766,31 @@ function arsenalPanel(el, g, P, L) {
   draw();
 }
 
+/* Form going in (round 11): each club's last five results before this game's date, oldest first, as QK.formPair, from
+   the team logs (teams.json, the file the team pages read; loaded after the first paint). Only games before this one
+   count, so a past game shows the form it was played on, not today's. */
+function formGoingIn(node, g, L, S, onRecords) {
+  if (!node) return;
+  const d0 = String(g.date || '').slice(0, 10);
+  const paint = T => {
+    if (!node.isConnected) return;
+    const before = tid => ((T[String(tid)] || {}).log || []).map(x => (Array.isArray(x) ? { gpk: String(x[0]), date: x[1], gtype: x[2], res: x[7] } : x))
+      .filter(x => x && (x.res === 'W' || x.res === 'L') && String(x.date || '') < d0 && String(x.gpk) !== String(g.gpk))
+      .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+    const side = tid => ({ name: BP.teamShort(tid), abbr: BP.teamAbbr(tid), colour: BP.ui.raw(tid) || undefined, form: before(tid).slice(-5).map(x => x.res) });
+    const html = QK.formPair({ left: side(g.away), right: side(g.home), n: 5, title: 'Last five, going in' });
+    node.innerHTML = html || QK.empty('No games yet', 'Neither club had played before this game.');
+    /* the regular-season records going in, for the hero of a game that has started (the standings' record is the
+       season's last word, games after this one included) */
+    if (onRecords && Object.keys(T).length) {
+      const recOf = tid => { const r = before(tid).filter(x => !x.gtype || x.gtype === 'R'); return r.length ? r.filter(x => x.res === 'W').length + '-' + r.filter(x => x.res === 'L').length : ''; };
+      const recs = {}; recs[String(g.away)] = recOf(g.away); recs[String(g.home)] = recOf(g.home);
+      onRecords(recs);
+    }
+  };
+  BP.loadYear('teams.json', L, S).then(d => paint((d && d.ok !== false && (d.teams || (d.catalogue || {}).teams)) || {}), () => paint({}));
+}
+
 // ── page ───────────────────────────────────────────────────────────────────
 
 function render(el, params) {
@@ -788,13 +827,23 @@ function render(el, params) {
     if (params.query && params.query.tab && tabs.some(t => t.key === params.query.tab)) tab = params.query.tab;
     el.innerHTML = '<div class="ph-nav gm-nav"><a href="' + BP.href('games/' + g.date, L, S) + '">‹ ' + esc(BP.fmtDate(g.date, { year: false })) + ' games</a>' +
       (g.series ? '<a href="' + BP.ghref('postseason') + '">Postseason</a>' : '<a href="' + BP.href('standings', L, S) + '">Standings</a>') + '</div>' +
-      '<div class="bp-gtop">' + header(g, L, S, season) + '<div class="bp-gside bp-stack">' + kpiStrip(g) +
-      ((g.model || preOf(g).model) && forecastRows(g).length ? BP.ui.card2(st === 'pre' ? 'Our forecast' : 'Our pre-game forecast', 'the questions our simulation answers; the market column is a reference, not our forecast', forecastTable(g)) : '') + '</div></div>' +
+      /* round 11: the tiles and each club's last five going in (the team logs, cut at this game's date) share the
+         first column of the side grid, the forecast the second */
+      '<div class="bp-gtop">' + header(g, L, S, season) + '<div class="bp-gside bp-stack"><div class="bp-stack">' + kpiStrip(g) +
+      BP.ui.card2('Form going in', 'Each club’s last five results before this game, from the team logs', '<div id="gm-form">' + QK.skeleton('lines', 2) + '</div>') + '</div>' +
+      ((g.model || preOf(g).model) && forecastRows(g).length ? BP.ui.card2(st === 'pre' ? 'Our forecast' : 'Our pre-game forecast', 'the questions our simulation answers' + (g.updated_at ? ' · game file as of ' + esc(BP.fmtStamp(g.updated_at)) : '') + '; the market column is a reference, not our forecast', forecastTable(g)) : '') + '</div></div>' +
+      /* round 11: once the game has started the default tab is the game itself, so the tale of the tape sits here */
+      (started && res.full && tape(g, season) ? '<section class="qk-section">' + QK.sectionHead({ kicker: 'Tale of the tape', title: BP.teamAbbr(g.away) + ' or ' + BP.teamAbbr(g.home) + '?', sub: 'The two clubs over the regular season, from our ratings (runs a game against an average club); the better side of each row is solid.' }) +
+        '<article class="qk-card"><div class="qk-card-body">' + tape(g, season) + '</div></article></section>' : '') +
       '<div style="margin-top:var(--sp-6)"></div>' +
       (tabs.length > 1 ? '<nav class="qk-tabs bp-tabs2" id="gm-tabs" aria-label="Game views">' + tabs.map(t => '<a class="qk-tab" href="javascript:void(0)" data-tab="' + t.key + '" aria-selected="' + (t.key === tab ? 'true' : 'false') + '">' + esc(t.label) + '</a>').join('') + '</nav>' : '') +
       '<div id="gm-panel"></div>' + (res.full ? '' : '<div class="section-note">' + (Number(S || BP.currentSeason(L)) < Number(BP.currentSeason(L)) ?
         'Pitch-by-pitch game centres are kept on the site for the current season only; this is the schedule card. Stats, tables and careers for the season are complete.' :
         'The full game centre for this game is not built yet; this is the schedule card.') + '</div>');
+    formGoingIn(document.getElementById('gm-form'), g, L, S, started ? recs => {
+      const node = el.querySelector('.bp-preview');
+      if (node && node.isConnected) node.outerHTML = header(g, L, S, season, recs);
+    } : null);
     const panel = document.getElementById('gm-panel');
     const show = k => {
       TAB[gpk] = k;

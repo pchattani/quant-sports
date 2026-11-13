@@ -523,3 +523,12 @@ td.gi-ours-cell { text-align: left; }
 .cmp-gline { margin: 8px 0 0; font-size: var(--fs-sm); color: var(--ink-2); max-width: 95ch; }
 .cmp-thin, .cmp-instead { margin: 8px 0 var(--sp-3); padding: 8px 12px; border-left: 3px solid var(--ink-3); font-size: var(--fs-sm); color: var(--ink-2); }
 .cmp-instead a, .cmp-thin a { font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+
+/* round 11 (12 Nov): the last results in the team hero. The kit's tinted form squares are made for the charcoal cards and
+   lose contrast on a team colour, so in the hero they are solid blocks with white letters (W cobalt, L red, D slate). */
+.qk-ph-meta .gi-phform { display: inline-flex; align-items: center; gap: 6px; }
+.qk-ph .qk-form i { width: 19px; height: 19px; font-size: 11px; background: #3a4150; color: #fff; }
+.qk-ph .qk-form i.w { background: #5a69b7; color: #fff; }
+.qk-ph .qk-form i.l { background: #c92d17; color: #fff; }
+/* round 11: one column on phones must not grow to its widest table (the body would clip the hero at 375 px) */
+@media (max-width: 1000px) { .gi-gtop { grid-template-columns: minmax(0, 1fr); } }

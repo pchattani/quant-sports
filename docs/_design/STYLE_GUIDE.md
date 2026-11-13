@@ -270,9 +270,10 @@ preference for quant user friendliness")
 | Component | Builder | Where |
 |---|---|---|
 | Table tools | automatic (`QK.tableTools`, run by the same observer as the header tooltips) | every table of 8+ rows and 3+ columns gets "N rows · CSV" under it; the CSV is the table as shown (a cell's `data-csv` wins over its text); skipped inside the Scouting Room board (it has its own CSV), the legal panel and `[data-no-tools]` |
-| Data freshness | `QK.stamp(iso, { what })` | every site, once, with its index's build time: "Updated 14 min ago" at the right of the section bar (wide screens) and in the footer (all widths); amber after three hours; the tooltip gives the clock time and what updates when |
-| Likely range | `QK.rangeBar({ lo, hi, mid, min, max, caption })`; `QK.statTile({ range })` | any interval the payload already has (projected points, "9 seasons in 10", margin ± spread); never invented |
-| Form pair | `QK.formPair({ left: { name, abbr, colour, form }, right, n })` | game pages: both sides' last five, oldest first, with the record |
+| Data freshness | `QK.stamp(iso, { what, stale })` | every site, once, with its index's build time: "Updated 14 min ago" at the right of the section bar (wide screens) and in the footer (all widths); amber after `stale` hours (default 3; the Iron, built from a weekly archive, passes 192); the tooltip gives the clock time and what updates when |
+| Likely range | `QK.rangeBar({ lo, hi, mid, min, max, ref, caption })`; `QK.statTile({ range })` | any interval the payload already has (projected points, "9 seasons in 10", margin ± spread); never invented; `ref: 0` draws a rule at zero for a rating ± its error |
+| Form pair | `QK.formPair({ left: { name, abbr, colour, form }, right, n })` | game pages: both sides' last five, oldest first, with the record; letters W, D, L, T (tie), O (overtime loss): W-D-L, W-L-T or W-L-O |
+| Miss words | `QK.missWords(p)` | "How sure are we?" lines: "about 3 times in 10" down to a 15% miss, then "about 1 time in 20 / 100 ...", "fewer than 1 time in 1,000"; the preview card and the split hero use it (a 99% call is no longer "1 time in 10") |
 
 The CSV helpers are `QK.csv(cols, rows)` and `QK.download(name, text)`. `QK.formDots(f, n)` shows the last n results
 (the power board shows ten). `QKC.scatter` takes `onClick(point)` (the drawer instead of a page change) and `pad: '8%'`.

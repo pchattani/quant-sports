@@ -38,11 +38,11 @@ function upcomingGrid(S, list) {
 
 function powerBoard(S, rows) {
   if (!QK.powerBars || !rows || !rows.length) return '';
-  var parts = [{ key: 'att', label: 'Attack', color: 'var(--c-1)' }, { key: 'dfn', label: 'Defence', color: 'var(--c-3)' }];
+  var pp = SC.powerParts(rows), parts = pp.parts;
   return QK.powerBars(null, { groups: [{ label: '', rows: rows.slice(0, 16).map(function (r) {
     var t = SC.team(S, r.id) || {};
     return { rank: r.rank, name: t.name, abbr: t.abbr, colour: t.colour, href: SC.teamHref(S, r.id), value: r.rating, text: SC.signed(r.rating, 1),
-      parts: { att: r.att, dfn: r.dfn }, form: r.form, follow: SC.followItem(S, r.id),
+      parts: pp.of(r), form: r.form, follow: SC.followItem(S, r.id),
       cells: [{ label: 'World Rugby rank', text: r.wr_rank ? QK.ordinal(r.wr_rank) : '—' }, { label: 'Last 12 months', text: (r.rec12 || []).join('–') }],
       sub: isNum(r.d30) && Math.abs(r.d30) >= 0.05 ? SC.signed(r.d30, 1) + ' in 30 days' : '' };
   }) }], parts: parts, valueLabel: 'Our rating', unit: 'points v an average test side', formN: 5, formLabel: 'Last 5' });

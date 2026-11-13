@@ -19,9 +19,8 @@ GR.page('events', function (el, params) {
         '<label for="gr-season">Season</label><select id="gr-season" class="qk-select">' + seasons.map(function (s) { return '<option value="' + s + '"' + (s === season ? ' selected' : '') + '>' + s + '</option>'; }).join('') + '</select></div>';
       var evs = (sc.events || []).filter(function (e) { return !e.team || true; });
       var done = evs.filter(function (e) { return e.status === 'final' && e.winner; });
-      var favWon = done.filter(function (e) { return e.fav && e.winner && e.fav.pid === e.winner.pid; }).length;
       el.innerHTML = QK.sectionHead({ tag: 'h1', kicker: GR.tourName(tour), title: season + ' season',
-          sub: evs.length + ' events' + (done.length ? '; our favourite won ' + favWon + ' of the ' + done.length + ' played' : '') + '.' }) + ctl + '<div id="gr-ev"></div>';
+          sub: evs.length + ' events' + (done.length ? ', ' + done.length + ' played' : '') + '. Each with our pre-event favourite and the chance we gave them; how our forecasts have done overall is on the Model page.' }) + ctl + '<div id="gr-ev"></div>';
       QK.seg(el.querySelector('#gr-tour'), function (v) { location.hash = '#/fixtures/' + v; });
       el.querySelector('#gr-season').addEventListener('change', function (e) { location.hash = '#/fixtures/' + tour + '/' + e.target.value; });
       QK.table(el.querySelector('#gr-ev'), {

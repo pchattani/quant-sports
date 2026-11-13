@@ -56,7 +56,18 @@ function leagueOpts(season, L, S) {
 }
 HW.leagueOpts = leagueOpts;
 
-function standingsTable(node, L, S, rows, sim, fmt, league, lo) {
+/* Form for the standings: each team's last five regular-season results (oldest first) from the season's schedule.json,
+   the games the standings count, so the squares agree with L10 and the streak beside them. { tid: ['W', 'L', ...] } */
+function formOf(sch) {
+  const out = {};
+  ((sch && sch.games) || []).filter(g => g && g.status === 'post' && (g.stype === 'reg' || !g.stype) && isNum(g.hs) && isNum(g.as))
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)))
+    .forEach(g => { [[g.home, g.hs > g.as], [g.away, g.as > g.hs]].forEach(x => { const k = String(x[0]); (out[k] || (out[k] = [])).push(x[1] ? 'W' : 'L'); }); });
+  Object.keys(out).forEach(k => { out[k] = out[k].slice(-5); });
+  return out;
+}
+
+function standingsTable(node, L, S, rows, sim, fmt, league, lo, form) {
   const live = Object.keys(sim).length > 0;
   const pre = live && rows.every(r => !r.w && !r.l);
   if (pre) rows = rows.slice().sort((a, b) => ((sim[b.team] || {}).exp_w || 0) - ((sim[a.team] || {}).exp_w || 0));
@@ -75,17 +86,21 @@ function standingsTable(node, L, S, rows, sim, fmt, league, lo) {
     { key: 'gb', label: 'GB', num: true, fmt: v => (isNum(v) ? (v === 0 ? '—' : U.f(v, 1)) : esc(v || '—')) },
     { key: 'home_w', label: 'Home', num: true, fmt: (v, r) => (r.home ? HW.record(r.home[0], r.home[1]) : '—') },
     { key: 'away_w', label: 'Away', num: true, fmt: (v, r) => (r.away ? HW.record(r.away[0], r.away[1]) : '—') },
-    { key: 'l10_w', label: 'L10', num: true, fmt: (v, r) => (r.l10 ? HW.record(r.l10[0], r.l10[1]) : '—') },
-    { key: 'streak', label: 'Strk', fmt: v => esc(v || '—') },
+    { key: 'l10_w', label: 'L10', num: true, fmt: (v, r) => (r.l10 ? HW.record(r.l10[0], r.l10[1]) : '—') }
+  ].concat(form && Object.keys(form).length
+    /* the form dots and the streak share one column, so the table keeps its width */
+    ? [{ key: 'streak', label: 'Form', sort: false, tip: 'The last five regular-season results, oldest first, then the streak', fmt: (v, r) => '<span class="hw-formcell">' + ((form[String(r.team)] || []).length ? QK.formDots(form[String(r.team)], 5) : '') + '<span class="num">' + esc(v || '—') + '</span></span>' }]
+    : [{ key: 'streak', label: 'Strk', fmt: v => esc(v || '—') }]).concat([
     { key: 'pd', label: 'Diff', num: true, fmt: v => U.sgnHTML(v, 0), tip: 'Points differential' }
-  ];
+  ]);
   if (live) {
     cols.push({ key: 'exp', label: 'Proj W', num: true, tip: 'Projected wins (mean of our simulations) with the 90% range', fmt: (v, r) => (isNum(v) ? '<span data-tip="' + esc(U.f(r.s.w_p05, 0) + '–' + U.f(r.s.w_p95, 0) + ' (90% range)') + '">' + U.f(v, 1) + '</span>' : '—') });
     cols.push({ key: 'pp', label: 'Playoffs', type: 'bar', max: 1, fmt: v => U.pct(v), tip: 'Our chance of reaching the playoffs proper' });
     if (hasPin) cols.push({ key: 'pin', label: 'Play-in', num: true, fmt: v => U.pct(v), tip: 'Our chance of finishing in the play-in places' });
     if (!league) cols.push({ key: 'pc', label: 'Conf', num: true, fmt: v => U.pct(v), tip: 'Our chance of winning the conference' });
     cols.push({ key: 'pt', label: 'Title', num: true, fmt: v => '<b>' + U.pct(v) + '</b>' });
-    cols.push({ key: 'mg', label: 'Clinch', sort: false, fmt: (v, r) => magic(r.s) });
+    /* the clinch column only once a team has a mark or a magic number within reach (early on it would be all dashes) */
+    if (data.some(r => { const m = magic(r.s); return !!m && m.indexOf('qk-muted') < 0; })) cols.push({ key: 'mg', label: 'Clinch', sort: false, fmt: (v, r) => magic(r.s) });
   }
   /* round 9: a finished season (no simulation) carries its final flags: z top seed, x playoffs, p play-in, e out */
   if (!live && HW.recap && HW.recap.flagSeason) {
@@ -103,9 +118,11 @@ function standingsTable(node, L, S, rows, sim, fmt, league, lo) {
 }
 
 function standingsTab(node, L, S, params) {
-  return Promise.all([HW.load(HW.path('season.json', L, S)), HW.load(HW.lpath('history.json', L))]).then(arr => {
+  /* the season's schedule (the same file the game pages read) gives each team's form, its last five results */
+  return Promise.all([HW.load(HW.path('season.json', L, S)), HW.load(HW.lpath('history.json', L)), HW.load(HW.path('schedule.json', L, S))]).then(arr => {
     if (!U.alive(node)) return;
     const season = U.ok(arr[0]) ? arr[0] : null;
+    const form = formOf(U.ok(arr[2]) ? arr[2] : null);
     if (!season) { node.innerHTML = U.empty('Not built yet', 'The season payload for ' + HW.seasonLabel(L, S) + ' is not available.'); return; }
     const sim = HW.simTeams(season), st = season.standings || {}, fmt = season.format || {};
     const confs = Object.keys(st).filter(c => (st[c] || []).length).sort();
@@ -134,7 +151,7 @@ function standingsTab(node, L, S, params) {
     if (lo) h += '<div id="st-shape"></div>';
     h += QK.explain('The leaders and the bottom five on every number, by role, are in the <a class="qk-link" href="' + esc(HW.href(L, 'scout', S) + (HW.sq(L, S) ? '&' : '?') + 'view=leaders') + '">Scouting Room ▸ Leaders</a>.', { title: 'Looking for the player leaders?' });
     node.innerHTML = h;
-    const draw = k => standingsTable(document.getElementById('st-table'), L, S, k === '__all' ? all() : (st[k] || []), sim, fmt, k === '__all', lo);
+    const draw = k => standingsTable(document.getElementById('st-table'), L, S, k === '__all' ? all() : (st[k] || []), sim, fmt, k === '__all', lo, form);
     draw(first);
     const seg = document.getElementById('st-seg');
     if (seg) QK.seg(seg, draw);

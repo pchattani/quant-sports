@@ -1033,19 +1033,34 @@ function nextLast(body, doc, R) {
   var gk = doc.pos === 'G';
   var last = R.apps.filter(function (r) { return (r.min || 0) > 0; }).sort(function (a, b) { return String(b.date).localeCompare(String(a.date)); })[0] || null;
   var club = cc.tid && FB.clubRow(cc.tid) && !(FB.clubRow(cc.tid) || {}).national ? FB.load('clubs/' + cc.tid + '.json') : Promise.resolve(null);
-  club.then(function (cd) {
-    if (!FB.alive(box)) return;
-    var now = Date.now();
-    var nx = ((cd || {}).matches || []).filter(function (x) { var t = FB.parseDate(x.date); return x.status !== 'finished' && x.status !== 'postponed' && x.status !== 'cancelled' && t && t.getTime() > now - 2 * 3600e3; })
+  var now = Date.now();
+  var nextOf = function (d) {
+    return ((d || {}).matches || []).filter(function (x) { var t = FB.parseDate(x.date); return x.status !== 'finished' && x.status !== 'postponed' && x.status !== 'cancelled' && t && t.getTime() > now - 2 * 3600e3; })
       .sort(function (a, b) { return String(a.date).localeCompare(String(b.date)); })[0];
+  };
+  /* the club's next match; in an international break (the club has none), the national team's next one when the player
+     appeared for it in its latest window (its call-up list), said to be the side's fixture, not a confirmed selection */
+  var nt = doc.national_team || {};
+  club.then(function (cd) {
+    var nx0 = nextOf(cd);
+    if (nx0 || !nt.tid || !FB.clubRow(nt.tid)) return { nx: nx0, team: cc };
+    return FB.load('clubs/' + nt.tid + '.json').then(function (nd) {
+      var inSquad = (((nd || {}).squad || {}).players || []).some(function (p) { return String(p.id) === String(doc.id); });
+      var nx1 = inSquad ? nextOf(nd) : null;
+      return nx1 ? { nx: nx1, team: { tid: nt.tid, name: nt.name || (nd || {}).name }, nt: (nd || {}).squad } : { nx: null, team: cc };
+    });
+  }).then(function (pick) {
+    if (!FB.alive(box)) return;
+    var nx = pick.nx, tm = pick.team;
     var h = '', nf = null;
     if (nx) {
       var home = nx.home === 1 || nx.home === true;
       nf = { id: nx.id, date: nx.date, comp: nx.comp, status: nx.status === 'live' ? 'live' : 'scheduled', round: nx.round, stage: nx.stage, model: nx.model,
-        home: home ? cc.name : nx.opp, away: home ? nx.opp : cc.name, home_id: home ? cc.tid : nx.opp_tid, away_id: home ? nx.opp_tid : cc.tid };
+        home: home ? tm.name : nx.opp, away: home ? nx.opp : tm.name, home_id: home ? tm.tid : nx.opp_tid, away_id: home ? nx.opp_tid : tm.tid };
       var rel = FB.relDay(nx.date), ev = new Date().getHours() >= 15;
-      h += '<div>' + QK.sectionHead({ kicker: nf.status === 'live' ? 'Live now' : rel === 'Today' ? 'What to watch ' + (ev ? 'tonight' : 'today') : 'Next up', title: nf.home + ' v ' + nf.away }) +
-        '<div id="pl-next">' + nextCard(nf, null) + '</div><p class="fb-cap"><a href="' + esc(FB.href.match(nx.comp, nx.id)) + '">The match centre →</a></p></div>';
+      var ntNote = pick.nt ? '<p class="fb-cap">' + esc(tm.name) + '’s next international: ' + esc(cc.name ? cc.name + ' have no match before it. ' : '') + 'The player appeared in ' + esc(tm.name) + '’s last window' + (pick.nt.as_of ? ' (to ' + esc(FB.fmtDate(pick.nt.as_of, { weekday: false, year: true })) + ')' : '') + '; this window’s squad is not in our data, so the selection is not confirmed.</p>' : '';
+      h += '<div>' + QK.sectionHead({ kicker: nf.status === 'live' ? 'Live now' : rel === 'Today' ? 'What to watch ' + (ev ? 'tonight' : 'today') : (pick.nt ? 'Next up · ' + tm.name : 'Next up'), title: nf.home + ' v ' + nf.away }) +
+        '<div id="pl-next">' + nextCard(nf, null) + '</div>' + ntNote + '<p class="fb-cap"><a href="' + esc(FB.href.match(nx.comp, nx.id)) + '">The match centre →</a></p></div>';
     }
     var lf = null;
     if (last) {
@@ -1452,8 +1467,13 @@ function drawValue(body, doc) {
       html += FB.kpis([
         FB.kpi('Value added (GAR/90)', FB.signed(row.gar90, 2), { signal: true, pctl: isNum(row.pct) ? row.pct : null, tip: 'Goals above replacement per 90 minutes, last 12 months of club football, our value model', sub: isNum(row.pct) ? FB.ordinal(row.pct) + ' percentile among ' + esc(roles[row.role] || row.role || '') + 's' : esc(roles[row.role] || row.role || '') }),
         FB.kpi('GAR', FB.signed(row.gar, 1), { sub: int(row.min) + ' min · PAR ' + FB.signed(row.par, 1) + ' pts' }),
-        FB.kpi('Fair value', isNum(row.v2) ? num(row.v2, 1) : '—', { tip: 'Valuation v2: expected points above replacement over four seasons (10-90% band)', sub: isNum(row.v2lo) ? num(row.v2lo, 1) + '–' + num(row.v2hi, 1) + ' pts' : '' }),
-        FB.kpi('Fair fee', isNum(row.fee) ? FB.money(row.fee) : '—', { tip: 'Fair fee to a buyer like the player\'s own club (fee model)', sub: isNum(row.feelo) ? FB.money(row.feelo) + '–' + FB.money(row.feehi) : (isNum(row.mv) ? 'market value ' + FB.money(row.mv) : '') })
+        /* the two projections that carry an interval draw it (kit QK.rangeBar): the value's 10-90% band, the fee's middle half */
+        FB.kpi('Fair value', isNum(row.v2) ? num(row.v2, 1) : '—', { unit: isNum(row.v2) ? 'pts' : '', tip: 'Valuation v2: expected points above replacement over four seasons (10-90% band)',
+          sub: isNum(row.v2lo) ? '8 in 10: ' + num(row.v2lo, 1) + '–' + num(row.v2hi, 1) + ' pts over four seasons' : '',
+          range: isNum(row.v2) && isNum(row.v2lo) && isNum(row.v2hi) ? { lo: row.v2lo, hi: row.v2hi, mid: row.v2, min: Math.min(0, row.v2lo), label: 'Fair value, 10th to 90th percentile', fmt: function (v) { return num(v, 1); } } : null }),
+        FB.kpi('Fair fee', isNum(row.fee) ? FB.money(row.fee) : '—', { tip: 'Fair fee to a buyer like the player\'s own club (fee model); the band is the middle half of the model\'s error',
+          sub: isNum(row.feelo) ? 'half the time: ' + FB.money(row.feelo) + '–' + FB.money(row.feehi) + (isNum(row.mv) ? ' · market value ' + FB.money(row.mv) : '') : (isNum(row.mv) ? 'market value ' + FB.money(row.mv) : ''),
+          range: isNum(row.fee) && isNum(row.feelo) && isNum(row.feehi) ? { lo: row.feelo, hi: row.feehi, mid: row.fee, min: 0, label: 'Fair fee, middle half', fmt: function (v) { return FB.money(v); } } : null })
       ], 'fb-pl-kpis2');
     }
     if (lines.length) {

@@ -660,6 +660,8 @@ function boot() {
     CC.LEVELS.forEach(function (L) { var i = idx.levels[L] || {}; CC.addTeams(L, i.teams); CC.addConfs(L, i.conferences); });
     var meta = QK.$('#meta-line');
     if (meta) meta.textContent = 'Data built ' + fmt.ago(idx.updated_at) + ' (' + fmt.date(idx.updated_at) + ' ' + fmt.time(idx.updated_at) + ').';
+    /* the data-freshness line (kit QK.stamp): the build time of index.json, the first file every page reads */
+    if (QK.stamp && idx.updated_at) QK.stamp(idx.updated_at);
     root.addEventListener('hashchange', render);
     if (QK.live) QK.live.attach(function () { if (!document.hidden && /^(overview|games|game)$/.test((CC.state && CC.state.sec) || 'overview')) render(); });
     render();

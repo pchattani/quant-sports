@@ -460,7 +460,10 @@ function lateMetrics(p, d) {
 /* Forget cached payloads so the next load fetches them again (live refresh). */
 function uncache(paths) { (Array.isArray(paths) ? paths : [paths]).forEach(p0 => { const p = String(p0).replace(/^\/+/, '').replace(/^data\//, ''); delete CACHE[p]; }); }
 /* Re-fetch index.json (fresh live cards), then resolve with it. */
-function refreshIndex() { uncache('index.json'); return load('index.json').then(d => { if (d) INDEX.data = d; return INDEX.data; }); }
+function refreshIndex() { uncache('index.json'); return load('index.json').then(d => { if (d) { INDEX.data = d; stampIndex(d); } return INDEX.data; }); }
+/* Data freshness (round 11): the build time of index.json, the first file every page loads, as the kit's "Updated 14 min
+   ago" line (the section bar and the footer). QK.stamp keeps the newest time it has seen. */
+function stampIndex(d) { try { if (window.QK && QK.stamp && d && d.updated_at) QK.stamp(d.updated_at, { what: 'The site rebuilds every hour, and every 15 minutes around games; live scores update on their own feed.' }); } catch (e) { /* the page stands without it */ } }
 /* Every ms while the page is shown and visible: forget `paths`, refresh index.json, re-render the page. */
 function liveRefresh(paths, ms) {
   interval(() => {
@@ -1571,6 +1574,7 @@ function init() {
   load('index.json').then(idx => {
     INDEX.data = idx;
     initHeader();
+    stampIndex(idx);
     initSearch();
     const ov = document.getElementById('loading-overlay');
     if (ov) ov.style.display = 'none';

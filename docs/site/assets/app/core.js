@@ -1174,7 +1174,7 @@ function kpi(label, value, o) {
   var text = o.text !== undefined ? !!o.text : (plain.length > 9 && /[A-Za-z]{3}/.test(plain));
   var sub = o.sub === undefined || o.sub === null ? '' : String(o.sub);
   return QK.statTile({ label: label, value: value, sub: sub + (o.spark ? '<span class="fb-stat-spark">' + o.spark + '</span>' : ''), html: true, cls: o.cls, tip: o.tip, text: text,
-    signal: !!o.signal, pctl: isNum(o.pctl) ? o.pctl : null, href: o.href || null, unit: o.unit, trend: o.trend, delta: o.delta, deltaFmt: o.deltaFmt });
+    signal: !!o.signal, pctl: isNum(o.pctl) ? o.pctl : null, href: o.href || null, unit: o.unit, trend: o.trend, delta: o.delta, deltaFmt: o.deltaFmt, range: o.range || null });
 }
 /* Matches with line-ups in THIS edition of a competition (meta.detail_season; meta.detail_matches counts every season
    the store holds, so it is used only when it cannot exceed the matches played). null when unknown. */
@@ -1370,6 +1370,8 @@ function init() {
     INDEX.bySlug = {};
     INDEX.comps.forEach(function (c) { INDEX.bySlug[c.slug] = c; });
     bootShell();
+    /* the data-freshness line (kit QK.stamp): the build time of competitions.json, the file every page loads first */
+    if (QK.stamp && INDEX.updated_at) QK.stamp(INDEX.updated_at, { what: 'Every competition rebuilds about once an hour: results, tables, our chances and the club and player pages. Live scores come from a separate feed while matches are on.' });
     load('hub.json').then(hubLive);
     if (window.QK && QK.live) QK.live.attach(function () {
       if (CACHE['hub.json']) hubLive(CACHE['hub.json']);

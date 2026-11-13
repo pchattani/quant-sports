@@ -61,3 +61,15 @@
 .gr-real { margin-top: var(--sp-4, 16px); }
 .gr-page .qk-chart { width: 100%; }
 @media (max-width: 640px) { .gr-cols2 { columns: 1; } .gr-feat .gr-feat-t { font-size: 1.6rem; } }
+
+/* 13 Nov 2026: the family sweep (event and course heroes, next and last event on the player page) */
+.gr-stack { display: flex; flex-direction: column; gap: var(--sp-5, 24px); min-width: 0; }
+.gr-stack > div:empty { display: none; }
+.gr-why { margin: 12px 0 0; }
+.gr-asof { margin: 14px 0 0; }
+.gr-foot-link { margin: var(--sp-6, 32px) 0 0; }
+.gr-last-line { margin: 0 0 6px; color: var(--ink-2); font: 400 var(--fs-sm, 15px)/1.5 var(--font-ui); }
+.gr-last-line b { color: var(--ink-1); }
+.gr-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr)); gap: var(--sp-5, 24px); }
+.gr-pair > div { min-width: 0; }
+.gr-pair > div:empty { display: none; }

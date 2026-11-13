@@ -9,7 +9,9 @@
  *     prediction markets and the closing line beside it as a named reference (the one place outside the Model pages
  *     where the market appears);
  *     set-score, total-games and game-handicap distributions from the exact Markov chain;
- *     the serve/return matchup (hold % and serve points won, inferred from scores); head to head;
+ *     the tale of the tape (QK.tape: Elo and surface Elo before the match, hold, break and serve points won
+ *     against each other, inferred; the season before the match from the two player files) beside the last five
+ *     matches (QK.formPair, every level, before this one) and the head to head;
  *   live and after: win probability game by game with set boundaries and the biggest swings,
  *     excitement and comeback; a stats comparison (real WTA statistics where they exist,
  *     otherwise the inferred serve/return numbers, labelled as such); the charting deep dive
@@ -79,23 +81,6 @@ function statsBlock(T, d, which) {
     vsRow('Break points saved', ratio(a.bp_saved, a.bp_faced), ratio(b.bp_saved, b.bp_faced), 'pct', { textA: frac(a.bp_saved, a.bp_faced), textB: frac(b.bp_saved, b.bp_faced) }) +
     vsRow('Break points converted', ratio(a.bp_conv, a.bp_opps), ratio(b.bp_conv, b.bp_opps), 'pct', { textA: frac(a.bp_conv, a.bp_opps), textB: frac(b.bp_conv, b.bp_opps) }) +
     vsRow('Service games', a.sv_gms, b.sv_gms, 'int') + '</div>';
-}
-
-function inferredBlock(T, d) {
-  const inf = d.inferred || {}, sr = (d.pre || {}).sr || {};
-  const hold = inf.hold || sr.hold || [], spw = inf.spw || sr.p_srv || [];
-  if (!hold.length && !spw.length) return TA.muted('No serve or return numbers for this match.');
-  const won = TA.setsWon(d);
-  const games = (d.sets || []).reduce((acc, s) => { acc[0] += s[0] || 0; acc[1] += s[1] || 0; return acc; }, [0, 0]);
-  return vsHead(T, d.p1, d.p2) + '<div class="vs-rows">' +
-    vsRow('Hold % (inferred)', hold[0], hold[1], 'pct', { title: 'Probability of holding serve against this opponent, from the serve/return model fitted on game and set scores' }) +
-    vsRow('Break % (inferred)', isNum(hold[1]) ? 1 - hold[1] : null, isNum(hold[0]) ? 1 - hold[0] : null, 'pct') +
-    vsRow('Serve points won (inferred)', spw[0], spw[1], 'pct', { title: 'Serve-point win probability implied by the hold probability (the game formula inverted)' }) +
-    (d.sets && d.sets.length ? vsRow('Sets', won[0], won[1], 'int') + vsRow('Games', games[0], games[1], 'int') : '') + '</div>' +
-    '<div class="label-note"><span class="scope-tag inferred">inferred</span> ' + (d.stats && d.stats.p1
-      ? 'The model’s pre-match expectations, inferred from game and set scores across each player’s matches. The real point-by-point numbers for this match are below.'
-      : 'No point-by-point statistics exist for this match' + (TA.state.tour === 'atp' ? ' (the ATP publishes none we can use; ATP matches the Match Charting Project has charted show its numbers)' : '') +
-        '. These numbers are the model’s serve and return strengths, inferred from game and set scores across each player’s matches — estimates, not measurements.') + '</div>';
 }
 
 function chartingBlock(T, d) {
@@ -282,7 +267,7 @@ function render(el, params) {
     if (isNum(dist.p_straight)) tiles.push({ label: 'Straight sets', value: TA.pct(dist.p_straight, 0), sub: 'either player' });
     const boardH = !wait && ((d.sets || []).length || live0) ? '<section class="qk-card"><div class="qk-card-body"><div class="qk-kicker" style="margin-bottom:8px">Set by set</div>' + board(T, d, p1) + '</div></section>' : '';
     el.innerHTML = '<div class="ta-gtop">' + hero(T, d, p1, ev, surface) + '<div class="ta-gside ta-stack">' + boardH + (tiles.length ? '<div class="ta-kpis">' + QK.stats(tiles) + '</div>' : '') +
-      (d._card ? '' : V2card(fin || live0 || wait ? 'Our forecast before the match' : 'Our forecast', 'Our chance and how it is built. The market and the closing line sit underneath as a reference, not our forecast.', preBoxes(T, d))) + '</div></div>' + '<div id="mt-body" style="margin-top:var(--sp-6)"></div>';
+      (d._card ? '' : V2card(fin || live0 || wait ? 'Our forecast before the match' : 'Our forecast', 'Our chance and how it is built. The market and the closing line sit underneath as a reference, not our forecast.' + (fin || wait ? (m.as_of ? ' Set before the first ball, on ' + esc(QK.fmt.date(String(m.as_of).slice(0, 10) + 'T12:00:00')) + '.' : '') : (d.updated_at ? ' As of ' + esc(QK.fmt.date(d.updated_at) + ' ' + QK.fmt.time(d.updated_at)) + '.' : '')), preBoxes(T, d))) + '</div></div>' + '<div id="mt-body" style="margin-top:var(--sp-6)"></div>';
     const body = document.getElementById('mt-body');
     if (d._card) {
       body.innerHTML = TA.card('Match centre', '', TA.muted('The full match centre for this match is not built yet; the score and our pre-match chance come from the schedule.' +
@@ -301,19 +286,33 @@ function render(el, params) {
     html += '<div class="grid-2"><div>' + TA.card('How it could finish', 'our chance of each score in sets, from the serve-point chances game by game' + (fin ? ' · outlined: what happened' : ''), '<div id="mt-sets"></div>' +
       '<div class="section-note">' + (isNum(dist.p_straight) ? 'Straight sets ' + TA.pct(dist.p_straight, 0) : '') + (isNum(dist.p_tiebreak) ? ' · at least one tiebreak ' + TA.pct(dist.p_tiebreak, 0) : '') + '</div>') + '</div><div>' +
       TA.card('How many games', 'our chance of each total, and of each winning margin in games', '<div class="toggle-row" id="mt-gt">' + TA.toggles([{ key: 'games', label: 'Total games' }, { key: 'handicap', label: 'Game handicap' }], 'games', 'data-gt') + '</div><div id="mt-games"></div><div class="section-note" id="mt-games-note"></div>') + '</div></div>';
-    // ── matchup and h2h
-    html += '<div class="grid-2"><div>' + TA.card('Serve against return', 'how each holds and breaks against this opponent on ' + esc(TA.surfaceLabel(surface, ev.indoor).toLowerCase()), inferredBlock(T, d) + eloRows(T, d, surface)) + '</div><div>' + h2hCard(T, d) + '</div></div>';
-    // ── stats
+    // ── the tale of the tape (ratings, serve and return, the season so far) beside recent form and the head to head
+    const nmA = TA.playerSurname(T, d.p1), nmB = TA.playerSurname(T, d.p2);
+    const infNote = '<b>How sure are we?</b> Elo is the rating before this match. Hold, break and serve points won are the model’s serve and return strengths against this opponent' +
+      (surface ? ' on ' + esc(TA.surfaceLabel(surface, ev.indoor).toLowerCase()) : '') + ', inferred from game and set scores across each player’s matches: estimates, not measurements' +
+      (d.stats && d.stats.p1 ? '. The real point-by-point numbers for this match are below.' : (TA.state.tour === 'atp' ? ' (the ATP publishes no point-by-point numbers we can use).' : '.'));
+    html += '<section class="qk-section ta-mt-tape"><div class="qk-g75"><div>' + QK.sectionHead({ kicker: 'Tale of the tape', title: nmA + ' or ' + nmB + '?', sub: 'Before the first ball: ratings, serve and return against each other, and the season so far. The side we favour is in blue.' }) +
+      '<div id="mt-tape">' + tapeHTML(T, d, surface, p1, null, null) + '</div>' + QK.explain(infNote) + '</div>' +
+      '<div class="ta-stack">' + QK.sectionHead({ kicker: 'Form', title: 'Coming in', tag: 'h3' }) + '<div id="mt-form">' + QK.skeleton('lines', 3) + '</div>' + h2hCard(T, d) + '</div></div></section>';
+    // ── stats, the charting deep dive and the awards: a section of their own under the tape
+    let after = '';
     if (d.stats && d.stats.p1) {
       const sets = (d.stats.by_set || []).map(x => x.set);
-      html += TA.card('The numbers', d.stats_source === 'charting' ?
+      after += TA.card('The numbers', d.stats_source === 'charting' ?
         '<span class="scope-tag charted">charted</span> point by point, from the <a href="https://github.com/JeffSackmann/tennis_MatchChartingProject" target="_blank" rel="noopener">Match Charting Project</a> (CC BY-NC-SA 4.0)' :
         '<span class="scope-tag real">real</span> point by point, from the WTA',
         (sets.length ? '<div class="toggle-row" id="mt-st">' + TA.toggles([{ key: 'all', label: 'Match' }].concat(sets.map(s => ({ key: String(s), label: 'Set ' + s }))), 'all', 'data-st') + '</div>' : '') + '<div id="mt-stats"></div>');
     }
-    html += chartingBlock(T, d);
-    html += awardsBlock(T, d);
+    after += chartingBlock(T, d);
+    after += awardsBlock(T, d);
+    if (after) html += '<section class="qk-section">' + after + '</section>';
     body.innerHTML = html;
+    /* the two player files (already published for the player pages): the season before this match and the last five */
+    Promise.all([TA.load(TA.playerPath(T, d.p1)), TA.load(TA.playerPath(T, d.p2))]).then(cs => {
+      const tp = document.getElementById('mt-tape'), fm = document.getElementById('mt-form');
+      if (tp) tp.innerHTML = tapeHTML(T, d, surface, p1, cs[0], cs[1]);
+      if (fm) fm.innerHTML = formHTML(T, d, cs[0], cs[1]) || TA.muted('No earlier matches on record for either player.');
+    });
 
     if (wpRows.length > 1) {
       TA.charts.wpChart('mt-wp', wpRows, { tour: T, p1: d.p1, p2: d.p2, swings: d.swings, market: pre.market && isNum(pre.market.p1) ? pre.market.p1 : null });
@@ -355,21 +354,64 @@ function render(el, params) {
   });
 }
 
+/* sweep (12 Nov 2026): the tale of the tape (QK.tape, the kit's two-block view; the side we favour is cobalt, as on the
+   hero) on the match file's pre-match numbers: Elo and surface Elo before the match, hold, break and serve points won
+   against each other (inferred), and, once the two player files are in, each player's season before this match (the
+   record and wins over expected: wins minus the sum of our pre-match chances). Nothing after the first ball enters. */
+function seasonBefore(c, d) {
+  if (!c || !TA.ok(c)) return null;
+  const day = String(d.date || '').slice(0, 10), yr = day.slice(0, 4);
+  const rs = (c.results || []).filter(r => r && r.date && String(r.date).slice(0, 4) === yr && String(r.date).slice(0, 10) < day && r.status !== 'wo');
+  if (!rs.length) return null;
+  const w = rs.filter(r => r.won).length;
+  const pp = rs.filter(r => isNum(r.p_pre));
+  return { n: rs.length, w: w, l: rs.length - w, wp: w / rs.length, woe: pp.length ? pp.reduce((a, r) => a + (r.won ? 1 : 0) - r.p_pre, 0) : null };
+}
+/* the last five results before this match, oldest first, every level (results_all: [date, event, round, surface, opp,
+   won, score]); walkovers are not matches */
+function formBefore(c, d) {
+  if (!c || !TA.ok(c)) return '';
+  const day = String(d.date || '').slice(0, 10);
+  let rs = (c.results_all || []).filter(r => Array.isArray(r) && String(r[0]).slice(0, 10) < day && !/w\/?o|walkover/i.test(String(r[6] || '')))
+    .map(r => ({ date: String(r[0]), round: r[2], won: !!r[5] }));
+  if (!rs.length) rs = (c.results || []).filter(r => r && r.date && String(r.date).slice(0, 10) < day && r.status !== 'wo').map(r => ({ date: String(r.date), round: r.round, won: !!r.won }));
+  rs.sort((a, b) => a.date.slice(0, 10).localeCompare(b.date.slice(0, 10)) || TA.roundIndex(a.round) - TA.roundIndex(b.round));
+  return rs.slice(-5).map(r => (r.won ? 'W' : 'L')).join('');
+}
+function tapeHTML(T, d, surface, p1, c1, c2) {
+  const e = (d.pre || {}).elo || {}, ea = e.p1 || {}, eb = e.p2 || {};
+  const sf = surface && surface !== 'all' ? surface : null;
+  const sa = isNum(ea.surface) ? ea.surface : (sf ? ea[sf] : null), sb = isNum(eb.surface) ? eb.surface : (sf ? eb[sf] : null);
+  const inf = d.inferred || {}, sr = (d.pre || {}).sr || {};
+  const hold = inf.hold || sr.hold || [], spw = inf.spw || sr.p_srv || [];
+  const pc = v => (isNum(v) ? TA.pct(v, 1) : '—'), el = v => (isNum(v) ? TA.num(v, 0) : '—');
+  const groups = [
+    { label: 'Ratings before the match', rows: [
+      { label: 'Elo rating', a: ea.all, b: eb.all, fmt: el, tip: 'Overall strength from every result, adjusted for the opponent, before this match. A 100-point lead is about a 64% chance.' },
+      sf ? { label: TA.surfaceLabel(sf) + ' Elo', a: sa, b: sb, fmt: el, tip: 'The same rating from matches on this surface.' } : null].filter(Boolean) },
+    { label: 'Serve and return against each other (inferred)', rows: [
+      { label: 'Hold %', a: hold[0], b: hold[1], fmt: pc, tip: 'Our chance of holding serve against this opponent, from the serve and return model fitted on game and set scores.' },
+      { label: 'Break %', a: isNum(hold[1]) ? 1 - hold[1] : null, b: isNum(hold[0]) ? 1 - hold[0] : null, fmt: pc, tip: 'Our chance of breaking this opponent’s serve in a game: one minus the opponent’s hold.' },
+      { label: 'Serve points won', a: spw[0], b: spw[1], fmt: pc, tip: 'The serve-point win chance the hold implies (the game formula inverted).' }] }
+  ];
+  const s1 = seasonBefore(c1, d), s2 = seasonBefore(c2, d);
+  if (s1 || s2) {
+    const yr = String(d.date || '').slice(0, 4);
+    groups.push({ label: yr + ' before this match', rows: [
+      { label: 'Won–lost', a: s1 ? s1.wp : null, b: s2 ? s2.wp : null, ta: s1 ? s1.w + '–' + s1.l : '—', tb: s2 ? s2.w + '–' + s2.l : '—', tip: 'Tour-level matches this year before this one (qualifying included); the bar is the win share.' },
+      { label: 'Wins over expected', a: s1 ? s1.woe : null, b: s2 ? s2.woe : null, fmt: v => (isNum(v) ? TA.signed(v, 1) : '—'), tip: 'Wins minus the sum of our pre-match chances in those matches: above zero, winning more than our numbers said. Season to season it barely repeats, so read it as form and luck.' }] });
+  }
+  const side = pid => { const rk = TA.playerRank(T, pid), cc = TA.playerCountry(T, pid); return { name: TA.playerName(T, pid), short: TA.playerSurname(T, pid), sub: [isNum(rk) ? 'No. ' + rk : 'Unranked', cc].filter(Boolean).join(' · '), href: TA.playerHref(T, pid) }; };
+  return QK.tape({ left: side(d.p1), right: side(d.p2), fav: isNum(p1) ? (p1 >= 0.5 ? 'a' : 'b') : undefined, groups: groups, wins: true });
+}
+function formHTML(T, d, c1, c2) {
+  const f = QK.formPair({ left: { name: TA.playerSurname(T, d.p1), form: formBefore(c1, d) }, right: { name: TA.playerSurname(T, d.p2), form: formBefore(c2, d) }, n: 5, title: 'Last five matches before this one' });
+  return f ? '<article class="qk-card"><div class="qk-card-body">' + f + '<div class="qk-caption">Every level, Challengers included: W won, L lost, the newest at the right.</div></div></article>' : '';
+}
+
 function V2card(title, sub, body) { return TA.v2.card(title, sub, body, { flush: true }); }
 function sumSide(d, side) { return (d.sets || []).reduce((a, s) => a + (s[side] || 0), 0); }
 function kindText(k) { return { hold: 'held', break: 'broke', tiebreak: 'won the tiebreak', start: 'start', set: 'won the set' }[k] || (k || ''); }
-
-function eloRows(T, d, surface) {
-  const e = (d.pre || {}).elo || {};
-  const a = e.p1 || {}, b = e.p2 || {};
-  if (!isNum(a.all) && !isNum(b.all)) return '';
-  const sf = surface && surface !== 'all' ? surface : null;
-  // the surface rating comes as "surface" (with e.surface naming it) or under the surface's own key
-  const sa = isNum(a.surface) ? a.surface : (sf ? a[sf] : null), sb = isNum(b.surface) ? b.surface : (sf ? b[sf] : null);
-  const sName = e.surface || sf;
-  return '<div class="vs-rows" style="padding-top:0">' + vsRow('Elo overall', a.all, b.all, '0') + (isNum(sa) || isNum(sb) ? vsRow('Elo ' + (sName ? TA.surfaceLabel(sName).toLowerCase() : 'surface'), sa, sb, '0') : '') +
-    (isNum(e.p) ? vsRow('Elo win probability', e.p, 1 - e.p, 'pct') : '') + '</div>';
-}
 
 function h2hCard(T, d) {
   const h = (d.pre || {}).h2h || null;

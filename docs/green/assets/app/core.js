@@ -206,6 +206,34 @@ function pctChip(p) {
   if (!isNum(p)) return '';
   return ' <span class="qk-pctl" style="background:' + QK.pctColor(p) + ';color:' + QK.pctInk(p) + '">' + Math.round(p) + '</span>';
 }
+/* "as of Fri 6 Nov 14:02": the build time of a file other than the index (an event or player file), the viewer's clock */
+function asOf(iso) {
+  if (!iso) return '';
+  var t = Date.parse(iso);
+  if (!isFinite(t)) return '';
+  var d = new Date(t), yr = d.getFullYear() !== new Date(QK.now()).getFullYear();
+  return 'as of ' + fmt.date(t, yr ? { day: 'numeric', month: 'short', year: 'numeric' } : undefined) + ' ' + fmt.time(t);
+}
+/* what a chance means in plain words: 0.04 -> "about 1 time in 25" */
+function oneIn(p) {
+  if (!isNum(p) || p <= 0) return '';
+  /* from the chance as shown (fmt.pct: one decimal under 1%), so "1%" reads "1 time in 100", not "in 95" */
+  var v = p * 100, q = (v < 1 ? Math.round(v * 10) / 10 : Math.round(v)) / 100;
+  if (q <= 0) q = p;
+  if (q >= 0.5) return 'about ' + Math.round(q * 10) + ' times in 10';
+  return 'about 1 time in ' + fmt.num(Math.max(2, Math.round(1 / q)));
+}
+/* an event's name without the sponsor's tail ("Austin Championship pres. by ...", "The ANNIKA driven by ...") */
+function shortEvent(n) { return String(n || '').replace(/\s+(pres\.|presented|driven|powered|hosted|supported)\s+by\s+.*$/i, '') || String(n || ''); }
+/* a course or event monogram for the hero's outlined face: up to three initials, words in brackets and small words out */
+function code(name) {
+  var w = String(name || '').replace(/\(.*?\)/g, ' ').replace(/[^A-Za-zÀ-ÿ0-9 ]/g, ' ').split(/\s+/).filter(function (x) { return x && !/^(the|at|of|de|del|la|le|and|by|pres)$/i.test(x); });
+  return w.slice(0, 3).map(function (x) { return x.charAt(0).toUpperCase(); }).join('') || '?';
+}
+/* where a chance ranked: 1 -> "the best", 4 -> "the 4th best" */
+function nthBest(k) { return k === 1 ? 'the best' : 'the ' + QK.ordinal(k) + ' best'; }
+/* the rating scale a stream is measured on */
+function scaleOf(stream) { return stream === 'women' ? 'an average LPGA Tour player' : 'an average PGA Tour player'; }
 
 /* My Players: a golfer as a follow item ('green:golfm:<pid>'), its star */
 function followItem(pid, name, stream) {
@@ -277,6 +305,10 @@ function boot() {
     }
   } catch (e) { /* no storage */ }
   render();
+  /* data freshness: the index's build time, once (QK.stamp keeps the newest) */
+  load('index.json').then(function (ix) {
+    if (ix && ix.updated_at && QK.stamp) QK.stamp(ix.updated_at, { what: 'Leaderboards and live chances refresh through each event day; ratings, rankings and the Scouting Room after each event.' });
+  }, function () { /* the page says so itself */ });
 }
 
 return {
@@ -286,6 +318,6 @@ return {
   STREAM_OF: STREAM_OF, TOUR_COL: TOUR_COL, playerHref: playerHref, playerLink: playerLink, eventLink: eventLink, courseLink: courseLink,
   thinTag: thinTag, THIN: THIN, statusTag: statusTag, surname: surname, mark: mark, vfmt: vfmt, lfmt: lfmt, PCTM: PCTM,
   card: card, head: head, sec: sec, chart: chart, table: table, note: note, seg: seg, tabs: tabs, failed: failed, safe: safe,
-  pctChip: pctChip, followItem: followItem, followStar: followStar, followed: followed
+  pctChip: pctChip, followItem: followItem, followStar: followStar, followed: followed, asOf: asOf, oneIn: oneIn, code: code, scaleOf: scaleOf, shortEvent: shortEvent, nthBest: nthBest
 };
 })();

@@ -354,7 +354,8 @@ V.verdicts = function (Ps, ids, sets, names) {
 };
 /* The compare view on a metric set for 2-3 entries of one peer group (QK.compareView), the best in each row under the
    highlighter. */
-V.compare = function (P, ids, sets, ents) {
+/* o.ours: false leaves out the strip naming our models (a page that has it elsewhere, or a tight column) */
+V.compare = function (P, ids, sets, ents, o) {
   var meta = P.meta;
   var groups = sets.map(function (g) {
     return { label: g[0], rows: g[1].filter(function (k) { return meta[k]; }).map(function (k) {
@@ -363,7 +364,7 @@ V.compare = function (P, ids, sets, ents) {
         pctls: ids.map(function (id) { return P.pct[id] ? P.pct[id][k] : null; }), fmt: function (v) { return V.fmt(meta, k, v); } };
     }) };
   });
-  return QK.compareView({ entities: ents, groups: groups, delta: false }) + V.oursStrip(sets, meta);
+  return QK.compareView({ entities: ents, groups: groups, delta: false }) + (o && o.ours === false ? '' : V.oursStrip(sets, meta));
 };
 /* The strip under a comparison: which of our models the rows on screen come from (sets: [[label, keys]], meta). */
 V.oursStrip = function (sets, meta) {

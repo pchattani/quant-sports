@@ -272,6 +272,26 @@ def test_follow_cards_one_per_team_under_8kb(tmp_path, monkeypatch):
     assert all(c["date"] >= "2026-11-02" for c in fx["upcoming"])          # nothing past the clock is "upcoming"
 
 
+def test_match_pages_carry_the_margin_spread(tmp_path, monkeypatch):
+    """Every match page's forecast carries sd, the spread of the margin behind its chances (the page's likely-range
+    bar): finished tests from the walk, upcoming ones from the same model."""
+    if not (FIX / "stores" / "men").exists():
+        pytest.skip("fixture stores not in this checkout")
+    import shutil
+    shutil.copytree(FIX / "stores", tmp_path / "stores")
+    monkeypatch.setenv("RUGBY_STORES", str(tmp_path / "stores"))
+    monkeypatch.setenv("SCRUM_NOW", "2026-11-02T12:00:00Z")
+    from oddsmarkets.rugby import pages
+    res = pages.build_scope("men", tmp_path / "data", sims=200, game_pages=True)
+    assert res["ok"]
+    pages_ = [json.loads(p.read_text(encoding="utf-8")) for p in (tmp_path / "data" / "men" / "matches").glob("*.json")]
+    fc = [p["forecast"] for p in pages_ if p.get("forecast")]
+    assert fc and all(isinstance(f.get("sd"), (int, float)) and f["sd"] > 0 for f in fc)
+    up = [p for p in pages_ if p.get("forecast") and p["match"].get("status") == "pre"]
+    for p in up:                                   # an upcoming test's spread is at least the model's floor s0
+        assert p["forecast"]["sd"] >= Params().s0 * 0.5
+
+
 def test_win_chance_path_starts_at_the_pre_match_call_and_ends_at_the_result():
     from oddsmarkets.rugby import pages
     m = {"hs": 20, "as": 10, "status": "final", "events": [[10, "try", "h", "1", "A", 5, 0], [70, "pg", "a", "2", "B", 5, 3], [79, "try", "h", "1", "A", 20, 10]]}

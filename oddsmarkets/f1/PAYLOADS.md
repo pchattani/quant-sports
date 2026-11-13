@@ -51,8 +51,11 @@ rather than omitted.
 ```
 {"metrics": [{"key","label","group","fmt","lower","desc","scope"}],      # ~70 metrics, groups: Results, Qualifying, Race pace, Racecraft, Tyres, Reliability, Telemetry style, Points
  "drivers": {driverId: {"name","team","races","values": {key: v}, "pct": {key: 0-100 field percentile, 100 = best}, "pct_teammate": {key: ...},
-                        "log": [{"round","name","grid","pos","status","points","quali_pos","pace","pace_rank","pos_gained","lap1_gain","overtakes","pit_stops","deg"}]}}}
+                        "log": [{"round","name","grid","pos","status","points","quali_pos","pace","pace_rank","pos_gained","lap1_gain","overtakes","pit_stops","deg",
+                                 "team","exp_points","p_win","p_podium"}]}}}
 ```
+`exp_points`, `p_win` and `p_podium` in a log row (p_win / p_podium added 12 Nov 2026): the walk-forward race forecast for that
+round (post-qualifying when qualifying exists, else pre-qualifying; null with no forecast), shown in the driver page's race log.
 Added 22 Oct 2026 (docs/METRICS_SPEC.md, Formula 1): top level `"peer_floor"` (starts to join the peer group: 8 in a finished
 season of 16+ rounds, else max(3, min(8, ceil(0.35 x rounds completed)))), `"peer_rule"`, `"peer_count"`; drivers add
 `"qualified"` (races >= peer_floor) and `"pct_peer"` (the `pct` formula among the qualifying drivers only; empty below the

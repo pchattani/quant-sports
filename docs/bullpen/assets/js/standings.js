@@ -366,12 +366,15 @@ function chancesView(el, params) {
    projections (value.json "e1", valuation v2; "proj" where it is missing), summed by the club the player is with now, and
    set against the league average (81 wins; a win of WAR is a win). Before free agency, trades and signings: a snapshot of
    the rosters, not a forecast of next year's clubs. */
-function nextSeason(body, L, S, all) {
-  BP.loadYear('value.json', L, S).then(v => {
-    if (!body.isConnected || !BP.ok(v) || !Array.isArray(v.rows)) return;
+/* The sums behind it, shared with the off-season overview and team pages (round 11): value.json read once, every club's
+   roster WAR for next season (e1, else proj) and its best players by it. Resolves { tot: {tid: WAR}, top: {tid: [[name,
+   WAR], ...] sorted}, ids, mean, W: tid -> projected wins } or null (no value file, or fewer than 20 clubs). */
+function nextSeasonWins(L, S, tids) {
+  return BP.loadYear('value.json', L, S).then(v => {
+    if (!BP.ok(v) || !Array.isArray(v.rows)) return null;
     const F = {};
     (v.fields || []).forEach((f, i) => { F[f] = i; });
-    if (F.team === undefined || (F.e1 === undefined && F.proj === undefined)) return;
+    if (F.team === undefined || (F.e1 === undefined && F.proj === undefined)) return null;
     const tot = {}, top = {};
     v.rows.forEach(r => {
       const t = String(r[F.team] || ''), x = F.e1 !== undefined && isNum(r[F.e1]) ? r[F.e1] : (F.proj !== undefined ? r[F.proj] : null);
@@ -379,10 +382,18 @@ function nextSeason(body, L, S, all) {
       tot[t] = (tot[t] || 0) + x;
       (top[t] = top[t] || []).push([r[F.name], x]);
     });
-    const ids = all.map(r => r.tid).filter(t => isNum(tot[t]));
-    if (ids.length < 20) return;
+    Object.keys(top).forEach(t => top[t].sort((a, b) => b[1] - a[1]));
+    const ids = (tids || Object.keys(tot)).filter(t => isNum(tot[t]));
+    if (ids.length < 20) return null;
     const mean = ids.reduce((a, t) => a + tot[t], 0) / ids.length;
-    const W = t => 81 + (tot[t] - mean);
+    return { tot: tot, top: top, ids: ids, mean: mean, W: t => 81 + (tot[t] - mean) };
+  });
+}
+BP.nextSeasonWins = nextSeasonWins;
+function nextSeason(body, L, S, all) {
+  nextSeasonWins(L, S, all.map(r => r.tid)).then(N => {
+    if (!body.isConnected || !N) return;
+    const tot = N.tot, top = N.top, ids = N.ids, W = N.W;
     const divs = {};
     all.forEach(r => { if (isNum(tot[r.tid])) (divs[r.division] = divs[r.division] || []).push(r); });
     const order = Object.keys(divs).sort((a, b) => { const ia = BP.DIVISIONS.indexOf(a), ib = BP.DIVISIONS.indexOf(b); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b); });

@@ -115,7 +115,17 @@ def test_driver_catalogue_percentiles_and_teammate_percentiles(paddock_data):
     assert {a, b} <= {0, 50, 100} and a + b == 100
     row = ds["drv0"]["log"][0]
     assert set(row) >= {"round", "name", "grid", "pos", "status", "points", "quali_pos", "pace", "pace_rank", "pos_gained",
-                        "lap1_gain", "overtakes", "pit_stops", "deg"}
+                        "lap1_gain", "overtakes", "pit_stops", "deg", "exp_points", "p_win", "p_podium"}
+
+
+def test_log_row_carries_the_pre_race_chances():
+    """The race log shows our pre-race forecast beside each result: expected points, win and podium chances, from the
+    same walk-forward forecast (post-qualifying when qualifying exists); absent forecast -> None, never 0."""
+    row = drv._log_row(_rec(3, points=18.0, exp=12.3456, pos=2, p_win=0.21234, p_podium=0.55559))
+    assert row["exp_points"] == pytest.approx(12.35)
+    assert row["p_win"] == pytest.approx(0.212) and row["p_podium"] == pytest.approx(0.556)
+    bare = drv._log_row(_rec(4, points=0.0, pos=12))
+    assert bare["exp_points"] is None and bare["p_win"] is None and bare["p_podium"] is None
 
 
 # ------------------------------------------------------------------------------------------ awards

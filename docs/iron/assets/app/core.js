@@ -126,6 +126,20 @@ function attempts(a) {
 function col(k) { return QK.cssVar(typeof k === 'number' ? '--c-' + k : '--' + k) || '#8a93a6'; }
 function form(f) { return f ? QK.formDots(f, f.length) : ''; }
 
+/* ── data freshness: build.json (tiny) carries the build time of every file in data/; QK.stamp shows it at the
+ * right of the section bar and in the footer, and asof() writes the "as of" for cards that read a player or meet
+ * file rather than the index ─────────────────────────────────────────── */
+var BUILT = null;
+var STAMP_WHAT = 'The site checks the OpenPowerlifting archive (published weekly) and rebuilds when it changes.';
+function stamp(iso) { try { if (iso && QK.stamp) QK.stamp(iso, { what: STAMP_WHAT, stale: 24 * 8 }); } catch (e) { /* the page stands without it */ } }
+function built() {
+  return load('build.json').then(function (b) { BUILT = b || null; if (b) stamp(b.updated_at); return BUILT; }, function () { return null; });
+}
+function asof() {
+  var t = BUILT && BUILT.updated_at;
+  return t ? 'as of ' + fmt.date(t, { day: 'numeric', month: 'short' }) + ' ' + fmt.time(t) : '';
+}
+
 /* ── page helpers (the Scrum's SC.ui) ───────────────────────────────── */
 var U = {};
 U.head = function (title, sub, kicker, right) {
@@ -248,6 +262,7 @@ function boot() {
       document.getElementById('fv-dismiss').addEventListener('click', function () { fv.hidden = true; try { localStorage.setItem('ir-fv', '1'); } catch (e) { /* private mode */ } });
     }
   } catch (e) { /* no storage */ }
+  built();
   render();
 }
 
@@ -256,6 +271,6 @@ return {
   signed: signed, pct: pct, pctv: pctv, cls: cls, year: year, date: date, className: className, sexOf: sexOf,
   playerHref: playerHref, eventHref: eventHref, playerLink: playerLink, eventLink: eventLink, thinTag: thinTag, THIN: THIN,
   delta: delta, attempts: attempts, form: form, col: col, ui: U, STREAMS: STREAMS, STREAM_KEYS: STREAM_KEYS, CLASSES: CLASSES, SITE: SITE,
-  followItem: followItem, followStar: followStar, followRows: followRows
+  followItem: followItem, followStar: followStar, followRows: followRows, stamp: stamp, built: built, asof: asof
 };
 })();

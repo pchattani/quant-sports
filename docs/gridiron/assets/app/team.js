@@ -97,6 +97,45 @@ function topPerformers(abbr, vj, S) {
   };
 }
 
+/* The black strip (round 11): the rating with its percentile among the 32 teams and its one-standard-error band (the
+   simulation's rating_se), our playoff and Super Bowl chances, the projected wins with the simulation's 5th-95th
+   percentile band, and the offence rating with its percentile (the defence beside it). Intervals only where the payload
+   has them. */
+function strip5(v, x, sim, info) {
+  const pc = (x && x.pct) || {};
+  const rt = isNum(v.rating) ? Number(v.rating) : (isNum(sim.rating) ? Number(sim.rating) : null);
+  const se = isNum(sim.rating_se) && sim.rating_se > 0 ? Number(sim.rating_se) : null;
+  const wMax = Array.isArray(sim.win_dist) && sim.win_dist.length > 1 ? sim.win_dist.length - 1 : 17;
+  const out = [
+    { label: 'Team rating', value: isNum(rt) ? GI.signed(rt, 1) : null, signal: true, pctl: isNum(rt) ? pc.rating : null,
+      sub: 'points a game against an average team' + (isNum(se) ? ' · ±' + GI.num(se, 1) + ', one standard error' : ''), tip: 'Our team-strength rating on a neutral field; the box ranks it among the 32 teams. The band is one standard error either side, the uncertainty our season simulation draws from.',
+      range: isNum(rt) && isNum(se) ? { lo: rt - se, hi: rt + se, mid: rt, fmt: z => GI.signed(z, 1), label: 'Team rating, one standard error either side' } : null },
+    { label: 'Make the playoffs', value: isNum(sim.p_playoffs) ? GI.pct(sim.p_playoffs, 0) : null, sub: 'from 20,000 simulated seasons' + (isNum(sim.p_div) ? ' · win the ' + (info.division || 'division') + ' ' + GI.pct(sim.p_div, 0) : '') },
+    { label: 'Win the Super Bowl', value: isNum(sim.p_sb) ? GI.pct(sim.p_sb, 1) : null, sub: isNum(sim.p_conf) ? 'win the conference ' + GI.pct(sim.p_conf, 0) : 'our chance' },
+    { label: 'Projected wins', value: isNum(sim.mean_wins) ? GI.num(sim.mean_wins, 1) : null, sub: isNum(sim.w_p05) && isNum(sim.w_p95) ? '9 seasons in 10: ' + GI.num(sim.w_p05, 0) + ' to ' + GI.num(sim.w_p95, 0) : 'the mean of our simulations',
+      range: isNum(sim.mean_wins) && isNum(sim.w_p05) && isNum(sim.w_p95) ? { lo: sim.w_p05, hi: sim.w_p95, mid: sim.mean_wins, min: 0, max: wMax, fmt: z => GI.num(z, 0), label: 'Wins in 9 simulated seasons in 10' } : null },
+    isNum(v.off_rating) ? { label: 'Offence rating', value: GI.signed(v.off_rating, 1), pctl: pc.off_rating, sub: 'points a game' + (isNum(v.def_rating) ? ' · defence ' + GI.signed(v.def_rating, 1) + (isNum(pc.def_rating) ? ', ' + GI.ordinal(pc.def_rating) + ' pctl' : '') : ''), tip: 'Points a game the offence adds against an average team, opponent-adjusted; the defence beside it. Percentiles among the 32 teams.' } : null
+  ];
+  return out.filter(Boolean).map(t => QK.statTile(t));
+}
+/* "How sure are we?" (round 11): what the playoff chance means in seasons, the simulation's range of wins, the rating's
+   standard error and the sample, in the explain strip under the season path. */
+function howSure(sim, w, l, t) {
+  const bits = [];
+  const p = sim.p_playoffs;
+  if (isNum(p) && p > 0.005 && p < 0.995) {
+    const q = p >= 0.5 ? 1 - p : p, per = q < 0.1 ? 100 : 10, k = Math.max(1, Math.round(per * q));
+    bits.push('A ' + GI.pct(p, 0) + ' playoff chance ' + (p >= 0.5 ? 'still misses' : 'still gets in') + ' about ' + k + ' season' + (k === 1 ? '' : 's') + ' in ' + per + '.');
+  }
+  const rem = ((sim.current || {}).remaining);
+  if (isNum(sim.w_p05) && isNum(sim.w_p95)) bits.push('Across 20,000 simulations' + (isNum(rem) ? ' of the ' + rem + ' game' + (rem === 1 ? '' : 's') + ' left' : '') + ', 9 seasons in 10 end with ' + GI.num(sim.w_p05, 0) + ' to ' + GI.num(sim.w_p95, 0) + ' wins.');
+  if (isNum(sim.rating_se)) bits.push('The rating itself is uncertain by about ±' + GI.num(sim.rating_se, 1) + ' points a game (one standard error), and the simulation draws from that.');
+  const g = (w || 0) + (l || 0) + (t || 0);
+  if (g) bits.push(g >= 16 ? g + ' games in: offence and defence numbers have both settled.' : g >= 6 ? g + ' games in: offence numbers settle after about six games, defence after about sixteen, so the defence still has some noise.'
+    : 'Only ' + g + ' game' + (g === 1 ? '' : 's') + ' in, a small sample: offence numbers settle after about six games, defence after about sixteen.');
+  return bits.length ? '<div style="margin-top:var(--sp-4)">' + QK.explain('<b>How sure are we?</b> ' + esc(bits.join(' '))) + '</div>' : '';
+}
+
 GI.route('team', function (el, params) {
   const abbr = GI.canonTeam(params.id);
   const S = Number(params.season);
@@ -117,7 +156,9 @@ GI.route('team', function (el, params) {
     document.title = GI.teamName(abbr) + ' · ' + GI.SITE;
     const recTxt = GI.record(first(r.w, rec.w), first(r.l, rec.l), first(r.t, rec.t));
     const tags = [];
-    if (Array.isArray(r.last5) && r.last5.length) tags.push(QK.formDots(r.last5));
+    /* round 11: the last five as a labelled hero chip (as the Rink's team page), solid squares on the team colour */
+    const l5 = Array.isArray(r.last5) && r.last5.length ? r.last5 : (Array.isArray(rec.last5) ? rec.last5 : []);
+    const formChip = l5.length ? '<span class="gi-phform" tabindex="0" data-tip="Last ' + l5.length + ' results, oldest first: W win, L loss, D tie">Last ' + l5.length + ' ' + QK.formDots(l5) + '</span>' : null;
     if (rec.streak || r.streak) tags.push(QK.tag('Streak ' + (r.streak || rec.streak)));
     /* The short version: the record, the rating and its rank, and what the simulation says */
     const allR = rows.filter(z => isNum(z.rating)).sort((a2, b2) => b2.rating - a2.rating);
@@ -129,12 +170,11 @@ GI.route('team', function (el, params) {
     let h = '<nav class="gi-crumb" aria-label="Breadcrumb"><a href="#/teams">NFL teams</a><span aria-hidden="true">›</span>' + esc(info.division || '') + '<span aria-hidden="true">›</span>' + esc(GI.teamName(abbr)) + '</nav>' +
       QK.playerHeader({ name: GI.teamName(abbr), split: false, pos: info.conference || '', kicker: recTxt + ' · ' + S, face: abbr,
       team: { name: info.division || '', abbr: abbr, colour: info.colour, alt: info.alt, href: GI.standingsHref(S) },
-      meta: [isNum(r.seed) ? ['Seed today', GI.ordinal(r.seed)] : null, (x || {}).coach ? '<span>Head coach <b>' + GI.coachLink(x.coach, S) + '</b></span>' : null, isNum(r.diff) ? ['Point difference', GI.signed(r.diff, 0)] : null],
-      /* v4: the black strip of five numbers under the team-colour hero, then "The short version" */
-      strip: [GI.kpi('Team rating', isNum(v.rating) ? GI.signed(v.rating, 1) : '—', 'points a game against an average team', { signal: true, tip: 'Our team-strength rating on a neutral field' }),
-        GI.kpi('Make the playoffs', GI.pct(sim.p_playoffs, 0), 'from 20,000 simulated seasons'), GI.kpi('Win the division', GI.pct(sim.p_div, 0), ''), GI.kpi('Win the Super Bowl', GI.pct(sim.p_sb, 1), ''),
-        GI.kpi('Projected wins', GI.num(sim.mean_wins, 1), isNum(sim.w_p05) ? 'likely ' + GI.num(sim.w_p05, 0) + ' to ' + GI.num(sim.w_p95, 0) : '')],
-      tags: tags, short: shortTxt.trim() || null,
+      meta: [isNum(r.seed) ? ['Seed today', GI.ordinal(r.seed)] : null, (x || {}).coach ? '<span>Head coach <b>' + GI.coachLink(x.coach, S) + '</b></span>' : null, isNum(r.diff) ? ['Point difference', GI.signed(r.diff, 0)] : null, formChip],
+      /* v4: the black strip of five numbers under the team-colour hero, then "The short version". Round 11: the ratings
+         carry their percentile among the 32 teams (teams.json pct), the rating its one-standard-error band (the
+         simulation's rating_se) and the projected wins the simulation's 5th-95th percentile band, as the kit's range bar */
+      strip: strip5(v, x, sim, info), tags: tags, short: shortTxt.trim() || null,
       /* My Teams: follow the team from the hero; it then leads Home and this site's overview */
       follow: GI.followItem(abbr) });
     h += '<nav class="qk-chips scroll" aria-label="On this page" style="margin-top:12px">' + [['#tp-season', 'How far they go'], ['#tp-top', 'Top performers'], ['#needs', 'Strengths and needs'], ['#tp-moves-host', 'Who moves next'], ['#roster', 'Roster'], ['#moves', 'Moves'], ['#tp-sched', 'Schedule'], ['#tp-profile', 'Profile'], ['#tp-4th', 'Fourth downs'], ['#tp-since', 'Since 1999']]
@@ -144,7 +184,8 @@ GI.route('team', function (el, params) {
     const stages = [['p_playoffs', 'Playoffs'], ['p_div', 'Win division'], ['p_bye', 'No. 1 seed'], ['p_conf', 'Win conference'], ['p_sb', 'Win Super Bowl']].filter(s => isNum(sim[s[0]]));
     h += '<div id="tp-season">' + GI.grid(GI.card('How far they go', 'Our chance of reaching each stage, from 20,000 simulated seasons', stages.length ? '<div id="tp-stages"></div>' : GI.muted('Our simulation chances are not available for this season.'), { span: 4 }) +
       GI.card('Final seed', 'Share of our simulated seasons', Array.isArray(sim.seed_dist) ? GI.chartBox('tp-seed', 230, 'Final seed distribution') : GI.muted('No seed distribution.'), { span: 4 }) +
-      GI.card('Final wins', 'Our simulated regular-season wins' + (isNum(sim.mean_wins) ? ' · mean ' + GI.num(sim.mean_wins, 1) : ''), Array.isArray(sim.win_dist) ? GI.chartBox('tp-wins', 230, 'Final win distribution') : GI.muted('No win distribution.'), { span: 4 })) + '</div>';
+      GI.card('Final wins', 'Our simulated regular-season wins' + (isNum(sim.mean_wins) ? ' · mean ' + GI.num(sim.mean_wins, 1) : ''), Array.isArray(sim.win_dist) ? GI.chartBox('tp-wins', 230, 'Final win distribution') : GI.muted('No win distribution.'), { span: 4 })) +
+      howSure(sim, first(r.w, rec.w), first(r.l, rec.l), first(r.t, rec.t)) + '</div>';
     /* strengths, weaknesses and the race (docs/_design/league.js): the plain-English read, the race facts and our
        chances over the season (the percentile card stays further down, under Profile) */
     const lo = GI.leagueOpts && GI.ok(res[1]) ? GI.leagueOpts(res[1], S) : null;

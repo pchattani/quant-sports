@@ -382,7 +382,9 @@ def price_window(ctx, cfg: dict) -> dict[str, dict]:
     mk = (ctx.markets() or {}).get("games") or {}
     out = {}
     for gpk, g in ctx.games.items():
-        if g.get("status") not in ("pre", "live", "scheduled"):
+        # before first pitch only: a game that has started keeps the forecast made before it (the page's pregame block
+        # is frozen at first pitch), so neither the model run nor the market beside it can take in-game prices
+        if g.get("status") not in ("pre", "scheduled"):
             continue
         try:
             d = date.fromisoformat(str(g.get("date"))[:10])

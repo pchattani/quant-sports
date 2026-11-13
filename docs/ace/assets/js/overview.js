@@ -16,7 +16,8 @@
  *   surface specialist); "Who's for real?" (QKC.quadrant: share of games won, the process, against share of matches
  *   won, the results, from value.json's luck rows); "What's that number?"; the title race in our chance only (the
  *   tournament in play, the year-end No. 1), the race to the Finals and the Elo top 10; past years: the champions.
- *   The market sits only beside our chance on match cards and the ticker, small and grey (market: 'quiet'). Our record
+ *   The market is not on the overview (sweep, 12 Nov 2026: it sits quietly on the match centre and the Model pages
+ *   only), so the cards and the ticker carry our chance alone. Our record
  *   and the calibration chart are on the Model section's "How we're doing" tab (#/<T>/calibration).
  *
  * Reads index.json (tours[T]), <T>/race.json, <T>/value.json (current year) and the in-play
@@ -400,7 +401,7 @@ function render(el, params) {
     /* round 9: one of each module. The lead's fallback race (nothing big on) is not repeated further down, and the Elo
        leaders live in the power list only (the Elo view has the tables) */
     const used = {};
-    let html = (tick.length ? '<div class="qk-ticker ta-ticker" aria-label="Scoreboard">' + QK.ticker(tick, { group: 'league', pill: false, market: 'quiet' }) + '</div>' : '') +
+    let html = (tick.length ? '<div class="qk-ticker ta-ticker" aria-label="Scoreboard">' + QK.ticker(tick, { group: 'league', pill: false }) + '</div>' : '') +
       intro({ tag: kicker,
         title: isCurrent ? 'Every ' + tourW + ' match, player and tournament, by the numbers.' : 'The ' + TA.tourName(T) + ' in ' + Y + ', as it finished.',
         lede: isCurrent ? 'Our chance for every match, title chances from simulating every draw, who’s for real, and the race to the Finals, in plain English.'

@@ -45,6 +45,96 @@ function peerChart(el, P, bd, key) {
     xName: meta.label + (pctm ? ' (%)' : '') + ' · ' + vs.length + ' regulars', yName: 'Players', marks: [{ x: pctm ? me * 100 : me, label: GR.surname(P.name) }], label: 'Where ' + P.name + ' sits' });
 }
 
+/* ── next and last event (the Rink player page's "what to watch" and "last game" pair, for golf) ── */
+
+/* this week's event the player is entered in: index.json's week (the player's own tour first), then each event file
+   until the player turns up in its field. Resolves { e, p } or null. */
+function findNext(P, stream, tour) {
+  return GR.maybe('index.json').then(function (ix) {
+    var wk = ((ix && ix.week) || []).filter(function (w) { return w.page && w.status !== 'final' && GR.STREAM_OF[w.tour] === stream; })
+      .sort(function (a, b) { return (b.tour === tour ? 1 : 0) - (a.tour === tour ? 1 : 0); });
+    var chain = Promise.resolve(null);
+    wk.forEach(function (w) {
+      chain = chain.then(function (hit) {
+        if (hit) return hit;
+        return GR.maybe('events/' + encodeURIComponent(w.id) + '.json').then(function (e) {
+          var p = e && (e.players || []).filter(function (x) { return String(x.pid) === String(P.pid); })[0];
+          return p ? { e: e, p: p } : null;
+        });
+      });
+    });
+    return chain;
+  });
+}
+/* where the player is in a live event: "-3 after round 1", "-5 through 12 in round 2" */
+function progress(p) {
+  var r = p.r || [], th = p.thru || [], done = 0, at = '';
+  for (var k = 0; k < r.length; k++) {
+    if (isNum(r[k])) done = k + 1;
+    else if (isNum(th[k]) && th[k] > 0 && th[k] < 18) at = 'through ' + th[k] + ' in round ' + (k + 1);
+  }
+  return at || (done ? 'after round ' + done : 'not started');
+}
+function nextHTML(e, p, P) {
+  var live = e.status === 'live' && !!e.live;
+  var pl = e.players || [];
+  var rk = 1 + pl.filter(function (q) { return (q.win || 0) > (p.win || 0); }).length;
+  var c = e.course || {};
+  var sur = esc(GR.surname(P.name));
+  var tiles = live ? [
+    { label: 'Position', value: GR.position(p) || 'Not started', text: !GR.position(p), sub: (GR.toPar(p.tp) || 'level') + ' ' + progress(p) },
+    { label: 'Live chance to win', value: GR.pct(p.lwin), signal: true, sub: 'from the score and the holes left' },
+    { label: 'Live top 10', value: GR.pct(p.lt10), sub: isNum(p.lcut) ? 'make the cut ' + GR.pct(p.lcut) : '' },
+    { label: 'Before the start', value: GR.pct(p.win), sub: 'to win, ' + GR.nthBest(rk) + ' of ' + pl.length + '; top 10 ' + GR.pct(p.t10) }
+  ] : [
+    { label: 'Our chance to win', value: GR.pct(p.win), signal: true, sub: GR.nthBest(rk) + ' in a field of ' + pl.length },
+    { label: 'Top 10', value: GR.pct(p.t10), sub: isNum(p.t20) ? 'top 20 ' + GR.pct(p.t20) : '' },
+    isNum(p.cut) && e.cut ? { label: 'Make the cut', value: GR.pct(p.cut), sub: 'top ' + e.cut.count + ' and ties after round ' + e.cut.round } : null,
+    isNum(p.xr) ? { label: 'Expected finish', value: QK.ordinal(Math.round(p.xr)), text: true, sub: 'the average over ' + fmt.num(e.sims) + ' simulated tournaments' } : null
+  ];
+  var pp = live ? p.lwin : p.win;
+  var sure = '<b>How sure are we?</b> ' + sur + '’s ' + GR.pct(pp) + (live ? ' now' : '') + ' comes off ' + GR.oneIn(pp) + '.' +
+    (live ? ' Live chances start from the score and the holes left; before the start it was ' + GR.pct(p.win) + '.' : ' From ' + fmt.num(e.sims) + ' simulated tournaments, with a rating built only from rounds played before the event.') +
+    (isNum(p.wt) && p.wt < GR.THIN ? ' Only ' + Math.round(p.wt) + ' recent rounds sit behind the rating, so read it lightly.' : '');
+  return QK.sectionHead({ kicker: live ? 'Live now' : 'This week', title: esc(GR.shortEvent(e.name)), html: true,
+      sub: esc((GR.shortEvent(e.name) !== e.name ? e.name + ' · ' : '') + GR.tourName(e.tour) + ' · ' + GR.dates(e.start, e.end) + (c.name ? ' · ' + c.name : '') + ' · ' + GR.asOf(live ? e.live.at : e.updated_at)) }) +
+    QK.stats(tiles.filter(Boolean)) + QK.explain(sure) +
+    '<p class="gr-meta" style="margin-top:10px"><a href="#/event/' + encodeURIComponent(e.id) + '">' + (live ? 'The live leaderboard and every player’s chances' : 'Every player’s chances') + ' →</a></p>';
+}
+/* the last event: the finish against what we expected, the rounds against the field par (the event file) */
+function lastHTML(ev, E, P) {
+  var sur = esc(GR.surname(P.name));
+  var p = E ? (E.players || []).filter(function (x) { return String(x.pid) === String(P.pid); })[0] : null;
+  var fp = {};
+  ((E && E.round_avg) || []).forEach(function (r) { fp[r.round] = r.field_par; });
+  var rows = [];
+  /* a final event's round score where the feed gave only the score against par: par + to par (one course only) */
+  var par = E && E.status === 'final' && E.course && isNum(E.course.par) && !((E.courses || []).length > 1) ? E.course.par : null;
+  if (p) (p.r || []).forEach(function (s0, k) {
+    var tp = (p.rtp || [])[k], s = isNum(s0) ? s0 : (isNum(par) && isNum(tp) ? par + tp : null);
+    if (isNum(s)) rows.push({ k: k + 1, s: s, tp: tp, fp: fp[k + 1], sg: isNum(fp[k + 1]) ? fp[k + 1] - s : null });
+  });
+  var finTxt = ev.st === 'finish' && isNum(ev.pos) ? (ev.pos === 1 && !ev.tie ? 'Won' : ev.tie ? 'T' + ev.pos : QK.ordinal(ev.pos)) : ev.st === 'cut' ? 'Missed cut' : String(ev.st || '').toUpperCase();
+  var xr = p && isNum(p.xr) ? p.xr : null;
+  var line = '<b>' + sur + ':</b> ' + (isNum(ev.sg) ? GR.signed(ev.sg, 2) + ' strokes gained a round against the field' : 'no strokes gained on file') +
+    (isNum(xr) ? '; we expected about ' + QK.ordinal(Math.round(xr)) + (ev.st === 'finish' && isNum(ev.pos) ? ' and the finish was ' + (ev.tie ? 'T' : '') + ev.pos + (isNum(p.beat) && Math.round(p.beat) !== 0 ? ', ' + Math.abs(Math.round(p.beat)) + ' places ' + (p.beat > 0 ? 'better' : 'worse') : '') : '') : '') +
+    '. Our chances before the start: win ' + GR.pct(ev.win) + ', top 10 ' + GR.pct(ev.t10) + (isNum(ev.rt) ? ', with a rating of ' + GR.rating(ev.rt) + ' coming in' : '') + '.';
+  var tbl = rows.length ? GR.table([{ label: 'Round' }, { label: 'Score' }, { label: 'To par' }, { label: 'Field par', title: 'What an average tour player would have shot that day: our strokes-gained baseline' }, { label: 'Strokes gained', title: 'Field par minus the score' }],
+    rows.map(function (r) { return [{ v: r.k, html: 'R' + r.k }, { v: r.s, html: String(r.s) }, { v: r.tp, html: GR.toParHTML(r.tp) }, { v: r.fp, html: isNum(r.fp) ? fmt.num(r.fp, 2) : '' }, { v: r.sg, html: '<b>' + GR.signed(r.sg, 2) + '</b>' }]; })) : '';
+  var html = QK.sectionHead({ kicker: 'Last event', title: esc(finTxt + (isNum(ev.tp) ? ' · ' + GR.toPar(ev.tp) : '')), html: true,
+      sub: GR.eventLink(ev.id, ev.name) + ' · ' + esc(GR.date(ev.date)) + (E ? ' · ' + esc(GR.asOf(E.updated_at)) : '') }) +
+    '<article class="qk-card"><div class="qk-card-body"><p class="gr-last-line">' + line + '</p>' +
+    (rows.length > 1 ? GR.chart('pl-last', 190, 'Strokes gained by round') : '') + '</div>' + (tbl ? '<div class="qk-card-body flush" data-no-tools>' + tbl + '</div>' : '') + '</article>';
+  return { html: html, rows: rows };
+}
+function lastChart(host, rows) {
+  var tb = host && host.querySelector('#pl-last');
+  rows = (rows || []).filter(function (r) { return isNum(r.sg); });
+  if (!tb || rows.length < 2) return;
+  QKC.bar(tb, { cats: rows.map(function (r) { return 'Round ' + r.k; }), series: [{ name: 'Strokes gained', data: rows.map(function (r) { return r.sg; }) }], diverging: true, labels: true,
+    fmt: function (v) { return GR.signed(v, 2); }, catName: 'Round', valName: 'Strokes gained v the field', label: 'Strokes gained by round' });
+}
+
 GR.page('player', function (el, params) {
   return GR.load('players/' + encodeURIComponent(params.id) + '.json').then(function (P) {
     var stream = P.stream || 'men';
@@ -70,6 +160,7 @@ GR.page('player', function (el, params) {
     var two = evs.filter(function (e) { return C && e.date >= C.from; });
     var wins2 = two.filter(function (e) { return e.st === 'finish' && e.pos === 1; }).length;
     var top10 = two.filter(function (e) { return e.st === 'finish' && e.pos <= 10; }).length;
+    var careerW = evs.filter(function (e) { return e.st === 'finish' && e.pos === 1; }).length, careerT = evs.filter(function (e) { return e.st === 'finish' && e.pos <= 10; }).length;
     var short = '';
     if (C && C.q && C.pc) {
       var ks = HEAD.filter(function (k) { return isNum(C.pc[k]); }).sort(function (a, b) { return C.pc[b] - C.pc[a]; });
@@ -79,15 +170,17 @@ GR.page('player', function (el, params) {
     } else short = P.name + ' has ' + fmt.num(P.rounds) + ' rounds in our data' + (C ? ', ' + C.rounds + ' in the last two years: under the 30 rounds for percentiles.' : ', none in the last two years.');
     var html = '<nav class="gr-crumb"><a href="#/scout' + (stream === 'women' ? '?s=women' : '') + '">Scouting Room</a> / ' + esc(P.name) + '</nav>';
     var mk = GR.mark(P.name, tour);
-    html += QK.playerHeader({ name: P.name, number: P.rank || '', pos: GR.tourName(tour), kicker: (stream === 'women' ? 'LPGA' : 'Men’s golf') + (P.rank ? ' · ranked ' + P.rank : ''),
+    /* the rank is the outlined face (no '#' chip: it is not a shirt number); the tour is the team chip, once */
+    html += QK.playerHeader({ name: P.name, face: P.rank ? String(P.rank) : undefined, kicker: (stream === 'women' ? 'LPGA' : 'Men’s golf') + (P.rank ? ' · ranked ' + P.rank : ''),
       team: { name: GR.tourName(tour), abbr: GR.tourShort(tour), colour: mk.colour, href: '#/fixtures/' + tour }, meta: meta,
       strip: [{ label: 'Our rating', value: GR.rating(P.rt), pctl: C && C.q ? C.pc.rt : null, signal: true, sub: 'strokes a round' },
         { label: 'Rank', value: P.rank ? String(P.rank) : 'unranked', sub: P.ranked ? (stream === 'women' ? 'LPGA' : 'men') : 'needs 10 recent rounds' },
-        { label: 'Wins', value: String(wins2), sub: 'last two years, ' + two.length + ' starts' },
-        { label: 'Top 10s', value: String(top10), sub: two.length ? Math.round(100 * top10 / two.length) + '% of starts' : '' },
-        { label: 'Form', value: C && isNum(C.v.form) ? GR.signed(C.v.form, 2) : GR.rating(P.rt), sub: 'last eight events', pctl: C && C.q ? C.pc.form : null }],
+        two.length ? { label: 'Wins', value: String(wins2), sub: 'last two years, ' + two.length + ' starts' } : { label: 'Career wins', value: String(careerW), sub: 'in ' + evs.length + ' starts on file' + (evs.length ? ', the last in ' + String(evs[0].date).slice(0, 4) : '') },
+        two.length ? { label: 'Top 10s', value: String(top10), sub: Math.round(100 * top10 / two.length) + '% of starts, last two years' } : { label: 'Career top 10s', value: String(careerT), sub: evs.length ? Math.round(100 * careerT / evs.length) + '% of starts on file' : '' },
+        C && isNum(C.v.form) ? { label: 'Form', value: GR.signed(C.v.form, 2), sub: 'strokes gained a round, last eight events', pctl: C.q ? C.pc.form : null }
+          : (isNum(sm.sg12) ? { label: '12 months', value: GR.signed(sm.sg12, 2), sub: 'strokes gained a round over the last 12 months' } : null)].filter(Boolean),
       short: short, follow: GR.followItem(P.pid, P.name, stream) });
-    if (isNum(P.wt) && P.wt < GR.THIN) html += QK.note('Thin record: only ' + Math.round(P.wt) + ' recent rounds sit behind this rating, so it can swing a long way on a few results.');
+    if (isNum(P.wt) && P.wt < GR.THIN) html += QK.note('Thin record: only ' + Math.round(P.wt) + ' recent round' + (Math.round(P.wt) === 1 ? '' : 's') + ' sit' + (Math.round(P.wt) === 1 ? 's' : '') + ' behind this rating, so it can swing a long way on a few results.');
     // percentiles
     var prev = P.prev || null;
     if (C && C.v) {
@@ -102,7 +195,9 @@ GR.page('player', function (el, params) {
         sample: C.rounds + ' rounds · ' + C.events + ' events since ' + GR.date(C.from), groups: groups }) : QK.empty('No percentiles yet', 'Percentiles need 12 rounds in the last two years.')) +
         QK.explain('<b>How sure are we?</b> ' + C.rounds + ' rounds is ' + (C.rounds < 60 ? 'a small sample: every rate is pulled toward the average (as if 12 average rounds, or 72 average holes, had been added), and a dashed knob marks a percentile still settling.' : 'a solid sample for strokes gained; win and top-10 rates still swing a lot from season to season.') +
           (tour !== 'pga' && stream === 'men' ? ' Ball-striking numbers come from PGA Tour season statistics only: ESPN carries none for the DP World Tour, LIV or the Korn Ferry Tour.' : '')) +
-        '</div><div id="pl-tape"></div></div>';
+        '</div><div class="gr-stack"><div id="pl-tape"></div><div id="pl-next"></div><div id="pl-lastev"></div></div></div>';
+    } else {
+      html += '<div class="gr-pair gr-gap"><div id="pl-next"></div><div id="pl-lastev"></div></div>';
     }
     html += '<div class="qk-g2 gr-gap">' + GR.card('Our rating over time', 'Before each event, against an average tour player of the trailing year.', GR.chart('pl-rt', 280, 'Rating over time')) +
       GR.card('Event by event', 'Strokes gained per round at each of the last 40 events: blue when it beat the rating they brought in, red when it fell short.', GR.chart('pl-form', 280, 'Strokes gained by event')) + '</div>';
@@ -134,10 +229,16 @@ GR.page('player', function (el, params) {
       yl.map(function (y) { var o = yrs[y], s = smy[y]; return [{ v: y, html: String(y) }, { v: o.tours.join(' '), html: esc(o.tours.join(', ')) }, { v: o.starts, html: String(o.starts) }, { v: o.wins, html: String(o.wins) }, { v: o.top10, html: String(o.top10) }, { v: o.cuts, html: String(o.cuts) },
         { v: o.earn, html: GR.money(o.earn, true) }, { v: s ? s.n : 0, html: s ? String(s.n) : '' }, cell(s, 'sg'), cell(s, 'bird'), cell(s, 'bog'), cell(s, 'dist'), cell(s, 'gir'), cell(s, 'ppg')]; }), { maxHeight: 520 }), { flush: true });
     // events
-    html += GR.card('Every event', 'Our chance before the event beside the finish, and strokes gained per round there.', GR.table([{ label: 'Date', align: 'left' }, { label: 'Event', align: 'left' }, { label: 'Tour' }, { label: 'Finish' }, { label: 'To par' }, { label: 'SG/rd' }, { label: 'Our win chance' }, { label: 'Our top 10' }, { label: 'Rating in' }, { label: 'Earnings' }],
-      evs.map(function (e) { return [{ v: e.date, html: esc(GR.date(e.date)) }, { v: e.name, html: GR.eventLink(e.id, e.name) + (e.major ? ' ' + QK.tag('Major') : '') }, { v: e.tour, html: esc(GR.tourShort(e.tour)) },
+    /* the event log, as the Rink's game log: the best finish highlighted (the latest of equal bests) */
+    var bestI = -1;
+    evs.forEach(function (e, i) { if (e.st === 'finish' && isNum(e.pos) && (bestI < 0 || e.pos < evs[bestI].pos)) bestI = i; });
+    var bestE = bestI >= 0 ? evs[bestI] : null;
+    html += '<section class="qk-section gr-sec">' + QK.sectionHead({ kicker: 'Event log', title: 'Every event', html: true, sub: 'Our chance before each event beside the finish, and strokes gained per round there.' +
+      (bestE ? ' The best finish, ' + (bestE.pos === 1 && !bestE.tie ? 'a win' : esc(fin(bestE))) + ' at the ' + esc(bestE.name) + ' (' + esc(GR.date(bestE.date)) + '), is highlighted.' : '') }) +
+      GR.card('', '', GR.table([{ label: 'Date', align: 'left' }, { label: 'Event', align: 'left' }, { label: 'Tour' }, { label: 'Finish' }, { label: 'To par' }, { label: 'SG/rd' }, { label: 'Our win chance' }, { label: 'Our top 10' }, { label: 'Rating in' }, { label: 'Earnings' }],
+      evs.map(function (e, i) { return { _class: i === bestI ? 'hl' : '', cells: [{ v: e.date, html: esc(GR.date(e.date)) }, { v: e.name, html: GR.eventLink(e.id, e.name) + (e.major ? ' ' + QK.tag('Major') : '') }, { v: e.tour, html: esc(GR.tourShort(e.tour)) },
         { v: e.st === 'finish' ? e.pos : 999, html: esc(fin(e)) }, { v: isNum(e.tp) ? e.tp : 99, html: GR.toParHTML(e.tp) }, { v: isNum(e.sg) ? e.sg : -99, html: GR.signed(e.sg, 2) },
-        { v: e.win || 0, html: GR.pct(e.win) }, { v: e.t10 || 0, html: GR.pct(e.t10) }, { v: isNum(e.rt) ? e.rt : -99, html: GR.rating(e.rt) }, { v: e.earn || 0, html: GR.money(e.earn, true) }]; }), { maxHeight: 640 }), { flush: true });
+        { v: e.win || 0, html: GR.pct(e.win) }, { v: e.t10 || 0, html: GR.pct(e.t10) }, { v: isNum(e.rt) ? e.rt : -99, html: GR.rating(e.rt) }, { v: e.earn || 0, html: GR.money(e.earn, true) }] }; }), { maxHeight: 640 }), { flush: true }) + '</section>';
     el.innerHTML = html;
     QK.sortable(el);
     document.title = P.name + ' · The Quant Green';
@@ -147,6 +248,19 @@ GR.page('player', function (el, params) {
     GR.safe(function () { if (pk) peerChart(el.querySelector('#pl-peer'), P, bd, pk); });
     var seg = el.querySelector('#pl-pk');
     if (seg) QK.seg(seg, function (k) { GR.safe(function () { peerChart(el.querySelector('#pl-peer'), P, bd, k); }); });
+    // this week's event (if entered) and the last event, beside the rail
+    var nx = el.querySelector('#pl-next');
+    if (nx) findNext(P, stream, tour).then(function (hit) { if (hit && nx.isConnected) nx.innerHTML = nextHTML(hit.e, hit.p, P); }, function () { /* nothing this week */ });
+    var lastEv = evs[0], lx = el.querySelector('#pl-lastev');
+    if (lx && lastEv) {
+      lx.innerHTML = lastHTML(lastEv, null, P).html;
+      GR.maybe('events/' + encodeURIComponent(lastEv.id) + '.json').then(function (E) {
+        if (!E || !lx.isConnected) return;
+        var L = lastHTML(lastEv, E, P);
+        lx.innerHTML = L.html;
+        GR.safe(function () { lastChart(lx, L.rows); });
+      });
+    }
     // the tale of the tape against the closest match
     var sim = (P.similar || [])[0];
     var tapeEl = el.querySelector('#pl-tape');

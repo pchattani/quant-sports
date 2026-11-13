@@ -424,3 +424,10 @@ a.cc-bt:hover .nm { color: var(--signal); }
 .cc-hk-goals .tx small { display: block; color: var(--ink-3); margin-top: 2px; }
 .cc-hk-goals .tx .qk-tag { margin-left: 6px; }
 .cc-hk-credit { margin-top: var(--sp-6); }
+/* sweep 12 Nov 2026: the team hero's form chip (the last results on black, so the kit's form squares keep their
+   contrast on any team colour) and the game page's form card */
+.cc-ph-form { display: inline-flex; align-items: center; gap: 8px; padding: 5px 10px; background: var(--block); font: 700 13px/1 var(--font-cond); text-transform: uppercase; letter-spacing: 0.06em; color: var(--block-ink-2); }
+.cc-ph-form b { font: 700 14px/1 var(--font-cond); color: #fff; letter-spacing: 0.02em; }
+.cc-ph-form .qk-form i { width: 18px; height: 18px; }
+.cc-form-card .qk-fpair { padding: 0; }
+.cc-nl .qk-g2 > div { min-width: 0; }

@@ -627,3 +627,12 @@ td.aw-h-c .num { color: var(--ink-2); font-size: var(--fs-xs); }
 td.aw-h-c.hit { box-shadow: inset 0 -3px 0 var(--volt); }
 td.aw-h-c.open { opacity: 0.85; }
 td.aw-h-c.open .qk-kicker { display: block; font-size: 10px; }
+
+/* round 11 (12 Nov): the last results in the team hero. The kit's tinted form squares are made for the charcoal cards and
+   lose contrast on a team colour, so in the hero they are solid blocks with white letters (W cobalt, L red). */
+.qk-ph-meta .bp-phform { display: inline-flex; align-items: center; gap: 6px; }
+.qk-ph .qk-form i { width: 19px; height: 19px; font-size: 11px; background: #3a4150; color: #fff; }
+.qk-ph .qk-form i.w { background: #5a69b7; color: #fff; }
+.qk-ph .qk-form i.l { background: #c92d17; color: #fff; }
+/* round 11: next season's best players on the team page */
+.bp-nexttop { margin: 12px 0 0; }

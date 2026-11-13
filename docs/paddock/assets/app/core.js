@@ -341,6 +341,9 @@ function fmtTime(s) {
   return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
 }
 function fmtStamp(s) { var d = parseDate(s); if (!d) return s ? String(s) : ''; return fmtDate(d, { year: false }) + ' ' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); }
+/* "as of" for a card fed from a file other than the index (a race file, a forecast): the kit's en-GB date and 24-hour
+   time in the viewer's zone ("Thu 12 Nov 23:26"), '' when there is no time */
+function asOf(s) { var d = parseDate(s); return d ? QK.fmt.date(d.toISOString()) + ' ' + QK.fmt.time(d.toISOString()) : ''; }
 function countdown(iso, now) {
   var d = parseDate(iso);
   if (!d) return '';
@@ -483,7 +486,7 @@ function chartBox(id, h, label) { return '<div id="' + esc(id) + '" class="pd-ch
  * o: {text (a word or a name, not a number), signal (ours: the forecast or rating), pctl, tip, trend: [..], trendColor, href, unit, cls} */
 function kpi(label, value, sub, o) {
   o = o || {};
-  return QK.statTile({ label: label, value: value, sub: sub, html: true, cls: o.cls, tip: o.tip, text: o.text, signal: o.signal, pctl: o.pctl, trend: o.trend, trendColor: o.trendColor, trendLabel: o.trendLabel, href: o.href, unit: o.unit });
+  return QK.statTile({ label: label, value: value, sub: sub, html: true, cls: o.cls, tip: o.tip, text: o.text, signal: o.signal, pctl: o.pctl, trend: o.trend, trendColor: o.trendColor, trendLabel: o.trendLabel, href: o.href, unit: o.unit, range: o.range });
 }
 function kpis(list, cls) { return '<div class="qk-stats pd-kpis' + (cls ? ' ' + cls : '') + '">' + list.join('') + '</div>'; }
 function chip(text, kind) { return '<span class="qk-badge' + (kind ? ' ' + kind : '') + '">' + esc(text) + '</span>'; }
@@ -648,8 +651,11 @@ function bootShell() {
   var sel = document.getElementById('pd-season');
   if (sel) { sel.value = String(state.year || currentSeason()); sel.addEventListener('change', function () { setYear(sel.value); }); }
   var foot = document.getElementById('qk-footer');
+  /* the build time goes through the kit's data-freshness line (QK.stamp: the section bar on wide screens, the footer
+     at every width), so the footnote no longer repeats it */
   if (foot) foot.insertAdjacentHTML('beforeend', '<div class="pd-footnote">Data from Jolpica-F1 and OpenF1 · Monte Carlo race and championship model · ' +
-    (idx.updated_at ? 'updated ' + esc(fmtStamp(idx.updated_at)) + ' · ' : '') + '<a href="#/disclaimer">Disclaimer and terms</a> · <a href="#/methodology">Methodology</a></div>');
+    '<a href="#/disclaimer">Disclaimer and terms</a> · <a href="#/methodology">Methodology</a></div>');
+  try { if (QK.stamp && idx.updated_at) QK.stamp(idx.updated_at, { what: 'The site rebuilds every hour: results, our race forecasts and the championship simulation.' }); } catch (e) { /* the page stands without it */ }
   // first-visit notice
   var fv = document.getElementById('first-visit-notice');
   var seen = false;
@@ -676,7 +682,7 @@ return {
   ROUTES: ROUTES, ROUTE_MAP: ROUTE_MAP, onLeave: onLeave, interval: interval, setHashQuiet: setHashQuiet, init: init, qs: qs,
   load: load, loadAll: loadAll, ok: ok, reason: reason, index: index, currentSeason: currentSeason, setYear: setYear, NAMES: NAMES,
   esc: esc, num: num, int: int, pts: pts, pct: pct, chance: chance, titlePct: titlePct, signed: signed, fmtMs: fmtMs, fmtGap: fmtGap, fmtDate: fmtDate, fmtTime: fmtTime,
-  fmtStamp: fmtStamp, countdown: countdown, ordinal: ordinal, fmtVal: fmtVal, parseDate: parseDate, isNum: isNum, titleCase: titleCase,
+  fmtStamp: fmtStamp, asOf: asOf, countdown: countdown, ordinal: ordinal, fmtVal: fmtVal, parseDate: parseDate, isNum: isNum, titleCase: titleCase,
   shortRace: shortRace, median: median, mean: mean, rowsOf: rowsOf, ageOf: ageOf, finished: finished,
   driverName: driverName, driverCode: driverCode, driverSurname: driverSurname, teamName: teamName, circuitName: circuitName, teamAbbr: teamAbbr,
   teamColour: teamColour, teamColourRaw: teamColourRaw, teamAlt: teamAlt, tc: tc, driverTeam: driverTeam, driverColour: driverColour, compoundColour: compoundColour, COMPOUNDS: COMPOUNDS, PALETTE: PALETTE,

@@ -13,8 +13,17 @@ function featured(f) {
     headline: b.name ? 'Best lifter on DOTS: ' + b.name + ', ' + IR.kg(b.total) + ' (' + IR.dots(b.dots) + ' DOTS).' : '',
     stats: [{ label: 'Full-power lifters', value: String(f.n) }, { label: 'Lifetime PRs', value: String(f.prs || 0) }, { label: 'Attempts made', value: IR.pctv(f.made) },
       { label: 'Our favourite', value: f.fav && f.fav.name ? QK.surname(f.fav.name) : '–', tip: f.fav ? 'The lifter we gave the best chance of winning a flight: ' + IR.pct(f.fav.p_win) + ' before the meet.' : '' }],
+    text: favLine(f.fav),
     links: [{ text: 'The full results', href: IR.eventHref(f.id) }]
   });
+}
+/* what our favourite's number meant, in one line (the meet is over: the call, then what happened) */
+function favLine(v) {
+  if (!v || !v.name || !isNum(v.p_win)) return '';
+  var miss = Math.max(1, Math.round(10 * (1 - v.p_win)));
+  return 'Our favourite, ' + v.name + ', had ' + IR.pct(v.p_win) + ' to win the flight before the meet' +
+    (v.place === '1' ? ' and won' : v.place === 'DQ' ? ' and bombed out' : v.place ? ' and placed ' + v.place : '') + '.' +
+    (v.p_win >= 0.5 ? ' A call like that still misses about ' + miss + ' time' + (miss === 1 ? '' : 's') + ' in 10.' : ' Under 50%: the field was more likely to beat our favourite than not.');
 }
 
 function digestTiles(d) {
@@ -39,8 +48,8 @@ function latestGrid(list) {
     return '<a class="qk-card is-link ir-meetcard" href="' + IR.eventHref(m.id) + '"><div class="qk-card-body">' +
       '<div class="ir-mc-k">' + esc(m.fed) + ' · ' + esc(IR.date(m.date)) + ' · ' + esc(m.country) + '</div>' +
       '<div class="ir-mc-n">' + esc(m.name) + '</div>' +
-      '<div class="ir-mc-row"><span>Best on DOTS</span><b>' + esc(b.name || '–') + '</b><em>' + IR.dots(b.dots) + '</em></div>' +
-      (f.name ? '<div class="ir-mc-row"><span>Our favourite</span><b>' + esc(f.name) + '</b><em>' + IR.pct(f.p_win) + ' to win the flight · ' + (won ? 'won' : f.place === 'DQ' ? 'bombed out' : 'placed ' + esc(f.place || '–')) + '</em></div>' : '') +
+      '<div class="ir-mc-row"><span>Best on DOTS</span><b>' + esc(b.name || '–') + '</b><em>' + IR.dots(b.dots) + ' DOTS' + (isNum(b.total) ? ' · ' + IR.kg(b.total) : '') + (isNum(b.pre) && isNum(b.dots) ? ' · ' + IR.signed(b.dots - b.pre) + ' v our forecast' : '') + '</em></div>' +
+      (f.name ? '<div class="ir-mc-row"><span>Our favourite</span><b>' + esc(f.name) + '</b><em>our chance to win the flight ' + IR.pct(f.p_win) + ' · ' + (won ? 'won' : f.place === 'DQ' ? 'bombed out' : 'placed ' + esc(f.place || '–')) + '</em></div>' : '') +
       '<div class="ir-mc-foot">' + m.n + ' full-power lifters · ' + (m.prs || 0) + ' PRs · ' + IR.pctv(m.made) + ' of attempts made</div></div></a>';
   }).join('') + '</div>';
 }
@@ -114,6 +123,7 @@ function followBoard(rk) {
 IR.page('overview', function (el) {
   return Promise.all([IR.load('index.json'), IR.load('rankings.json')]).then(function (res) {
     var d = res[0], rk = res[1];
+    IR.stamp(d.updated_at);
     var c = d.counts || {};
     var html = QK.greeting({ date: 'Data to ' + IR.date(d.data_to) + ' · OpenPowerlifting archive',
       title: 'Powerlifting, ' + QK.mark('by the numbers') + '.',

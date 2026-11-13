@@ -18,6 +18,10 @@
 .qk-ph-meta .fb-cl-crest .qk-team-mark { width: 28px; height: 28px; background: #fff; }
 .qk-ph + .qk-strip + .qk-ph-short + .fb-cl-bar, .qk-ph + .qk-strip + .fb-cl-bar { margin-top: var(--sp-6); }
 .fb-cl-gcs { display: grid; gap: var(--sp-3); }
+/* the overview's left column: the season list over our season chances, beside the next-and-last cards */
+.fb-cl-stack { display: grid; gap: var(--sp-4); align-content: start; min-width: 0; }
+.fb-cl-fpts { margin-top: var(--sp-4); }
+.fb-cl-fpts .qk-range-cap { color: var(--ink-2); }
 .fb-cl-gcs > .qk-kicker { margin: 2px 0 -4px; }
 .qk-ph-meta .fb-comp { color: inherit; }
 .fb-cl-bar { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--line-1); }

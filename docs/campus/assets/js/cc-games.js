@@ -127,6 +127,106 @@ function excitement(L, S, cards, season, fb) {
     }).join('') + '</ol>', { cls: 'cc-ex-card' });
 }
 
+/* ── shared with the team page (cc-teams.js) ─────────────────────────── */
+/* A team's result in one finished schedule row, from the scores: 'W', 'L', or for hockey 'T' (level, or a shootout,
+   which the record keeps as a tie). null when the row is not a scored, finished game of the team. */
+CC.resultOf = function (L, c, tid) {
+  if (!c || c.status !== 'post' || !isNum(c.hs) || !isNum(c.as)) return null;
+  var home = String(c.home) === String(tid);
+  if (!home && String(c.away) !== String(tid)) return null;
+  var my = home ? c.hs : c.as, op = home ? c.as : c.hs;
+  return CC.hk(L) && (my === op || c.so) ? 'T' : my > op ? 'W' : my < op ? 'L' : null;
+};
+/* Recent form for both sides of a game (QK.formPair): each team's last five results before this game's start, oldest
+   first, from the season's schedule.json; exhibitions left out. A side with no results (a team outside the level's
+   schedule) is left out by the kit. Hockey ties show as T squares, and the record under them reads W–L–T (hockey's
+   order, not the kit's W–D–L). */
+CC.formPair = function (L, g, sch) {
+  if (!sch || !(sch.games || []).length) return '';
+  var t0 = Date.parse(g.date);
+  var done = sch.games.filter(function (c) { return c && String(c.id) !== String(g.id) && c.status === 'post' && c.stype !== 'exh' && c.stype !== 'pre' && Date.parse(c.date) < t0; })
+    .sort(function (x, y) { return String(x.date).localeCompare(String(y.date)); });
+  var sides = [g.away, g.home].map(function (tid) {
+    return { name: CC.tshort(L, tid), abbr: CC.tabbr(L, tid), colour: CC.traw(L, tid) || undefined, form: done.map(function (c) { return CC.resultOf(L, c, tid); }).filter(Boolean).slice(-5) };
+  });
+  var fp = QK.formPair({ left: sides[0], right: sides[1], n: 5, title: CC.status(g) === 'pre' ? 'Form, last 5' : 'Form before this game, last 5' });
+  if (!fp) return '';
+  if (CC.hk(L)) {
+    var shown = sides.filter(function (s) { return s.form.length; }), k = 0;
+    fp = fp.replace(/<span class="qk-fpair-rec num">[^<]*<\/span>/g, function (m) {
+      var s = shown[k++];
+      if (!s) return m;
+      var c = function (x) { return s.form.filter(function (r) { return r === x; }).length; };
+      return '<span class="qk-fpair-rec num">' + c('W') + '–' + c('L') + (c('T') ? '–' + c('T') : '') + '</span>';
+    });
+  }
+  return '<section class="qk-card cc-card cc-form-card"><div class="qk-card-body">' + fp + '</div></section>';
+};
+/* Times in minutes from the start (PAYLOADS.md); payloads in seconds are converted. */
+function toMinutes(arr) {
+  if (!arr || !arr.length) return arr;
+  var mx = Math.max.apply(null, arr.map(function (x) { return x[0]; }));
+  return mx > 100 ? arr.map(function (x) { return [x[0] / 60, x[1]]; }) : arr;
+}
+/* Our win chance through a game (QKC.winProb) from a game file's wp: our model only (ESPN's own number is the game
+   centre's reference, not ours). false when there is no curve. */
+CC.wpChart = function (sel, L, g, o) {
+  o = o || {};
+  var m = g.wp ? toMinutes(g.wp.model) : null;
+  if (!m || m.length < 3) return false;
+  var home = CC.team(L, g.home) || {}, away = CC.team(L, g.away) || {};
+  var tMax = Math.max.apply(null, m.map(function (x) { return x[0]; }));
+  QKC.winProb(sel, { t: m.map(function (x) { return x[0]; }), p: m.map(function (x) { return x[1]; }), home: { name: home.short || home.name, abbr: home.abbr, colour: home.colour }, away: { name: away.short || away.name, abbr: away.abbr, colour: away.colour },
+    periods: breaks(L, g.season, tMax), tMin: 0, tMax: Math.max(tMax, CC.fb(L) ? 60 : 40), tFmt: function (v) { return Math.round(v) + '′'; }, tLabel: function (v) { return clockLabel(L, g.season, v); }, step: true,
+    tName: o.tName || 'Game time (minutes)', yName: o.yName || (CC.tabbr(L, g.home) + ' win chance (ours)') });
+  return true;
+};
+/* The last game's box for the team page: the line score by period where the payload has one (hockey: goals with
+   shots on goal in brackets, from College Hockey News); else the two teams' totals (football: yards, turnovers,
+   third downs and our EPA per play; basketball: shooting, rebounds, assists, turnovers). '' when there is nothing. */
+CC.lastBox = function (L, g, tid) {
+  var H = String(g.home), A = String(g.away), hk = CC.hk(L), fb = CC.fb(L);
+  var row = function (t, cells) { return '<tr' + (String(t) === String(tid) ? ' class="hl"' : '') + '><td>' + QK.teamMark(U.mark(L, t), 'sm') + '</td>' + cells.map(function (c) { return '<td class="num">' + c + '</td>'; }).join('') + '</tr>'; };
+  var table = function (heads, ra, rh) {
+    return '<div class="qk-table-wrap"><table class="qk-table dense"><thead><tr><th>Team</th>' + heads.map(function (h) { return '<th class="num"' + (h[1] ? ' data-tip="' + esc(h[1]) + '"' : '') + '>' + esc(h[0]) + '</th>'; }).join('') + '</tr></thead><tbody>' + row(A, ra) + row(H, rh) + '</tbody></table></div>';
+  };
+  var n = function (v) { return isNum(v) ? String(v) : '–'; };
+  var ln = g.line || {};
+  if ((ln.home || []).length && (ln.away || []).length) {
+    var np = Math.max(ln.home.length, ln.away.length), heads = [];
+    for (var i = 1; i <= np; i++) heads.push([perLabel(L, g.season, i)]);
+    heads.push(['Total']);
+    var cells = function (a, tot) { var out = []; for (var k = 0; k < np; k++) out.push(n(a[k])); out.push('<b>' + n(tot) + '</b>'); return out; };
+    return table(heads, cells(ln.away, g.as), cells(ln.home, g.hs));
+  }
+  var ts = g.team_stats || {}, bx = g.box || {};
+  if (hk) {
+    var th = ts[H] || {}, ta = ts[A] || {};
+    if (!(th.goals_per || th.sog_per)) return '';
+    var nq = Math.max((th.goals_per || []).length, (th.sog_per || []).length, (ta.goals_per || []).length, (ta.sog_per || []).length, 3), hh = [];
+    for (var j = 1; j <= nq; j++) hh.push([j <= 3 ? 'P' + j : (j === 4 ? 'OT' : (j - 3) + 'OT')]);
+    hh.push(['Total', 'Goals, with shots on goal in brackets']);
+    var per = function (d, sc) { var gp = d.goals_per || [], sp = d.sog_per || [], out = []; for (var k = 0; k < nq; k++) out.push(n(gp[k]) + (isNum(sp[k]) ? ' <span class="qk-muted">(' + sp[k] + ')</span>' : '')); out.push('<b>' + n(sc) + '</b>' + (isNum(d.sog) ? ' <span class="qk-muted">(' + d.sog + ')</span>' : '')); return out; };
+    return table(hh, per(ta, g.as), per(th, g.hs));
+  }
+  if (fb) {
+    var E = g.epa || {};
+    var fr = function (t) {
+      var d = ts[t] || {}, e = E[t] || {};
+      return [n(d.total_yards), n(d.pass_yards), n(d.rush_yards), n(d.turnovers), isNum(d.third_conv) && isNum(d.third_att) ? d.third_conv + '/' + d.third_att : '–', isNum(e.epa_play) ? CC.signed(e.epa_play, 2) : '–', isNum(e.sr) ? CC.pct(e.sr, 0) : '–'];
+    };
+    if (!ts[H] && !E[H]) return '';
+    return table([['Yards'], ['Pass'], ['Rush'], ['TO', 'Turnovers'], ['3rd', 'Third downs converted'], ['EPA/play', 'Expected points added per play (ours), garbage time included'], ['Success', 'Success rate: the share of plays that kept the offence on schedule']], fr(A), fr(H));
+  }
+  var tb = function (t) { return (bx[t] && bx[t].team) || ts[t] || null; };
+  if (!tb(H) || !tb(A)) return '';
+  var br = function (t, sc) {
+    var d = tb(t), reb = isNum(d.reb) ? d.reb : (isNum(d.oreb) && isNum(d.dreb) ? d.oreb + d.dreb : null);
+    return ['<b>' + n(sc) + '</b>', isNum(d.fga) ? d.fgm + '-' + d.fga : '–', isNum(d.tpa) ? d.tpm + '-' + d.tpa : '–', isNum(d.fta) ? d.ftm + '-' + d.fta : '–', n(reb), n(d.ast), n(d.tov)];
+  };
+  return table([['Pts'], ['FG', 'Field goals made-attempted'], ['3P', 'Threes made-attempted'], ['FT', 'Free throws made-attempted'], ['Reb'], ['Ast'], ['TO', 'Turnovers']], br(A, g.as), br(H, g.hs));
+};
+
 /* ── game centre ─────────────────────────────────────────────────────── */
 function clockLabel(L, season, t) {
   if (!isNum(t)) return '';
@@ -230,12 +330,25 @@ function tiles(L, g) {
     var hs = (m.total + m.margin) / 2, as = (m.total - m.margin) / 2;
     out.push({ label: 'Projected score', value: CC.f(as, 0) + '–' + CC.f(hs, 0), sub: CC.tabbr(L, g.away) + ' – ' + CC.tabbr(L, g.home) + ' · ' + CC.f(m.total, 1) + ' points expected' });
   }
-  if (isNum(m.sd)) out.push({ label: 'Margin uncertainty', value: '± ' + CC.f(m.sd, 1), unit: 'pts', sub: 'one standard deviation of the final margin', tip: 'How far the final margin typically lands from our projection' });
+  if (isNum(m.sd)) {
+    /* the model's own spread around the projected margin as the likely-range bar, in the favourite's points */
+    var fv = isNum(m.margin) && m.margin < 0 ? g.away : g.home, dg = fv === g.home ? g.away : g.home, M = isNum(m.margin) ? Math.abs(m.margin) : null;
+    var sideM = function (v) { return v < 0 ? CC.tabbr(L, dg) + ' by ' + CC.f(-v, 1) : v > 0 ? CC.tabbr(L, fv) + ' by ' + CC.f(v, 1) : 'level'; };
+    out.push({ label: 'Margin uncertainty', value: '± ' + CC.f(m.sd, 1), unit: 'pts', sub: 'one standard deviation of the final margin', tip: 'How far the final margin typically lands from our projection: about two games in three land inside the bar',
+      range: isNum(M) && m.sd > 0 ? { lo: M - m.sd, hi: M + m.sd, mid: M, fmt: sideM, label: 'Projected margin, one standard deviation', caption: sideM(M - m.sd) + ' to ' + sideM(M + m.sd) } : null });
+  }
   if (st === 'final' && (g.plays || []).length) {
     var top = g.plays.slice().sort(function (x, y) { return Math.abs(y.wpa || 0) - Math.abs(x.wpa || 0); })[0];
     if (top && isNum(top.wpa)) out.push({ label: 'Biggest swing', value: Math.round(Math.abs(top.wpa) * 100) + ' pts', sub: perLabel(L, g.season, top.period) + (top.team ? ' · ' + CC.tabbr(L, top.team) : '') + ' · the largest win-chance move in one play' });
   }
   if (st === 'final' && g.result && g.result.model_correct !== undefined && g.result.model_correct !== null) out.push({ label: 'Our pick', value: g.result.model_correct ? 'Right' : 'Wrong', text: true, sub: g.result.model_correct ? 'our favourite won' : 'our favourite lost' });
+  /* the tiles sit two a row: an odd count leaves an empty black block, so a real number from the payload fills it */
+  if (out.length % 2 === 1) {
+    var elo = pg.elo_p_home;
+    if (CC.hk(L) && isNum(m.xg_home) && st !== 'pre') out.push({ label: 'Our pre-game expected goals', value: CC.f(m.xg_away, 1) + '–' + CC.f(m.xg_home, 1), sub: CC.tabbr(L, g.away) + ' – ' + CC.tabbr(L, g.home) + ' · from the two ratings' });
+    else if (CC.hk(L) && isNum(m.total)) out.push({ label: 'Total goals', value: CC.f(m.total, 1), sub: 'expected, both teams · from the two ratings' });
+    else if (isNum(elo)) out.push({ label: 'Elo alone', value: CC.tabbr(L, elo >= 0.5 ? g.home : g.away) + ' ' + CC.pct(Math.max(elo, 1 - elo)), sub: 'a simpler rating, for comparison', tip: 'The win chance from our Elo ratings alone (results only), shown beside our forecast' });
+  }
   return out.length ? U.stats(out) : '';
 }
 
@@ -416,7 +529,7 @@ CC.route('game', function (el, p) {
     var fb = CC.fb(L), st = CC.status(g);
     var season = CC.ok(a[2]) ? a[2] : null;
     var back = '<div class="qk-kicker" style="margin-bottom:10px"><a href="' + esc(CC.href(L, 'games', null, g.season, fb && isNum(g.week) && g.stype === 'reg' ? 'w=w' + g.week : '')) + '">← ' + esc(CC.LSHORT[L]) + ' games</a></div>';
-    var html = back + '<div class="cc-gtop"><div class="qk-stack">' + hero(L, g, season) + heroMeta(L, g) + '</div><div class="qk-stack">' + tiles(L, g) + pregame(L, g) + '</div></div>';
+    var html = back + '<div class="cc-gtop"><div class="qk-stack">' + hero(L, g, season) + heroMeta(L, g) + '</div><div class="qk-stack">' + tiles(L, g) + pregame(L, g) + CC.formPair(L, g, sch) + '</div></div>';
     if (g.light) html += QK.note(st === 'pre' ? 'The full game page appears on game day.' : 'The recap: this game has no detailed page (game pages are kept for the current season and the last postseason), so the result and our pre-game numbers are above.');
     var tp = tape(L, g, season);
     /* before the game there is no win-chance path: the tale of the tape takes the row */

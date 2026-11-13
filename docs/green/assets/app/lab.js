@@ -2,7 +2,7 @@
  * Lab: what wins (each statistic against strokes gained), the strokes-gained category fit with its out-of-sample R2,
  * the age curve and peak age, tee-time waves, scoring by round, the tours side by side. Courses: every course with
  * editions on file, its difficulty, length and what it rewards. Records: lowest rounds against the field, biggest
- * winning margins, longest-odds winners, best seasons and the season-best progression. Reads lab.json,
+ * winning margins, the biggest upsets, best seasons and the season-best progression. Reads lab.json,
  * courses.json, records.json and courses/<id>.json (depth.py). */
 (function () {
 'use strict';
@@ -104,7 +104,7 @@ function recordsTab(el, R, s) {
       (d.low_rounds || []).map(function (r) { return [{ v: r.name, html: GR.playerLink(r.pid, r.name) }, { v: r.ev, html: GR.eventLink(r.event, r.y + ' ' + (r.ev || '')) + ' <span class="gr-muted">R' + r.round + '</span>' }, { v: r.strokes, html: String(r.strokes) }, { v: r.field, html: fmt.num(r.field, 1) }, { v: r.sg, html: '<b>' + GR.signed(r.sg, 1) + '</b>' }]; })), { flush: true }) +
     GR.card('Biggest winning margins', 'Strokes between the winner and second, from the round scores.', t([{ label: 'Winner', align: 'left' }, { label: 'Event', align: 'left' }, { label: 'Margin' }],
       (d.margins || []).map(function (r) { return [{ v: r.name, html: GR.playerLink(r.pid, r.name) }, { v: r.ev, html: GR.eventLink(r.event, r.y + ' ' + r.ev) }, { v: r.margin, html: '<b>' + r.margin + '</b>' }]; })), { flush: true }) + '</div>' +
-    '<div class="qk-g2 gr-gap">' + GR.card('Longest-odds winners', 'Winners we gave the smallest chance before the event.', t([{ label: 'Winner', align: 'left' }, { label: 'Event', align: 'left' }, { label: 'Our chance' }],
+    '<div class="qk-g2 gr-gap">' + GR.card('Biggest upsets', 'Winners we gave the smallest chance before the event.', t([{ label: 'Winner', align: 'left' }, { label: 'Event', align: 'left' }, { label: 'Our chance' }],
       (d.longshots || []).map(function (r) { return [{ v: r.name, html: GR.playerLink(r.pid, r.name) }, { v: r.ev, html: GR.eventLink(r.event, r.y + ' ' + (r.ev || '')) }, { v: r.p, html: '<b>' + GR.pct(r.p, 2) + '</b>' }]; })), { flush: true }) +
     GR.card('Best seasons', 'Strokes gained per round over a calendar year, 40+ rounds.', t([{ label: 'Player', align: 'left' }, { label: 'Year' }, { label: 'Rounds' }, { label: 'Wins' }, { label: 'SG/rd' }],
       (d.best_seasons || []).map(function (r) { return [{ v: r.name, html: GR.playerLink(r.pid, r.name) }, { v: r.y, html: String(r.y) }, { v: r.rounds, html: String(r.rounds) }, { v: r.wins || 0, html: String(r.wins || 0) }, { v: r.sg, html: '<b>' + GR.signed(r.sg, 2) + '</b>' }]; })), { flush: true }) + '</div>' +
@@ -133,28 +133,73 @@ GR.page('lab', function (el, params) {
   });
 });
 
+/* The course page, in the family's order: the hero (the tour colour, the course's initials, par, yardage and editions as
+   chips) with the black strip of its numbers, the short version, then the charts (scoring by hole, what it rewards),
+   then the tables (who plays it best, who has played it most, every edition, the holes). Difficulty is ranked against
+   every course of the same stream with 200+ rounds on file (courses.json, the Lab's courses list). */
 GR.page('course', function (el, params) {
-  return GR.load('courses/' + encodeURIComponent(params.id) + '.json').then(function (c) {
+  return Promise.all([GR.load('courses/' + encodeURIComponent(params.id) + '.json'), GR.maybe('courses.json')]).then(function (res) {
     if (!el.isConnected) return;
+    var c = res[0], all = res[1];
     var rw = c.rw || {};
     var lab = { dist: 'Driving distance', acc: 'Driving accuracy', gir: 'Greens in regulation', ppg: 'Putting', sand: 'Sand saves' };
     var keys = Object.keys(rw).filter(function (k) { return isNum(rw[k]); });
-    var html = GR.head(c.name, [c.par ? 'Par ' + c.par : '', c.yards ? fmt.num(c.yards) + ' yards' : '', GR.tourName(c.tour), c.events + ' editions on file, ' + String(c.first).slice(0, 4) + '–' + String(c.last).slice(0, 4)].filter(Boolean).join(' · '), 'Course') +
-      QK.stats([{ label: 'Difficulty', value: GR.signed(c.diff, 2), sub: 'strokes an average tour field takes against par, a round', signal: true },
-        { label: 'Scoring', value: GR.signed(c.to_par, 2), sub: 'the actual fields against par' }, { label: 'Rounds on file', value: fmt.num(c.rounds) },
-        { label: 'Editions', value: String(c.events) }]);
-    html += '<div class="qk-g2 gr-gap">' + GR.card('Who plays it best', 'Strokes a round better than their own rating here (eight rounds or more), shrunk toward zero with 32 rounds. History, not a forecast: course history did not improve our forecasts out of sample.',
-      GR.table([{ label: 'Player', align: 'left' }, { label: 'Rounds' }, { label: 'Editions' }, { label: 'SG/rd here' }, { label: 'Fit' }], (c.best || []).map(function (p) {
-        return [{ v: p.name, html: GR.playerLink(p.pid, p.name) }, { v: p.rounds, html: String(p.rounds) }, { v: p.events, html: String(p.events) }, { v: p.sg, html: GR.signed(p.sg, 2) }, { v: p.fit, html: '<b>' + GR.signed(p.fit, 2) + '</b>' }]; }), { maxHeight: 520 }), { flush: true }) +
-      GR.card('What it rewards', 'The correlation of beating one’s own rating here with each PGA Tour season statistic (2017 on); putting turned so positive means good putters gain.', keys.length ? GR.chart('co-rw', 260, 'What the course rewards') : QK.empty('Not enough striking data here', 'It needs PGA Tour rounds from 2017 on.')) + '</div>';
-    if ((c.holes || []).length) html += GR.card('The holes, every edition on file', 'Average strokes against par per hole, with the birdie and bogey rates.', GR.chart('co-h', 300, 'Scoring by hole') +
-      GR.table([{ label: 'Hole' }, { label: 'Par' }, { label: 'Rounds' }, { label: 'v par' }, { label: 'Birdie or better' }, { label: 'Bogey or worse' }], c.holes.map(function (h) {
-        return [{ v: h.h, html: String(h.h) }, { v: h.par, html: String(h.par) }, { v: h.n, html: fmt.num(h.n) }, { v: h.avg, html: '<b>' + GR.signed(h.avg, 3) + '</b>' }, { v: h.bird, html: GR.pct(h.bird, 1) }, { v: h.bog, html: GR.pct(h.bog, 1) }]; })), { flush: false });
-    html += '<div class="qk-g2 gr-gap">' + GR.card('Every edition', '', GR.table([{ label: 'Year' }, { label: 'Event', align: 'left' }, { label: 'Winner', align: 'left' }], (c.editions || []).map(function (e) {
-        return [{ v: e.y, html: String(e.y) }, { v: e.name, html: e.page ? GR.eventLink(e.id, e.name) : esc(e.name) }, { v: e.winner ? e.winner.name : '', html: e.winner ? GR.playerLink(e.winner.pid, e.winner.name) : '<span class="gr-muted">' + (e.status === 'final' ? 'no winner on file' : 'to come') + '</span>' }]; }), { maxHeight: 520 }), { flush: true }) +
-      GR.card('Played most here', 'Rounds on file at this course.', GR.table([{ label: 'Player', align: 'left' }, { label: 'Rounds' }, { label: 'SG/rd here' }, { label: 'Fit' }], (c.most || []).map(function (p) {
-        return [{ v: p.name, html: GR.playerLink(p.pid, p.name) }, { v: p.rounds, html: String(p.rounds) }, { v: p.sg, html: GR.signed(p.sg, 2) }, { v: p.fit, html: GR.signed(p.fit, 2) }]; })) +
-        ((c.similar || []).length ? '<div class="qk-card-body"><p class="gr-meta">Courses most like it (length, difficulty and what they reward): ' + c.similar.map(function (x) { return GR.courseLink(x.id, x.name); }).join(', ') + '</p></div>' : ''), { flush: true }) + '</div>';
+    var stream = c.stream || (c.tour === 'lpga' ? 'women' : 'men');
+    var hs = c.holes || [];
+    var y0 = String(c.first || '').slice(0, 4), y1 = String(c.last || '').slice(0, 4);
+    /* difficulty against the peers: same stream, 200+ rounds */
+    var peers = ((all && all.courses) || []).filter(function (x) { return (x.stream || 'men') === stream && x.rounds >= 200 && isNum(x.diff); });
+    var inPeers = peers.some(function (x) { return String(x.id) === String(c.id); });
+    var rankD = inPeers ? 1 + peers.filter(function (x) { return x.diff > c.diff; }).length : null;
+    var peerTxt = inPeers ? 'the ' + QK.ordinal(rankD) + ' hardest of ' + peers.length + (stream === 'women' ? ' LPGA' : ' men’s') + ' courses with 200+ rounds' : (c.rounds < 200 ? 'under the 200 rounds needed to rank it' : '');
+    var hard = hs.length ? hs.slice().sort(function (a, b) { return b.avg - a.avg; })[0] : null;
+    var easy = hs.length ? hs.slice().sort(function (a, b) { return a.avg - b.avg; })[0] : null;
+    var lastEd = (c.editions || []).filter(function (e) { return e.status === 'final'; })[0];
+    var strip = [
+      { label: 'Difficulty', value: GR.signed(c.diff, 2), signal: true, sub: 'strokes over par a round for an average tour field' + (peerTxt ? ': ' + peerTxt : ''),
+        tip: 'Our number: the field’s average score against par, adjusted for how strong the field was, so a course is not called easy because the best players went there' },
+      { label: 'Scoring', value: GR.signed(c.to_par, 2), sub: 'what the fields that played it actually averaged against par, a round' },
+      hard ? { label: 'Hardest hole: the ' + QK.ordinal(hard.h), value: GR.signed(hard.avg, 2), sub: 'par ' + hard.par + ' · ' + GR.pct(hard.bog, 0) + ' bogey or worse, ' + GR.pct(hard.bird, 0) + ' birdie or better' } : null,
+      easy ? { label: 'Easiest hole: the ' + QK.ordinal(easy.h), value: GR.signed(easy.avg, 2), sub: 'par ' + easy.par + ' · ' + GR.pct(easy.bird, 0) + ' birdie or better' } : null,
+      { label: 'Rounds on file', value: fmt.num(c.rounds), sub: 'from ' + c.events + (c.events === 1 ? ' edition' : ' editions') + (y0 ? ', ' + y0 + (y1 && y1 !== y0 ? '–' + y1 : '') : '') + ((c.editions || []).length > c.events ? ' (the others have no round scores tied to this course)' : '') }
+    ].filter(Boolean);
+    /* the short version: how hard, where the strokes go, what it rewards */
+    var sv = esc(c.name) + ' plays ' + GR.signed(c.diff, 2) + ' strokes a round against par for an average tour field' + (inPeers ? ', the ' + QK.ordinal(rankD) + ' hardest of ' + peers.length + ' courses on file' : '') + '.';
+    if (hard && easy) sv += ' The ' + QK.ordinal(hard.h) + ' is the hardest hole (' + GR.signed(hard.avg, 2) + ' against par), the ' + QK.ordinal(easy.h) + ' the easiest (' + GR.signed(easy.avg, 2) + ').';
+    if (keys.length) {
+      var rv = function (k) { return k === 'ppg' ? -rw[k] : rw[k]; };
+      var ks = keys.slice().sort(function (a, b) { return rv(b) - rv(a); });
+      var big = Math.max.apply(null, keys.map(function (k) { return Math.abs(rv(k)); }));
+      sv += ' Of the PGA Tour statistics, it rewards ' + lab[ks[0]].toLowerCase() + ' most (' + GR.signed(rv(ks[0]), 2) + ') and ' + lab[ks[ks.length - 1]].toLowerCase() + ' least (' + GR.signed(rv(ks[ks.length - 1]), 2) + ')' +
+        (big < 0.1 ? ', but every link is weak (under 0.10): no single skill decides it here.' : '.');
+    }
+    var sure = '<b>How sure are we?</b> ' + fmt.num(c.rounds) + ' rounds over ' + c.events + (c.events === 1 ? ' edition is a thin base: read the difficulty and the hole numbers lightly.' : ' editions: ' + (c.rounds >= 1000 ? 'a solid base for the difficulty and the hole averages.' : 'enough for the difficulty, but the hole averages still move with the weather of a single edition.')) +
+      ' Course fit needs eight rounds here and is shrunk toward zero with 32 rounds, and it is history, not a forecast: adding it did not improve our forecasts on the sealed test seasons.';
+    var nEd = Math.max(c.events || 0, (c.editions || []).length);
+    var chips = [c.par ? ['Par', String(c.par)] : null, c.yards ? fmt.num(c.yards) + ' yards' : null, nEd + (nEd === 1 ? ' edition' : ' editions') + ' on file',
+      lastEd ? 'Last: ' + (lastEd.page ? '<a href="#/event/' + encodeURIComponent(lastEd.id) + '">' + esc(lastEd.y + ' ' + lastEd.name) + '</a>' : esc(lastEd.y + ' ' + lastEd.name)) : null];
+    var html = '<nav class="gr-crumb"><a href="#/value?tab=courses">Courses</a> / ' + esc(c.name) + '</nav>' +
+      QK.playerHeader({ name: c.name, face: GR.code(c.name), kicker: GR.tourName(c.tour) + ' · Course',
+        team: { name: GR.tourName(c.tour), abbr: GR.tourShort(c.tour), colour: GR.TOUR_COL[c.tour], href: '#/fixtures/' + c.tour }, meta: chips, strip: strip, short: { title: 'The short version', html: sv } });
+    /* the charts: scoring by hole beside what the course rewards */
+    var simLine = (c.similar || []).length ? GR.note('Courses most like it (length, difficulty and what they reward): ' + c.similar.map(function (x) { return GR.courseLink(x.id, x.name); }).join(', ') + '.') : '';
+    var rewards = GR.card('What it rewards', 'The correlation of beating one’s own rating here with each PGA Tour season statistic (2017 on); putting turned so positive means good putters gain.',
+      (keys.length ? GR.chart('co-rw', 260, 'What the course rewards') : QK.empty('Not enough striking data here', 'It needs PGA Tour rounds from 2017 on.')) + simLine, { html: true });
+    html += GR.sec('Hole by hole', 'Where the strokes go', 'Average strokes against par on each hole over every edition on file, and the season statistics that pay off here.',
+      hs.length ? '<div class="qk-g2">' + GR.card('Scoring by hole', 'Strokes against par per hole, every round on file. Above the line plays over par.', GR.chart('co-h', 260, 'Scoring by hole')) + rewards + '</div>' : rewards);
+    /* the tables: who plays it best (kept) beside who has played it most and every edition */
+    var best = GR.card('Who plays it best', 'Strokes a round better than their own rating here (eight rounds or more), shrunk toward zero with 32 rounds.',
+      GR.table([{ label: 'Player', align: 'left' }, { label: 'Rounds' }, { label: 'Editions' }, { label: 'SG/rd here', title: 'Strokes gained a round against the field here' }, { label: 'Fit', title: 'Strokes a round better than the rating they brought, shrunk with 32 rounds' }], (c.best || []).map(function (p) {
+        return [{ v: p.name, html: GR.playerLink(p.pid, p.name) }, { v: p.rounds, html: String(p.rounds) }, { v: p.events, html: String(p.events) }, { v: p.sg, html: GR.signed(p.sg, 2) }, { v: p.fit, html: '<b>' + GR.signed(p.fit, 2) + '</b>' }]; }), { maxHeight: 640 }), { flush: true });
+    var most = GR.card('Played most here', 'Rounds on file at this course.', GR.table([{ label: 'Player', align: 'left' }, { label: 'Rounds' }, { label: 'SG/rd here' }, { label: 'Fit' }], (c.most || []).map(function (p) {
+        return [{ v: p.name, html: GR.playerLink(p.pid, p.name) }, { v: p.rounds, html: String(p.rounds) }, { v: p.sg, html: GR.signed(p.sg, 2) }, { v: p.fit, html: GR.signed(p.fit, 2) }]; })), { flush: true });
+    var eds = GR.card('Every edition', 'Each event on file at this course and its winner' + ((c.editions || []).length > c.events ? '; ' + c.events + ' of them have round scores tied to this course, and only those count in the numbers above.' : '.'), GR.table([{ label: 'Year' }, { label: 'Event', align: 'left' }, { label: 'Winner', align: 'left' }], (c.editions || []).map(function (e) {
+        return [{ v: e.y, html: String(e.y) }, { v: e.name, html: e.page ? GR.eventLink(e.id, e.name) : esc(e.name) }, { v: e.winner ? e.winner.name : '', html: e.winner ? GR.playerLink(e.winner.pid, e.winner.name) : '<span class="gr-muted">' + (e.status === 'final' ? 'no winner on file' : 'to come') + '</span>' }]; }), { maxHeight: 420 }), { flush: true });
+    html += GR.sec('Course history', 'Who plays it best', 'The players who beat their own rating here by most, the ones with the most rounds here, and every edition on file.',
+      '<div class="qk-g2">' + best + '<div class="gr-stack">' + most + eds + '</div></div>' + QK.explain(sure));
+    if (hs.length) html += '<section class="qk-section gr-sec">' + GR.card('The holes, every edition on file', 'Average strokes against par per hole, with the birdie and bogey rates.',
+      GR.table([{ label: 'Hole' }, { label: 'Par' }, { label: 'Rounds' }, { label: 'v par' }, { label: 'Birdie or better' }, { label: 'Bogey or worse' }], hs.map(function (h) {
+        return { _class: hard && h.h === hard.h ? 'hl' : '', cells: [{ v: h.h, html: String(h.h) }, { v: h.par, html: String(h.par) }, { v: h.n, html: fmt.num(h.n) }, { v: h.avg, html: '<b>' + GR.signed(h.avg, 3) + '</b>' }, { v: h.bird, html: GR.pct(h.bird, 1) }, { v: h.bog, html: GR.pct(h.bog, 1) }] }; })), { flush: true }) + '</section>';
     el.innerHTML = html;
     QK.sortable(el);
     document.title = c.name + ' · The Quant Green';
@@ -164,7 +209,6 @@ GR.page('course', function (el, params) {
         fmt: function (v) { return GR.signed(v, 2); }, valName: 'Correlation with beating one’s rating here', catName: 'Statistic' });
     });
     GR.safe(function () {
-      var hs = c.holes || [];
       if (!hs.length) return;
       QKC.bar(el.querySelector('#co-h'), { cats: hs.map(function (h) { return String(h.h); }), series: [{ name: 'Against par', data: hs.map(function (h) { return h.avg; }) }], diverging: true,
         fmt: function (v) { return GR.signed(v, 2); }, catName: 'Hole', valName: 'Strokes against par' });

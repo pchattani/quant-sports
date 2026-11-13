@@ -109,7 +109,9 @@ def match_page(S, w, rep, m, ana) -> dict:
                            "rating": [r1(fc.get("r_h"), 2), r1(fc.get("r_a"), 2)], "edge": r1(fc.get("edge")),
                            "travel_km": [round(ctx.get("km_h", 0)), round(ctx.get("km_a", 0))],
                            "zones": [r1(ctx.get("tz_h"), 1), r1(ctx.get("tz_a"), 1)],
-                           "rest": [ctx.get("rest_h"), ctx.get("rest_a")], "alt": ctx.get("alt") or 0}
+                           "rest": [ctx.get("rest_h"), ctx.get("rest_a")], "alt": ctx.get("alt") or 0,
+                           # the margin's spread (the model's normal sd behind p): the match page's likely-range bar
+                           "sd": r1(fc.get("sd"))}
     # World Rugby exchange (replica): the points each side took
     ex = rep["exchange"].get(m["id"])
     if ex:

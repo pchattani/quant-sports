@@ -341,11 +341,62 @@ function yearRows(C, q) {
   return Object.keys(yb).map(function (k) { return yb[k]; }).sort(function (a, b) { return FB.eraKey(b.era) - FB.eraKey(a.era); });
 }
 
+/* The club's home league this season (the strip's chances and the "Season chances" card): the competition's own
+   probs, table, strength and meta (the files its pages read), only while the club plays in it this season. */
+var LG_FILES = ['probs', 'table', 'strength', 'meta'];
+function leagueCtx(C, d) {
+  var doc = C.doc, slug = doc.home, c = slug ? FB.comp(slug) : null;
+  if (!c || !c.ok || !d || doc.national || !C.live.some(function (s) { return s.comp === slug; })) return null;
+  var name = (doc.names || {})[slug] || doc.name;
+  var prob = ((d.probs || {}).teams || []).filter(function (t) { return t.team === name; })[0] || null;
+  var t = d.table || {}, rows = (t.standings || t.overall || []).slice();
+  if (!rows.length && t.conferences) Object.keys(t.conferences).forEach(function (g) { rows = rows.concat(t.conferences[g] || []); });
+  var sRows = ((d.strength || {}).rows || []);
+  var L = { slug: slug, c: c, name: name, prob: prob, bands: (d.probs || {}).bands || [], row: rows.filter(function (r) { return r.team === name; })[0] || null,
+    str: sRows.filter(function (r) { return r.team === name; })[0] || null, sRows: sRows, meta: d.meta || {}, mpt: t.matches_per_team,
+    asof: (d.probs || {}).updated_at || (d.meta || {}).updated_at || null };
+  return L.prob || L.row || L.str ? L : null;
+}
+/* A percentile from a rank (1 = best) among n; and from a value among peers' values (ties count half). */
+function rankPct(rank, n) { return isNum(rank) && isNum(n) && n > 1 ? Math.max(0, Math.min(100, 100 * (n - rank) / (n - 1))) : null; }
+function pctAmong(v, list, low) {
+  var xs = list.filter(isNum);
+  if (!isNum(v) || xs.length < 3) return null;
+  var below = 0, eq = 0;
+  xs.forEach(function (x) { if (low ? x > v : x < v) below++; else if (x === v) eq++; });
+  return Math.max(0, Math.min(100, 100 * (below + 0.5 * Math.max(0, eq - 1)) / (xs.length - 1)));
+}
+/* our chance as text: a tenth of a point near the ends, never "100%" for a title still to be won */
+function chanceTxt(p) {
+  if (!isNum(p)) return '—';
+  if (p >= 0.9995 && p < 1) return '>99.9%';
+  if (p > 0 && p < 0.0005) return '<0.1%';
+  return pct(p, (p > 0 && p < 0.1) || (p > 0.9 && p < 1) ? 1 : 0);
+}
+var PHRASE = { Title: 'the title', Champion: 'the championship', Relegation: 'the drop', Drop: 'the drop', Playoffs: 'the playoffs', Shield: 'the Supporters’ Shield',
+  Liguilla: 'the Liguilla', 'Top 8': 'the top eight', 'MLS Cup': 'the MLS Cup', 'Win it': 'the trophy', 'Reach the final': 'the final' };
+function chancePhrase(l) { return PHRASE[l] || (/League$|Libertadores|Sudamericana/.test(l) ? 'a ' + l + ' place' : l); }
+/* every chance the league's simulation gives the club: the title (or the competition's headline), each band up
+   the table, the drop */
+function seasonChances(L) {
+  if (!L || !L.prob) return [];
+  var k = L.c.kind;
+  if (k !== 'league') return headline(L.c, L.prob, L.bands).filter(function (h) { return isNum(h[1]); });
+  var out = [['Title', L.prob.p_title]];
+  (L.bands || []).filter(function (b) { return b.kind === 'up'; }).forEach(function (b) { out.push([b.label, (L.prob.bands || {})[b.key]]); });
+  var downs = (L.bands || []).filter(function (b) { return b.kind === 'down'; });
+  if (downs.length) out.push([downs.length > 1 ? 'Drop' : downs[0].label, downs.reduce(function (s, b) { return s + ((L.prob.bands || {})[b.key] || 0); }, 0)]);
+  return out.filter(function (h) { return isNum(h[1]); });
+}
+
 FB.route('club', function (el, p) {
   var tid = String(p.tid || '');
   var q = FB.merge(p.query || {}, {});
   el.innerHTML = FB.loading('lines', 8);
-  return Promise.all([FB.load('clubs/' + tid + '.json'), FB.clubsIndex()]).then(function (arr) {
+  /* the home league's files load beside the club file (clubs_index.json says which league is home) */
+  var row0 = FB.clubRow(tid) || {};
+  var lg0 = row0.home && !row0.national && FB.comp(row0.home) && FB.comp(row0.home).ok ? row0.home : null;
+  return Promise.all([FB.load('clubs/' + tid + '.json'), FB.clubsIndex(), lg0 ? FB.compFiles(lg0, LG_FILES) : Promise.resolve(null)]).then(function (arr) {
     if (!FB.alive(el)) return;
     var doc = arr[0];
     if (!doc || doc.id === undefined) {
@@ -353,24 +404,41 @@ FB.route('club', function (el, p) {
       return;
     }
     var C = prep(doc);
-    if (q.c && !C.comps.some(function (c) { return c.slug === q.c; })) delete q.c;
-    if (q.e && C.eras.indexOf(q.e) < 0) delete q.e;
-    if (q.c && FB.comp(q.c)) FB.setCompPicker(q.c);
-    document.title = doc.name + ' · The Quant Footballer';
-    var tabs = ['overview', 'seasons', 'squad', 'matches'].concat(C.valueLeague ? ['transfers'] : []);
-    var tab = tabs.indexOf(q.tab) >= 0 ? q.tab : 'overview';
-    el.innerHTML = hero(C) + '<div class="fb-cl-bar">' + FB.subnav(tabs.map(function (t) {
-      return [FB.href.club(tid, FB.merge(q, { tab: t === 'overview' ? null : t })), { overview: 'Overview', seasons: 'Season by season', squad: doc.national ? 'Call-up' : 'Squad', matches: 'Matches', transfers: 'Moves & needs' }[t], t];
-    }), tab, 'Club views') + filterBar(C, q, tab) + '</div><div id="cl-body" class="fb-cl-body"></div>';
-    wireFilter(el, C);
-    var body = el.querySelector('#cl-body');
-    if (tab === 'seasons') return drawSeasons(body, C, q);
-    if (tab === 'squad') return drawSquad(body, C, q);
-    if (tab === 'matches') return drawMatches(body, C, q);
-    if (tab === 'transfers') return drawTransfers(body, C);
-    return drawOverview(body, C, q);
+    /* the rating's peer count: the club file's pool.n_rated, else (until the next build writes it) pool.json's model */
+    var pl = doc.pool || {};
+    var needN = isNum(pl.rank_rated) && !isNum(pl.n_rated);
+    var lgP = doc.home && doc.home !== lg0 && FB.comp(doc.home) ? FB.compFiles(doc.home, LG_FILES) : Promise.resolve(arr[2]);
+    /* a national team's rating: the international model's table (nations.json, the Nations page's file) */
+    return Promise.all([lgP, needN ? FB.load('pool.json') : Promise.resolve(null), doc.national ? FB.load('nations.json') : Promise.resolve(null)]).then(function (more) {
+      if (!FB.alive(el)) return;
+      C.lg = leagueCtx(C, more[0]);
+      C.nRated = isNum(pl.n_rated) ? pl.n_rated : (((more[1] || {}).model || {}).n_rated || null);
+      var nt = ((more[2] || {}).teams || []);
+      C.nation = nt.filter(function (t) { return t.team === doc.name; })[0] || null;
+      C.nNations = nt.length;
+      drawClub(el, C, q, tid);
+    });
   });
 });
+function drawClub(el, C, q, tid) {
+  var doc = C.doc;
+  if (q.c && !C.comps.some(function (c) { return c.slug === q.c; })) delete q.c;
+  if (q.e && C.eras.indexOf(q.e) < 0) delete q.e;
+  if (q.c && FB.comp(q.c)) FB.setCompPicker(q.c);
+  document.title = doc.name + ' · The Quant Footballer';
+  var tabs = ['overview', 'seasons', 'squad', 'matches'].concat(C.valueLeague ? ['transfers'] : []);
+  var tab = tabs.indexOf(q.tab) >= 0 ? q.tab : 'overview';
+  el.innerHTML = hero(C) + '<div class="fb-cl-bar">' + FB.subnav(tabs.map(function (t) {
+    return [FB.href.club(tid, FB.merge(q, { tab: t === 'overview' ? null : t })), { overview: 'Overview', seasons: 'Season by season', squad: doc.national ? 'Call-up' : 'Squad', matches: 'Matches', transfers: 'Moves & needs' }[t], t];
+  }), tab, 'Club views') + filterBar(C, q, tab) + '</div><div id="cl-body" class="fb-cl-body"></div>';
+  wireFilter(el, C);
+  var body = el.querySelector('#cl-body');
+  if (tab === 'seasons') return drawSeasons(body, C, q);
+  if (tab === 'squad') return drawSquad(body, C, q);
+  if (tab === 'matches') return drawMatches(body, C, q);
+  if (tab === 'transfers') return drawTransfers(body, C);
+  return drawOverview(body, C, q);
+}
 
 function hero(C) {
   var doc = C.doc;
@@ -393,17 +461,57 @@ function hero(C) {
   if (ages.length) meta.push('<span>Average age <b>' + num(ages.reduce(function (a, b) { return a + b; }, 0) / ages.length, 1) + '</b></span>');
   var live = Array.from(new Set(C.live.map(function (s) { return s.comp; })));
   var pool = doc.pool || {};
+  var L = C.lg;
   var tiles = [];
+  /* v4 strip, as the Rink's team page: our chances first (the home league's simulation), then how good the club is,
+     each number with its peer group and its percentile (rank among the rated clubs; the league's clubs for xG) */
+  var ch = seasonChances(L);
+  /* a settled season (every chance 0 or 1 once the league is complete) says nothing as a chance: the tile and the card
+     drop it */
+  if (L && L.meta.league_complete && ch.every(function (h) { return h[1] === 0 || h[1] === 1; })) ch = [];
+  var lgShort = L ? FB.compName(L.slug, true) : '';
+  var nSims = L && isNum(L.meta.n_sims) ? L.meta.n_sims : null;
+  if (ch.length) tiles.push(FB.kpi(ch[0][0] === 'Title' || ch[0][0] === 'Champion' ? 'Title chance' : ch[0][0] + ' chance', chanceTxt(ch[0][1]), { signal: true, text: false,
+    sub: esc(lgShort) + (nSims ? ' · from ' + FB.int(nSims) + ' simulated seasons' : ' · our chance'), tip: 'Our chance from the ' + FB.compName(L.slug) + ' season simulation: every remaining match played out with our match model' }));
+  var R = L && L.row;
+  var left = R && isNum(L.mpt) && isNum(R.played) ? L.mpt - R.played : null;
+  if (R && isNum(R.exp_pts) && isNum(R.p05) && isNum(R.p95) && R.p95 > R.p05 && !L.meta.league_complete) {
+    tiles.push(FB.kpi('Projected points', num(R.exp_pts, 0), { unit: 'pts', text: false,
+      sub: '9 seasons in 10: ' + num(R.p05, 0) + '–' + num(R.p95, 0) + (isNum(left) ? ' · ' + left + ' of ' + L.mpt + ' to play' : ''),
+      range: { lo: R.p05, hi: R.p95, mid: R.exp_pts, min: isNum(R.pts) ? R.pts : undefined, max: isNum(R.pts) && isNum(left) ? R.pts + 3 * left : undefined, label: 'Final points, 9 seasons in 10' },
+      tip: 'The mean of the simulated seasons; the bar runs from the points already won to the most still possible, the blue band is the middle 90%' }));
+  }
   /* a club with no finished match in the stores this season carries the prior, not a measured rating: no tile */
   var rated = C.matches.some(function (m) { return m.status === 'finished' && m.era === C.cur; });
-  if (isNum(pool.strength) && rated) tiles.push(FB.kpi('Our rating', num(pool.strength, 2), { signal: true, unit: 'PPG', sub: 'on one scale across every league', href: '#/clubs', tip: 'Expected points per game against the pool-average club at a neutral venue, from our pooled Dixon-Coles fit across every league' }));
-  if (curY && curY.played) tiles.push(FB.kpi(curY.era + ' record', curY.w + '-' + curY.d + '-' + curY.l, { text: false, sub: 'won, drawn, lost · ' + curY.played + ' played' }));
-  if (curY && curY.played) tiles.push(FB.kpi('Points a game', num(ppgOf(curY), 2), { sub: 'every competition, ' + esc(curY.era) }));
-  tiles.push(FB.kpi('Trophies on record', String(trophies), { sub: years.length + ' season' + (years.length === 1 ? '' : 's') + ' in the data' }));
+  var nR = C.nRated;
+  if (isNum(pool.strength) && rated) tiles.push(FB.kpi('Our rating', num(pool.strength, 2), { signal: !ch.length, unit: 'pts a game', text: false, pctl: rankPct(pool.rank_rated, nR),
+    sub: (isNum(pool.rank_rated) && nR ? FB.ordinal(pool.rank_rated) + ' of ' + FB.int(nR) + ' rated clubs · ' : '') + 'v the average club anywhere', href: '#/clubs',
+    tip: 'Expected points a game against the average club of every league at a neutral venue, from our pooled Dixon-Coles fit; the percentile is among the clubs with a rated match' }));
+  var NT = doc.national ? C.nation : null;
+  if (NT && isNum(NT.strength)) tiles.push(FB.kpi('Our rating', num(NT.strength, 2), { signal: true, unit: 'pts a game', text: false, pctl: rankPct(NT.rank, C.nNations),
+    sub: (isNum(NT.rank) ? FB.ordinal(NT.rank) + ' of ' + C.nNations + ' national teams · ' : '') + 'v the average national team' + (NT.played ? ' · ' + NT.played + ' matches' : ''), href: '#/clubs/nations',
+    tip: 'Expected points a game against the average national team at a neutral venue, from our international Dixon-Coles fit; the percentile is among the national teams it rates' }));
+  if (curY && curY.played) tiles.push(FB.kpi(curY.era + ' record', curY.w + '-' + curY.d + '-' + curY.l, { text: false, sub: 'won, drawn, lost · ' + curY.played + ' played · ' + num(ppgOf(curY), 2) + ' points a game' }));
+  if (NT && isNum(NT.elo)) tiles.push(FB.kpi('Elo', num(NT.elo, 0), { text: false, sub: 'results only, on its own scale' + (NT.confederation ? ' · ' + NT.confederation : ''), tip: 'Elo from the international results: a second rating, on its own scale' }));
+  var S0 = L && L.str;
+  var xgd = function (r) { return r && isNum(r.xg_for) && isNum(r.xg_against) && r.played ? (r.xg_for - r.xg_against) / r.played : null; };
+  if (S0 && isNum(xgd(S0))) {
+    var peers = L.sRows.map(xgd).filter(isNum), xr = 1 + peers.filter(function (v) { return v > xgd(S0); }).length;
+    tiles.push(FB.kpi('xG difference', signed(xgd(S0), 2), { unit: 'a match', text: false, pctl: pctAmong(xgd(S0), peers),
+      sub: esc(lgShort) + ' · ' + FB.ordinal(xr) + ' of ' + peers.length + ' · ' + S0.played + ' matches', tip: 'Expected goals for minus against, a league match: over a season it predicts the next results better than the goal difference. The percentile is among the league\'s clubs.' }));
+  }
+  /* the strip keeps five numbers; the trophy count moves to the chips when the chances fill it */
+  if (tiles.length < 5) tiles.push(FB.kpi('Trophies on record', String(trophies), { sub: years.length + ' season' + (years.length === 1 ? '' : 's') + ' in the data' }));
+  else meta.push('<span>Trophies on record <b>' + trophies + '</b></span>');
   /* "The short version" in plain English, the explain strip under the hero */
   var short = '';
   if (curY && curY.played) short = doc.name + ' have won ' + curY.w + ', drawn ' + curY.d + ' and lost ' + curY.l + ' of ' + curY.played + ' in ' + curY.era + (curY.comps > 1 ? ' across ' + curY.comps + ' competitions' : '') + ', ' + num(ppgOf(curY), 2) + ' points a game.';
-  if (isNum(pool.strength) && rated) short += (short ? ' ' : '') + 'Our rating puts them at ' + num(pool.strength, 2) + ' points a game against an average side anywhere' + (isNum(pool.rank) ? ', ' + FB.ordinal(pool.rank) + ' of every ' + (doc.national ? 'national team' : 'club') + ' on one scale' : '') + '.';
+  /* the same rank as the strip's: among the clubs with a rated match (pool.rank also counts the cup entrants that only
+     carry the prior) */
+  if (isNum(pool.strength) && rated) short += (short ? ' ' : '') + 'Our rating puts them at ' + num(pool.strength, 2) + ' points a game against an average side anywhere' +
+    (isNum(pool.rank_rated) && nR ? ', ' + FB.ordinal(pool.rank_rated) + ' of the ' + FB.int(nR) + ' rated ' + (doc.national ? 'national teams' : 'clubs') + ' on one scale' : isNum(pool.rank) ? ', ' + FB.ordinal(pool.rank) + ' of every ' + (doc.national ? 'national team' : 'club') + ' on one scale' : '') + '.';
+  if (NT && isNum(NT.strength)) short += ' Our international rating puts them at ' + num(NT.strength, 2) + ' points a game against the average national team, ' + FB.ordinal(NT.rank) + ' of ' + C.nNations + '.';
+  if (ch.length) short += ' We give them ' + ch.slice(0, 2).map(function (h) { return chanceTxt(h[1]) + ' for ' + chancePhrase(h[0]); }).join(' and ') + ' in ' + FB.compName(L.slug) + '.';
   if (curY && curY.played && curY.played < 8) short += ' Early days: ' + curY.played + ' matches is a small sample.';
   /* v4 (Broadcast): the club as the full-bleed team-colour hero (QK.playerHeader: the club's kit colour and its
      alternate from clubs_index.json, else cobalt; the club's short code outlined where a player's number goes, the name
@@ -492,13 +600,17 @@ function drawOverview(body, C, q) {
     '<section class="fb-sec">' + FB.card('Year by year', (q.c ? 'In ' + esc(FB.compName(q.c)) + ' only. ' : 'Every competition summed per season, ') + 'oldest to newest: results by colour, points per game on the line. ' +
       (C.frame === 'calendar' ? 'Seasons are calendar years.' : 'Seasons run July to June; summer tournaments close the season they end.'),
       FB.chartBox('cl-yy', 300, 'Results by season') + '<div id="cl-yyt" class="fb-mt"></div>') + '</section>' +
+    /* the season list and our chances stack on the left, so the column matches the next-and-last cards beside it */
     '<section class="fb-sec">' + FB.grid(
-      FB.card('This season, competition by competition', esc(C.cur) + ' · finish, record and our rating.', '<div id="cl-now"></div>', { span: 7, flush: true, foot: '<span></span><a href="' + esc(FB.href.club(C.tid, { tab: 'seasons' })) + '">Every season →</a>' }) +
-      FB.card('Next and last', 'Kick-off in your time zone; before a match, our chance for each side and the draw.', '<div id="cl-nl" class="fb-cl-gcs"></div>', { span: 5, foot: '<span></span><a href="' + esc(FB.href.club(C.tid, FB.merge(q, { tab: 'matches' }))) + '">All matches →</a>' })
+      '<div class="qk-span-7 fb-cl-stack">' +
+        FB.card('This season, competition by competition', esc(C.cur) + ' · finish, record and our rating in each (points a game against an average side there).', '<div id="cl-now"></div>', { flush: true, foot: '<span></span><a href="' + esc(FB.href.club(C.tid, { tab: 'seasons' })) + '">Every season →</a>' }) +
+        (q.c && q.c !== doc.home ? '' : chancesCard(C)) +
+      '</div>' +
+      FB.card('Next and last', 'Kick-off in your time zone; before a match, our chance for each side and the draw, with a line on why.', '<div id="cl-nl" class="fb-cl-gcs"></div>', { span: 5, foot: '<span></span><a href="' + esc(FB.href.club(C.tid, FB.merge(q, { tab: 'matches' }))) + '">All matches →</a>' })
     ) + '</section>' +
     '<section class="fb-sec">' + FB.grid(
-      FB.card('Rating through the season', 'Elo after each match' + (doc.home ? ' in ' + esc(FB.compName(doc.home)) : '') + '.', FB.chartBox('cl-elo', 260, 'Elo through the season'), { span: 6, id: 'cl-elo-card' }) +
-      FB.card('Rating by competition', 'This season\'s rating in each competition: expected points a game against an average side there.', FB.chartBox('cl-str', 220, 'Strength by competition'), { span: 6, id: 'cl-str-card' })
+      FB.card('Elo through the season', 'Elo after each match' + (doc.home ? ' in ' + esc(FB.compName(doc.home)) : '') + ': a results-only rating on its own scale (the dashed line is the league average now). It is not the rating in the strip, which is points a game against the average club anywhere.', FB.chartBox('cl-elo', 260, 'Elo through the season'), { span: 6, id: 'cl-elo-card' }) +
+      FB.card('Our rating by competition', 'This season\'s rating in each competition, in points a game like the strip\'s, but against an average side in that competition rather than anywhere.', FB.chartBox('cl-str', 220, 'Strength by competition'), { span: 6, id: 'cl-str-card' })
     ) + '</section>' +
     (C.valueLeague ? '<section class="fb-sec" id="cl-needs-mini"></section>' : '') +
     '<section class="fb-sec" id="cl-most"></section>';
@@ -509,17 +621,61 @@ function drawOverview(body, C, q) {
   var nl = C.matches.filter(function (m) { return !q.c || m.comp === q.c; });
   var next = nl.filter(function (m) { return (m.status === 'scheduled' || m.status === 'live') && !FB.staleLive(m); }).sort(function (a, b) { return String(a.date).localeCompare(String(b.date)); }).slice(0, 2);
   var last = nl.filter(function (m) { return m.status === 'finished'; }).slice(0, 2);
-  var gc = function (m) { return FB.matchCard(asFixture(C, m), m.comp, { league: FB.compName(m.comp, true) }); };
+  var gc = function (m) { return FB.matchCard(asFixture(C, m), m.comp, { league: FB.compName(m.comp, true), why: true }); };
   body.querySelector('#cl-nl').innerHTML = (next.length || last.length) ?
     (next.length ? '<div class="qk-kicker fb-cl-k">Next</div>' + next.map(gc).join('') : '') +
     (last.length ? '<div class="qk-kicker fb-cl-k">Last</div>' + last.map(gc).join('') : '')
     : FB.empty('No matches', 'Nothing in the stores for this filter.');
   drawRatings(body, C);
+  drawFinish(body.querySelector('#cl-fin'), C);
   if (C.valueLeague) FB.load('value/club/' + C.tid + '.json').then(function (d) { if (FB.alive(body)) drawNeedsMini(body.querySelector('#cl-needs-mini'), C, d); });
   drawMost(body.querySelector('#cl-most'), C);
   drawPerformers(body.querySelector('#cl-perf'), C);
   clubAbsences(body.querySelector('#cl-abs'), C);
   if (cdossier) drawDossier(body.querySelector('#cl-dossier'), C, q.c);
+}
+
+/* "Season chances": every outcome of the home league's simulation for the club (the title, each band up the table,
+   the drop) as our chance bars, the final-points range, where it finishes, and how sure we are (the sample, what the
+   headline chance means). The competition's own probs, table and meta; nothing when the club is not in it this season. */
+function chancesCard(C) {
+  var L = C.lg, ch = seasonChances(L);
+  var R = (L && L.row) || {};
+  if (L && L.meta.league_complete && ch.every(function (h) { return h[1] === 0 || h[1] === 1; })) return '';
+  if (!ch.length && !isNum(R.exp_pts)) return '';
+  var left = isNum(L.mpt) && isNum(R.played) ? L.mpt - R.played : null;
+  var nSims = isNum(L.meta.n_sims) ? L.meta.n_sims : null;
+  var body = ch.length ? QK.chances(ch.map(function (h) { return { label: h[0], p: h[1], text: chanceTxt(h[1]) }; }), { sort: false, key: false, max: 1, teamColours: false }) : '';
+  if (isNum(R.p05) && isNum(R.p95) && R.p95 > R.p05 && !L.meta.league_complete) {
+    var most = isNum(R.pts) && isNum(left) ? R.pts + 3 * left : null;
+    body += '<div class="fb-cl-fpts"><div class="qk-kicker">Final points</div>' + QK.rangeBar({ lo: R.p05, hi: R.p95, mid: R.exp_pts, min: isNum(R.pts) ? R.pts : undefined, max: isNum(most) ? most : undefined,
+      label: 'Final points, 9 seasons in 10', caption: (isNum(R.pts) ? R.pts + ' now · ' : '') + 'about ' + num(R.exp_pts, 0) + ' expected · 9 seasons in 10 between ' + num(R.p05, 0) + ' and ' + num(R.p95, 0) + (isNum(most) ? ' · ' + most + ' at most' : '') }) + '</div>';
+  }
+  if ((R.p_pos || []).length > 1 && !L.meta.league_complete) body += '<div class="qk-kicker fb-mt">Where they finish</div>' + FB.chartBox('cl-fin', 190, 'Our chance of each final position');
+  var why = '';
+  var p0 = ch.length ? ch[0][1] : null;
+  if (isNum(p0) && p0 > 0 && p0 < 1) {
+    var q0 = p0 >= 0.5 ? 1 - p0 : p0;
+    why = chanceTxt(p0) + ' for ' + chancePhrase(ch[0][0]) + ' means they ' + (p0 >= 0.5 ? 'miss out' : 'make it') + (q0 < 0.01 ? ' in fewer than 1 simulated season in 100' : ' in about 1 simulated season in ' + Math.max(2, Math.round(1 / q0))) + '. ';
+  }
+  if (isNum(R.played) && isNum(L.mpt)) why += 'The simulation starts from ' + R.played + ' of ' + L.mpt + ' league matches played' + (R.played < 10 ? ', an early sample: the chances lean more on our ratings than on the table.' : '.');
+  if (why) body += QK.explain('<b>How sure are we?</b> ' + why);
+  return FB.card('Season chances in ' + esc(FB.compName(L.slug)), 'Our chances' + (nSims ? ' from ' + FB.int(nSims) + ' simulated seasons' : '') + ', every remaining league match played out with our match model' + (L.asof ? '. As of ' + esc(FB.fmtStamp(L.asof)) : '') + '.', body,
+    { foot: '<span></span><a href="' + esc(FB.href.comp(L.slug, 'table')) + '">The table and every club’s chances →</a>' });
+}
+function drawFinish(box, C) {
+  var R = (C.lg && C.lg.row) || {};
+  var pp = R.p_pos || [];
+  if (!box || pp.length < 2) return;
+  var lo = 0, hi = pp.length - 1;
+  while (lo < hi && !(pp[lo] >= 0.001)) lo++;
+  while (hi > lo && !(pp[hi] >= 0.001)) hi--;
+  var cats = [], data = [];
+  for (var i = lo; i <= hi; i++) { cats.push(FB.ordinal(i + 1)); data.push(Math.round((pp[i] || 0) * 1000) / 10); }
+  /* headroom over the tallest bar so its label clears the axis title */
+  var top = Math.min(100, Math.ceil((Math.max.apply(null, data) + 18) / 10) * 10);
+  QKC.bar(box, { cats: cats, series: [{ name: 'Our chance', color: 'model', data: data }], labels: cats.length <= 10, min: 0, max: top, fmt: function (v) { return v >= 0.5 ? Math.round(v) + '%' : v > 0 ? '<1%' : ''; },
+    valName: 'Our chance (%)', catName: 'Final position', label: 'Our chance of each final position' });
 }
 
 function drawYears(body, C, q) {

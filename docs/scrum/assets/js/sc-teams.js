@@ -31,11 +31,12 @@ SC.route('teams', function (page, P) {
     var prows = rows.filter(function (r) { return Object.keys(r.m || {}).length; });   /* sides with a team-stats profile */
     var q = P.query || {};
     var preset = PRESETS.filter(function (p) { return p.key === q.map; })[0] || PRESETS[0];
-    var html = U.sec('Power board', 'Every ranked side', 'Our rating split into attack and defence, the last ten results. The ranks are the ones on the Rankings page; sides with a provisional rating are listed there, unranked.', QK.powerBars ? QK.powerBars(null, { groups: [{ label: '', rows: rows.map(function (r, i) {
+    var pp = SC.powerParts(rows);
+    var html = U.sec('Power board', 'Every ranked side', 'Our rating' + (pp.parts.length > 1 ? ' split into attack and defence' : ' (points a test against an average test side)') + ', the last ten results. The ranks are the ones on the Rankings page; sides with a provisional rating are listed there, unranked.', QK.powerBars ? QK.powerBars(null, { groups: [{ label: '', rows: rows.map(function (r, i) {
       var t = SC.team(S, r.id) || {};
-      return { rank: isNum(r.rank) ? r.rank : i + 1, name: t.name, abbr: t.abbr, colour: t.colour, href: SC.teamHref(S, r.id), value: r.rating, text: SC.signed(r.rating, 1), parts: { att: r.att, dfn: r.dfn }, form: r.form,
+      return { rank: isNum(r.rank) ? r.rank : i + 1, name: t.name, abbr: t.abbr, colour: t.colour, href: SC.teamHref(S, r.id), value: r.rating, text: SC.signed(r.rating, 1), parts: pp.of(r), form: r.form,
         follow: SC.followItem(S, r.id), cells: [{ label: 'Tests rated', text: String(r.tests || r.n) }] };
-    }) }], parts: [{ key: 'att', label: 'Attack', color: 'var(--c-1)' }, { key: 'dfn', label: 'Defence', color: 'var(--c-3)' }], valueLabel: 'Our rating', unit: 'points', formN: 10 }) : '');
+    }) }], parts: pp.parts, valueLabel: 'Our rating', unit: 'points', formN: 10 }) : '');
     html += U.sec('Team profile', 'Every side on every measure', 'Per test since ' + SC.date(d.since) + ', opponent-adjusted (shifted by how much each opponent usually allows), coloured by percentile among these sides. Grey columns describe style, not quality. Only the ' + prows.length + ' ranked sides with six or more tests that our source carries team statistics for are here (it has none for the 2026 Nations Championship).', '<div id="tm-grid"></div>');
     html += U.sec('Style map', 'How they play', 'Two measures at a time; the dashed lines are the averages. Pick a pair.', '<div class="qk-chips sc-filters" id="tm-map">' + PRESETS.map(function (p) {
       return '<a class="qk-chip" href="' + esc(SC.href(S, 'teams', null, 'map=' + p.key)) + '" aria-pressed="' + (p.key === preset.key) + '">' + esc(p.label) + '</a>';
@@ -223,12 +224,23 @@ SC.route('team', function (page, P) {
       ' (' + QK.ordinal(Math.round(sw.best[0].pct)) + ' percentile among test sides), and weakest on ' + (sw.worst[0] ? sw.worst[0].label.toLowerCase() : '') + '. Our rating has them ' + SC.signed(T.rating, 1) +
       ' points against an average side.' : t.name + ': our rating ' + SC.signed(T.rating, 1) + ' points against an average test side.';
     var html = '<nav class="sc-crumb"><a href="' + esc(SC.href(S, 'teams')) + '">Teams</a> / ' + esc(t.name) + '</nav>';
+    /* the black strip, each number with its peers: the rating's rank among the sides we rate, points for and against a
+       test with the opponent-adjusted percentile among test sides (the profile). Our model rates a side as one number
+       (attack and defence would each be half of it), so the strip shows the scoring itself, not two halves. */
+    var Pm = (T.profile && T.profile.m) || {};
+    var split = isNum(T.att) && isNum(T.dfn) && Math.abs(T.att - T.dfn) > 0.05;
+    var strip = [{ label: T.prov ? 'Our rating (provisional)' : 'Our rating', value: SC.signed(T.rating, 1), unit: 'pts', pctl: rk && T.of > 1 ? 100 * (T.of - rk) / (T.of - 1) : null,
+      sub: rk ? QK.ordinal(rk) + ' of the ' + (T.of || '') + ' sides we rank · v an average test side' : (T.prov ? 'too few tests against the main pool to rank' : (T.invitational ? 'an invitational side, not ranked' : 'v an average test side')), signal: true }];
+    if (split) strip.push({ label: 'Attack', value: SC.signed(T.att, 1), sub: 'points scored v average' }, { label: 'Defence', value: SC.signed(T.dfn, 1), sub: 'points kept out v average' });
+    else {
+      if (Pm.pf) strip.push({ label: 'Points scored', value: SC.f(Pm.pf.v, 1), unit: 'a test', pctl: Pm.pf.pct, sub: T.profile.n + ' tests since ' + SC.date(T.profile.since) + ', opponent-adjusted percentile', tip: 'Points a test over the last two years; the percentile is among test sides with six or more tests, adjusted for the opposition' });
+      if (Pm.pa) strip.push({ label: 'Points conceded', value: SC.f(Pm.pa.v, 1), unit: 'a test', pctl: Pm.pa.pct, sub: 'fewer is better: the percentile is turned so higher is better', tip: 'Points conceded a test over the last two years, opponent-adjusted for the percentile' });
+    }
+    strip.push({ label: 'World Rugby', value: isNum(T.wr) ? SC.f(T.wr, 2) : '—', sub: T.wr_rank ? QK.ordinal(T.wr_rank) + ', points in our rebuild' : 'points, our rebuild' }, { label: 'Last 12 months', value: y12.join('–'), sub: 'won, drawn, lost · ' + (y12[0] + y12[1] + y12[2]) + ' tests' });
     html += QK.playerHeader({ name: t.name, face: t.abbr, kicker: SC.SNAME[S] + (rk ? ' · ' + QK.ordinal(rk) + ' in our ratings' : (T.prov ? ' · provisional rating' : '')) + (T.wr_rank ? ' · ' + QK.ordinal(T.wr_rank) + ' in World Rugby’s (our rebuild)' : ''), team: { name: '', colour: t.colour, alt: t.alt },
       meta: [['Tests in our data', String(rec[0] + rec[1] + rec[2])], ['Since', SC.year(T.first)], ['All time', rec.join('–')]],
       tags: [SC.followStar(S, tid, 'sc-hero-star') || ''],
-      strip: [{ label: T.prov ? 'Our rating (provisional)' : 'Our rating', value: SC.signed(T.rating, 1), sub: rk ? QK.ordinal(rk) + ' of the ' + (T.of || '') + ' sides we rank' : (T.prov ? 'too few tests against the main pool to rank' : (T.invitational ? 'an invitational side, not ranked' : '')), signal: true },
-        { label: 'Attack', value: SC.signed(T.att, 1), sub: 'points scored v average' }, { label: 'Defence', value: SC.signed(T.dfn, 1), sub: 'points kept out v average' },
-        { label: 'World Rugby', value: isNum(T.wr) ? SC.f(T.wr, 2) : '—', sub: T.wr_rank ? QK.ordinal(T.wr_rank) + ', points in our rebuild' : 'points, our rebuild' }, { label: 'Last 12 months', value: y12.join('–'), sub: 'won, drawn, lost' }],
+      strip: strip.slice(0, 5),
       short: short });
     if (SC.cmpHref) {
       var nopp = (T.next || [])[0] ? (String(T.next[0].home) === String(tid) ? T.next[0].away : T.next[0].home) : null;
@@ -236,15 +248,30 @@ SC.route('team', function (page, P) {
         '<a class="qk-chip" href="' + esc(SC.progHref(S, 't', [tid])) + '">Rating and form over time →</a></div>';
     }
     var nxt = (T.next || [])[0];
-    html += '<div class="qk-g2 sc-gap"><div>' + (nxt ? U.card('Next test', SC.compName(nxt.comp) + (nxt.venue ? ' · ' + esc(nxt.venue) : ''), QK.previewCard(SC.game(S, nxt), { layout: 'bug', homeFirst: true, noun: 'test' }) +
-      (isNum(nxt.m) ? U.note('We expect ' + esc(SC.margin(S, nxt)) + (isNum(nxt.t) ? ', about ' + Math.round(nxt.t) + ' points in all' : '') + '.') : '')) : U.card('Next test', '', QK.empty('No test scheduled', 'The next fixture appears here once it is announced.'))) +
-      (T.chances && T.chances.length ? U.card('Title chances', 'From our simulated tournaments.', QK.chances(T.chances.map(function (c) { return { label: SC.compName(c.comp) + ' ' + (c.season || ''), p: c.title || 0, href: SC.href(S, 'standings', null, 'tab=' + c.comp), color: t.colour, mark: SC.mark(S, tid) }; }), { key: false, sort: false })) : '') +
-      '</div><div>' + U.card('Form', 'The last ten results.', '<div class="sc-formbig">' + U.form(T.form) + '</div>' + '<ul class="sc-list">' + (T.results || []).slice(0, 6).map(function (c) {
+    /* v4 (as the Rink's team page): the next test as the scoreboard bug beside the last one, titled with its score */
+    var lst = (T.results || []).filter(function (c) { return isNum(c.hs); })[0];
+    var lastCard = '';
+    if (lst) {
+      var lh = String(lst.home) === String(tid), lr = SC.result(S, lst, tid), lp = lst.p ? (lh ? lst.p[0] : lst.p[2]) : null;
+      var lopp = lh ? lst.away : lst.home;
+      var lttl = SC.tabbr(S, lst.home) + ' ' + SC.scoreText(lst.hs, lst.as, lst.ro) + ' ' + SC.tabbr(S, lst.away);
+      var lwhy = isNum(lp) ? 'We gave ' + t.name + ' ' + SC.pct(lp) + ' before the start' + (lr === 'W' ? (lp >= 0.5 ? ': as expected.' : ': an upset win.') : lr === 'L' ? (lp >= 0.5 ? ': an upset defeat.' : ': as expected.') : ': a draw.') : '';
+      if (isNum(lst.m) && !lst.ro) lwhy += ' We expected ' + SC.margin(S, lst) + '; it finished ' + SC.signed(lst.hs - lst.as, 0) + ' (home side first).';
+      lastCard = U.card('Last test: ' + lttl, SC.compName(lst.comp) + ' · ' + esc(SC.date(lst.date)) + (lst.venue ? ' · ' + esc(lst.venue) : '') + ' · ' + (lh ? 'v ' : 'at ') + esc(SC.tname(S, lopp)),
+        QK.gameCard(SC.game(S, lst), { sport: false, homeFirst: true, why: false, market: false, form: false }) + (lwhy ? QK.explain('<b>' + (lr === 'W' ? 'Won' : lr === 'L' ? 'Lost' : 'Drawn') + '.</b> ' + esc(lwhy)) : '') +
+        '<p class="sc-note"><a href="' + esc(SC.matchHref(S, lst.id)) + '">The match page: the score race, the stat lines and both 23s →</a></p>');
+    }
+    html += '<div class="qk-g2 sc-gap"><div>' + (nxt ? U.card('Next test', SC.compName(nxt.comp) + (nxt.venue ? ' · ' + esc(nxt.venue) : ''), QK.previewCard(SC.game(S, nxt), { layout: 'bug', homeFirst: true, noun: 'test', note: SC.howSure(S, nxt) }) +
+      (isNum(nxt.m) ? U.note('We expect ' + esc(SC.margin(S, nxt)) + (isNum(nxt.t) ? ', about ' + Math.round(nxt.t) + ' points in all' : '') + '. <a href="' + esc(SC.matchHref(S, nxt.id)) + '">The match page →</a>') : '')) : U.card('Next test', '', QK.empty('No test scheduled', 'The next fixture appears here once it is announced.'))) +
+      '</div><div>' + lastCard + '</div></div>';
+    var chancesC = T.chances && T.chances.length ? U.card('Title chances', 'From our simulated tournaments.', QK.chances(T.chances.map(function (c) { return { label: SC.compName(c.comp) + ' ' + (c.season || ''), p: c.title || 0, href: SC.href(S, 'standings', null, 'tab=' + c.comp), color: t.colour, mark: SC.mark(S, tid) }; }), { key: false, sort: false })) : '';
+    var formC = U.card('Form', 'The last ten results, oldest first; the list is the last six, newest first, with our pre-test chance.', '<div class="sc-formbig">' + U.form(T.form) + '</div>' + '<ul class="sc-list">' + (T.results || []).slice(0, 6).map(function (c) {
         var r = SC.result(S, c, tid), opp = String(c.home) === String(tid) ? c.away : c.home, home = String(c.home) === String(tid);
         var us = home ? c.hs : c.as, th = home ? c.as : c.hs;
         var p = c.p ? (home ? c.p[0] : c.p[2]) : null;
         return '<li><span class="sc-res ' + r + '">' + r + '</span><span class="s">' + esc(SC.date(c.date)) + '</span>' + (home ? 'v ' : 'at ') + U.teamEnt(S, opp) + '<a class="v" href="' + esc(SC.matchHref(S, c.id)) + '">' + SC.scoreText(us, th, c.ro) + '</a>' + (isNum(p) ? '<span class="s">we gave ' + SC.pct(p) + '</span>' : '') + '</li>';
-      }).join('') + '</ul>') + '</div></div>';
+      }).join('') + '</ul>');
+    html += chancesC ? '<div class="qk-g2 sc-gap"><div>' + formC + '</div><div>' + chancesC + '</div></div>' : formC;
     // the profile against every side
     if (T.profile) {
       var groups = {};

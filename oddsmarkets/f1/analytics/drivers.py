@@ -461,6 +461,9 @@ def race_records(year: int, rnd: int, fc: dict | None = None) -> dict[str, dict]
         # forecasts
         if d in exp_src:
             rec["exp_points"] = exp_src[d].get("exp_points")
+            # the same walk-forward forecast's win and podium chances (the driver page's race log, 12 Nov 2026)
+            rec["p_win"] = exp_src[d].get("p_win")
+            rec["p_podium"] = exp_src[d].get("p_podium")
         if d in pre:
             rec["exp_points_pre"] = pre[d].get("exp_points")
         # sprint
@@ -641,7 +644,8 @@ def _log_row(rec: dict) -> dict:
             "quali_pos": rec.get("quali_pos"), "pace": _r(rec.get("pace"), 3), "pace_rank": rec.get("pace_rank"),
             "pos_gained": rec.get("pos_gained"), "lap1_gain": rec.get("lap1_gain"), "overtakes": rec.get("ovt_made"),
             "pit_stops": rec.get("stops"), "deg": {c: _r(x, 4) for c, x in (rec.get("deg") or {}).items()} or None,
-            "team": rec.get("team"), "exp_points": _r(rec.get("exp_points"), 2)}
+            "team": rec.get("team"), "exp_points": _r(rec.get("exp_points"), 2),
+            "p_win": _r(rec.get("p_win"), 3), "p_podium": _r(rec.get("p_podium"), 3)}
 
 
 def _round_value(key: str, v: Any) -> Any:

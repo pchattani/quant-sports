@@ -40,6 +40,15 @@
 .fb-mx-fc th.mk, .fb-mx-fc td.mk { color: var(--c-market, var(--ink-3)); font-family: var(--font-num); font-weight: 500; white-space: normal; }
 .fb-mx-fc td:first-child { white-space: normal; min-width: 7em; }
 .fb-mx-tform { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: var(--sp-3); font-size: var(--fs-2xs); }
+/* the form card: each side's last five, one line each (result from that side's view, the opponent, competition and date) */
+.fb-mx-lf { list-style: none; margin: 6px 0 0; padding: 0; }
+.fb-mx-lf li { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line-1); font-size: var(--fs-sm); }
+.fb-mx-lf li:last-child { border-bottom: 0; }
+.fb-mx-lf .fb-pl-res { display: inline-block; min-width: 58px; text-align: center; }
+.fb-mx-lf .o { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 4px; }
+.fb-mx-lf .o .fb-ent { min-width: 0; }
+.fb-mx-lf .o .fb-ent-n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fb-mx-lf .m { color: var(--ink-3); font-size: var(--fs-2xs); white-space: nowrap; }
 .fb-mx-ktiles { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
 @media (max-width: 720px) { .fb-mx-ktiles, .fb-mx-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 

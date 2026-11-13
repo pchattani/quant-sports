@@ -181,7 +181,8 @@ def walk(S: Scope) -> dict:
         et = tot.expect(m)
         up[m["id"]] = {"p_home": e["p_home"], "p_draw": e["p_draw"], "p_away": e["p_away"], "margin": e["margin"],
                        "total": et["total"], "exp_h": (et["total"] + e["margin"]) / 2, "exp_a": (et["total"] - e["margin"]) / 2,
-                       "edge": e["edge"], "ctx": e["ctx"], "r_h": mdl.rating(m["home"]["id"]), "r_a": mdl.rating(m["away"]["id"])}
+                       "edge": e["edge"], "ctx": e["ctx"], "r_h": mdl.rating(m["home"]["id"]), "r_a": mdl.rating(m["away"]["id"]),
+                       "sd": e.get("sd")}
     return {"model": mdl, "total": tot, "fc": fc, "up": up, "hist": hist}
 
 

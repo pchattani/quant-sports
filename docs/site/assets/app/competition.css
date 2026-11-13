@@ -185,3 +185,8 @@
 .fb-co-calledp { font: 400 1.35rem/1 var(--font-display); text-align: right; color: var(--ink-3); }
 .fb-co-called.hit .fb-co-calledp { color: var(--signal); }
 @media (max-width: 600px) { .fb-co-called { grid-template-columns: minmax(0, 1fr) 46px; gap: 4px; } .fb-co-calledp { font-size: 1.05rem; } }
+
+/* the table's Range column: the kit's likely-range bar, every club on one scale, the numbers under it */
+.fb-rng { display: block; min-width: 58px; text-align: left; }
+.fb-rng .qk-range { margin: 2px 0 0; }
+.fb-rng .qk-range-cap { margin-top: 3px; color: var(--ink-2); font-family: var(--font-num); text-transform: none; letter-spacing: 0; font-weight: 600; }

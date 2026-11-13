@@ -843,7 +843,9 @@ function standings(box, ctx, rows, bands, o) {
   var bar = function (key, label, tip) { return { key: key, label: label, type: 'bar', max: 1, tip: tip, fmt: function (v) { return pctFmt(v); } }; };
   if (!o.plain) {
     cols.push({ key: 'exp_pts', label: 'Proj.', num: true, tip: 'Our projected final points (mean of the simulated seasons)', fmt: function (v) { return num(v, 1); } });
-    if (!o.compact) cols.push({ key: 'p50', label: 'Range', num: true, sort: false, tip: 'Our 90% range of final points: 5th to 95th percentile of the simulated seasons', fmt: function (v, r) { return rangeBar(r); } });
+    var lo5 = (rows || []).map(function (r) { return r.p05; }).filter(isNum), hi95 = (rows || []).map(function (r) { return r.p95; }).filter(isNum);
+    var rsc = lo5.length > 1 && hi95.length > 1 ? { min: Math.max(0, Math.min.apply(null, lo5) - 2), max: Math.max.apply(null, hi95) + 2 } : null;
+    if (!o.compact) cols.push({ key: 'p50', label: 'Range', num: true, sort: false, tip: 'Our 90% range of final points: 5th to 95th percentile of the simulated seasons (the blue band; the tick is the projection), every club on one scale', fmt: function (v, r) { return rangeBar(r, rsc); } });
     if (o.titleLabel !== null) cols.push(bar('p_title', o.titleLabel || 'Title', 'Our chance'));
     (o.extra || []).forEach(function (x) { cols.push(bar(x.key, x.label, x.tip)); });
     ups.forEach(function (b) { cols.push(bar('_b_' + b.key, b.label, 'Our chance of finishing in this band')); });
@@ -862,9 +864,12 @@ function standings(box, ctx, rows, bands, o) {
   });
   QK.leaderboard(box, { columns: cols, rows: list, dense: true, caption: 'Standings' });
 }
-function rangeBar(r) {
+/* the 90% range of final points as the kit's likely-range bar (QK.rangeBar), every row on the table's one scale (the
+   lowest 5th to the highest 95th percentile), the projection as the volt tick and the numbers under it (the CSV text) */
+function rangeBar(r, sc) {
   if (!isNum(r.p05) || !isNum(r.p95)) return '—';
-  return '<span class="fb-num qk-muted">' + num(r.p05, 0) + '–' + num(r.p95, 0) + '</span>';
+  if (!sc || !(r.p95 > r.p05)) return '<span class="fb-num qk-muted">' + num(r.p05, 0) + '–' + num(r.p95, 0) + '</span>';
+  return '<span class="fb-rng">' + QK.rangeBar({ lo: r.p05, hi: r.p95, mid: isNum(r.exp_pts) ? r.exp_pts : r.p50, min: sc.min, max: sc.max, label: 'Final points, 9 seasons in 10', caption: num(r.p05, 0) + '–' + num(r.p95, 0) }) + '</span>';
 }
 function posHeat(box, rows, get, bands) {
   var teams = rows.map(function (r) { return r.team; });

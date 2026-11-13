@@ -118,13 +118,14 @@ function cardOf(d, id) {
    line before the game (game detail is one of the two places it may appear), and how the clubs match up so far. */
 const TWO_WORD = /(Maple Leafs|Red Wings|Golden Knights|Blue Jackets)$/;
 U.nick = abbr => { const n = RK.teamName(abbr) || abbr; const m = TWO_WORD.exec(n); return m ? m[1] : String(n).split(' ').slice(-1)[0]; };
-function hero(c, d, g, season) {
+function hero(c, d, g, season, recs) {
   const st = g.status, pre = st === 'pre';
   const m = ((d && d.pregame) || {}).model || c.model || {};
   const mk = ((d && d.pregame) || {}).market || c.market || {};
   const [ca, ch] = U.pair(c.away, c.home);
   const rows = {}; (((season && season.standings) || {}).rows || []).forEach(r => { rows[r.team] = r; });
-  const rec = t => { const r = rows[t]; return r && isNum(r.w) ? r.w + '–' + r.l + '–' + (r.otl || 0) + (isNum(r.pts) ? ' · ' + r.pts + ' pts' : '') : ''; };
+  /* round 11: recs, the records going in (formGoingIn), replace today's standings once the game has started */
+  const rec = t => { if (recs && recs[t]) return recs[t]; const r = rows[t]; return r && isNum(r.w) ? r.w + '–' + r.l + '–' + (r.otl || 0) + (isNum(r.pts) ? ' · ' + r.pts + ' pts' : '') : ''; };
   /* v4: the diagonal hero takes the raw kit colours and the alternates (QK.color.blockPair makes them blocks with
      white type and resolves a clash); the charts keep the lifted pair [ca, ch] */
   const G = Object.assign({}, g, { home: Object.assign({}, g.home, { colour: RK.teamColourRaw(c.home) || ch, alt: RK.teamAlt(c.home), full: RK.teamName(c.home), record: rec(c.home) }),
@@ -143,12 +144,19 @@ function hero(c, d, g, season) {
   const extra = [];
   if (pre && isNum(m.p_ot)) extra.push('About ' + (Math.round(1 / m.p_ot) > 1 ? '1 in ' + Math.round(1 / m.p_ot) : 'half') + ' (' + U.pct(m.p_ot) + ') go to overtime');
   if (pre && isNum(m.total)) extra.push('we expect about ' + Math.round(m.total) + ' goals in all');
+  /* round 11: a final keeps the pre-game call and its verdict (the kit's note) and adds what that chance meant: one
+     result is one draw from it */
+  let sure = '';
+  if (st === 'final' && isNum(m.p_home)) {
+    const fh = m.p_home >= 0.5, pf = fh ? Number(m.p_home) : 1 - Number(m.p_home), miss = Math.max(1, Math.round(10 * (1 - pf)));
+    sure = ' <b>How sure are we?</b> ' + esc(U.pct(pf) + ' means the ' + U.nick(fh ? c.home : c.away) + ' lose a game like this about ' + miss + ' time' + (miss === 1 ? '' : 's') + ' in 10, so one result says little about the forecast.');
+  }
   const kick = 'NHL' + (d && d.venue ? ' · ' + d.venue : '') + (RK.isPlayoffGame(c) && G.league !== 'NHL' ? ' · ' + G.league : '');
   /* round 6: the market's chance sits quietly under the hero (QK.marketLine), the source on hover */
   const src = RK.srcLineOnly && RK.srcLineOnly(mk.sources) ? 'the no-vig sportsbook line' : (RK.srcLabel(mk.sources) || '');
   if (pre && isNum(mk.p_home)) { G.market_home = Number(mk.p_home); G.market_src = src; } else G.market_home = null;
   return '<div class="rk-preview">' + QK.previewCard(G, { kicker: kick, nick: t => U.nick(t.abbr), colors: [ca, ch], factors: fx,
-    noteExtra: extra.length ? esc(extra.join(', and ') + '.') : '', market: 'quiet' }) + '</div>';
+    noteExtra: (extra.length ? esc(extra.join(', and ') + '.') : '') + sure, market: 'quiet' }) + '</div>';
 }
 
 function kpiStrip(c, d, g) {
@@ -394,6 +402,31 @@ function summary(node, d, c, g, season) {
   if (live) RK.liveRefresh([RK.gamePath(c.game_id)], 30000);
 }
 
+/* Form going in (round 11): each club's last five results before this game's start, from the season schedule (the file
+   the games page reads; loaded after the first paint). Only games final before the start count, so a past game shows
+   the form it was played on, not today's. QK.formPair counts W and L, so an overtime or shootout loss is an L here. */
+function formGoingIn(node, c, onRecords) {
+  if (!node) return;
+  const t0 = String(c.start || c.date || '');
+  RK.loadYear('schedule.json', RK.gameSeason ? RK.gameSeason(c.game_id) : undefined).then(sch => {
+    if (!node.isConnected) return;
+    const games = RK.ok(sch) ? (sch.games || []).filter(g => g && RK.isFinal(g) && isNum(g.hs) && isNum(g.as) && String(g.start || g.date || '') < t0) : [];
+    const mine = ab => games.filter(g => g.home === ab || g.away === ab).sort((a, b) => String(a.start || a.date).localeCompare(String(b.start || b.date)));
+    const won = (g, ab) => (g.home === ab) === (Number(g.hs) > Number(g.as));
+    const formOf = ab => mine(ab).slice(-5).map(g => (won(g, ab) ? 'W' : 'L'));
+    const side = ab => ({ name: U.nick(ab), abbr: RK.teamAbbr(ab), colour: RK.teamColourRaw(ab) || RK.teamColour(ab), form: formOf(ab) });
+    const html = QK.formPair({ left: side(c.away), right: side(c.home), n: 5, title: 'Last five, going in' });
+    node.innerHTML = html || QK.empty('No games yet', 'Neither club had played before this game.');
+    /* the records going in (wins, regulation losses, overtime and shootout losses, points), for the hero of a game
+       that has started: the standings' record would count this game and every one after it */
+    if (onRecords && RK.ok(sch)) {
+      const recOf = ab => { let w = 0, l = 0, o = 0; mine(ab).filter(g => !g.type || g.type === 'REG').forEach(g => { if (won(g, ab)) w++; else if (g.ot || g.so) o++; else l++; }); return w + '–' + l + '–' + o + ' · ' + (2 * w + o) + ' pts'; };
+      const recs = {}; recs[c.away] = recOf(c.away); recs[c.home] = recOf(c.home);
+      onRecords(recs);
+    }
+  });
+}
+
 function gamePage(el, params, state) {
   const id = params.id;
   const view = ((params.query || {}).view) === 'detail' ? 'detail' : 'summary';
@@ -412,8 +445,13 @@ function gamePage(el, params, state) {
     const tabs = [{ key: 'summary', label: 'Summary', href: RK.gameHref(id) }, { key: 'detail', label: 'Detail: preview, game flow, lines, full box', href: RK.gameHref(id) + '?view=detail' }];
     el.innerHTML = '<div class="qk-kicker" style="margin-bottom:10px"><a href="' + RK.gamesHref(c.date) + '">← ' + esc(RK.fmtDate(c.date || c.start, { year: false })) + ' games</a></div>' +
       '<div class="rk-gtop">' + hero(c, RK.ok(d) ? d : null, g, season) + '<div class="rk-gside rk-stack">' + kpiStrip(c, RK.ok(d) ? d : null, g) +
-      (RK.ok(d) ? U.card2(g.status === 'pre' ? 'Our forecast' : 'Our pre-game forecast', 'Chances from our game model; the market column is a reference, not our forecast', pregameCard(d, c) || QK.empty('No pre-game forecast'), { flush: true }) : '') + '</div></div>' +
+      (RK.ok(d) ? U.card2(g.status === 'pre' ? 'Our forecast' : 'Our pre-game forecast', 'Chances from our game model' + (g.status !== 'pre' && ((d.pregame || {}).source === 'frozen' || ((d.pregame || {}).model || {}).source === 'frozen') ? ', fixed at the start' : '') + '; the market column is a reference, not our forecast' + (d.updated_at ? ' · game file as of ' + esc(RK.fmtStamp(d.updated_at)) : ''), pregameCard(d, c) || QK.empty('No pre-game forecast'), { flush: true }) : '') +
+      U.card2('Form going in', 'Each club’s last five results before this game, from the season schedule; overtime and shootout losses count as losses', '<div id="gm-form">' + QK.skeleton('lines', 2) + '</div>') + '</div></div>' +
       '<div style="margin-top:var(--sp-6)">' + U.tabsHTML(tabs, view) + '</div><div id="gm-body" style="margin-top:var(--sp-4)"></div>';
+    formGoingIn(el.querySelector('#gm-form'), c, g.status === 'pre' ? null : recs => {
+      const node = el.querySelector('.rk-preview');
+      if (node && node.isConnected) node.outerHTML = hero(c, RK.ok(d) ? d : null, g, season, recs);
+    });
     const body = el.querySelector('#gm-body');
     if (view === 'detail') return U.legacy('game', body, params, state);
     if (!RK.ok(d)) { body.innerHTML = U.card2('Game centre', '', QK.empty('The game page is not built yet', RK.reason(d))); return; }

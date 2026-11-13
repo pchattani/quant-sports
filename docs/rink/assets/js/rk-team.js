@@ -60,9 +60,12 @@ function header(abbr, S, x, row, sim, tr) {
     { label: 'Team rating', value: U.signed(isNum(v.rating) ? v.rating : (x.units || {}).rating, 2), pctl: pc.rating, sub: 'goals a game against an average club', tip: 'Our team-strength model: expected goal difference per game against an average team, all situations' },
     { label: '5v5 chance share', value: U.teamFmt('xgf_pct5', v.xgf_pct5), pctl: pc.xgf_pct5, sub: 'of the expected goals at 5-on-5', tip: 'Share of the 5-on-5 expected goals: over a season it predicts the next games better than the goal difference' }
   ];
+  /* round 11: the last ten results as the kit's form squares, oldest first (O = an overtime or shootout loss) */
+  const f10 = (x.schedule || []).filter(g => g.result).slice(-10).map(g => (g.result === 'W' ? 'W' : g.result === 'L' ? 'L' : 'O'));
+  const form = f10.length ? '<span class="rk-phform" tabindex="0" data-tip="Last ' + f10.length + ' results, oldest first: W win, L loss, O overtime or shootout loss">Last ' + f10.length + ' ' + QK.formDots(f10, 10) + '</span>' : null;
   return QK.playerHeader({ name: RK.teamName(abbr), split: false, face: RK.teamAbbr(abbr), pos: (x.conference || RK.teamConf(abbr)) + ' Conference', kicker: RK.seasonLabel(S) + (rec.gp ? ' · ' + rec.gp + ' game' + (rec.gp === 1 ? '' : 's') + ' in' : ''),
     team: { name: (x.division || RK.teamDiv(abbr)) + ' Division', abbr: RK.teamAbbr(abbr), colour: RK.teamColourRaw(abbr), alt: RK.teamAlt(abbr) },
-    meta: [['Record', RK.record(rec.w, rec.l, rec.otl)], ['Points', (isNum(rec.pts) ? rec.pts : '—') + ' in ' + (rec.gp || 0)], row && row.streak ? ['Streak', row.streak] : null, row && row.league_rank ? ['League', RK.ordinal(row.league_rank)] : null],
+    meta: [['Record', RK.record(rec.w, rec.l, rec.otl)], ['Points', (isNum(rec.pts) ? rec.pts : '—') + ' in ' + (rec.gp || 0)], row && row.streak ? ['Streak', row.streak] : null, row && row.league_rank ? ['League', RK.ordinal(row.league_rank)] : null, form],
     strip: strip, short: shortTeam(abbr, x, sim, tr),
     /* My Teams: follow the club from the hero; it then leads Home and this site's overview */
     follow: U.followItem(abbr) });

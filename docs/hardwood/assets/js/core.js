@@ -1214,6 +1214,8 @@ function init() {
   load('index.json').then(idx => {
     INDEX.data = idx;
     initHeader();
+    /* the data-freshness line (kit QK.stamp): the build time of index.json, the first file every page reads */
+    if (window.QK && QK.stamp && idx && idx.updated_at) QK.stamp(idx.updated_at);
     initSearch();
     const ov = document.getElementById('loading-overlay');
     if (ov) ov.style.display = 'none';

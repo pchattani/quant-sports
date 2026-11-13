@@ -283,14 +283,14 @@ CC.raceTab = function (node, L, S, season, x) {
         need.length ? '<ul class="cc-list">' + need.slice(0, 8).map(function (r) { return teamRow(L, S, r.t, 'needs ' + r.k + ' win' + (r.k === 1 ? '' : 's') + ' from ' + r.left + ' left', CC.pct(sim[r.t].p_bowl)); }).join('') + '</ul>' : '');
       var every = ts.filter(function (t) { return (sim[t].p_cfp || 0) >= 1; }), none = ts.filter(function (t) { return (sim[t].p_cfp || 0) <= 0 && (R[t] || {}).rank; });
       var confAlive = cs.map(function (c) { var tt = ts.filter(function (t) { return String((CC.team(L, t) || {}).conference) === String(c) && (sim[t].p_conf || 0) > 0; }); return { c: c, n: tt.length, lead: tt.sort(function (a, b) { return sim[b].p_conf - sim[a].p_conf; })[0] }; }).filter(function (r) { return r.n; });
-      out += U.card('Locks and long shots', 'From ' + ns + ' simulated seasons. Nothing here is mathematically settled: “every” and “none” are our simulations, not the arithmetic.',
+      out += U.card('Near certain and long shots', 'From ' + ns + ' simulated seasons. Nothing here is mathematically settled: “every” and “none” are our simulations, not the arithmetic.',
         '<ul class="cc-list">' + (every.length ? '<li><b>In the CFP in every simulation:</b>&nbsp;' + every.map(function (t) { return esc(CC.tshort(L, t)); }).join(', ') + '</li>' : '<li>No team makes the CFP in every simulation yet.</li>') +
         (none.length ? '<li><b>Ranked, but in no simulated CFP field:</b>&nbsp;' + none.map(function (t) { return esc(CC.tshort(L, t)); }).join(', ') + '</li>' : '') +
         confAlive.map(function (r) { return '<li><span>' + esc(CC.cname(L, r.c)) + ': <b>' + r.n + '</b> team' + (r.n === 1 ? '' : 's') + ' win the title in at least one simulation</span><span class="v">' + esc(CC.tabbr(L, r.lead)) + ' ' + CC.pct(sim[r.lead].p_conf) + '</span></li>'; }).join('') + '</ul>');
     } else {
       var locks = byP.filter(function (t) { return (sim[t].p_ncaa || 0) >= 0.99; });
       var crown = cs.map(function (c) { var tt = ts.filter(function (t) { return String((CC.team(L, t) || {}).conference) === String(c); }).sort(function (a, b) { return (sim[b].p_conf_reg || 0) - (sim[a].p_conf_reg || 0); }); return { c: c, lead: tt[0], n: tt.filter(function (t) { return (sim[t].p_conf_reg || 0) > 0; }).length }; }).filter(function (r) { return r.lead; });
-      out += U.card('Locks and long shots', 'From ' + ns + ' simulated seasons; nothing here is mathematically settled.',
+      out += U.card('Near certain and long shots', 'From ' + ns + ' simulated seasons; nothing here is mathematically settled.',
         '<ul class="cc-list">' + (locks.length ? '<li><b>In the field in 99%+ of simulations:</b>&nbsp;' + locks.map(function (t) { return esc(CC.tshort(L, t)); }).join(', ') + '</li>' : '<li>No team is in the field in 99% of simulations yet.</li>') +
         crown.slice(0, 12).map(function (r) { return '<li><span>' + esc(CC.cname(L, r.c)) + ': <b>' + r.n + '</b> can win the regular season</span><span class="v">' + esc(CC.tabbr(L, r.lead)) + ' ' + CC.pct(sim[r.lead].p_conf_reg) + '</span></li>'; }).join('') + '</ul>');
     }

@@ -1951,7 +1951,9 @@ class Unified:
             pc = pool_by_tid.get(tid)
             if pc and not national:
                 payload["pool"] = {"strength": pc.get("strength"), "rank": pc.get("rank"), "rank_rated": pc.get("rank_rated"),
-                                   "rated": pc.get("rated"), "comp": pc.get("comp")}
+                                   "rated": pc.get("rated"), "comp": pc.get("comp"),
+                                   # the peer count behind rank_rated (the club page's percentile chip)
+                                   "n_rated": (self.pool.get("model") or {}).get("n_rated")}
             _write(clubs_dir / f"{tid}.json", payload)
             written.add(tid)
             comps_used = sorted({r["comp"] for r in seasons if r.get("source") in ("live", "store")},

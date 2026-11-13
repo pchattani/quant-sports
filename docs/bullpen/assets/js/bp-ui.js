@@ -97,6 +97,48 @@ U.forms = games => {
   Object.keys(by).forEach(t => { out[t] = by[t].slice(-5).join(''); });
   return out;
 };
+/* The last game from its game file (round 11, shared by the player and team pages): the line score by inning (runs,
+   hits, errors) into `box`, the club's row highlighted, and our win chance through the game into `race` (chart id cid).
+   Resolves with the game file, or null. */
+U.lastGame = (box, race, cid, gpk, L, S, tid) => BP.loadGame(gpk, L, S).then(d => {
+  if (!BP.ok(d) || !box || !box.isConnected) return null;
+  const ls = Array.isArray(d.linescore) ? d.linescore : (d.linescore && d.linescore.innings) || [];
+  if (ls.length) {
+    const tot = d.linescore_totals || {};
+    const n9 = Math.max(9, ls.length);
+    const row = (t, kx, runs) => '<tr' + (String(t) === String(tid) ? ' class="hl"' : '') + '><td>' + BP.teamMark(t, 'sm') + '</td>' +
+      Array.apply(null, Array(n9)).map((_, i) => '<td class="num">' + (ls[i] && isNum(ls[i][kx]) ? ls[i][kx] : (ls[i] ? 'x' : '')) + '</td>').join('') +
+      '<td class="num"><b>' + (isNum(runs) ? runs : '–') + '</b></td>' + (tot.h ? '<td class="num">' + (isNum(tot.h[kx]) ? tot.h[kx] : '–') + '</td>' : '') + (tot.e ? '<td class="num">' + (isNum(tot.e[kx]) ? tot.e[kx] : '–') + '</td>' : '') + '</tr>';
+    box.innerHTML = '<div class="qk-table-wrap"><table class="qk-table dense bp-ls"><thead><tr><th>Club</th>' + Array.apply(null, Array(n9)).map((_, i) => '<th class="num">' + (i + 1) + '</th>').join('') +
+      '<th class="num" data-tip="Runs">R</th>' + (tot.h ? '<th class="num" data-tip="Hits">H</th>' : '') + (tot.e ? '<th class="num" data-tip="Errors">E</th>' : '') + '</tr></thead><tbody>' + row(d.away, 0, d.as) + row(d.home, 1, d.hs) + '</tbody></table></div>';
+  }
+  /* wp.ours rows [play, inning, half (0 top, 1 bottom), our home win chance]: placed by inning and half */
+  const wr = (((d.wp || {}).ours) || (Array.isArray(d.wp) ? d.wp : [])).filter(r => Array.isArray(r) && isNum(r[1]) && isNum(r[3]));
+  if (race && wr.length > 4) {
+    const cnt = {}, seen = {};
+    wr.forEach(r => { const kk = r[1] + ':' + (r[2] ? 1 : 0); cnt[kk] = (cnt[kk] || 0) + 1; });
+    const t = wr.map(r => { const kk = r[1] + ':' + (r[2] ? 1 : 0); const j = seen[kk] = (seen[kk] || 0) + 1; return (r[1] - 1) + (r[2] ? 0.5 : 0) + 0.5 * (j - 1) / cnt[kk]; });
+    const innN = Math.max(9, Math.ceil(t[t.length - 1]));
+    const per = []; for (let i = 1; i < innN; i++) per.push(i);
+    const hc = U.pair(d.home, d.away);
+    race.innerHTML = U.chart(cid, 230, 'Our win chance through the last game');
+    QKC.winProb('#' + cid, { t: t, p: wr.map(r => r[3]), step: true, tMin: 0, tMax: innN, interval: 1, periods: per,
+      home: { name: BP.teamName(d.home), abbr: BP.teamAbbr(d.home), colour: hc[0] }, away: { name: BP.teamName(d.away), abbr: BP.teamAbbr(d.away), colour: hc[1] },
+      tFmt: x => (x < innN ? String(Math.round(x) + 1) : ''), tLabel: x => (x % 1 >= 0.5 ? 'Bottom ' : 'Top ') + (Math.floor(x) + 1),
+      tName: 'Inning', yName: BP.teamAbbr(d.home) + ' win chance (ours)' });
+  }
+  return d;
+});
+/* The club's last result from a game log row (round 11: the off-season has no recent cards): the title "NYY 8, MIN 3"
+   from the result ("W 8-3", or "W" with runs for and against). */
+U.scoreTitle = (tid, opp, res, rs, ra) => {
+  const m = /^([WLT])\s*(\d+)\s*[-–]\s*(\d+)/.exec(String(res || ''));
+  const won = m ? m[1] === 'W' : String(res) === 'W';
+  const a = m ? Number(m[2]) : rs, b = m ? Number(m[3]) : ra;
+  if (!isNum(a) || !isNum(b)) return '';
+  const me = BP.teamAbbr(tid), op = BP.teamAbbr(opp) || String(opp || '');
+  return won ? me + ' ' + a + ', ' + op + ' ' + b : op + ' ' + b + ', ' + me + ' ' + a;
+};
 /* A cached card still marked live or upcoming 12 hours after its start is a stale snapshot: hide it. */
 U.fresh = c => {
   if (c && BP.notNeeded && BP.notNeeded(c)) return false;

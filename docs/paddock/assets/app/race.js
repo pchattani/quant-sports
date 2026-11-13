@@ -83,7 +83,7 @@ function forecastViews(race) {
   if (race.sprint_forecast && has(race.sprint_forecast.drivers)) v.push(['sprint', 'Sprint', race.sprint_forecast]);
   return v;
 }
-function forecastBlock(hostId, views, teams, title, startKey, market) {
+function forecastBlock(hostId, views, teams, title, startKey, market, note) {
   var host = document.getElementById(hostId);
   if (!host) return;
   if (!views.length) { host.innerHTML = PD.card(title, '', PD.muted('No forecast was built for this race.')); return; }
@@ -97,7 +97,7 @@ function forecastBlock(hostId, views, teams, title, startKey, market) {
     var sim = v[2], ds = sim.drivers;
     var ids = Object.keys(ds).sort(function (a, b) { return (ds[b].p_win - ds[a].p_win) || (ds[a].exp_pos - ds[b].exp_pos); });
     var mk = v[0] !== 'sprint' && market ? market : null;
-    PD.set(hostId + '-s', esc(v[1]) + (isNum(sim.p_sc) ? ' · P(safety car) ' + PD.pct(sim.p_sc, 0) : '') + (isNum(sim.p_vsc) ? ' · P(VSC) ' + PD.pct(sim.p_vsc, 0) : '') + (isNum(sim.p_wet) && sim.p_wet > 0.005 ? ' · P(wet) ' + PD.pct(sim.p_wet, 0) : '') + ' · our win chance' + (mk ? '; the grey tick is the Kalshi / Polymarket number, for reference' : ''));
+    PD.set(hostId + '-s', esc(v[1]) + (isNum(sim.p_sc) ? ' · P(safety car) ' + PD.pct(sim.p_sc, 0) : '') + (isNum(sim.p_vsc) ? ' · P(VSC) ' + PD.pct(sim.p_vsc, 0) : '') + (isNum(sim.p_wet) && sim.p_wet > 0.005 ? ' · P(wet) ' + PD.pct(sim.p_wet, 0) : '') + ' · our win chance' + (mk ? '; the grey tick is the Kalshi / Polymarket number, for reference' : '') + (note ? '. ' + esc(note) + '.' : ''));
     var top = ids.slice(0, 12);
     var rows = PD.v2.chanceRows(top, function (id) { return (ds[id] || {}).p_win || 0; }, true, mk);
     rows.forEach(function (r0, i) { var d0 = ds[top[i]] || {}; r0.sub = 'podium ' + PD.pct(d0.p_podium, 0); });
@@ -139,14 +139,21 @@ function overviewUpcoming(host, race, season, teams, markets) {
   var mk = nr.year === race.year && nr.round === race.round && nr.prices && Object.keys(nr.prices).length ? nr.prices : null;
   if (mk) { mk = Object.assign({}, mk); Object.defineProperty(mk, '_src', { value: nr.sources || [], enumerable: false }); }
   var raceS = sessions.filter(function (s) { return s.key === 'race'; })[0];
+  var fAt = main ? (main[2].generated_at || (race.forecast || {}).generated_at) : null;
+  var favIds = Object.keys(ds || {}).filter(function (k) { return isNum((ds[k] || {}).p_win); }).sort(function (a, b) { return ds[b].p_win - ds[a].p_win; });
   host.innerHTML = '<div class="pd-gtop">' + hero(race, main, mk, raceS, post, teams) + '<div class="pd-gside">' +
-    PD.card(post ? 'Our forecast, after qualifying' : 'Our forecast', 'The top ten by our win chance, from ' + (main && main[2].n ? PD.int(main[2].n) : '20,000') + ' simulated races.', '<div id="rc-top"></div>', { flush: true }) +
+    PD.card(post ? 'Our forecast, after qualifying' : 'Our forecast', 'The top ten by our win chance, from ' + (main && main[2].n ? PD.int(main[2].n) : '20,000') + ' simulated races' + (fAt ? ' · as of ' + esc(PD.asOf(fAt)) : '') + '.', '<div id="rc-top"></div>', { flush: true }) +
     PD.kpis([
       PD.kpi('Safety car', main && isNum(main[2].p_sc) ? PD.pct(main[2].p_sc, 0) : '—', 'our chance of at least one' + (main && isNum(main[2].p_vsc) ? ' · VSC ' + PD.pct(main[2].p_vsc, 0) : '')),
       PD.kpi('Race start', raceS ? esc(PD.fmtTime(raceS.iso)) : esc(PD.fmtDate(race.date, { year: false })), raceS ? esc(PD.fmtDate(raceS.iso, { year: false })) + ', your time' : '')
     ], 'pd-kpis-2') + '</div></div>' +
-    (sessions.length ? PD.grid(PD.card('The weekend', 'Times in your time zone.', '<div class="pd-wk"><div class="pd-cd" id="rc-cd"></div><ul class="pd-sched" id="rc-sched"></ul></div>', { span: 12 }), 'pd-mt') : '') +
-    '<div id="rc-fc" class="pd-mt"></div>' + (race.forecast && race.forecast.generated_at ? '<p class="pd-cap">Forecast made ' + esc(PD.fmtStamp(race.forecast.generated_at)) + '.</p>' : '');
+    /* the tale of the tape for our top two picks (season so far) beside the weekend's schedule and their last five
+       finishes (without a forecast, the weekend runs the full width) */
+    (favIds.length >= 2 ? PD.grid(PD.card('Tale of the tape: ' + esc(PD.driverSurname(favIds[0])) + ' v ' + esc(PD.driverSurname(favIds[1])), '<span id="rc-tape-s">Our top two picks, this season so far.</span>', '<div id="rc-tape">' + QK.skeleton('lines', 6) + '</div>', { span: 7 }) +
+      '<div class="qk-span-5 pd-stack">' + (sessions.length ? PD.card('The weekend', 'Times in your time zone.', '<div class="pd-wk pd-wk-1"><div class="pd-cd" id="rc-cd"></div><ul class="pd-sched" id="rc-sched"></ul></div>') : '') +
+      PD.card('Form going in', 'Our top two picks in the last five rounds.', '<div id="rc-form"></div>', { flush: true }) + '</div>', 'pd-mt')
+      : (sessions.length ? PD.grid(PD.card('The weekend', 'Times in your time zone.', '<div class="pd-wk"><div class="pd-cd" id="rc-cd"></div><ul class="pd-sched" id="rc-sched"></ul></div>', { span: 12 }), 'pd-mt') : '')) +
+    '<div id="rc-fc" class="pd-mt"></div>';
   if (main) {
     var top = Object.keys(ds).sort(function (a, b) { return ds[b].p_win - ds[a].p_win; }).slice(0, 10);
     PD.table('rc-top', [
@@ -158,7 +165,8 @@ function overviewUpcoming(host, race, season, teams, markets) {
     ], top.map(function (id) { var d = ds[id]; return { id: id, name: PD.driverName(id), p_win: d.p_win, p_podium: d.p_podium, p_points: d.p_points, exp_pos: d.exp_pos }; }));
   } else PD.set('rc-top', PD.muted('The forecast is built once the weekend is near.'));
   if (sessions.length) PD.weekendClock(sessions, 'rc-cd', 'rc-sched');
-  forecastBlock('rc-fc', views, teams, 'Who wins? Our chance', post ? 'post' : 'pre', mk);
+  forecastBlock('rc-fc', views, teams, 'Who wins? Our chance', post ? 'post' : 'pre', mk, fAt ? 'As of ' + PD.asOf(fAt) : '');
+  if (favIds.length >= 2) tapeUpcoming(race, favIds);
 }
 
 /* v4 (Broadcast) hero for a race still to run, after rk-games.js: QK.previewCard, the diagonal split hero with our
@@ -266,20 +274,23 @@ function overviewDone(host, race, season, teams) {
       (x.label ? '<div class="pd-award-v">' + esc(x.label) + '</div>' : '') + (x.why ? '<div class="pd-award-why">' + esc(x.why) + '</div>' : '') + '</div>';
   });
   var top = heroDone(race, res, teams, pre, fav, favRes);
+  var post = race.forecast && race.forecast.post_quali && race.forecast.post_quali.drivers;
+  var tp = tapeDone(race, res, teams, pre, post);
   host.innerHTML = (top ? '<div class="pd-gtop">' + top + '<div class="pd-gside">' : '') + PD.kpis([
     PD.kpi('Winner', winner ? PD.driverLink(winner.driver, { team: teams[winner.driver] }) : '—', winner ? (winner.grid ? 'from P' + winner.grid : '') + (isNum(winnerP) ? ' · our chance was ' + PD.pct(winnerP) : '') : '', { text: true }),
     PD.kpi('Pole', q ? PD.driverLink(q.driver, { team: teams[q.driver] }) : '—', q ? PD.fmtMs(q.q3 || q.q2 || q.q1) : '', { text: true }),
     PD.kpi('Fastest lap', fl ? PD.driverLink(fl.driver, { team: teams[fl.driver] }) : '—', fl ? PD.fmtMs(fl.fastest_ms) : '', { text: true }),
     PD.kpi('Neutralisations', has(race.control) ? String(sc + vsc + red) : '—', has(race.control) ? [sc + ' SC', vsc + ' VSC'].concat(red ? [red + ' red'] : []).join(' · ') : 'no race control data'),
     PD.kpi('Our favourite', fav ? PD.driverLink(fav, { team: teams[fav] }) : '—', fav ? PD.pct(pre[fav].p_win) + ' to win · finished ' + (favRes ? (PD.finished(favRes.status) ? 'P' + favRes.pos : 'DNF') : '—') : 'no pre-race forecast', { text: true })
-  ], top ? 'pd-kpis-2' : '') + (top ? '</div></div>' : '') +
+  ], top ? 'pd-kpis-2' : '') + sureDone(pre, post, fav, winner) + (top ? '</div></div>' : '') +
   (fav && winner && !top ? '<div class="pd-mt">' + QK.note(winner.driver === fav ? 'Our favourite won: we gave <b>' + esc(PD.driverName(fav)) + '</b> ' + PD.pct(pre[fav].p_win, 0) + ' before qualifying.'
     : '<b>' + esc(PD.driverName(winner.driver)) + '</b> won' + (isNum(winnerP) ? ', at ' + PD.pct(winnerP, winnerP < 0.1 ? 1 : 0) + ' in our numbers before qualifying' + (winnerP < 0.1 ? ': a real surprise, about 1 race in ' + Math.round(1 / Math.max(winnerP, 0.001)) : '') : '') + '. Our favourite, ' + esc(PD.driverName(fav)) + ', finished ' + (favRes ? (PD.finished(favRes.status) ? 'P' + favRes.pos : 'out of the race') : 'unclassified') + '.') + '</div>' : '') +
   (cards.length ? '<section class="qk-section pd-sec">' + PD.secHead('Awards', 'The race in numbers', 'Our picks of the race, each with the number behind it.') + '<div class="pd-awards">' + cards.join('') + '</div></section>' : '') +
   PD.grid(
-    PD.card('Result', race.sprint && race.sprint.length ? 'Sprint result below.' : '', '<div id="rc-res"></div>', { span: 7, flush: true }) +
+    PD.card('Result', (race.sprint && race.sprint.length ? 'Sprint result below. ' : '') + (race.updated_at ? 'Race file as of ' + esc(PD.asOf(race.updated_at)) + '.' : ''), '<div id="rc-res"></div>', { span: 7, flush: true }) +
     PD.card('Forecast v result', 'Where we expected each driver to finish (blue) against where they did (ring).', PD.chartBox('rc-eva', 560), { span: 5 }) +
-    PD.card('Win chance through the race', '<span id="rc-wp-s">Our chance of winning after every lap.</span>', PD.chartBox('rc-wp', 380, 'Win chance after every lap'), { span: 12 }) +
+    (tp ? PD.card('Tale of the tape: ' + esc(PD.driverSurname(res[0].driver)) + ' v ' + esc(PD.driverSurname(res[1].driver)), 'The top two: our numbers before the race, then the race itself. The better side of each row is solid.', tp, { span: 6 }) : '') +
+    PD.card('Win chance through the race', '<span id="rc-wp-s">Our chance of winning after every lap.</span>', PD.chartBox('rc-wp', tp ? 540 : 380, 'Win chance after every lap'), { span: tp ? 6 : 12 }) +
     PD.card('Positions lap by lap', 'Team colours; a team’s second driver is dashed. Bands: safety car (amber), red flag.', PD.chartBox('rc-pos-mini', 420), { span: 12, foot: '<a href="' + PD.raceHref(race.year, race.round, 'laps') + '">Gaps, lap times, overtakes and race control →</a>' }) +
     (race.sprint && race.sprint.length ? PD.card('Sprint result', '', '<div id="rc-sprint"></div>', { span: 12, flush: true }) : ''), 'pd-mt') +
   '<div id="rc-prefc" class="pd-mt"></div>';
@@ -294,7 +305,92 @@ function overviewDone(host, race, season, teams) {
   positionChart('rc-pos-mini', race, res, teams, nLaps);
   winChance('rc-wp', race, res);
   var views = forecastViews(race);
-  if (views.length) forecastBlock('rc-prefc', views, teams, 'The forecast before the race', views.some(function (v) { return v[0] === 'post'; }) ? 'post' : 'pre', null);
+  if (views.length) forecastBlock('rc-prefc', views, teams, 'The forecast before the race', views.some(function (v) { return v[0] === 'post'; }) ? 'post' : 'pre', null,
+    'Walk-forward: built only from results and laps published before the race (and its qualifying, for the view after qualifying)');
+}
+
+/* "How sure are we?" for a finished race: what our favourite's chance meant with a full grid, where the winner sat in
+   our order before qualifying, and its chance once the grid was set. */
+function sureDone(pre, post, fav, winner) {
+  if (!pre || !fav || !pre[fav] || !isNum(pre[fav].p_win)) return '';
+  var p = pre[fav].p_win, miss = Math.max(1, Math.round(10 * (1 - p))), n = Object.keys(pre).length;
+  var order = Object.keys(pre).filter(function (k) { return isNum(pre[k].p_win); }).sort(function (a, b) { return pre[b].p_win - pre[a].p_win; });
+  var w = winner ? winner.driver : null, rank = w ? order.indexOf(w) + 1 : 0;
+  var pc = function (v) { return PD.pct(v, v < 0.1 ? 1 : 0); };
+  var t = '<b>How sure are we?</b> Our favourite before qualifying, ' + esc(PD.driverSurname(fav)) + ', had ' + pc(p) + ': with ' + n + ' cars even a clear favourite loses a race like this about ' + miss + ' time' + (miss === 1 ? '' : 's') + ' in 10.';
+  if (w && w === fav) t += ' This time the favourite won.';
+  else if (w && rank > 0) t += ' ' + esc(PD.driverSurname(w)) + ' won from ' + pc(pre[w].p_win) + ', our ' + PD.ordinal(rank) + ' pick' + (post && post[w] && isNum(post[w].p_win) ? ' (' + pc(post[w].p_win) + ' once the grid was set)' : '') + '.';
+  return '<div class="pd-settle">' + QK.explain(t) + '</div>';
+}
+
+/* The tale of the tape for a finished race (QK.tape, the kit's team-colour blocks; team-mates: the second driver on
+   slate with the constructor colour as the rule): the winner against the runner-up, first on our numbers before the
+   race (win chance before and after qualifying, expected finish, grid), then on the race (finish, corrected pace, laps
+   led, overtakes, fastest lap, points against our expectation). Everything from the race file. */
+function tapeDone(race, res, teams, pre, post) {
+  var w = res[0], r2 = res[1];
+  if (!w || !r2 || w.pos !== 1 || r2.pos !== 2) return '';
+  var tw = w.team || teams[w.driver], t2 = r2.team || teams[r2.driver];
+  var A = PD.v2.side(w.driver, tw), B = PD.v2.mates(PD.v2.side(w.driver, tw), PD.v2.side(r2.driver, t2));
+  A.sub = 'Winner · ' + PD.teamName(tw); B.sub = 'P2 · ' + PD.teamName(t2);
+  var ex = post || pre || {};
+  var pace = (race.pace || {}).drivers || {}, pos = (race.laps || {}).positions || {}, eva = race.expected_v_actual || {};
+  var ov = Array.isArray(race.overtakes) && race.overtakes.length ? race.overtakes : null;
+  var get = function (o, d, k) { return o && o[d] && isNum(o[d][k]) ? o[d][k] : null; };
+  var pc = function (v) { return isNum(v) ? PD.pct(v, v < 0.1 ? 1 : 0) : '—'; };
+  var P = function (v) { return isNum(v) ? 'P' + (v % 1 ? PD.num(v, 1) : v) : '—'; };
+  var led = function (d) { var a = pos[d]; return Array.isArray(a) && a.length ? a.filter(function (x) { return x === 1; }).length : null; };
+  var made = function (d) { return ov ? ov.filter(function (o) { return o && o.by === d; }).length : null; };
+  var vexp = function (d) { var e = eva[d]; return e && isNum(e.points) && isNum(e.exp_points) ? e.points - e.exp_points : null; };
+  var row = function (label, a, b, better, f, tip) { return { label: label, a: a, b: b, better: better, fmt: f, tip: tip }; };
+  return QK.tape({ left: A, right: B, wins: true, groups: [
+    { label: 'Our numbers before the race', rows: [
+      row('Win chance, before qualifying', get(pre, w.driver, 'p_win'), get(pre, r2.driver, 'p_win'), 'high', pc, 'Our simulator’s win chance before qualifying'),
+      row('Win chance, grid set', get(post, w.driver, 'p_win'), get(post, r2.driver, 'p_win'), 'high', pc, 'Our win chance after qualifying'),
+      row('Expected finish', get(ex, w.driver, 'exp_pos'), get(ex, r2.driver, 'exp_pos'), 'low', P, 'Our average finishing position across the simulated races'),
+      row('Grid', w.grid > 0 ? w.grid : null, r2.grid > 0 ? r2.grid : null, 'low', P)] },
+    { label: 'The race', rows: [
+      row('Race pace v field, s/lap', get(pace, w.driver, 'pace'), get(pace, r2.driver, 'pace'), 'low', function (v) { return isNum(v) ? PD.signed(v, 3) : '—'; }, 'Seconds a lap against the field, corrected for fuel, tyres and traffic (negative is faster)'),
+      row('Laps led', led(w.driver), led(r2.driver), 'high', function (v) { return isNum(v) ? String(v) : '—'; }),
+      row('Overtakes made', made(w.driver), made(r2.driver), 'high', function (v) { return isNum(v) ? String(v) : '—'; }, 'On-track passes, pit stops and safety-car periods left out (tracked from 2023)'),
+      row('Fastest lap', w.fastest_ms, r2.fastest_ms, 'low', function (v) { return isNum(v) ? PD.fmtMs(v, 1) : '—'; }, 'Each driver’s fastest lap of the race, to a tenth of a second'),
+      row('Points v our expectation', vexp(w.driver), vexp(r2.driver), 'high', function (v) { return isNum(v) ? PD.signed(v, 1) : '—'; }, 'Points scored minus the points our forecast expected')] }
+  ] });
+}
+
+/* The tale of the tape for a race still to run: our top two picks on this season's headline set (percentiles against
+   the season's peer group, PD.v2.compare), and their last five finishes before this round. Reads <y>/drivers.json,
+   which the driver pages share (cached). */
+function tapeUpcoming(race, ids) {
+  var host = document.getElementById('rc-tape');
+  if (!host || ids.length < 2) return;
+  PD.loadAll([race.year + '/drivers.json', race.year + '/season.json']).then(function (r) {
+    var cat = r[0], season = r[1];
+    host = document.getElementById('rc-tape');
+    if (!host || !PD.ok(cat)) { if (host) host.closest('.qk-grid').hidden = true; return; }
+    var D = cat.drivers || {}, two = ids.filter(function (k) { return D[k]; }).slice(0, 2);
+    if (two.length < 2) { host.closest('.qk-grid').hidden = true; return; }
+    var V = PD.v2, P = V.peer(cat, 'drivers', season);
+    var ents = two.map(function (k) { var t = D[k].team; return { name: PD.driverName(k), short: PD.driverSurname(k), href: PD.driverHref(k), colour: PD.teamColourRaw(t), alt: PD.teamAlt(t), team: t, sub: [PD.teamName(t), (D[k].races || 0) + ' starts'].join(' · ') }; });
+    V.mates(ents[0], ents[1]);
+    PD.set('rc-tape-s', 'This season so far: bar length = percentile against ' + esc(P.label) + '. The better number in each row is solid.');
+    host.innerHTML = V.compare(P, two, V.DRIVER_SET, ents, { ours: false }) + QK.verdicts(V.verdicts([P, P], two, V.DRIVER_SET, two.map(PD.driverSurname)));
+    /* the last five races before this one (no look-ahead), finishing positions oldest first */
+    var rows = two.map(function (k) { return { id: k, log: (D[k].log || []).filter(function (x) { return x.round < race.round; }).sort(function (a, b) { return a.round - b.round; }).slice(-5) }; });
+    var rounds = [];
+    rows.forEach(function (x) { x.log.forEach(function (l) { if (rounds.indexOf(l.round) < 0) rounds.push(l.round); }); });
+    rounds.sort(function (a, b) { return a - b; });
+    rounds = rounds.slice(-5);
+    var nm = {};
+    rows.forEach(function (x) { x.log.forEach(function (l) { nm[l.round] = l.name; }); });
+    PD.set('rc-form', rounds.length ? '<div class="qk-table-wrap"><table class="qk-table dense"><thead><tr><th>Driver</th>' + rounds.map(function (k) { return '<th class="num" title="' + esc(nm[k] || '') + '">' + esc(PD.shortRace(nm[k] || ('R' + k)).slice(0, 3).toUpperCase()) + '</th>'; }).join('') + '<th class="num">Pts</th><th class="num" data-tip="Points minus our expected points over these races">v exp.</th></tr></thead><tbody>' +
+      rows.map(function (x) {
+        var by = {}; x.log.forEach(function (l) { by[l.round] = l; });
+        var pts = x.log.reduce(function (s, l) { return s + (l.points || 0); }, 0), ex = x.log.filter(function (l) { return isNum(l.exp_points); });
+        var dv = ex.length === x.log.length && ex.length ? x.log.reduce(function (s, l) { return s + (isNum(l.race_points) ? l.race_points : (l.points || 0)) - l.exp_points; }, 0) : null;
+        return '<tr><td>' + PD.driverLink(x.id, { code: true }) + '</td>' + rounds.map(function (k) { var l = by[k]; return '<td class="num">' + (l ? PD.posHTML(l.pos, l.status) : '—') + '</td>'; }).join('') + '<td class="num"><b>' + PD.pts(pts) + '</b></td><td class="num">' + PD.deltaHTML(dv, 1) + '</td></tr>';
+      }).join('') + '</tbody></table></div><p class="pd-cap">Finishing position in each of the last ' + rounds.length + ' rounds before this one, oldest first; “v exp.” is the Grand Prix points against our forecast for those races.</p>' : PD.muted('No races yet this season.'));
+  });
 }
 
 /* Win chance through the race (round 9, Phase 4): after every lap, a conditional logit over the drivers still running,

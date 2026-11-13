@@ -1,7 +1,10 @@
-/* The Quant Hardwood — the team page (#/<L>/team/<tid>), on kit v4 "Broadcast".
+/* The Quant Hardwood — the team page (#/<L>/team/<tid>), on kit v4 "Broadcast" (the Rink's team page is the reference).
  *
- * Overview tab: the full-bleed team-colour hero with the black strip of numbers (record, our playoff and title
- * chances first, projected wins with the simulation's 90% range, the rating); the net rating through the
+ * Overview tab: the full-bleed team-colour hero (the last ten results as form dots) with the black strip of numbers
+ * (record, our playoff and title chances, projected wins with the simulation's 90% range as the likely-range bar, the
+ * net rating with its percentile among the league's teams) and "The short version"; "How sure are we?"; what to watch
+ * next (the scoreboard bug) beside the last game (its score, the line score by quarter and our win chance through it,
+ * from the game file); the net rating through the
  * season (±1 standard error shaded, results marked); our season chances and the final-seed distribution; strengths
  * and needs (current season; no trade targets: the user's call, 25 Oct 2026); top performers overall and by role
  * against the league (QKL.performers, from players.json's role, qualified flag and role percentiles); the current roster as a leaderboard; the schedule (next
@@ -65,6 +68,105 @@ function topPerformers(node, L, S, tid, cat) {
   });
 }
 
+/* "The short version" (as the Rink's team page): the record and the seed, our playoff and title chances, the net rating
+   and its rank, then, from 10 games (the Rink's floor for ranks), what the team does best and its weak spot among the
+   league's teams on the league block's team set (season.json league_block: percentiles oriented so 100 is best; style
+   metrics such as pace left out). Small samples are named. */
+const NUMW = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten'];
+/* "about 3 in 10" for a chance, in hundreds near the ends (1% is about 1 in 100, never "1 in 10") */
+function freqWords(p) {
+  if (p >= 0.995) return 'nearly all';
+  if (p <= 0.005) return 'almost none';
+  return p < 0.095 || p > 0.905 ? 'about ' + Math.round(p * 100) + ' in 100' : 'about ' + Math.round(p * 10) + ' in 10';
+}
+const RANK_GP = 10;
+function lc(x) { return /^[A-Z][a-z]/.test(x) ? x.charAt(0).toLowerCase() + x.slice(1) : x; }
+function shortTeam(L, tid, isCur, s, sim, r, lbT, prof, nTeams) {
+  const nm = HW.teamShort(L, tid);
+  const gp = (s.w || 0) + (s.l || 0);
+  if (!gp) return isCur && isNum(sim.p_playoffs) ? 'No games yet. Before the opening tip we give the ' + nm + ' a ' + U.pct(sim.p_playoffs) + ' chance of making the playoffs.' : null;
+  /* the season in play reads in the present; a finished one (a past season, or this one in the offseason) in the past */
+  const over = !isCur || HW.phase(L) === 'offseason';
+  let t = 'The ' + nm + (over ? ' finished ' : ' are ') + HW.record(s.w, s.l) + (isNum(s.seed) ? ', ' + HW.ordinal(s.seed) + ' in the ' + (s.conf || 'league') : '') + '.';
+  if (isCur && isNum(sim.p_playoffs)) t += ' We give them a ' + U.pct(sim.p_playoffs) + ' chance of the playoffs' + (isNum(sim.p_title) ? ' and ' + U.pct(sim.p_title) + ' to win the title' : '') + '.';
+  if (isNum(r.net)) t += ' Our net rating of ' + U.signed(r.net, 1) + ' points per 100 possessions' + (isNum(r.rank) && nTeams ? ' ranks ' + HW.ordinal(r.rank) + ' of ' + nTeams : '') + '.';
+  const pc = (lbT && lbT.pct) || {};
+  /* process metrics only (as the Rink's): the rating itself and the results group (the average margin) are left out */
+  const rows = (prof || []).filter(m => m && !m.style && m.id !== 'model_net' && m.group !== 'Results' && isNum(pc[m.id])).map(m => [m.id, pc[m.id], m.label]);
+  if (gp >= RANK_GP && rows.length) {
+    const top = rows.slice().sort((a, b) => b[1] - a[1])[0], low = rows.slice().sort((a, b) => a[1] - b[1])[0];
+    if (top[1] >= 70) t += ' Best at ' + lc(top[2]) + ' (' + QK.ordinal(Math.round(top[1])) + ' percentile of the ' + (nTeams || 'league’s') + ' teams).';
+    if (low[1] <= 30 && low[0] !== top[0]) t += ' The weak spot: ' + lc(low[2]) + ', in the ' + QK.ordinal(Math.round(low[1])) + ' percentile.';
+  } else if (gp < RANK_GP) t += ' ' + (NUMW[gp] || gp) + ' game' + (gp === 1 ? ' is' : 's is') + ' a small sample, so the strengths and weak spots start after ' + RANK_GP + '.';
+  return t;
+}
+
+/* What to watch next (the scoreboard bug and how the teams match up, as the Rink's team page) beside the last game:
+   its score as the title, our pre-game chance against the result, the line score by quarter and our win chance
+   through it (the game file, as the player page). No market here: it sits on the game page only. */
+function nextAndLast(L, S, tid, upcoming, log, season) {
+  const nxt = upcoming[0] || null, last = log.length ? log[log.length - 1] : null;
+  if (!nxt && !last) return '';
+  let h = '<section class="qk-section hw-sec1"><div class="qk-g2">';
+  if (nxt) {
+    const st0 = U.status(nxt);
+    const R = (season && season.ratings) || {}, ra = R[String(nxt.away)] || {}, rh = R[String(nxt.home)] || {};
+    const fx = [];
+    const add = (label, a, b, f, low) => { if (isNum(a) && isNum(b)) fx.push({ label: label, a: f(a), b: f(b), better: Math.abs(a - b) < 1e-9 ? null : ((a > b) !== !!low ? 'a' : 'b') }); };
+    add('Net rating, per 100 trips', ra.net, rh.net, x => U.signed(x, 1));
+    add('Points scored per 100', ra.off, rh.off, x => U.f(x, 1));
+    add('Points allowed per 100', ra.def, rh.def, x => U.f(x, 1), true);
+    const m = nxt.model || {};
+    const extra = st0 === 'pre' && isNum(m.margin) ? 'We expect ' + HW.teamAbbr(L, m.margin >= 0 ? nxt.home : nxt.away) + ' by about ' + Math.max(1, Math.round(Math.abs(m.margin))) + (isNum(m.total) ? ', with about ' + Math.round(m.total) + ' points in all' : '') + '.' : '';
+    h += '<div>' + QK.sectionHead({ kicker: st0 === 'live' ? 'Live now' : (QK.fmt.relDay(nxt.date) === 'Today' ? 'What to watch tonight' : 'Next up'), title: U.nick(L, nxt.away) + ' at ' + U.nick(L, nxt.home) }) +
+      QK.previewCard(U.game(nxt, L, { records: U.records(season) }), { layout: 'bug', nick: t => t.short || t.name, factors: fx, factorsTitle: 'How they match up this season', noteExtra: esc(extra) }) + '</div>';
+  }
+  if (last) {
+    const me = HW.teamAbbr(L, tid), op = HW.teamAbbr(L, last.opp), won = String(last.res).charAt(0) === 'W';
+    const ttl = isNum(last.pts) && isNum(last.opp_pts) ? (won ? me + ' ' + last.pts + ', ' + op + ' ' + last.opp_pts : op + ' ' + last.opp_pts + ', ' + me + ' ' + last.pts) : (last.home ? 'v ' : 'at ') + HW.teamName(L, last.opp);
+    let pre = '';
+    if (isNum(last.p_win)) {
+      const fav = last.p_win >= 0.5;
+      pre = 'We gave the ' + HW.teamShort(L, tid) + ' a ' + U.pct(last.p_win) + ' chance before the game' + (Math.abs(last.p_win - 0.5) < 0.05 ? ': a coin flip, ' + (won ? 'and they won.' : 'and they lost.') : fav === won ? ': the favourite won.' : ': ' + (won ? 'an upset win.' : 'an upset loss.'));
+    }
+    const href = last.game ? HW.gameHref(L, last.game, S) : null;
+    /* alone (no next game: the offseason, a past season) the card runs full width, the box beside the race */
+    const body = nxt ? '<div id="tp-box"></div>' + (pre ? QK.explain(esc(pre)) : '') + '<div id="tp-race"></div>'
+      : '<div class="qk-g2"><div><div id="tp-box"></div>' + (pre ? QK.explain(esc(pre)) : '') + '</div><div id="tp-race"></div></div>';
+    h += '<div>' + QK.sectionHead({ kicker: 'Last game', title: '<span id="tp-last-t">' + esc(ttl) + '</span>', html: true, sub: esc(HW.fmtDate(last.date, { year: false }) + (last.home ? ' · at home' : ' · away')),
+      actions: href ? '<a class="qk-more" href="' + esc(href) + '">The game centre</a>' : '' }) +
+      '<article class="qk-card"><div class="qk-card-body">' + body + '</div></article></div>';
+  }
+  return h.replace('<div class="qk-g2">', nxt && last ? '<div class="qk-g2">' : '<div>') + '</div></section>';
+}
+function fillLast(el, L, S, tid, last) {
+  if (!last || !last.game || !el.querySelector('#tp-box')) return;
+  HW.gameCentre.loadGame(L, S, last.game).then(res => {
+    if (!res || !U.ok(res.d) || !U.alive(el)) return;
+    const d = res.d, H = String(d.home), A = String(d.away);
+    const ln = d.line || {}, la = ln.away || [], lh = ln.home || [];
+    if (la.length && lh.length && el.querySelector('#tp-box')) {
+      const n = Math.max(la.length, lh.length);
+      const ql = i => (i < 4 ? 'Q' + (i + 1) : (n > 5 ? 'OT' + (i - 3) : 'OT'));
+      const sum = a => a.reduce((s, x) => s + (isNum(x) ? x : 0), 0);
+      const row = (t, a) => '<tr' + (t === tid ? ' class="hl"' : '') + '><td>' + QK.teamMark(U.team(L, t), 'sm') + '</td>' + a.map(x => '<td class="num">' + (isNum(x) ? x : '–') + '</td>').join('') + '<td class="num"><b>' + sum(a) + '</b></td></tr>';
+      el.querySelector('#tp-box').innerHTML = '<div class="qk-table-wrap"><table class="qk-table dense"><thead><tr><th>Team</th>' + la.map((_, i) => '<th class="num">' + ql(i) + '</th>').join('') + '<th class="num">Total</th></tr></thead><tbody>' + row(A, la) + row(H, lh) + '</tbody></table></div>';
+    }
+    const wp = ((d.wp || {}).model || []).filter(x => isNum(x[0]) && isNum(x[1]));
+    const node = el.querySelector('#tp-race');
+    if (wp.length > 4 && node) {
+      const PS = L === 'wnba' ? 600 : 720, tMax = Math.max(wp[wp.length - 1][0], 4 * PS);
+      const per = []; for (let t = PS; t < tMax; t += t < 4 * PS ? PS : 300) per.push(t);
+      const hc = U.pair(L, H, A);
+      node.innerHTML = U.chart('tp-race-c', 240, 'Our win chance through the last game');
+      QKC.winProb('#tp-race-c', { t: wp.map(x => x[0]), p: wp.map(x => x[1]), step: true, tMin: 0, tMax: tMax, interval: PS, periods: per,
+        home: { name: HW.teamName(L, H), abbr: HW.teamAbbr(L, H), colour: hc[0] }, away: { name: HW.teamName(L, A), abbr: HW.teamAbbr(L, A), colour: hc[1] },
+        tFmt: x => (x < 4 * PS ? 'Q' + (Math.round(x / PS) + 1) : ''), tLabel: x => (x < 4 * PS ? 'Q' + (Math.floor(x / PS) + 1) : 'OT') + ' · ' + Math.floor((x % PS) / 60) + ' min in',
+        tName: 'Game time (quarters)', yName: HW.teamAbbr(L, H) + ' win chance (ours)' });
+    }
+  });
+}
+
 function render(el, params) {
   const L = U.L(params), S = U.S(params), tid = String(params.id || '');
   const isCur = U.isCur(L, S);
@@ -73,7 +175,7 @@ function render(el, params) {
   const opt = (cond, p) => (cond ? HW.load(p) : Promise.resolve(null));
   return Promise.all([HW.load(HW.path('season.json', L, S)), HW.load(HW.path('teams.json', L, S)), HW.load(HW.path('players.json', L, S)),
     opt(isCur, HW.path('needs/' + tid + '.json', L, S)), opt(isCur, HW.path('valuation.json', L, S)), opt(isCur, HW.path('transactions.json', L, S)),
-    opt(isCur, HW.path('deals.json', L, S)), opt(isCur, HW.path('schedule.json', L, S)), isCur ? U.movement(L) : Promise.resolve(null)]).then(a => {
+    opt(isCur, HW.path('deals.json', L, S)), HW.load(HW.path('schedule.json', L, S)), isCur ? U.movement(L) : Promise.resolve(null)]).then(a => {
     if (!U.alive(el)) return;
     const season = U.ok(a[0]) ? a[0] : null, teams = U.ok(a[1]) ? a[1] : null, cat = U.ok(a[2]) ? a[2] : null;
     const mv = a[8] || null;
@@ -87,22 +189,47 @@ function render(el, params) {
     const col = U.tcol(L, tid);
     document.title = name + ' · ' + HW.leagueName(L) + ' · The Quant Hardwood';
     const open = isNum(sim.w_p05) && sim.w_p95 > sim.w_p05;
-    const stats = [
-      { label: 'Record', value: isNum(s.w) ? HW.record(s.w, s.l) : '—', sub: isNum(s.seed) && (s.w || s.l) ? HW.ordinal(s.seed) + ' in the ' + (s.conf || 'league') : (isCur ? 'no games yet' : '') },
-      { label: 'Net rating', value: U.signed(r.net, 1), sub: isNum(r.rank) ? HW.ordinal(r.rank) + ' of ' + Object.keys((season && season.ratings) || {}).length : '' }
-    ];
-    if (open) stats.push({ label: 'Projected wins', value: U.f(sim.exp_w, 1), sub: U.f(sim.w_p05, 0) + '–' + U.f(sim.w_p95, 0) });
-    const tiles = [];
-    if (isCur && isNum(sim.p_playoffs)) tiles.push({ label: 'Our playoff chance', value: U.pct(sim.p_playoffs), signal: true, sub: 'from ' + Number(((season.sim || {}).n_sims) || 20000).toLocaleString('en-GB') + ' simulated seasons', tip: 'Our chance of a playoff place (play-in excluded)' });
+    const nTeams = Object.keys((season && season.ratings) || {}).length;
+    /* the league block (season.json): the team set's percentiles against the league, oriented so 100 is best */
+    const lb = season && (season.league_block || (season.league && typeof season.league === 'object' ? season.league : null));
+    const lbT = lb && lb.teams ? lb.teams[tid] || null : null;
+    const prof = lb && lb.profile ? lb.profile.metrics || [] : [];
+    const pcNet = lbT && lbT.pct && isNum(lbT.pct.model_net) ? lbT.pct.model_net : null;
+    const nSims = Number(((season && season.sim) || {}).n_sims || 20000);
+    const cur0 = sim.current || {}, nGames = isNum(cur0.remaining) && isNum(cur0.w) && isNum(cur0.l) ? cur0.w + cur0.l + cur0.remaining : null;
+    const tiles = [{ label: 'Record', value: isNum(s.w) ? HW.record(s.w, s.l) : '—', sub: isNum(s.seed) && (s.w || s.l) ? HW.ordinal(s.seed) + ' in the ' + (s.conf || 'league') : (isCur ? 'no games yet' : '') }];
+    if (isCur && isNum(sim.p_playoffs)) tiles.push({ label: 'Our playoff chance', value: U.pct(sim.p_playoffs), signal: true, sub: 'from ' + nSims.toLocaleString('en-GB') + ' simulated seasons', tip: 'Our chance of a playoff place (play-in excluded)' });
     if (isCur && isNum(sim.p_title)) tiles.push({ label: 'Our title chance', value: U.pct(sim.p_title), signal: true, sub: isNum(sim.p_conf) ? 'conference ' + U.pct(sim.p_conf) : '' });
-    if (open) tiles.push({ label: 'Projected wins', value: U.f(sim.exp_w, 1), sub: '90% range ' + U.f(sim.w_p05, 0) + ' to ' + U.f(sim.w_p95, 0), tip: 'Mean of the simulated seasons; the range holds nine seasons in ten' });
-    if (isNum(r.net)) tiles.push({ label: 'Net rating', value: U.signed(r.net, 1), sub: 'per 100 possessions' + (isNum(r.se_net) ? ' ± ' + U.f(r.se_net, 1) : '') + (isNum(r.rank) ? ' · ' + HW.ordinal(r.rank) : ''), tip: 'Our opponent-adjusted net rating (Kalman filter); ± one standard error' });
-    if (isNum(r.off)) tiles.push({ label: 'Offence · defence', value: U.f(r.off, 1) + ' · ' + U.f(r.def, 1), sub: 'points scored and allowed per 100' });
+    /* projected wins with the simulation's own 90% range as the likely-range bar, on the scale of the full season */
+    if (open) tiles.push({ label: 'Projected wins', value: U.f(sim.exp_w, 1), sub: '9 seasons in 10: ' + U.f(sim.w_p05, 0) + '–' + U.f(sim.w_p95, 0) + (nGames ? ' of ' + nGames : ''), tip: 'Mean of the simulated seasons; the bar is the range that holds nine seasons in ten' + (nGames ? ', drawn on the scale of the ' + nGames + '-game season' : ''),
+      range: { lo: sim.w_p05, hi: sim.w_p95, mid: sim.exp_w, min: nGames ? 0 : undefined, max: nGames || undefined, label: 'Projected wins, nine seasons in ten', fmt: v => U.f(v, 0) } });
+    if (isNum(r.net)) tiles.push({ label: 'Net rating', value: U.signed(r.net, 1), pctl: pcNet, sub: 'per 100 possessions' + (isNum(r.se_net) ? ' ± ' + U.f(r.se_net, 1) : '') + (isNum(r.rank) ? ' · ' + HW.ordinal(r.rank) + ' of ' + nTeams : ''), tip: 'Our opponent-adjusted net rating (Kalman filter); ± one standard error; the chip is its percentile among the league’s teams' });
+    /* a past season (no simulation): the two halves of the rating fill the strip, with their percentiles */
+    const pcOf = k => (lbT && lbT.pct && isNum(lbT.pct[k]) ? lbT.pct[k] : null);
+    if (tiles.length < 5 && isNum(r.off)) tiles.push({ label: 'Offence', value: U.f(r.off, 1), pctl: pcOf('model_off'), sub: 'points scored per 100, adjusted' });
+    if (tiles.length < 5 && isNum(r.def)) tiles.push({ label: 'Defence', value: U.f(r.def, 1), pctl: pcOf('model_def'), sub: 'points allowed per 100 (lower is better)' });
+    const path = ((season && season.rating_paths) || {})[tid] || [];
+    const log = (T.log || []).slice().sort((x, y) => String(x.date).localeCompare(String(y.date)));
+    /* every game the team has finished this season, playoffs included (teams.json's log is the regular season only),
+       from the season's schedule.json: the last game and the form come from it; the log is the fallback */
+    const played = sched ? (sched.games || []).filter(g => (String(g.home) === tid || String(g.away) === tid) && HW.gameState(g) === 'post' && g.stype !== 'pre' && isNum(g.hs) && isNum(g.as))
+      .sort((x, y) => String(x.date).localeCompare(String(y.date))).map(g => {
+        const home = String(g.home) === tid, pts = home ? g.hs : g.as, opp = home ? g.as : g.hs, ph = (g.model || {}).p_home;
+        return { game: g.id, date: g.date, opp: home ? g.away : g.home, home: home, res: pts > opp ? 'W' : 'L', pts: pts, opp_pts: opp, p_win: isNum(ph) ? (home ? ph : 1 - ph) : null };
+      }) : [];
+    const games = played.length ? played : log;
+    /* form: the last ten results, oldest first, on a black chip in the hero (the dots keep their contrast) */
+    /* the streak from the same games as the form (playoffs included), so the two never disagree */
+    let streak = s.streak || '';
+    if (played.length) { const lastR = played[played.length - 1].res; let k = 0; for (let i = played.length - 1; i >= 0 && played[i].res === lastR; i--) k++; streak = lastR + k; }
+    const f10 = games.slice(-10).map(g => String(g.res || '').charAt(0).toUpperCase()).filter(x => x === 'W' || x === 'L');
+    const formTag = f10.length ? '<span class="hw-ph-form" tabindex="0" data-tip="The last ' + f10.length + ' results, oldest first">Last ' + f10.length + ' ' + QK.formDots(f10, f10.length) + '<b class="num">' + f10.filter(x => x === 'W').length + '–' + f10.filter(x => x === 'L').length + '</b></span>' : '';
     /* v4: the full-bleed team-colour hero (the alternate colour on the diagonal, the abbreviation outlined) with the
-       black strip of five numbers: the record, our chances, projected wins and the rating */
+       black strip of five numbers: the record, our chances, projected wins and the rating; then "The short version" */
     let h = '<nav class="hw-crumb" aria-label="Breadcrumb"><a href="' + esc(HW.href(L, 'teams', S)) + '">' + esc(HW.leagueName(L)) + ' teams</a><span aria-hidden="true">›</span>' + esc(name) + '</nav>' +
       QK.playerHeader({ name: name, split: false, kicker: U.kicker(L, S), face: HW.teamAbbr(L, tid), team: { name: [info.conference || s.conf, info.division].filter(Boolean).join(' · ') || HW.leagueName(L), abbr: HW.teamAbbr(L, tid), colour: HW.teamColourRaw(L, tid), alt: HW.teamAlt(L, tid) },
-        meta: [isNum(r.off) ? ['Offence', U.f(r.off, 1) + ' per 100'] : null, isNum(r.def) ? ['Defence', U.f(r.def, 1) + ' allowed'] : null, isNum(r.pace) ? ['Pace', U.f(r.pace, 1)] : null], strip: [stats[0]].concat(tiles.length ? tiles.filter(t => t.label !== 'Offence · defence') : stats.slice(1)).slice(0, 5),
+        meta: [isNum(r.off) ? ['Offence', U.f(r.off, 1) + ' per 100'] : null, isNum(r.def) ? ['Defence', U.f(r.def, 1) + ' allowed'] : null, isNum(r.pace) ? ['Pace', U.f(r.pace, 1)] : null, streak ? ['Streak', streak] : null],
+        tags: formTag ? [formTag] : [], strip: tiles.slice(0, 5), short: shortTeam(L, tid, isCur, s, sim, r, lbT, prof, nTeams),
         /* round 12 (My Teams): follow the team from the hero; it then leads Home and this site's overview */
         follow: U.followItem(L, tid) });
     const base = HW.teamHref(L, tid, S);
@@ -114,14 +241,22 @@ function render(el, params) {
       return out;
     }
     if (!season && !teams) { el.innerHTML = h + U.empty('Not in this season', name + ' has no data for ' + HW.seasonLabel(L, S) + '.'); return; }
-    const path = ((season && season.rating_paths) || {})[tid] || [];
-    const log = (T.log || []).slice().sort((x, y) => String(x.date).localeCompare(String(y.date)));
-    if (isCur && isNum(sim.p_playoffs)) h += '<div style="margin-top:var(--sp-3)">' + QK.note('<b>' + U.pct(sim.p_playoffs) + '</b> to make the playoffs means ' + esc(HW.teamName(L, tid)) + ' made it in ' +
-      (sim.p_playoffs >= 0.995 ? 'nearly all its' : sim.p_playoffs <= 0.005 ? 'almost none of the' : 'about ' + Math.max(1, Math.round(sim.p_playoffs * 10)) + ' of every 10') + ' simulated seasons.' + (isNum(r.net) ? ' A net rating of <b>' + U.signed(r.net, 1) + '</b> is the points per 100 trips the team is better than an average one, after the schedule.' : '')) + '</div>';
+    /* "How sure are we?": what the playoff chance means, and the sample behind the rating (its standard error) */
+    const gp0 = (s.w || 0) + (s.l || 0);
+    const sure = [];
+    if (isCur && isNum(sim.p_playoffs)) sure.push('<b>' + U.pct(sim.p_playoffs) + '</b> to make the playoffs means the ' + esc(HW.teamShort(L, tid)) + ' made it in ' +
+      freqWords(sim.p_playoffs) + ' of our ' + nSims.toLocaleString('en-GB') + ' simulated seasons.');
+    const over0 = !isCur || HW.phase(L) === 'offseason';
+    if (isNum(r.net)) sure.push((gp0 ? (over0 ? 'Over ' + gp0 + ' game' + (gp0 === 1 ? '' : 's') : esc(NUMW[gp0] || String(gp0)) + ' game' + (gp0 === 1 ? '' : 's') + ' in') + ', our' : 'Before the first game our') + ' net rating is <b>' + U.signed(r.net, 1) + (isNum(r.se_net) ? ' ± ' + U.f(r.se_net, 1) : '') + '</b> points per 100 possessions against an average team' + (isNum(r.se_net) ? ' (one standard error)' : '') + '.' +
+      (open ? ' That is why the projected wins still run from ' + U.f(sim.w_p05, 0) + ' to ' + U.f(sim.w_p95, 0) + ' in nine seasons out of ten.' : ''));
+    if (sure.length) h += '<div style="margin-top:var(--sp-3)">' + QK.explain(sure.join(' '), { title: 'How sure are we?' }) + '</div>';
+    h += '%NEXT_LAST%';
     h += '<div class="qk-grid hw-sec">';
-    if (path.length > 1) h += U.card2('Net rating through the season', 'Our rating per 100 possessions after each game (Kalman filter), shaded ±1 standard error' + (log.length ? '; dots are results (green won, red lost)' : ''), U.chart('tp-path', 300, 'Net rating through the season'), { cls: 'qk-span-8' });
     const oddsRows = [['Playoffs', sim.p_playoffs], ['Top-six seed', sim.p_top6], ['Conference', sim.p_conf], ['Title', sim.p_title]].filter(x => isNum(x[1]) && x[1] > 0);
-    if (oddsRows.length && isCur) h += U.card2('Season chances', 'Our chances from the season simulation',
+    const chancesOn = !!(oddsRows.length && isCur);
+    /* the rating path runs full width when there are no season chances beside it (the offseason, a past season) */
+    if (path.length > 1) h += U.card2('Net rating through the season', 'Our rating per 100 possessions after each game (Kalman filter), shaded ±1 standard error' + (log.length ? '; dots are regular-season results (green won, red lost)' : ''), U.chart('tp-path', 300, 'Net rating through the season'), { cls: chancesOn ? 'qk-span-8' : 'qk-span-12' });
+    if (chancesOn) h += U.card2('Season chances', 'Our chances from the season simulation',
       QK.chances(oddsRows.map(x => ({ label: x[0], p: x[1], color: HW.teamColourRaw(L, tid) })), { sort: false, max: 1, key: false }) +
       ((sim.seed_dist || []).length && open ? U.chart('tp-seed', 190, 'Chance of each final seed') : ''), { cls: path.length > 1 ? 'qk-span-4' : 'qk-span-12' });
     h += '</div>';
@@ -152,16 +287,12 @@ function render(el, params) {
       '<div class="qk-card"><div id="tp-roster"></div></div></section>';
     // schedule + moves
     const upcoming = sched ? (sched.games || []).filter(g => (String(g.home) === tid || String(g.away) === tid) && HW.gameState(g) !== 'post' && U.fresh(g)).sort((x, y) => String(x.date).localeCompare(String(y.date))).slice(0, 8) : [];
-    const recent = log.slice(-8).reverse();
+    const recent = games.slice(-8).reverse();
     const txRows = tx ? U.rowsOf(tx).filter(x => String(x.team) === tid) : [];
     const seen = {}, txs = txRows.filter(x => { const k = x.date + x.text; if (seen[k]) return false; seen[k] = 1; return true; }).sort((x, y) => String(y.date).localeCompare(String(x.date))).slice(0, 10);
     const dl = deals && deals.teams ? deals.teams[tid] : null;
-    /* v4: the next game as the scoreboard bug (our chance, the start, both teams in their colours) */
-    if (upcoming.length) {
-      const g0 = upcoming[0], st0 = U.status(g0);
-      h += '<section class="qk-section">' + QK.sectionHead({ kicker: st0 === 'live' ? 'Live now' : (QK.fmt.relDay(g0.date) === 'Today' ? 'What to watch tonight' : 'Next up'), title: U.nick(L, g0.away) + ' at ' + U.nick(L, g0.home) }) +
-        QK.previewCard(U.game(g0, L, { records: U.records(season) }), { layout: 'bug', nick: t => t.short || t.name, market: 'quiet' }) + '</section>';
-    }
+    /* v4 (as the Rink): what to watch next (the scoreboard bug) beside the last game, straight under the hero */
+    h = h.replace('%NEXT_LAST%', nextAndLast(L, S, tid, upcoming, games, season));
     h += '<div class="qk-grid hw-sec">' + U.card2('Schedule', upcoming.length ? 'Next games with our win chance' : 'Results', '<div id="tp-sched"></div>', { cls: 'qk-span-6', flush: true });
     if (txs.length || dl) h += U.card2('Moves', dl ? dl.n + ' rated trade' + (dl.n === 1 ? '' : 's') + ' in 12 months · net ' + U.signed(dl.net_now, 1) + ' WAR in today’s view' : 'Transactions in the last 12 months',
       '<div>' + txs.map(x => '<div class="hw-tx"><span class="d">' + esc(HW.fmtDate(x.date, { year: 'auto', weekday: false })) + '</span><span>' + esc(x.text) + '</span></div>').join('') + '</div>',
@@ -170,6 +301,7 @@ function render(el, params) {
     el.innerHTML = h;
     if (lo) QKL.team(document.getElementById('tp-league'), lo, tid);
     if (window.QKL && QKL.performers) topPerformers(document.getElementById('tp-top'), L, S, tid, cat);
+    fillLast(el, L, S, tid, games.length ? games[games.length - 1] : null);
 
     // rating path with the se band and results
     if (document.getElementById('tp-path')) {

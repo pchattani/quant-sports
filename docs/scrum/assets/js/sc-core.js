@@ -148,6 +148,25 @@ SC.margin = function (S, c) {
   var fav = c.m >= 0 ? c.home : c.away;
   return SC.tabbr(S, fav) + ' by ' + Math.max(1, Math.round(Math.abs(c.m)));
 };
+/* The power board's bar (QK.powerBars parts): attack and defence when the model splits a side's rating, else the one
+   rating. Our model rates a side as one number today (attack and defence are each half of it: two equal halves that
+   say nothing), so the bar is the rating itself until a split model ships. */
+SC.powerParts = function (rows) {
+  var split = (rows || []).some(function (r) { return isNum(r.att) && isNum(r.dfn) && Math.abs(r.att - r.dfn) > 0.05; });
+  return split ? { parts: [{ key: 'att', label: 'Attack', color: 'var(--c-1)' }, { key: 'dfn', label: 'Defence', color: 'var(--c-3)' }], of: function (r) { return { att: r.att, dfn: r.dfn }; } }
+    : { parts: [{ key: 'rating', label: 'Points v an average side', color: 'var(--signal-deep)' }], of: function (r) { return { rating: r.rating }; } };
+};
+/* "How sure are we?" for a test before the start, in words that hold at the ends (a 99% favourite fails to win about
+   1 test in 100, not "1 time in 10"): the note for QK.previewCard, or undefined to keep the kit's own */
+SC.howSure = function (S, c, extra) {
+  var p = (c && c.p) || [];
+  if (!c || c.status === 'final' || !isNum(p[0]) || !isNum(p[2])) return undefined;
+  var pf = Math.max(p[0], p[2]), q = 1 - pf, k10 = Math.round(q * 10);
+  /* "1 time in N" with a round N (12, 15, 20, 30, 50, 100 ...): the chance is an estimate, not a count */
+  var n = q > 0 ? 1 / q : Infinity, nn = n < 12 ? Math.round(n) : n < 30 ? Math.round(n / 5) * 5 : n < 100 ? Math.round(n / 10) * 10 : Math.round(n / 50) * 50;
+  var freq = q >= 0.095 ? 'about ' + k10 + ' time' + (k10 === 1 ? '' : 's') + ' in 10' : q >= 0.002 ? 'about 1 time in ' + nn : 'fewer than 1 time in 500';
+  return '<b>How sure are we?</b> ' + SC.pct(pf) + ' means ' + esc(SC.tname(S, p[0] >= p[2] ? c.home : c.away)) + ' fail to win a test like this ' + freq + '.' + (extra ? ' ' + extra : '');
+};
 SC.result = function (S, c, tid) {
   if (!isNum(c.hs)) return '';
   var home = String(c.home) === String(tid), us = home ? c.hs : c.as, th = home ? c.as : c.hs;
@@ -309,6 +328,8 @@ function boot() {
     Object.keys(idx.sources || {}).forEach(function (k) { if (idx.sources[k] === false) document.documentElement.setAttribute('data-nosrc-' + k, ''); });
     var meta = QK.$('#meta-line');
     if (meta) meta.textContent = 'Data built ' + fmt.ago(idx.updated_at) + ' (' + fmt.date(idx.updated_at) + ' ' + fmt.time(idx.updated_at) + '). ' + (idx.credit || '');
+    /* the data-freshness line (kit QK.stamp): index.json's build time, the file every page loads first */
+    if (QK.stamp && idx.updated_at) QK.stamp(idx.updated_at, { what: 'The site rebuilds about once an hour: results, ratings, our chances and every page. Live scores come from a separate feed while tests are on.' });
     root.addEventListener('hashchange', render);
     if (QK.live) QK.live.attach(function () { if (!document.hidden && /^(overview|fixtures|match)$/.test((SC.state && SC.state.sec) || 'overview')) render(); });
     render();

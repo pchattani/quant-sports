@@ -361,7 +361,10 @@ function load(p0) {
 }
 function loadAll(paths) { return Promise.all(paths.map(load)); }
 function uncache(paths) { (Array.isArray(paths) ? paths : [paths]).forEach(p0 => { delete CACHE[String(p0).replace(/^\/+/, '').replace(/^data\//, '')]; }); }
-function refreshIndex() { uncache('index.json'); return load('index.json').then(d => { if (d) INDEX.data = d; return INDEX.data; }); }
+function refreshIndex() { uncache('index.json'); return load('index.json').then(d => { if (d) { INDEX.data = d; stampIndex(d); } return INDEX.data; }); }
+/* Data freshness (round 11): the build time of index.json, the first file every page loads, as the kit's "Updated 14 min
+   ago" line (the section bar and the footer). QK.stamp keeps the newest time it has seen. */
+function stampIndex(d) { try { if (window.QK && QK.stamp && d && d.updated_at) QK.stamp(d.updated_at, { what: 'The site rebuilds every hour, and every 15 minutes around games; live scores update on their own feed.' }); } catch (e) { /* the page stands without it */ } }
 /* Every ms while visible: forget `paths`, refresh index.json and re-render the page in place. */
 function liveRefresh(paths, ms) {
   interval(() => {
@@ -1250,7 +1253,6 @@ function searchRows() {
   });
 }
 function bootShell() {
-  const idx = INDEX.data || {};
   const ctx = '<select class="qk-select" id="gi-season" aria-label="Season">' + seasons().map(y => '<option value="' + y + '">' + y + '</option>').join('') + '</select>';
   const secs = QK.sections('nfl', { scout: true }).map(s => {
     s.href = { overview: '#/', fixtures: '#/games', standings: '#/standings', teams: '#/teams', scout: '#/scout', value: '#/value', fantasy: '#/fantasy', model: '#/methodology' }[s.key] || s.href;
@@ -1261,7 +1263,7 @@ function bootShell() {
   if (sel) { sel.value = String(state.season || currentSeason()); sel.addEventListener('change', () => setSeason(sel.value)); }
   const foot = document.getElementById('qk-footer');
   if (foot) foot.insertAdjacentHTML('beforeend', '<div class="gi-footnote">Data from nflverse (CC BY 4.0), ESPN, Kalshi and Polymarket · our own expected points, win probability and season simulation · ' +
-    (idx.updated_at ? 'updated ' + esc(fmtStamp(idx.updated_at)) + ' · ' : '') + '<a href="#/disclaimer">Disclaimer and terms</a> · <a href="#/methodology">How it works</a></div>');
+    '<a href="#/disclaimer">Disclaimer and terms</a> · <a href="#/methodology">How it works</a></div>');
   const fv = document.getElementById('first-visit-notice');
   let seen = false;
   try { seen = window.localStorage.getItem('qg-notice-v1') === '1'; } catch (e) { seen = false; }
@@ -1274,6 +1276,7 @@ function init() {
     INDEX.data = idx || {};
     state.season = currentSeason();
     bootShell();
+    stampIndex(INDEX.data);
     booted = true;
     window.addEventListener('hashchange', () => render());
     if (window.QK && QK.live) QK.live.attach(() => { if (document.visibilityState === 'visible' && /^(hub|overview|games|game)$/.test(state.route || '')) render({ keep: true }); });

@@ -587,6 +587,12 @@ function drawPlayer(el, T, pid, career, careerRaw, cat, elo, ranks, race) {
   const pc = (p && p.pct) || {};
   const Y = (cat || {}).year || K.Y(null, null, T);
   const sur = K.surname(name);
+  /* the record this year: the catalogue's wins and losses, else the career file's season row (the player file's peer
+     block carries the win share but not the counts, which left the strip's first tile dashed) */
+  const seasRow = (c.seasons || []).filter(r => r && Number(r.year) === Number(Y))[0] || null;
+  const wins = isNum(vals.wins) ? vals.wins : (seasRow && isNum(seasRow.w) ? seasRow.w : null);
+  const losses = isNum(vals.losses) ? vals.losses : (seasRow && isNum(seasRow.l) ? seasRow.l : null);
+  const titles = isNum(vals.titles) ? vals.titles : (seasRow && isNum(seasRow.titles) ? seasRow.titles : null);
   const nM = p && isNum(p.matches) ? p.matches : null;
   /* "The short version": what the numbers say, in plain English, from this season's tour percentiles */
   const lc = x => (/^[A-Z][a-z]/.test(x) ? x.charAt(0).toLowerCase() + x.slice(1) : x);
@@ -595,7 +601,7 @@ function drawPlayer(el, T, pid, career, careerRaw, cat, elo, ranks, race) {
     const bits = [];
     const eloR = eloCur && isNum(eloCur.rank) ? eloCur.rank : null;
     bits.push(sur + (isNum(rank) ? ' is ranked No. ' + rank : ' is unranked') + (isNum(eloR) ? (eloR === rank ? ', and No. ' + eloR + ' by our Elo too' : ', No. ' + eloR + ' by our Elo') : '') + '.');
-    if (isNum(vals.wins) && isNum(vals.losses) && vals.wins + vals.losses > 0) bits.push('This year: ' + vals.wins + ' wins and ' + vals.losses + ' losses at tour level' + (isNum(vals.titles) && vals.titles ? ', with ' + (vals.titles === 1 ? 'a title' : vals.titles + ' titles') : '') + '.');
+    if (isNum(wins) && isNum(losses) && wins + losses > 0) bits.push('This year: ' + wins + ' win' + (wins === 1 ? '' : 's') + ' and ' + losses + ' loss' + (losses === 1 ? '' : 'es') + ' at tour level' + (isNum(titles) && titles ? ', with ' + (titles === 1 ? 'a title' : titles + ' titles') : '') + '.');
     if (p.qualified) {
       const rows = V.set(T, '').map(k => [k, pc[k], V.label(k)]).filter(r => isNum(r[1]) && !V.isElo(r[0]));
       const top = rows.filter(r => r[1] >= 90).sort((x, y) => y[1] - x[1]).slice(0, 2);
@@ -613,8 +619,8 @@ function drawPlayer(el, T, pid, career, careerRaw, cat, elo, ranks, race) {
   const finalsT = isNum(fq) && fq >= 0.005 ? { label: finalsName, value: K.pct(fq, fq > 0.995 || fq < 0.01 ? 1 : 0), signal: true, sub: 'our chance of qualifying', href: K.href(T, 'race'), tip: 'From simulating the rest of the season' } : null;
   const raceT = { label: 'Race position', value: raceIdx >= 0 ? '#' + (raceIdx + 1) : '—', sub: raceIdx >= 0 ? K.int(raceList[raceIdx][1]) + ' points this year, this week included' : 'outside the race top 100' };
   const strip = [
-    { label: 'Won–lost this year', value: isNum(vals.wins) && isNum(vals.losses) ? vals.wins + '–' + vals.losses : '—', pctl: isNum(pc.win_pct) ? pc.win_pct : null,
-      sub: isNum(vals.win_pct) ? K.pct(vals.win_pct, 0) + ' of tour-level matches' + (isNum(vals.titles) && vals.titles ? ' · ' + vals.titles + ' title' + (vals.titles === 1 ? '' : 's') : '') : 'tour level' },
+    { label: 'Won–lost this year', value: isNum(wins) && isNum(losses) ? wins + '–' + losses : '—', pctl: isNum(pc.win_pct) ? pc.win_pct : null,
+      sub: (isNum(vals.win_pct) ? K.pct(vals.win_pct, 0) + ' of tour-level matches' : 'tour level') + (isNum(titles) && titles ? ' · ' + titles + ' title' + (titles === 1 ? '' : 's') : '') },
     { label: 'Elo', value: K.num(eloCur ? eloCur.all : vals.elo, 0), pctl: isNum(pc.elo) ? pc.elo : null, sub: eloCur && isNum(eloCur.rank) ? 'No. ' + eloCur.rank + ' by our rating' : 'our strength rating', tip: 'Overall strength rating from every result, adjusted for the opponent. A 100-point edge is about a 64% chance.' },
     isNum(vals.hold_plus_break) ? { label: 'Serve + return', value: K.fmtV(vals.hold_plus_break, 'pct'), pctl: isNum(pc.hold_plus_break) ? pc.hold_plus_break : null, sub: 'hold ' + K.fmtV(vals.hold, 'pct') + ' + break ' + K.fmtV(vals.brk, 'pct') + ', inferred', tip: 'Hold % plus break %, inferred from set scores: the best single predictor beyond Elo. 100% is an average player.' }
       : { label: 'Games won', value: K.fmtV(vals.games_won_pct, 'pct'), pctl: isNum(pc.games_won_pct) ? pc.games_won_pct : null, sub: 'share of all games this year' },
@@ -706,8 +712,11 @@ function drawPlayer(el, T, pid, career, careerRaw, cat, elo, ranks, race) {
         '<article class="qk-card"><div class="qk-card-body">' + (box || '<p class="ta-cap">' + K.esc(lastR.score || 'No score recorded') + '</p>') + (pre ? QK.explain(pre, { cls: 'ta-lastline' }) : '') +
         '<div id="pp-race"></div>' + (lastR.match ? '<a class="qk-more" style="display:inline-block;margin-top:12px" href="' + K.matchHref(T, lastR.match) + '">The match centre</a>' : '') + '</div></article></div>';
     }
+    /* sweep: with no match scheduled the last match would sit beside an empty half; "Their type" fills it instead */
+    if (!nxt && lastR && tape && typeCard) h += '<div>' + QK.sectionHead({ kicker: 'Their type', title: 'Who plays most alike', sub: 'The closest profiles this season, and the most frequent opponents.' }) + typeCard.replace('<div class="qk-kicker">Their type</div>', '') + '</div>';
     h += '</div></section>';
   }
+  const typeBeside = !nxt && !!lastR && tape && !!typeCard;
   /* round 9 (Phase 4): what's next. The next or live match (index.json's cards), and the points at stake on the road ahead:
      each counted event of the last 52 weeks drops off on its date (the career file's to_defend), so the player keeps those
      points only by matching last year's result there. */
@@ -742,7 +751,8 @@ function drawPlayer(el, T, pid, career, careerRaw, cat, elo, ranks, race) {
       '</tbody></table></div></div></article></section>';
   }
   /* 4. match by match and their type */
-  if (tape && (gbg || typeCard)) h += '<section class="qk-section"><div class="qk-gside"><div>' + gbg + '</div><div>' + typeCard + '</div></div></section>';
+  if (typeBeside) { if (gbg) h += '<section class="qk-section">' + gbg + '</section>'; }
+  else if (tape && (gbg || typeCard)) h += '<section class="qk-section"><div class="qk-gside"><div>' + gbg + '</div><div>' + typeCard + '</div></div></section>';
 
   // ── more on the player: the older sections, on the kit's cards
   h += '<section class="qk-section">' + QK.sectionHead({ kicker: 'More on the player', title: 'Form, luck and the long view', sub: 'Where the ranking is heading, how much of the record is luck, every rating over time and every result in the data.' }) +
