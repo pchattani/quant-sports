@@ -12,7 +12,8 @@ happens inside a step:
   2. per scope: oddsmarkets.rugby.pages.build_scope (overview, fixtures, years, ratings, rankings, comps, teams,
      players, matches, model, lab, records), then the follow cards (oddsmarkets.rugby.follow_build)
   3. site-wide: index.json, search.json, glossary.json (oddsmarkets.rugby.site)
-  4. a size report; exits non-zero over the 400 MB budget
+  4. the power rankings: power.json and power/<S>.json (oddsmarkets.rugby.power_build)
+  5. a size report; exits non-zero over the 400 MB budget
 
 Inputs: the season stores (data/rugby/stores, written by scripts/scrum_fetch.py) and the fitted parameters
 (oddsmarkets/rugby/fitted, written by scripts/scrum_fit.py). Payloads go to SCRUM_DATA (default docs/scrum/data).
@@ -111,6 +112,15 @@ def main(argv=None) -> int:
         site.build_glossary(data)
         return {"ok": True}
     step("site", site_files, report)
+
+    # power rankings: data/power/<S>.json and data/power.json (oddsmarkets/common/power.py), from the payloads just
+    # written (index.json among them), so after the site files
+    def power():
+        from oddsmarkets.rugby import power_build
+        return power_build.build(data)
+    pw = step("power rankings", power, report)
+    if pw:
+        log.info("power rankings: %d files, %.0f KB, largest %d bytes", pw["n"], pw["bytes"] / 1024, pw["max"])
     rep = size_report(SITE)
     print(f"size {rep['total_mb']} MB: {rep['by']}")
     bad = {k: v for k, v in report.items() if not v.get("ok")}

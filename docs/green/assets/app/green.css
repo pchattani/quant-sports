@@ -73,3 +73,7 @@
 .gr-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr)); gap: var(--sp-5, 24px); }
 .gr-pair > div { min-width: 0; }
 .gr-pair > div:empty { display: none; }
+/* #/power (power.js): golfers' surnames run longer than team names; the climb's end labels tighten so they fit */
+.gr-page .qkp-b-lab { gap: 4px; }
+.gr-page .qkp-b-nm { font-size: 13.5px; letter-spacing: 0; }
+.gr-page .qkp-b-v { font-size: 12px; }

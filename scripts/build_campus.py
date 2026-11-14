@@ -303,6 +303,12 @@ def main(argv=None) -> int:
         fl = step(f"follow cards {L}", lambda: FLB.build(data, L), report)
         if fl:
             log.info("follow cards %s: %d, %.0f KB, largest %d bytes", L, fl["n"], fl["bytes"] / 1024, fl["max"])
+    # power rankings: data/power/<level>.json for every level on disk and data/power.json (oddsmarkets/common/power.py),
+    # from the season, schedule and player payloads written above
+    from oddsmarkets.college import power_build as PWB
+    pw = step("power rankings", lambda: PWB.build(data), report)
+    if pw:
+        log.info("power rankings: %d league files, %.0f KB, largest %d bytes", pw["n"], pw["bytes"] / 1024, pw["max"])
     rep = size_report(SITE)
     print_size(rep)
     bad = {k: v for k, v in report.items() if not v.get("ok")}

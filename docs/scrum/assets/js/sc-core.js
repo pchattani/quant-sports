@@ -4,6 +4,7 @@
  *   #/                         the remembered scope, else men            #/<S>                 overview
  *   #/<S>/fixtures?tab=upcoming|results|year&y=YYYY                      #/<S>/match/<id>      match page
  *   #/<S>/standings?tab=nc|six|trc|rwc&view=table|chances|bracket|history
+ *   #/<S>/power?g=<group>      power rankings (sc-power.js; #/power?l=<S> from Home is sent on to it)
  *   #/<S>/rankings?tab=wr|ours                                           (the Rankings section: World Rugby replica, ours)
  *   #/<S>/teams   #/<S>/team/<id>   #/<S>/scout?view=board|leaders&grp=  #/<S>/player/<id>
  *   #/<S>/model?tab=method|doing|lab|records|glossary|terms              #/disclaimer
@@ -227,7 +228,7 @@ U.heat = function (p, d) {
 var ROUTES = {};
 SC.route = function (name, fn) { ROUTES[name] = fn; };
 SC.state = { S: null, sec: 'overview' };
-var SEC_OF = { overview: 'overview', fixtures: 'fixtures', match: 'fixtures', standings: 'standings', teams: 'teams', team: 'teams',
+var SEC_OF = { overview: 'overview', fixtures: 'fixtures', match: 'fixtures', standings: 'standings', power: 'power', teams: 'teams', team: 'teams',
   scout: 'scout', player: 'scout', rankings: 'value', model: 'model', disclaimer: 'model', compare: 'teams', progression: 'teams' };
 var LEAVE = [];
 SC.onLeave = function (fn) { if (typeof fn === 'function') LEAVE.push(fn); };
@@ -240,6 +241,8 @@ SC.parse = function (hash) {
   var parts = path.split('/').filter(function (x) { return x !== ''; }).map(decodeURIComponent);
   var r = { S: null, sec: 'overview', id: null, query: query };
   if (parts[0] === 'disclaimer') { r.sec = 'disclaimer'; return r; }
+  /* #/power[?l=men|women&g=]: the address Home links to; render() sends it on to #/<S>/power */
+  if (parts[0] === 'power') { r.sec = 'power'; r.bare = true; r.S = SC.SCOPES.indexOf(query.l) >= 0 ? query.l : null; return r; }
   if (SC.SCOPES.indexOf(parts[0]) >= 0) {
     r.S = parts.shift();
     if (parts[0]) r.sec = parts[0];
@@ -253,7 +256,7 @@ SC.defaultScope = function () {
   return 'men';
 };
 function sectionHrefs(S) {
-  var map = { overview: '', fixtures: 'fixtures', standings: 'standings', teams: 'teams', scout: 'scout', value: 'rankings', model: 'model' };
+  var map = { overview: '', fixtures: 'fixtures', standings: 'standings', power: 'power', teams: 'teams', scout: 'scout', value: 'rankings', model: 'model' };
   QK.$$('.qk-secnav a[data-sec]').forEach(function (a) { var k = a.getAttribute('data-sec'); if (k in map) a.setAttribute('href', '#/' + S + (map[k] ? '/' + map[k] : '')); });
 }
 function paintCtx(S) {
@@ -268,6 +271,7 @@ function render() {
     root.scrollTo(0, 0);
     return;
   }
+  if (r.bare) { root.location.replace('#/' + (r.S || SC.defaultScope()) + '/power' + (r.query.g ? '?g=' + encodeURIComponent(r.query.g) : '')); return; }
   if (!r.S) { root.location.replace('#/' + SC.defaultScope()); return; }
   var S = r.S;
   LEAVE.splice(0).forEach(function (fn) { try { fn(); } catch (e) { /* gone */ } });
@@ -295,7 +299,7 @@ function render() {
     var pr = fn(page, { S: S, id: r.id, query: r.query, sec: r.sec });
     if (pr && pr.then) pr.then(null, function (e) { if (root.console) console.error(e); page.innerHTML = QK.empty('This page could not be shown', String(e && e.message || e)); });
   } catch (e) { if (root.console) console.error(e); page.innerHTML = QK.empty('This page could not be shown', String(e && e.message || e)); }
-  document.title = (r.sec === 'overview' ? SC.SSHORT[S] + ' · ' : '') + SC.SITE;
+  document.title = (r.sec === 'overview' ? SC.SSHORT[S] + ' · ' : r.sec === 'power' ? 'Power rankings · ' + SC.SSHORT[S] + ' · ' : '') + SC.SITE;
 }
 SC.go = function (h) { if (root.location.hash === h) render(); else root.location.hash = h; };
 SC.rerender = render;
@@ -306,12 +310,15 @@ function boot() {
   }).join('') + '</div></div>';
   shell = QK.shell({
     sport: 'rugby', section: 'overview', ctx: ctx,
-    sections: QK.sections('rugby', { scout: true }),
-    search: { load: function () { return SC.load('search.json').then(function (rows) { return Array.isArray(rows) ? rows.map(function (r) { return { sport: 'rugby', t: r.t, s: r.s, href: r.href, w: r.w }; }) : []; }); } }
+    sections: QK.sections('rugby', { scout: true, power: true }),
+    search: { load: function () { return SC.load('search.json').then(function (rows) {
+      return (Array.isArray(rows) ? rows.map(function (r) { return { sport: 'rugby', t: r.t, s: r.s, href: r.href, w: r.w }; }) : [])
+        .concat(SC.SCOPES.map(function (S) { return { sport: 'rugby', t: 'Power rankings: ' + SC.SNAME[S].toLowerCase() + ', sides and players by position', s: 'Page', href: '#/' + S + '/power' }; }));
+    }); } }
   });
   QK.seg(QK.$('#sc-scope'), function (S) {
     var st = SC.state, sec = st.sec;
-    var keep = { overview: 1, fixtures: 1, standings: 1, teams: 1, scout: 1, rankings: 1, model: 1, compare: 1, progression: 1 };
+    var keep = { overview: 1, fixtures: 1, standings: 1, power: 1, teams: 1, scout: 1, rankings: 1, model: 1, compare: 1, progression: 1 };
     var to = { match: 'fixtures', team: 'teams', player: 'scout' }[sec] || (keep[sec] ? sec : 'overview');
     /* a player compare or progression stays on players (the ids are per scope, so the defaults fill in) */
     var q0 = st.query || {}, plv = (to === 'compare' || to === 'progression') && ((q0.p !== undefined && q0.t === undefined) || q0.view === 'players' || st.id === 'players');

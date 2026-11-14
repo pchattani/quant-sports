@@ -1093,6 +1093,13 @@ def main(argv: list[str] | None = None) -> int:
             if fl:
                 b.written.extend(data / "follow" / lvl / f"{i}.json" for i in fl["ids"])
                 logger.info("follow cards %s: %d, %.0f KB, largest %d bytes", lvl, fl["n"], fl["bytes"] / 1024, fl["max"])
+    # power rankings: data/power/mlb.json and data/power.json (oddsmarkets/common/power.py), from the payloads on disk
+    if "mlb" in levels:
+        from oddsmarkets.baseball.analytics import power_build as PWB
+        pw = b.step("power rankings", lambda: PWB.build(data), None)
+        if pw:
+            b.written.extend([data / "power.json"] + [data / "power" / f"{x}.json" for x in pw["leagues"]])
+            logger.info("power rankings: %d league files, %.0f KB", pw["n"], pw["bytes"] / 1024)
     total = sum(p.stat().st_size for p in set(b.written) if p.exists())
     logger.info("wrote %d files (%.1f MB) in %.1f s; %d step errors", len(set(b.written)), total / 1e6, time.perf_counter() - t_start,
                 len(b.errors))

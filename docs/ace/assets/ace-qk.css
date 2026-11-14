@@ -22,6 +22,11 @@
 .ta-page .wc-table a, .ta-page a.qk-match, .ta-page a.qk-card, .ta-page a.qk-btn, .ta-page a.ov-div-row, .ta-page .rk-name a { color: var(--ink-1); }
 .ta-page a.ply-link:hover, .ta-page a.team-link:hover, .ta-page .qk-table a:hover, .ta-page .wc-table a:hover, .ta-page .rk-name a:hover { color: var(--signal); }
 .ta-page a.qk-btn.primary { color: var(--ink-inv); }
+/* power rankings (ta-power.js, the kit's QKR.page): the kit's own link colours inside the page, not the page's cobalt */
+.ta-page .qkp-page a.qkp-who, .ta-page .qkp-page a.qkp-b-lab, .ta-page .qkp-page a.qkp-mvc, .ta-page .qkp-page .qkp-sp-who a, .ta-page .qkp-page .qkp-sd a { color: var(--ink-1); }
+.ta-page .qkp-page a.qkp-who:hover b, .ta-page .qkp-page a.qkp-b-lab:hover .qkp-b-nm, .ta-page .qkp-page .qkp-sp-who a:hover, .ta-page .qkp-page .qkp-sd a:hover { color: var(--volt); }
+.ta-page .qkp-page a.qk-chip { color: var(--ink-2); }
+.ta-page .qkp-page a.qk-chip:hover, .ta-page .qkp-page a.qk-chip[aria-pressed="true"] { color: var(--ink-1); }
 .ta-page code { background: var(--s-2); padding: 1px 5px; border-radius: 0; font: 500 0.85em var(--font-num); }
 .ta-page h2 { font-size: var(--fs-lg); }
 .ta-page select, .ta-page input[type="search"], .ta-page input[type="text"], .ta-page input[type="number"], .ta-page input[type="date"] {

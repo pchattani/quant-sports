@@ -499,6 +499,16 @@ def main(argv: list[str] | None = None) -> int:
         b.written.extend(data / "follow" / scope / f"{i}.json" for i in s_["ids"])
         logger.info("follow cards %s: %d, %.0f KB, largest %d bytes", scope, s_["n"], s_["bytes"] / 1024, s_["max"])
 
+    # power rankings: data/power/drivers.json, constructors.json and data/power.json (oddsmarkets/common/power.py), from
+    # the payloads this run has just written (season.json, the catalogues and the careers' Elo paths)
+    def power():
+        from oddsmarkets.f1.analytics import power_build as PWB
+        return PWB.build(data)
+    pw = b.step("power rankings", power, None)
+    if pw:
+        b.written.extend([data / "power.json"] + [data / "power" / f"{x}.json" for x in pw["leagues"]])
+        logger.info("power rankings: %d league files, %.0f KB", pw["n"], pw["bytes"] / 1024)
+
     total = sum(p.stat().st_size for p in b.written if p.exists())
     logger.info("wrote %d files (%.1f MB) in %.1f s; %d step errors", len(b.written), total / 1e6, time.perf_counter() - t_start, len(b.errors))
     for e in b.errors[:50]:

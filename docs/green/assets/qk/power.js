@@ -28,7 +28,8 @@ var QKR = {};
 var MINUS = '−';
 
 /* ───────────────────────────── numbers */
-function sgn(x, d) { return (x > 0 ? '+' : x < 0 ? MINUS : '±') + Math.abs(x).toFixed(d); }
+/* a value that rounds to zero is plain 0.00: never "−0.00" */
+function sgn(x, d) { var a = Math.abs(x).toFixed(d); if (+a === 0) return a; return (x > 0 ? '+' : MINUS) + a; }
 QKR.fmt = function (v, code) {
   if (!isNum(v)) return '—';
   var c = String(code || '1');
@@ -36,6 +37,7 @@ QKR.fmt = function (v, code) {
   if (c.charAt(0) === '+') return sgn(v, parseInt(c.slice(1), 10) || 0);
   var d = parseInt(c, 10); if (!isFinite(d)) d = 1;
   var s = Math.abs(v) >= 1000 && d === 0 ? Math.round(v).toLocaleString('en-GB') : v.toFixed(d);
+  if (+s.replace(/,/g, '') === 0) return Math.abs(0).toFixed(d);
   return v < 0 ? MINUS + s.replace('-', '') : s;
 };
 function ord(n) { return QK.ordinal ? QK.ordinal(n) : n + 'th'; }
@@ -106,7 +108,12 @@ function bumpHTML(el, doc, o) {
   var shown = all.filter(function (t) { return t.rank && lanes[nS - 1][t.id] <= N; }).sort(function (a, b) { return lanes[nS - 1][a.id] - lanes[nS - 1][b.id]; });
   var outside = shown.some(function (t) { for (var k = 0; k < nS; k++) { var l = lanes[k][t.id]; if (!l || l > N) return true; } return false; });
   var nL = N + (outside ? 1 : 0);
-  var padL = 26, padR = narrow ? 86 : 178, padT = 12, padB = 30, laneH = narrow ? 27 : (o.compact ? 28 : 31);
+  /* the end labels' room: the move chip, the mark, the longest name (about 8.4 px a character in Barlow Condensed caps)
+     and, on wide screens, the rating; never more than about two fifths of the chart */
+  var labName = function (t) { return short(t); };   /* phones drop the mark (the line's colour edges the name) */
+  var longest = Math.max.apply(null, shown.map(function (t) { return String(labName(t)).length; }).concat([3]));
+  var padR = Math.round(Math.max(narrow ? 86 : 178, Math.min(W * (narrow ? 0.4 : 0.42), (narrow ? 52 : 132) + longest * 8.4)));
+  var padL = 26, padT = 12, padB = 30, laneH = narrow ? 27 : (o.compact ? 28 : 31);
   var H = padT + (nL - 1) * laneH + padB + 4, plotW = W - padL - padR;
   function x(k) { return padL + (nS === 1 ? plotW / 2 : k * plotW / (nS - 1)); }
   function y(l) { return padT + (Math.min(l || nL, nL) - 1) * laneH; }
@@ -146,7 +153,7 @@ function bumpHTML(el, doc, o) {
   var labs = shown.map(function (t) {
     var ly = y(lanes[nS - 1][t.id]);
     var href = rel(o.base, t.href);
-    var inner = moveChip(t) + mark(t) + '<span class="qkp-b-nm">' + esc(narrow ? (t.abbr || short(t)) : short(t)) + '</span>' +
+    var inner = moveChip(t) + (narrow ? '' : mark(t)) + '<span class="qkp-b-nm"' + (narrow ? ' style="border-left:3px solid ' + col(t.colour) + ';padding-left:5px"' : '') + '>' + esc(labName(t)) + '</span>' +
       (narrow ? '' : '<span class="qkp-b-v">' + esc(QKR.fmt(t.rating, (doc.rating || {}).fmt || '+1')) + '</span>');
     return (href ? '<a' : '<span') + ' class="qkp-b-lab" data-id="' + esc(t.id) + '" style="top:' + (ly - 12) + 'px;left:' + (W - padR + 12) + 'px;width:' + (padR - 14) + 'px"' +
       (href ? ' href="' + esc(href) + '"' : ' tabindex="0"') + ' aria-label="' + esc(ord(t.rank) + ', ' + t.name + (isNum(t.move) && t.move ? (t.move > 0 ? ', up ' : ', down ') + Math.abs(t.move) : '')) + '">' + inner + (href ? '</a>' : '</span>');
@@ -317,11 +324,13 @@ QKR.list = function (doc, o) {
   o = o || {};
   var teams = doc.teams || [], parts = doc.parts || [], fmtR = (doc.rating || {}).fmt || '+1';
   var PC = ['var(--c-2)', 'var(--c-3)', 'var(--c-5)', 'var(--c-4)'];
+  var fmtD = /^[0-9]$/.test(fmtR) ? '+' + fmtR : fmtR;   /* a change is always signed */
+  var Z = isNum((doc.rating || {}).zero) ? doc.rating.zero : 0;   /* the bar's baseline: 0, or an average Elo */
   var max = 0.5;
   teams.forEach(function (t) {
     var pos = 0, neg = 0;
     parts.forEach(function (p) { var v = (t.parts || {})[p.key]; if (isNum(v)) { if (v > 0) pos += v; else neg += v; } });
-    max = Math.max(max, Math.abs(pos), Math.abs(neg), Math.abs(isNum(t.rating) ? t.rating : 0));
+    max = Math.max(max, Math.abs(pos), Math.abs(neg), Math.abs(isNum(t.rating) ? t.rating - Z : 0));
   });
   max *= 1.06;
   function X(v) { return 50 + 50 * Math.max(-1, Math.min(1, v / max)); }
@@ -333,10 +342,10 @@ QKR.list = function (doc, o) {
       segs += '<i style="left:' + a.toFixed(2) + '%;width:' + Math.max(0.4, b - a).toFixed(2) + '%;background:' + PC[i % PC.length] + '" title="' + esc(p.label + ' ' + QKR.fmt(v, fmtR)) + '"></i>';
     });
     if (!parts.length && isNum(t.rating)) {
-      var a0 = X(Math.min(0, t.rating)), b0 = X(Math.max(0, t.rating));
+      var a0 = X(Math.min(0, t.rating - Z)), b0 = X(Math.max(0, t.rating - Z));
       segs = '<i style="left:' + a0.toFixed(2) + '%;width:' + Math.max(0.4, b0 - a0).toFixed(2) + '%;background:' + col(t.colour) + '"></i>';
     }
-    return '<div class="qkp-bar"><span class="z"></span>' + segs + (isNum(t.rating) ? '<b style="left:' + X(t.rating).toFixed(2) + '%"></b>' : '') + '</div>';
+    return '<div class="qkp-bar"><span class="z"></span>' + segs + (isNum(t.rating) ? '<b style="left:' + X(t.rating - Z).toFixed(2) + '%"></b>' : '') + '</div>';
   }
   var key = parts.length ? '<div class="qkp-key">' + parts.map(function (p, i) { return '<span><i style="background:' + PC[i % PC.length] + '"></i>' + esc(p.label) + '</span>'; }).join('') +
     '<span><b></b>' + esc((doc.rating || {}).label || 'Our rating') + '</span><span class="sc">Bar ends at ' + esc(QKR.fmt(-max, fmtR)) + ' and ' + esc(QKR.fmt(max, fmtR)) + '</span></div>' : '';
@@ -347,9 +356,9 @@ QKR.list = function (doc, o) {
       (t.stats || []).map(function (c) { return '<span class="qkp-st"><small>' + esc(c.label) + '</small>' + esc(c.text) + '</span>'; }).join('') +
       (t.form ? '<span class="qkp-fm">' + QK.formDots(t.form, 5) + '</span>' : '');
     return '<li class="qkp-row' + (t.rank <= 3 ? ' top' : '') + '">' +
-      '<span class="qkp-rk num">' + esc(t.rank) + '</span>' + moveChip(t, { word: false }) +
+      '<span class="qkp-rk num">' + esc(t.rank) + '</span>' + (moveChip(t, { word: false }) || '<span class="qkp-mv eq" title="No earlier snapshot yet">–</span>') +
       (href ? '<a class="qkp-who" href="' + esc(href) + '">' : '<span class="qkp-who">') + mark(t) + '<span><b>' + esc(t.name) + '</b>' + (sub ? '<small>' + esc(sub) + '</small>' : '') + '</span>' + (href ? '</a>' : '</span>') +
-      bar(t) + '<span class="qkp-val num">' + esc(QKR.fmt(t.rating, fmtR)) + (isNum(t.delta) && t.delta ? '<small class="' + (t.delta > 0 ? 'up' : 'dn') + '">' + esc(QKR.fmt(t.delta, fmtR)) + '</small>' : '') + '</span>' +
+      bar(t) + '<span class="qkp-val num">' + esc(QKR.fmt(t.rating, fmtR)) + (isNum(t.delta) && !/^[+−±]?0(\.0+)?$/.test(QKR.fmt(t.delta, fmtD)) ? '<small class="' + (t.delta > 0 ? 'up' : 'dn') + '">' + esc(QKR.fmt(t.delta, fmtD)) + '</small>' : '') + '</span>' +
       '<span class="qkp-meta">' + meta + '</span>' +
       (t.note ? '<p class="qkp-note">' + esc(t.note) + '</p>' : '') + '</li>';
   }).join('');
@@ -361,7 +370,8 @@ QKR.groupTables = function (g, o) {
   o = o || {};
   var m = g.metric || {}, st = g.stats || [];
   function table(rows, cap) {
-    return '<table class="qk-table qkp-gt"><caption>' + esc(cap) + '</caption><thead><tr><th class="num">Rk</th><th>Player</th><th>Team</th>' +
+    var C = o.cols || {};
+    return '<table class="qk-table qkp-gt"><caption>' + esc(cap) + '</caption><thead><tr><th class="num">Rk</th><th>' + esc(C.player || 'Player') + '</th><th>' + esc(C.team || 'Team') + '</th>' +
       '<th class="num" title="' + esc(m.tip || m.label || '') + '">' + esc(m.label || '') + (m.unit ? ' (' + esc(m.unit) + ')' : '') + '</th>' +
       st.map(function (s) { return '<th class="num"' + (s.tip ? ' title="' + esc(s.tip) + '"' : '') + '>' + esc(s.label) + '</th>'; }).join('') + '<th class="num" title="Percentile in the group: 100 is the best">Pctl</th></tr></thead><tbody>' +
       rows.map(function (p) {
@@ -385,7 +395,7 @@ function movers(doc) {
 }
 function moversHTML(doc, o) {
   var mv = movers(doc), one = (doc.teams || [])[0];
-  if (!mv.up.length && !mv.dn.length) return '';
+  if (!one && !mv.up.length && !mv.dn.length) return '';
   function card(t, kind) {
     var href = rel(o.base, t.href);
     return (href ? '<a class="qkp-mvc ' + kind + '" href="' + esc(href) + '"' : '<span class="qkp-mvc ' + kind + '"') + ' style="--tc:' + col(t.colour) + '">' +
@@ -409,26 +419,29 @@ QKR.page = function (el, o) {
     if (!el.isConnected) return;
     if (!doc || !doc.teams || !doc.teams.length) { el.innerHTML = QK.empty('Power rankings are not built yet', 'They appear after the next build of this site.'); return; }
     var groups = ((doc.players || {}).groups || []);
+    /* doc.players.head {kicker, title, sub, home}: a sport without positions names its own split (F1, tennis, golf) */
+    var PH = (doc.players || {}).head || {};
     st.g = groups.length ? (o.group && groups.some(function (g) { return g.key === o.group; }) ? o.group : groups[0].key) : null;
     var r = doc.rating || {}, snaps = doc.snapshots || [], noun = doc.noun || 'teams';
-    var phaseWord = doc.phase === 'offseason' ? 'Final ' : doc.phase === 'preseason' ? 'Preseason ' : '';
+    var one1 = noun.replace(/s$/, '');
     var chips = (o.leagues || []).length > 1 ? '<nav class="qk-chips scroll qkp-lg" aria-label="League">' + o.leagues.map(function (l) {
       return '<a class="qk-chip" href="' + esc(l.href) + '" aria-pressed="' + (l.key === doc.league ? 'true' : 'false') + '">' + esc(l.label) + '</a>'; }).join('') + '</nav>' : '';
     var nTop = Math.min(doc.teams.length, 10);
-    var segTop = doc.teams.length > 12 ? '<div class="qk-seg" id="qkp-top" role="group" aria-label="How many lines"><button type="button" aria-pressed="true" data-value="10">Top 10</button><button type="button" aria-pressed="false" data-value="20">Top 20</button></div>' : '';
+    var one = snaps.length < 2;
+    var segTop = doc.teams.length > 12 && !one ? '<div class="qk-seg" id="qkp-top" role="group" aria-label="How many lines"><button type="button" aria-pressed="true" data-value="10">Top 10</button><button type="button" aria-pressed="false" data-value="20">Top 20</button></div>' : '';
     el.innerHTML = '<div class="qkp-page">' + (o.head || '') + chips +
-      QK.sectionHead({ kicker: 'Power rankings · ' + doc.label + ' · ' + (doc.season_label || doc.season || ''), title: phaseWord + (doc.kind === 'players' ? 'Every ' + noun.replace(/s$/, '') + ', ranked' : 'Every ' + noun.replace(/s$/, '') + ', ranked'), size: 'lg',
-        sub: 'Ranked by ' + (r.label || 'our rating').toLowerCase() + (r.unit ? ' (' + r.unit + ')' : '') + ', the model’s view of who is best now, not the table. The arrows are the move since ' + sinceWord(doc) + '. ' + (doc.phase === 'offseason' ? 'The season is over: this is where it finished.' : '') }) +
+      QK.sectionHead({ kicker: 'Power rankings · ' + doc.label + ' · ' + (doc.season_label || doc.season || ''), title: doc.phase === 'offseason' ? 'Final ranking: every ' + one1 : doc.phase === 'preseason' ? 'Preseason ranking: every ' + one1 : 'Every ' + one1 + ', ranked', size: 'lg',
+        sub: 'Ranked by ' + lc1(r.label || 'our rating') + (r.unit ? ' (' + r.unit + ')' : '') + ', the model’s view of who is best now, not the table. The arrows are the move since ' + sinceWord(doc) + '. ' + (doc.phase === 'offseason' ? 'The season is over: this is where it finished.' : '') }) +
       moversHTML(doc, o) +
-      '<section class="qk-section qkp-sec"><header class="qk-sh"><div class="qk-sh-main"><div class="qk-sh-kicker">The climb</div><h2 class="qk-sh-title">How the top <span class="qkr-n">' + nTop + '</span> got here</h2><p class="qk-sh-sub">Rank at each snapshot, ' + esc(snaps.length ? snaps[0].label + ' to ' + snaps[snaps.length - 1].label : '') + '. Hover or tap a line to follow one ' + esc(noun.replace(/s$/, '')) + '.</p></div>' + (segTop ? '<div class="qk-sh-actions">' + segTop + '</div>' : '') + '</header>' +
+      '<section class="qk-section qkp-sec"><header class="qk-sh"><div class="qk-sh-main"><div class="qk-sh-kicker">The climb</div><h2 class="qk-sh-title">How the top <span class="qkr-n">' + nTop + '</span> got here</h2><p class="qk-sh-sub">' + (one ? 'Rank at each snapshot. The climb starts with the next one, a ' + esc(doc.step || 'week') + ' from now.' : 'Rank at each snapshot, ' + esc(snaps[0].label + ' to ' + snaps[snaps.length - 1].label) + '. Hover or tap a line to follow one ' + esc(noun.replace(/s$/, '')) + '.') + '</p></div>' + (segTop ? '<div class="qk-sh-actions">' + segTop + '</div>' : '') + '</header>' +
         '<div class="qk-card"><div class="qk-card-body"><div id="qkp-bump"></div></div></div></section>' +
       '<section class="qk-section qkp-sec"><header class="qk-sh"><div class="qk-sh-main"><div class="qk-sh-kicker">The rankings</div><h2 class="qk-sh-title">All ' + doc.teams.length + ' ' + esc(noun) + '</h2>' +
         '<p class="qk-sh-sub">' + esc((r.tip || '') + ' The small number under the rating is its change since ' + sinceWord(doc) + '.') + '</p></div></header>' +
         '<div class="qk-card"><div class="qk-card-body">' + QKR.list(doc, o) + '</div></div></section>' +
-      (groups.length ? '<section class="qk-section qkp-sec"><header class="qk-sh"><div class="qk-sh-main"><div class="qk-sh-kicker">' + esc(doc.players.noun === 'players' ? 'Players' : cap(doc.players.noun || 'Players')) + ' by position</div><h2 class="qk-sh-title">Best and worst at every position</h2>' +
-        '<p class="qk-sh-sub">Every dot is a qualified player on the position’s headline number, worse to the left, better to the right; the top three in their team colour, the bottom three in coral. Tap a position for its top five and bottom three.</p></div></header>' +
+      (groups.length ? '<section class="qk-section qkp-sec"><header class="qk-sh"><div class="qk-sh-main"><div class="qk-sh-kicker">' + esc(PH.kicker || ((doc.players.noun === 'players' ? 'Players' : cap(doc.players.noun || 'Players')) + ' by position')) + '</div><h2 class="qk-sh-title">' + esc(PH.title || 'Best and worst at every position') + '</h2>' +
+        '<p class="qk-sh-sub">' + esc(PH.sub || 'Every dot is a qualified player on the position’s headline number, worse to the left, better to the right; the top three in their team colour, the bottom three in coral. Tap a position for its top five and bottom three.') + '</p></div></header>' +
         '<div class="qk-card"><div class="qk-card-body"><div id="qkp-sp"></div></div></div>' +
-        '<div class="qk-chips scroll qkp-gch" id="qkp-gch" role="group" aria-label="Position">' + groups.map(function (g) { return '<button type="button" class="qk-chip" data-value="' + esc(g.key) + '" aria-pressed="' + (g.key === st.g ? 'true' : 'false') + '">' + esc(g.label) + '</button>'; }).join('') + '</div>' +
+        '<div class="qk-chips scroll qkp-gch" id="qkp-gch" role="group" aria-label="' + esc(PH.chips || 'Position') + '">' + groups.map(function (g) { return '<button type="button" class="qk-chip" data-value="' + esc(g.key) + '" aria-pressed="' + (g.key === st.g ? 'true' : 'false') + '">' + esc(g.label) + '</button>'; }).join('') + '</div>' +
         '<div class="qk-card"><div class="qk-card-body" id="qkp-gt"></div></div></section>' : '') +
       ((doc.notes || []).length ? '<p class="qk-sub qkp-notes">' + doc.notes.map(esc).join(' ') + '</p>' : '') + '</div>';
     if (QK.stamp) QK.stamp(doc.updated_at, { what: 'The power rankings are rebuilt with the rest of the site after each round of games.' });
@@ -439,7 +452,7 @@ QKR.page = function (el, o) {
     if (groups.length) {
       QKR.mountSpectrum(el.querySelector('#qkp-sp'), groups, { base: o.base });
       var gt = el.querySelector('#qkp-gt');
-      var paint = function () { var g = groups.filter(function (x) { return x.key === st.g; })[0]; gt.innerHTML = g ? QKR.groupTables(g, o) : ''; if (o.onGroup) o.onGroup(st.g); };
+      var paint = function () { var g = groups.filter(function (x) { return x.key === st.g; })[0]; gt.innerHTML = g ? QKR.groupTables(g, { base: o.base, cols: (doc.players || {}).cols }) : ''; if (o.onGroup) o.onGroup(st.g); };
       paint();
       QK.chips(el.querySelector('#qkp-gch'), function (v) { st.g = v[0] || st.g; paint(); });
     }
@@ -449,6 +462,9 @@ QKR.page = function (el, o) {
   });
 };
 function cap(s) { s = String(s || ''); return s.charAt(0).toUpperCase() + s.slice(1); }
+/* lower-case the first letter only, and leave an acronym or a name ("Elo", "DOTS") alone */
+function lc1(s) { s = String(s || ''); return /^(Our|The|A|An|Rating|Expected)/.test(s) ? s.charAt(0).toLowerCase() + s.slice(1) : s; }
+var BY = { week: 'week by week', race: 'race by race', round: 'round by round', month: 'month by month', event: 'event by event', test: 'window by window' };
 
 /* ───────────────────────────── Home: the No. 1 in every sport, then the climb and the spectrum for one sport */
 QKR.home = function (el, P, o) {
@@ -463,7 +479,7 @@ QKR.home = function (el, P, o) {
   var strip = sports.map(function (s) { var l = s.leagues.filter(function (x) { return x.league === s.default; })[0] || s.leagues[0];
     return { sport: s.sport, label: s.label + (s.leagues.length > 1 ? ' · ' + l.label : ''), top: (l.top || [])[0], kind: l.kind, step: l.step, phase: l.phase, season_label: l.season_label, rating: l.rating }; });
   el.innerHTML = QK.sectionHead({ kicker: 'Power rankings · every sport', title: 'Who’s on top, and who’s climbing',
-      sub: 'Our ratings, ranked: the No. 1 in every sport, how the top ten got there week by week, and the best and worst players at every position. Pick a sport.' }) +
+      sub: 'Our ratings, ranked: the No. 1 in every sport, how the top ten got there, and the best and worst players at every position. Pick a sport.' }) +
     '<div class="qkp-hm-strip">' + QKR.no1Strip(strip, { active: st.sport }) + '</div>' +
     '<div class="qkp-hm-bar"><div class="qk-chips scroll" id="qkp-hm-sp" role="group" aria-label="Sport">' + sports.map(function (s) { return '<button type="button" class="qk-chip" data-value="' + esc(s.sport) + '" aria-pressed="' + (s.sport === st.sport ? 'true' : 'false') + '">' + esc(s.label) + '</button>'; }).join('') + '</div>' +
       '<div id="qkp-hm-lg"></div></div>' +
@@ -483,13 +499,14 @@ QKR.home = function (el, P, o) {
     var s = sp(), l = lg(), base = QK.sportUrl(s.sport);
     var where = s.label === l.label ? s.label : s.label + ' · ' + l.label;
     var lgEl = el.querySelector('#qkp-hm-lg');
-    lgEl.innerHTML = s.leagues.length > 1 ? '<div class="qk-seg" role="group" aria-label="League">' + s.leagues.map(function (x) { return '<button type="button" data-value="' + esc(x.league) + '" aria-pressed="' + (x.league === l.league ? 'true' : 'false') + '">' + esc(x.label) + '</button>'; }).join('') + '</div>' : '';
-    if (s.leagues.length > 1) QK.seg(lgEl.querySelector('.qk-seg'), function (v) { st.league = v; paint(); });
+    /* a scrolling row of chips: football has 18 leagues (a segmented control widened the page past the screen) */
+    lgEl.innerHTML = s.leagues.length > 1 ? '<div class="qk-chips scroll" role="group" aria-label="League">' + s.leagues.map(function (x) { return '<button type="button" class="qk-chip" data-value="' + esc(x.league) + '" aria-pressed="' + (x.league === l.league ? 'true' : 'false') + '">' + esc(x.label) + '</button>'; }).join('') + '</div>' : '';
+    if (s.leagues.length > 1) QK.chips(lgEl.querySelector('.qk-chips'), function (v) { if (v[0]) { st.league = v[0]; paint(); } });
     var ha = el.querySelector('#qkp-hm-ha'), hb = el.querySelector('#qkp-hm-hb'), bump = el.querySelector('#qkp-hm-bump'), spe = el.querySelector('#qkp-hm-sp2');
     var href = base + '#/power' + (s.leagues.length > 1 ? '?l=' + encodeURIComponent(l.league) : '');
     if (s.power_href) href = base + s.power_href.replace('{league}', encodeURIComponent(l.league));
     if (l.power_href) href = base + l.power_href;
-    ha.innerHTML = '<div><div class="qk-sh-kicker">' + esc(where + ' · the climb') + '</div><h3>' + esc(l.kind === 'players' ? 'The top ' + (l.noun || 'players') : 'The top ' + (l.noun || 'teams')) + ', ' + esc(l.phase === 'offseason' ? 'as the season ended' : 'week by week') + '</h3></div><a class="qk-more" href="' + esc(href) + '">Full power rankings</a>';
+    ha.innerHTML = '<div><div class="qk-sh-kicker">' + esc(where + ' · the climb') + '</div><h3>' + esc(l.kind === 'players' ? 'The top ' + (l.noun || 'players') : 'The top ' + (l.noun || 'teams')) + ', ' + esc(l.phase === 'offseason' ? 'as the season ended' : (BY[l.step] || 'week by week')) + '</h3></div><a class="qk-more" href="' + esc(href) + '">Full power rankings</a>';
     hb.innerHTML = '';
     bump.innerHTML = '<div class="qk-skel block" style="height:300px"></div>'; spe.innerHTML = '';
     var url = base + 'data/' + l.file, key = s.sport + ':' + l.league, tok = key + Math.random();
@@ -503,7 +520,8 @@ QKR.home = function (el, P, o) {
       pb.hidden = !gs.length;
       el.querySelector('.qkp-hm-panel').classList.toggle('one', !gs.length);
       if (gs.length) {
-        hb.innerHTML = '<div><div class="qk-sh-kicker">' + esc(where + ' · by position') + '</div><h3>Best and worst at every position</h3></div><span class="qkp-hm-cap">Each dot a qualified player · better →</span>';
+        var PH = (doc.players || {}).head || {};
+        hb.innerHTML = '<div><div class="qk-sh-kicker">' + esc(where + ' · ' + (PH.home || 'by position')) + '</div><h3>' + esc(PH.title || 'Best and worst at every position') + '</h3></div><span class="qkp-hm-cap">Each dot a qualified ' + esc(((doc.players || {}).noun || 'player').replace(/s$/, '')) + ' · better →</span>';
         QKR.mountSpectrum(spe, gs, { base: base, max: o.maxGroups || 9 });
       }
     }, function () {

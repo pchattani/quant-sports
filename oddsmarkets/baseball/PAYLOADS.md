@@ -64,7 +64,8 @@ sz_top/sz_bot), spray chart (field outline from park dims), movement plot (IVB Ã
 sliders, zone heatmaps. Routes: `#/`, `#/<L>/game/<gpk>`, `#/<L>/games[/<date>]`, `#/<L>/standings`, `#/postseason`,
 `#/<L>/hitter/<pid>`, `#/<L>/pitcher/<pid>` (or `#/player/<pid>` with tabs), `#/<L>/hitters`, `#/<L>/pitchers`, `#/<L>/team/<tid>`,
 `#/<L>/teams`, `#/<L>/leaders`, `#/umpires`, `#/umpire/<id>`, `#/parks`, `#/park/<vid>`, `#/prospects`, `#/history`, `#/awards`,
-`#/<L>/lab`, `#/compare/<a>/<b>`, `#/markets`, `#/calibration`, `#/glossary`, `#/methodology`, `#/disclaimer`.
+`#/<L>/lab`, `#/compare/<a>/<b>`, `#/markets`, `#/calibration`, `#/glossary`, `#/methodology`, `#/disclaimer`; round 13
+`#/mlb/power` (`bp-power.js`, the "Power Rankings" section; `#/power` and other levels open it).
 Disclaimer: no affiliation with MLB, MLBAM, teams, players, ESPN or bookmakers; no logos; Retrosheet notice verbatim
 ("The information used here was obtained free of charge from and is copyrighted by Retrosheet. Interested parties may contact
 Retrosheet at "www.retrosheet.org"."); Chadwick register ODC-BY attribution; Lahman CC BY-SA; MLBAM data shown for non-commercial,
@@ -272,6 +273,16 @@ name, team, pos, season, recent, delta, n, last, spark}`. `chases.json` (`analyt
 in HR, SB, H, BB, 2B, SO, W and SV at their 162-game pace (final once the regular season is over) against the top 15 AL/NL
 seasons since 1901 (`analytics/season_records.json` from Lahman, `scripts/mlb_season_records.py`): `{final, team_games, source,
 stats {key: {label, kind, record, list_min, top, leaders [{pid, name, team, value, pace, rank, behind}]}}}`.
+
+### power.json and power/mlb.json (round 13, 13 Nov 2026)
+`analytics/power_build.py`, the build's last step, from the payloads on disk; the shape is `oddsmarkets/common/power.py`
+(drawn by the kit's power.js on `#/mlb/power` and Home). MLB only, about 52 KB. Ranked on the season simulation's
+run-differential rating (`season_sim.team_ratings` in runs: regular-season run differential a game regressed with 50 games
+of prior; parts run scoring and run prevention against the league's runs a game): our team rating (`values.rating`) has no
+history in any payload, so it is a stat on each row. Snapshots: every 7 days back from the last complete date (all
+regular-season games that day final, cancelled or postponed), at most ten, each using the games dated on or before it; the
+last is now ("Final" off-season, when the notes lead with how far each club went). Players: C, 1B, 2B, 3B, SS, CF, corner
+OF, DH, starters, relievers on WAR, qualified as `performers.json` (200 PA, 300 / 120 BF, prorated).
 
 ### players/<pid>.json and players_index.json
 - `players_index.json`: `{pid: [name, team tid, pos, bats, throws, [levels]]}`.

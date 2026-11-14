@@ -29,6 +29,7 @@
  *   #/<T>/scout                     the Scouting Room (?view=board|chart|leaders, within=pos&pos=<surface>, min, ctry, age, q, p, cmp)
  *   #/<T>/players  #/<T>/lab        redirect to the Scouting Room
  *   #/<T>/rankings  race  elo  calendar  markets  calibration  value (?v=breakout|luck|over|surface|market|validation)
+ *   #/<T>/power[?g=<group>]         power rankings (ta-power.js, the kit's QKR.page; no section bar: the page has its head)
  *   #/<T>/h2h[/<a>[/<b>]]           head to head
  *   #/<T>/compare[/<a>[/<b>]]       compare players
  *   #/glossary[/<key>]  #/methodology  #/disclaimer   (global; a tour prefix is accepted)
@@ -119,6 +120,7 @@ addRoute('profiles', 'profiles');
 addRoute('versus', 'versus');
 addRoute('who-moves-next', 'who-moves-next');
 addRoute('rankings', 'rankings');
+addRoute('power', 'power');
 addRoute('race', 'race');
 addRoute('elo', 'elo');
 addRoute('calendar', 'calendar');
@@ -143,7 +145,7 @@ const ALIASES = {
   draws: 'calendar', fixtures: 'calendar', tournaments: 'calendar', standings: 'rankings', model: 'methodology', odds: 'markets', terms: 'disclaimer'
 };
 const TITLES = {
-  hub: 'Overview', event: 'Tournament', match: 'Match centre', player: 'Player', players: 'Players', rankings: 'Rankings',
+  hub: 'Overview', event: 'Tournament', match: 'Match centre', player: 'Player', players: 'Players', rankings: 'Rankings', power: 'Power rankings',
   race: 'Race', elo: 'Elo', calendar: 'Calendar', h2h: 'Head to head', lab: 'Lab', compare: 'Compare', scout: 'Scouting Room',
   markets: 'Forecasts', calibration: 'How we’re doing', defend: 'Points to defend', profiles: 'Profiles', versus: 'Our forecasts v the market', 'who-moves-next': 'Who moves next', value: 'Value', glossary: 'Glossary', methodology: 'How it works', disclaimer: 'Disclaimer & terms'
 };
@@ -151,7 +153,7 @@ const NAV_OF = { hub: 'hub', event: 'calendar', calendar: 'calendar', match: 'hu
   rankings: 'rankings', race: 'race', elo: 'elo', h2h: 'h2h', lab: 'scout', compare: 'compare', markets: 'markets',
   calibration: 'calibration', value: 'value', glossary: 'glossary', methodology: 'methodology' };
 /* The sections (QK.sections('tennis')) and the routes each one holds. */
-const SECTION_OF = { hub: 'overview', calendar: 'fixtures', event: 'fixtures', match: 'fixtures', markets: 'fixtures', rankings: 'standings', race: 'standings',
+const SECTION_OF = { hub: 'overview', power: 'power', calendar: 'fixtures', event: 'fixtures', match: 'fixtures', markets: 'fixtures', rankings: 'standings', race: 'standings',
   elo: 'standings', defend: 'standings', profiles: 'standings', versus: 'model', 'who-moves-next': 'model', players: 'scout', player: 'scout', scout: 'scout', h2h: 'scout', value: 'value', lab: 'scout', compare: 'scout', methodology: 'model',
   calibration: 'model', glossary: 'model', disclaimer: 'model' };
 /* Tabs per section: [route, label, scope] with scope 'g' (a global route) or '' (per tour). */
@@ -376,7 +378,7 @@ function sectionBar(r) {
   const sec = SECTION_OF[r.name] || '';
   const bar = document.createElement('div');
   bar.className = 'ta-secbar';
-  if (!sec || sec === 'overview' || r.name === 'notfound') { bar.hidden = true; bar.innerHTML = '<span id="meta-line" hidden></span>'; return bar; }
+  if (!sec || sec === 'overview' || sec === 'power' || r.name === 'notfound') { bar.hidden = true; bar.innerHTML = '<span id="meta-line" hidden></span>'; return bar; }
   const T = state.tour, Y = state.year;
   const tabs = SECTION_TABS[sec] || [];
   const detail = DETAIL_OF[r.name];
@@ -1259,6 +1261,7 @@ function loadSearch() {
       items.push({ sport: 'tennis', t: (e.name || eventName(T, id)) + ' ' + Y, s: [levelLabel(e.level, T), surfaceLabel(e.surface, e.indoor), e.city].filter(Boolean).join(' · '),
         href: eventHref(T, id), order: 500 + levelRank(e.level) });
     });
+    items.push({ sport: 'tennis', t: 'Power rankings', s: TOUR_NAME[T] + ' · the top 100 on our Elo, and the best and worst on serve, return and each surface', href: href(T, 'power'), order: 450 });
     items.sort((a, b) => a.order - b.order);
     return items;
   });
@@ -1275,7 +1278,7 @@ function init() {
   if (window.QK) {
     SHELL = QK.shell({
       sport: 'tennis', section: 'overview',
-      sections: QK.sections('tennis', { value: 'Value', fantasy: null, scout: true }).map(x => Object.assign({}, x, { href: x.key === 'overview' ? '#/' : '#/' + x.key })),
+      sections: QK.sections('tennis', { value: 'Value', fantasy: null, scout: true, power: true }).map(x => Object.assign({}, x, { href: x.key === 'overview' ? '#/' : '#/' + x.key })),
       ctx: ctxHTML(),
       search: { load: loadSearch }
     });

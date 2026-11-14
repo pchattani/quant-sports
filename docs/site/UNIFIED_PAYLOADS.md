@@ -963,3 +963,20 @@ task's engine commit, `push_stores.py`) and `export_public.py` classes every `st
 - Front end (`assets/app/progression.js`): a season with `st` >= 0.5 reads "minutes · Sofascore season totals" in every
   tooltip (chart, grid headers, compare), and the header says how many seasons (and which) come from Sofascore's
   season totals.
+
+## 17. As built (13 November 2026): power rankings (`power.json`, `power/<league>.json`)
+
+- Written by `oddsmarkets/football/analytics/power_build.py`, the last step of `scripts/build_site_all.py` (after every
+  competition, inside the step wrapper), from the payloads on disk; the shape is `oddsmarkets/common/power.py` and the
+  page is `#/power?l=<league>&g=<group>` (`assets/app/power-rankings.js`, the kit's `QKR.page`). Home reads `power.json`.
+- One file per domestic league with a table (kinds `league`, `conference`, `playoff`, `liga`, `torneo`: 18 today, about
+  30-45 KB each); cups, super cups and national-team tournaments have none. `power.json` lists them, default
+  `premier-league`. Neither is gzipped (`power/` is not a gz kind).
+- Clubs are ranked on the Elo replay (`strength.json` `elo_history`, an entry is the rating after its game), shown
+  against the league's average club; `strength_ppg` is a stat beside it ("Points rating"), the table's place and points
+  another. Snapshots: seven days apart counted back from the latest league game, a week without a game skipped, the
+  last one Now; at most ten. Play-off games are not in the replay.
+- Players: `lab/season/<league>.json` (or its `.gz`), the Scouting Room's formation-role groups (gk, cb, fb, dm_cm,
+  am_w, st) on GAR/90, qualified at the spec's 450 minutes (900 for keepers) or the view's floor if higher; goals,
+  assists and xG are the per-90 rates times the minutes. A rate the source does not cover in a league (nine players in
+  ten at zero, as keepers' goals prevented in Uruguay, Chile and Peru) is left out of that group.

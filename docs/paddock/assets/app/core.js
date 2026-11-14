@@ -7,6 +7,7 @@
  *   #/races[/<y>]  #/circuits  #/circuit/<id>                          [races]
  *   #/race/<y>/<r>[/laps|strategy|quali|telemetry]   race centre       [races]
  *   #/standings[/<y>][?tab=championship|odds|pace]                     [standings]
+ *   #/power[?l=constructors&g=<group>] (pd-power.js, the kit's QKR.page)  [power rankings]
  *   #/constructors[/<y>] (the Teams page, pd-teams.js)  #/team/<id>[/<y>]   [constructors]
  *   #/scout (the Scouting Room, pd-scout.js)  #/driver/<id>[/<y>]  #/compare[/drivers|teams[/<a>[/<b>]]]   [scouting room]
  *   #/value[/<y>][?tab=drivers|swap|needs&x=&w=]                       [value & moves]
@@ -53,6 +54,7 @@ addRoute('race/:year/:round', 'race', 'fixtures');
 addRoute('race/:year/:round/:tab', 'race', 'fixtures');
 addRoute('standings', 'standings', 'standings');
 addRoute('standings/:year', 'standings', 'standings');
+addRoute('power', 'power', 'power');
 addRoute('constructors', 'constructors', 'teams');
 addRoute('constructors/:year', 'constructors', 'teams');
 addRoute('team/:id', 'team', 'teams');
@@ -96,7 +98,7 @@ var ROUTE_MAP = [
 ];
 
 var TITLES = {
-  overview: '', races: 'Races', circuits: 'Circuits', circuit: 'Circuit', race: 'Race centre', standings: 'Standings',
+  overview: '', races: 'Races', circuits: 'Circuits', circuit: 'Circuit', race: 'Race centre', standings: 'Standings', power: 'Power rankings',
   constructors: 'Constructors', team: 'Constructor', scout: 'Scouting Room', driver: 'Driver', value: 'Value & Moves',
   fantasy: 'Fantasy', compare: 'Compare', model: 'How it works', versus: 'Our forecasts v the market', methodology: 'Methodology',
   calibration: 'Calibration', glossary: 'Glossary', disclaimer: 'Disclaimer and terms'
@@ -631,7 +633,7 @@ function searchRows() {
     Object.keys(circ).forEach(function (id) { var c = circ[id]; if (c && c.name) add('c:' + id, c.name, 'Circuit · ' + (c.country || '') + ((c.history || []).length ? ' · ' + c.history.length + ' races' : ''), '#/circuit/' + id); });
     var s = arr[2];
     if (ok(s)) (s.calendar || []).forEach(function (c) { add('r:' + c.round, s.year + ' ' + c.name, 'Race · round ' + c.round + ' · ' + fmtDate(c.date, { weekday: false }), raceHref(s.year, c.round)); });
-    [['Standings', '#/standings'], ['Title chances', '#/standings?tab=chances'], ['Every champion', '#/standings?tab=history'], ['Driver value', '#/value'], ['Driver-swap simulator', '#/value?tab=swap'], ['Fantasy', '#/fantasy'], ['Scouting Room', '#/scout'], ['Build your own chart', '#/scout?view=chart'], ['Compare drivers', '#/scout'], ['Teams: head to head', '#/constructors?sec=h2h'], ['How it works', '#/methodology'], ['How we’re doing', '#/model'], ['Glossary', '#/glossary']]
+    [['Standings', '#/standings'], ['Power rankings: drivers, constructors and the best in each discipline', '#/power'], ['Title chances', '#/standings?tab=chances'], ['Every champion', '#/standings?tab=history'], ['Driver value', '#/value'], ['Driver-swap simulator', '#/value?tab=swap'], ['Fantasy', '#/fantasy'], ['Scouting Room', '#/scout'], ['Build your own chart', '#/scout?view=chart'], ['Compare drivers', '#/scout'], ['Teams: head to head', '#/constructors?sec=h2h'], ['How it works', '#/methodology'], ['How we’re doing', '#/model'], ['Glossary', '#/glossary']]
       .forEach(function (p) { add('p:' + p[0], p[0], 'Page', p[1]); });
     return rows;
   });
@@ -643,8 +645,8 @@ function bootShell() {
   var ctx = '<label class="pd-season"><select class="qk-select" id="pd-season" aria-label="Season">' +
     years.map(function (y) { return '<option value="' + y + '">' + y + '</option>'; }).join('') + '</select></label>';
   /* round 9: the Scouting Room in the Drivers slot (QK.sections scout: Drivers and the Lab become #/scout) */
-  var secs = QK.sections('f1', { scout: true }).map(function (s) {
-    s.href = { overview: '#/', fixtures: '#/races', standings: '#/standings', teams: '#/constructors', scout: '#/scout', value: '#/value', fantasy: '#/fantasy', model: '#/model' }[s.key] || s.href;
+  var secs = QK.sections('f1', { scout: true, power: true }).map(function (s) {
+    s.href = { overview: '#/', fixtures: '#/races', standings: '#/standings', power: '#/power', teams: '#/constructors', scout: '#/scout', value: '#/value', fantasy: '#/fantasy', model: '#/model' }[s.key] || s.href;
     return s;
   });
   SHELL = QK.shell({ sport: 'f1', section: 'overview', sections: secs, ctx: ctx, search: { load: searchRows } });

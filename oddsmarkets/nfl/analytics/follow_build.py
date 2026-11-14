@@ -17,8 +17,8 @@ already written this run (no new fetching):
     build(data_root, now=None) -> {"n", "bytes", "max", "ids"}        (python -m oddsmarkets.nfl.analytics.follow_build)
 
 No look-ahead: a result counts only once its kickoff is at or before the build clock, a finished game's chance is the
-model's pre-game number (walk-forward or frozen before kickoff), a week's rating is dated at that week's first
-kickoff (it is the rating going into the week), and the 7-day change compares two race-log snapshots taken on those
+model's pre-game number (walk-forward or frozen before kickoff), a week's rating is dated at that week's last
+kickoff (it is the rating after the week's games), and the 7-day change compares two race-log snapshots taken on those
 days.
 """
 from __future__ import annotations
@@ -188,6 +188,18 @@ def _week_starts(games: list[dict]) -> dict:
     return out
 
 
+def _week_ends(games: list[dict]) -> dict:
+    """{week: the last kickoff of that regular-season week}: when the week's rating is complete."""
+    out: dict = {}
+    for g in games or []:
+        w, k = g.get("week"), g.get("kickoff")
+        if g.get("gtype", "REG") != "REG" or w is None or not k:
+            continue
+        if w not in out or str(k) > out[w]:
+            out[w] = str(k)
+    return out
+
+
 def build(data: Path, now: datetime | None = None, out_dir: Path | None = None) -> dict:
     """Write data/follow/team/<ABBR>.json for every team of the current season; returns write_cards' summary."""
     data = Path(data)
@@ -248,8 +260,12 @@ def build(data: Path, now: datetime | None = None, out_dir: Path | None = None) 
         ranks[m["id"]], ties[m["id"]] = rk, _ties(rk)
     race = L.get("race") or {}
     rlog = (_read(data / "race_log.json") or {}).get(str(season)) or {}
-    # our weekly ratings, as league ranks dated at each week's first kickoff (the rating going into that week)
-    wk_start = _week_starts(games)
+    # our weekly ratings, as league ranks dated at each week's last kickoff: a history entry [w, net, ...] is the rating
+    # after week w's games (a team's entry moves with its own result that week: Kansas City lost 3-20 in week 7 of 2026
+    # and its week-7 entry fell from 7.09 to 5.36), so it is known only once the week is played. A week still being
+    # played is dated in the future and the fact engine leaves it out (13 Nov 2026; it was dated at the first kickoff,
+    # which let a "30 days ago" rank include up to six days of later games).
+    wk_start = _week_ends(games)
     by_week: dict = {}
     for t in teams:
         for h in (tj.get(t) or {}).get("history") or []:

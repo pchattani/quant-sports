@@ -161,7 +161,7 @@ GR.page('overview', function (el) {
     if (dg && (dg.events || []).length) html += GR.sec('The week in golf', 'The last ' + (NW[dg.events.length] || dg.events.length) + (dg.events.length === 1 ? ' event' : ' events'), 'Winners, what we gave them before the event, the biggest upset and the round of the week against the field.', digestTiles(dg, ix) + results(dg));
     var pw = ov.power || {};
     html += GR.sec('Power board', 'Who is best right now?', 'Our rating is strokes a round better than an average PGA Tour player. For the men, the bar splits it into what the PGA Tour’s season statistics explain (our estimate: off the tee, approach, short game and putting) and the rest. Players without PGA Tour statistics show the rating alone. Star a player to follow them.',
-      powerBoard(pw.men, 'men'), '<a class="qk-more" href="#/standings">Every ranked player</a>');
+      powerBoard(pw.men, 'men'), '<a class="qk-more" href="#/power">Power rankings</a> <a class="qk-more" href="#/standings">Every ranked player</a>');
     html += '<div id="ov-stars"></div><section class="qk-section" id="ov-leaders"></section>';
     html += GR.sec('LPGA', 'The top of the women’s game', 'Strokes a round better than an average LPGA Tour player.', powerBoard(pw.women, 'women'), '<a class="qk-more" href="#/standings?s=women">Every ranked player</a>');
     html += GR.sec('Stories', 'What the numbers say', 'Movers, runs and the players doing more than their rating says.', stories(ov.stories) +

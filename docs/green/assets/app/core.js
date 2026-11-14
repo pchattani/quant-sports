@@ -8,6 +8,7 @@
  *   #/event/<id>[/<tab>]                   an event: leaderboard, forecast, course, holes, rounds   [fixtures]
  *   #/course/<id>                          a course: editions, who plays it best, holes, similar courses   [fixtures]
  *   #/standings?s=men|women&tab=ours|points   our rankings and the points ranking     [standings: Rankings]
+ *   #/power?l=men|women&g=<group>          the power rankings: the climb, the top 100, best and worst by category   [power]
  *   #/scout?s=men|women&view=board|chart|leaders&grp=...    the Scouting Room       [scout]
  *   #/player/<id>                          a player                                 [scout]
  *   #/value?tab=lab|courses|records        the Lab: what wins, ages, waves, courses, records   [value: Lab]
@@ -41,6 +42,7 @@ addRoute('event/:id', 'event', 'fixtures');
 addRoute('event/:id/:tab', 'event', 'fixtures');
 addRoute('course/:id', 'course', 'fixtures');
 addRoute('standings', 'rankings', 'standings');
+addRoute('power', 'power', 'power');
 addRoute('scout', 'scout', 'scout');
 addRoute('players', 'scout', 'scout');
 addRoute('player/:id', 'player', 'scout');
@@ -48,7 +50,7 @@ addRoute('value', 'lab', 'value');
 addRoute('model', 'model', 'model');
 addRoute('disclaimer', 'disclaimer', 'model');
 
-var TITLES = { overview: '', events: 'Events', event: 'Event', course: 'Course', rankings: 'Rankings', scout: 'Scouting Room', player: 'Player',
+var TITLES = { overview: '', events: 'Events', event: 'Event', course: 'Course', rankings: 'Rankings', power: 'Power rankings', scout: 'Scouting Room', player: 'Player',
   lab: 'Lab', model: 'Model', disclaimer: 'Disclaimer and terms' };
 
 function dec(s) { try { return decodeURIComponent(s); } catch (e) { return s; } }
@@ -289,13 +291,14 @@ function searchRows() {
     (s.players || []).forEach(function (p) { out.push({ t: p[1], s: 'Player' + (p[2] ? ' · ' + p[2] : ''), href: '#/player/' + encodeURIComponent(p[0]), sport: 'golf' }); });
     (s.events || []).forEach(function (e) { out.push({ t: e[1], s: e[2] + ' · ' + tourName(e[3]), href: '#/event/' + encodeURIComponent(e[0]), sport: 'golf' }); });
     (s.courses || []).forEach(function (c) { out.push({ t: c[1], s: 'Course · ' + tourName(c[2]), href: '#/course/' + encodeURIComponent(c[0]), sport: 'golf' }); });
+    out.unshift({ t: 'Power rankings: players and strokes-gained categories', s: 'Page', href: '#/power', sport: 'golf' });
     return out;
   });
 }
 
 function boot() {
   var m = parse();
-  SHELL = QK.shell({ sport: 'golf', section: m ? m.route.section : 'overview', sections: QK.sections('golf', { scout: true, value: 'Lab' }), search: { load: searchRows } });
+  SHELL = QK.shell({ sport: 'golf', section: m ? m.route.section : 'overview', sections: QK.sections('golf', { scout: true, value: 'Lab', power: true }), search: { load: searchRows } });
   window.addEventListener('hashchange', render);
   var fv = document.getElementById('first-visit-notice');
   try {

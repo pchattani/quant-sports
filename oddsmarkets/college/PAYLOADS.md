@@ -70,6 +70,15 @@ METRIC: `{"key","label","group","fmt":"int|1|2|3|pct|prob|signed1|signed2","lowe
 ```
 phase: cfb `preseason|regular|conf_champ|bowls|playoff|offseason`; basketball `preseason|regular|conf_tourneys|ncaa|offseason`.
 
+`data/power.json` and `data/power/<L>.json` (round 13, 13 Nov 2026): the power rankings of every level with a current season
+(`oddsmarkets/college/power_build.py`, the build's last step, from season.json, schedule.json and players.json on disk; the
+shape is `oddsmarkets/common/power.py`, drawn by the kit's power.js on `#/<L>/power` and Home; default `cfb`; 35-160 KB a
+level, basketball's 365 teams the largest). Ranked on `ratings` (Now); snapshots from `rating_paths`: football one per
+completed week ("Wk N", a week still in play folds into Now), hockey the same on its weekly grid, basketball every 7 days
+back from the latest game day (one snapshot in a season's first week). Players by position on the level's headline
+(football value per game, punters gross average; basketball box rating; hockey GAR per game, goalies GSAA), qualified on
+the catalogue's flag (football `qualified_rate`).
+
 `data/glossary.json` `{"groups":[{"name","entries":[{"key","label","desc"}]}]}`.
 `data/search.json` `[{"t","s","href","sport":"college","w"}]` (teams of every level, players with a career file;
 `href` = `#/<L>/team/<tid>` or `#/<L>/player/<pid>`).
@@ -278,14 +287,15 @@ Kit-native like Hardwood's `hw-*` sections and Gridiron: `index.html` (data-spor
 the build), `assets/campus.css`, `assets/js/*.js` with a small router `window.CC`. Hash routes, level first:
 `#/` (level from state, default by phase: whichever level is in season, cfb in the autumn), `#/<L>`, `#/<L>/games`,
 `#/<L>/game/<gid>`, `#/<L>/standings` (tabs: The race, Conferences, Polls, Playoff (cfb) / Bracket (mbb, wbb), Bowls (cfb)
-/ Conference tournaments, History, Races), `#/<L>/teams` (round 9: power board, team profile grid, style map, strengths
+/ Conference tournaments, History, Races), `#/<L>/power` (round 13: the power rankings, `cc-power.js`; `#/power?l=<L>`
+opens it), `#/<L>/teams` (round 9: power board, team profile grid, style map, strengths
 and weaknesses, head to head, through the season; `cc-teamspage.js`), `#/<L>/team/<tid>`, `#/<L>/scout` (round 9: the
 Scouting Room, Players and the Lab in one: Board / Chart / Leaders, the profile drawer and the compare tray, reading
 `lab_players.json`; `cc-scout.js`), `#/<L>/player/<pid>`, `#/<L>/compare?p=<pid>,<pid>`, `#/<L>/value` (By position,
 Value, Transfers), `#/<L>/fantasy`, `#/<L>/model` (How it works, How we're doing, Our forecasts v the market, Who moves
 next, Glossary, Terms); `?season=S` or `/<S>` suffix for past seasons. Old routes redirect (`CC.redirect`:
 `#/<L>/players` and `#/<L>/lab` to the Scouting Room, the Teams page's style map or the compare page). Shell:
-`QK.shell({sport: 'college', sections: QK.sections('college', { scout: true })...})` (Overview · Games · Standings · Teams ·
+`QK.shell({sport: 'college', sections: QK.sections('college', { scout: true, power: true })...})` (Overview · Games · Standings · Power Rankings · Teams ·
 Scouting Room · Value & Moves · Fantasy · Model), level switch CFB / MBB / WBB (a `QK.seg` in `ctx`, with the season
 picker), mobile-clean at 375 px, both themes. Disclaimer: unofficial, not affiliated with the NCAA, the CFP, any conference, school, ESPN or a
 bookmaker; no logos.

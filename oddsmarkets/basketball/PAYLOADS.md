@@ -38,6 +38,15 @@ Outs applied for upcoming games). The game payload's `pregame.model.detail` carr
  "champions": [[season, tid]], "first_season": S, "elo_all_time":[{"team","name","peak","season"}], "team_names": {tid: name}}`.
  Champions come from the season stores only (1997 on, as far as the backfill has reached); there is no pre-1997 source, so pages
  say "from <first_season>". index.json `champions` is the same list.
+`data/power/<L>.json` (nba, wnba) and the index `data/power.json` (default nba; 13 Nov 2026; shape: `oddsmarkets/common/power.py`;
+ built last by `oddsmarkets/basketball/analytics/power_build.py` from the payloads on disk; drawn by the kit's power.js on
+ `#/<L>/power` and on Home, whose `#/power?l=<L>` link lands there). Each league's current season: the teams ranked by the
+ Kalman net rating after each game (`season.json` rating_paths, every snapshot and now from that one path; the season fit in
+ `ratings` has no history and can differ by a place or so). Snapshots every 7 days back from the latest completed game day
+ (path dates are the local game day; a snapshot takes each team's last entry dated that day or earlier, so the rating after
+ the games finished by then), the oldest dropped until every team has played; the move is the last seven days. Off-season the
+ snapshots are the season's last weeks and the last reads "Final", with each team's playoff finish. Players: guards, wings
+ and bigs (players.json `role`) on HPM, qualified on the `qualified` flag; form and run from `schedule.json` (playoffs in).
 
 ## Per league and season `data/<L>/<S>/`
 

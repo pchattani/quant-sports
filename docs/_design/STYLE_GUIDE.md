@@ -290,6 +290,13 @@ Rankings" section right after Standings, route `#/power`, page `QKR.page(el, { u
 | Position tables | `QKR.groupTables(group)` | the site page: top ten and bottom five with every stat and the percentile (CSV through the table tools) |
 | Home section | `QKR.home(el, home.power)` | "Who's on top, and who's climbing": the strip, a sport (and league) picker, the climb beside the spectrum; each sport's file fetched from its own site when picked |
 
+File options the kit reads: `players.head` `{kicker, title, sub, home, chips}` for a sport without positions (F1 disciplines,
+tennis serve/return/surfaces, golf categories, powerlifting weight classes); `players.cols` `{player, team}` for the table
+columns ("Driver", "Nation", "Tour", "Country"); `rating.zero` (the bar's baseline, for a raw Elo); `step` (week, race,
+month ...) words the moves and Home's heading. A value that rounds to zero is "0.00", never "−0.00"; a rating's change is
+always signed and hidden when it rounds to zero. With one snapshot the climb says when it starts and the list keeps a
+level chip. Players without team colours (tennis, golf, powerlifting) take the categorical slots by rank.
+
 The CSV helpers are `QK.csv(cols, rows)` and `QK.download(name, text)`. `QK.formDots(f, n)` shows the last n results
 (the power board shows ten). `QKC.scatter` takes `onClick(point)` (the drawer instead of a page change) and `pad: '8%'`.
 The showcase has a "Scouting Room" block (`showcase.html#scouting`).

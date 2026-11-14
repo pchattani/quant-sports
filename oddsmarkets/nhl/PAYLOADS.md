@@ -12,6 +12,14 @@ Spread convention: puck line is the home team's line (−1.5 means home favoured
    "model":{"p_home","p_reg_home","p_ot","total","puck_line_home"},"market":{"p_home","sources"}|null,"line":{"ml_home","ml_away","puck_line","total","open","close"}|null,"wp_home":live|null,"xg":{"home","away"}|null}`
 - `data/players_index.json` `{pid:[name, team, pos, first_season, last_season]}`; `data/glossary.json`; `data/calibration.json`;
   `data/history.json` (champions 1917→, season leaders).
+- `data/power/nhl.json` and the index `data/power.json` (13 Nov 2026; shape: `oddsmarkets/common/power.py`; built last by
+  `oddsmarkets/nhl/analytics/power_build.py` from the payloads on disk; drawn by the kit's power.js on `#/power` and on Home).
+  The clubs ranked by our rating (`teams.json` units.rating) with offence and defence (units.model goals for and against a game
+  about the league's mean, adding up to the rating). Snapshots: each `<S>/rating_history.json` Monday (the refit on the games
+  before it, so the ranking after the Sunday's games) whose games end at least a week before the latest completed game, then
+  Now; the week in play folds into Now, so the move covers seven to thirteen days of games. Off-season the last one reads
+  "Final". Players: centres, wingers and defencemen on Rink value per 60 (GAR/60), goalies on GSAx, qualified on the
+  catalogues' `qualified` flag.
 
 ## Per season — `data/<S>/`
 - `season.json`: standings (division/conference/wild card; GP, W, L, OTL, PTS, P%, RW, ROW, GF, GA, xGF%, our rating), sim odds per team

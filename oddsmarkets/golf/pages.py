@@ -13,6 +13,10 @@ The Quant Green's payloads (docs/green/data), from the season stores (store.py) 
     players/<id>.json              a player: rating history, every event with our pre-event chance, season lines
     model.json                     parameters, the tuning grid, the sealed test and calibration
     search.json                    players and events for the search box
+    power.json, power/<men|women>.json   the power rankings (oddsmarkets/common/power.py), written after the payloads by
+                                   power_build.py (scripts/build_green.py): the top 100 per stream by our rating, one
+                                   snapshot per completed event week (the last is now), the men's strokes-gained
+                                   categories and the LPGA's scoring splits as the groups
 
 Every chance is what the model said before the event, from ratings walked forward with nothing from the event or
 after it (models/ratings.py). A final event's page is written once per MODEL_VERSION and kept (CI restores it from the

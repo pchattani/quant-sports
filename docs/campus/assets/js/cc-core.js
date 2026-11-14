@@ -7,6 +7,7 @@
  *   #/<L>/teams  #/<L>/team/<tid>  #/<L>/scout (the Scouting Room: Players and the Lab in one, round 9)  #/<L>/player/<pid>
  *   #/<L>/compare?p=<pid>,<pid>  #/<L>/compare/progression/<pid>/<pid>
  *   #/<L>/value?tab=position|value|transfers   #/<L>/fantasy   #/<L>/model?tab=method|calibration|market|moves|glossary|terms
+ *   #/<L>/power?g=<group>   power rankings (round 13, cc-power.js; the current season); #/power?l=<L> (Home's link) opens it
  *   old routes redirect (CC.redirect): #/<L>/players -> scout, #/<L>/lab -> scout?view=chart | teams (style map) | compare
  *   ?season=S (or a trailing /S: #/<L>/<S> or #/<L>/<sec>/<id>/<S>) for a past season;  #/disclaimer
  * Data: data/index.json, data/<L>/..., data/<L>/<S>/... (PAYLOADS.md). In local preview only, ?data=<path> points
@@ -523,7 +524,7 @@ function seasonOptions(L, S) {
 var ROUTES = {};
 CC.route = function (name, fn) { ROUTES[name] = fn; };
 CC.state = { L: null, S: null, sec: 'overview' };
-var SEC_OF = { overview: 'overview', games: 'fixtures', game: 'fixtures', standings: 'standings', teams: 'teams', team: 'teams', scout: 'scout',
+var SEC_OF = { overview: 'overview', games: 'fixtures', game: 'fixtures', standings: 'standings', power: 'power', teams: 'teams', team: 'teams', scout: 'scout',
   player: 'scout', compare: 'scout', value: 'value', fantasy: 'fantasy', model: 'model', disclaimer: 'model' };
 /* Round 9: the old Players and Lab routes open the Scouting Room or the Teams page, their parameters mapped
    (players?pos=, lab?kind=players|teams|compare&x=&y=&within=&pos=&q=&c=). Returns the new hash, or null. */
@@ -556,6 +557,7 @@ CC.parse = function (hash) {
   var parts = path.split('/').filter(function (x) { return x !== ''; }).map(decodeURIComponent);
   var r = { L: null, sec: 'overview', id: null, S: null, query: query };
   if (parts[0] === 'disclaimer') { r.sec = 'disclaimer'; return r; }
+  if (parts[0] === 'power') { r.sec = 'power'; return r; }      /* #/power[?l=<level>] (Home's link) opens #/<L>/power */
   if (CC.LEVELS.indexOf(parts[0]) >= 0) {
     r.L = parts.shift();
     /* a trailing year is the season only in #/<L>/<S> and #/<L>/<sec>/<id>/<S>: in #/cfb/team/2390 it is the id */
@@ -578,7 +580,7 @@ CC.defaultLevel = function () {
   return m >= 7 || m === 0 ? 'cfb' : 'mbb';
 };
 function sectionHrefs(L) {
-  var map = { overview: '', fixtures: 'games', standings: 'standings', teams: 'teams', scout: 'scout', value: 'value', fantasy: 'fantasy', model: 'model' };
+  var map = { overview: '', fixtures: 'games', standings: 'standings', power: 'power', teams: 'teams', scout: 'scout', value: 'value', fantasy: 'fantasy', model: 'model' };
   QK.$$('.qk-secnav a[data-sec]').forEach(function (a) { var k = a.getAttribute('data-sec'); a.setAttribute('href', '#/' + L + (map[k] ? '/' + map[k] : '')); if (k === 'fantasy') { a.hidden = CC.hk(L); a.style.display = CC.hk(L) ? 'none' : ''; } });
 }
 function paintCtx(L, S) {
@@ -594,6 +596,11 @@ function render() {
     var t = document.getElementById('disclaimer-template');
     main0.innerHTML = '<div class="cc-page">' + U.head('Disclaimer and terms', '', 'The Quant Campus') + (t ? t.innerHTML : '') + '</div>';
     root.scrollTo(0, 0);
+    return;
+  }
+  if (!r.L && r.sec === 'power') {
+    var pl = CC.LEVELS.indexOf(r.query.l) >= 0 ? r.query.l : CC.defaultLevel();
+    root.location.replace('#/' + pl + '/power' + (r.query.g ? '?g=' + encodeURIComponent(r.query.g) : ''));
     return;
   }
   if (!r.L) { root.location.replace('#/' + CC.defaultLevel()); return; }
@@ -624,7 +631,7 @@ function render() {
     var pr = fn(page, { L: L, S: S, id: r.id, query: r.query, sec: r.sec });
     if (pr && pr.then) pr.then(null, function (e) { console.error(e); page.innerHTML = QK.empty('This page could not be shown', String(e && e.message || e)); });
   } catch (e) { console.error(e); page.innerHTML = QK.empty('This page could not be shown', String(e && e.message || e)); }
-  document.title = (r.sec === 'overview' ? CC.LSHORT[L] + ' ' : '') + 'The Quant Campus';
+  document.title = (r.sec === 'overview' ? CC.LSHORT[L] + ' ' : r.sec === 'power' ? 'Power rankings · ' + CC.LSHORT[L] + ' · ' : '') + 'The Quant Campus';
 }
 CC.go = function (h) { if (root.location.hash === h) render(); else root.location.hash = h; };
 CC.rerender = render;
@@ -635,12 +642,17 @@ function boot() {
   }).join('') + '</div><select class="qk-select" id="cc-season" aria-label="Season"></select></div>';
   shell = QK.shell({
     sport: 'college', section: 'overview', ctx: ctx,
-    sections: QK.sections('college', { scout: true }),
-    search: { load: function () { return CC.load('search.json').then(function (rows) { return Array.isArray(rows) ? rows.map(function (r) { return { sport: 'college', t: r.t, s: r.s, href: r.href, w: r.w }; }) : []; }); } }
+    sections: QK.sections('college', { scout: true, power: true }),
+    /* the builder's search rows, then a page row per level for the power rankings (round 13) */
+    search: { load: function () { return CC.load('search.json').then(function (rows) {
+      var out = Array.isArray(rows) ? rows.map(function (r) { return { sport: 'college', t: r.t, s: r.s, href: r.href, w: r.w }; }) : [];
+      CC.LEVELS.forEach(function (L) { out.push({ sport: 'college', t: 'Power rankings: ' + CC.FOLLOW_LABEL[L].toLowerCase() + ' teams and players by position', s: 'Page · ' + CC.LSHORT[L], href: '#/' + L + '/power' }); });
+      return out;
+    }); } }
   });
   QK.seg(QK.$('#cc-level'), function (L) {
     var st = CC.state, sec = st.sec;
-    var keep = { overview: 1, games: 1, standings: 1, teams: 1, scout: 1, value: 1, fantasy: 1, model: 1 };
+    var keep = { overview: 1, games: 1, standings: 1, power: 1, teams: 1, scout: 1, value: 1, fantasy: 1, model: 1 };
     var to = { game: 'games', team: 'teams', player: 'scout' }[sec] || (sec === 'compare' && !st.id ? 'compare' : sec === 'compare' ? 'scout' : keep[sec] ? sec : 'overview');
     CC.go('#/' + L + (to !== 'overview' ? '/' + to : ''));
   });

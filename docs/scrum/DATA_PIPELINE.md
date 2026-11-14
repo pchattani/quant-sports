@@ -147,6 +147,7 @@ store shape, and a scope tab on the site. Nothing else in the store changes; the
 | `<S>/model.json`, `<S>/lab.json`, `<S>/records.json` | the ladder, calibration and forecast log; league-wide analytics (with the scoring clock, the age curve, weather and altitude); records (with career caps and tests by decade) |
 | `<S>/referees.json` | referee tendencies (tests, penalties and cards a test, the home share of penalties, the home side against our chances) and the next appointments |
 | `follow/<S>/<id>.json` | My Teams cards (`follow_build.py`, under 8 KB each) |
+| `power.json`, `power/<S>.json` | power rankings (`power_build.py`, after the site files; shape `oddsmarkets/common/power.py`, about 40 KB a scope): the ranked sides on our rating with a snapshot at each calendar month's end for the last ten months back from the latest month with a test, which is Now (a ratings `hist` entry is the rating after the month's last test); players by position group on Scrum value per 80, qualified (160 minutes) and capped within 400 days of the scope's latest test with player statistics. Page `#/<S>/power?g=<group>` (`sc-power.js`); Home's `#/power?l=<S>` is sent on to it |
 | `search.json`, `glossary.json` | search rows; the glossary |
 
 The forecast log (`data/rugby/stores/forecast_log_<S>.json`) records every published forecast up to kick-off and then

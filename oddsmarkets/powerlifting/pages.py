@@ -4,6 +4,11 @@
                                board, stories, who's hot by class, "who's for real", the ranking tops (Home reads it)
     rankings.json              our rating (expected DOTS at the next meet) per stream, with class, 90-day movement and
                                "what a result would do" (the total that takes a lifter to No. 1 and up one place)
+    rank_paths.json            today's top 100 per stream: rank and rating on the first day of each of the last ten
+                               months, ranked as rankings.json ranks (13 Nov 2026; read by power_build.py)
+    power.json, power/<stream>.json   the power rankings (oddsmarkets/common/power.py), written after the payloads by
+                               power_build.py (scripts/build_iron.py): men and women raw, the top 100 by our rating, monthly
+                               snapshots from rank_paths.json (the last is now), the IPF weight classes as the groups
     scout/<stream>.json        the Scouting Room pool, column-oriented: every metric of analytics.METRICS
     schedule/<year>.json       that year's meets (compact)
     events/<id>.json           a meet: flights, places, attempts, our pre-meet expectation and podium chance, PRs,
@@ -186,6 +191,11 @@ def build(out: Path, today: date | None = None, full: bool = False) -> dict:
             r["pg"] = r["pid"] in pset
     _write(out / "rankings.json", ranks)
     _tick('_write(out / "rankings.json", ranks)')
+    try:
+        _rank_paths(out, walked, live, p, m0, ranks)
+    except Exception:          # noqa: BLE001 - the power rankings' history is a garnish; the payloads must still publish
+        logger.exception("rank_paths.json failed")
+    _tick('_rank_paths(out, walked, live, p, m0, ranks)')
     keep = _meet_pages(out, entries, meets, ent, walked, train_model, live, names, today, pset, rep.get("podium") or {}, p, m0)
     _tick('keep = _meet_pages(out, entries, meets, ')
     n_player = _player_pages(out, ppids, walked, entries, prof, pct, prof_prev, pct_prev, cur, ranks, names,
@@ -212,16 +222,22 @@ def build(out: Path, today: date | None = None, full: bool = False) -> dict:
 
 
 # ── ratings on a date ─────────────────────────────────────────────────────────────────────────────────────────
-def _ratings_at(walked: pd.DataFrame, at: pd.Timestamp, model: F.Model, p, m0) -> pd.DataFrame:
-    """Our rating on `at`: the expected DOTS at a meet that day, from the book as it stood (rows before `at` only)."""
+def _ratings_at(walked: pd.DataFrame, at: pd.Timestamp, model: F.Model, p, m0, recent: int | None = None) -> pd.DataFrame:
+    """Our rating on `at`: the expected DOTS at a meet that day, from the book as it stood (rows before `at` only).
+    recent: only lifters whose last scored meet is at most this many days before `at` (the ranked pool, faster)."""
     w = walked[(walked["date"] < at) & walked["scored"]]
-    if w.empty:
-        return pd.DataFrame(columns=["stream", "pid", "rt", "n", "last", "bw", "sex", "age", "st_s", "st_w", "st_t", "best_dots", "pre"])
     last = w.groupby(["stream", "pid"], sort=False).tail(1)
+    if recent is not None:
+        last = last[(at - last["date"]).dt.days <= recent]
+    if last.empty:
+        return pd.DataFrame(columns=["stream", "pid", "rt", "n", "last", "bw", "sex", "age", "st_s", "st_w", "st_t", "best_dots", "pre", "last_dots"])
     fr = last[["stream", "pid", "sex", "bw", "age", "date"]].rename(columns={"date": "last"}).copy()
     fr["age"] = fr["age"] + (at - fr["last"]).dt.days / 365.25
     fr["date"] = at
-    st = F.pre_state(fr.reset_index(drop=True), walked[walked["date"] < at], p, m0)
+    hist = walked[walked["date"] < at]
+    if recent is not None:
+        hist = hist[hist["pid"].isin(set(fr["pid"]))]          # only the pool's own rows reach pre_state
+    st = F.pre_state(fr.reset_index(drop=True), hist, p, m0)
     st["rt"] = model.mu(st)
     return st[["stream", "pid", "rt", "n", "last", "bw", "sex", "age", "st_s", "st_w", "st_t", "best_dots", "pre", "last_dots"]]
 
@@ -308,6 +324,40 @@ def _rankings(out: Path, cur, prev, yr, books, model, p, m0, names, walked, T) -
            "classes": {"M": A.class_order("M"), "F": A.class_order("F")},
            "streams": {k: {"label": canon.STREAMS[k]["label"], "rows": streams[k]} for k in canon.STREAMS}}
     _write(out / "rankings.json", obj)
+    return obj
+
+
+PATH_MONTHS = 10     # the power rankings' monthly snapshots (oddsmarkets/powerlifting/power_build.py)
+PATH_TOP = 100       # lifters per stream whose monthly path is kept: today's top PATH_TOP
+
+
+def month_starts(last_day: pd.Timestamp, k: int = PATH_MONTHS) -> list[pd.Timestamp]:
+    """The first day of each of the last k months up to the archive's last meet day (inclusive), oldest first."""
+    m = pd.Timestamp(last_day).normalize().replace(day=1)
+    return [m - pd.DateOffset(months=i) for i in range(k - 1, -1, -1)]
+
+
+def _rank_paths(out: Path, walked, model, p, m0, ranks: dict) -> dict:
+    """data/rank_paths.json: today's top PATH_TOP of every stream, their rank and rating on the first day of each of
+    the last PATH_MONTHS months (the meets dated before that day, as the archive has them now), ranked exactly as the
+    rankings are (RANK_MIN_MEETS scored meets, one in the last RANK_ACTIVE_DAYS) among every lifter, so the power
+    rankings' monthly climb and move need no reconstruction. {"dates", "streams": {stream: {pid: [[rank, rt] ...]}}}"""
+    dates = month_starts(walked.loc[walked["scored"], "date"].max())
+    keep = {k: [r["pid"] for r in v["rows"][:PATH_TOP]] for k, v in ranks["streams"].items()}
+    paths = {k: {pid: [] for pid in pids} for k, pids in keep.items()}
+    for at in dates:
+        st = _ratings_at(walked, at, model, p, m0, recent=RANK_ACTIVE_DAYS)
+        st = st[(st["n"] >= RANK_MIN_MEETS) & st["rt"].notna()]
+        for key, pids in keep.items():
+            d = st[st["stream"] == key].sort_values("rt", ascending=False).reset_index(drop=True)
+            at_rank = dict(zip(d["pid"], range(1, len(d) + 1)))
+            at_rt = dict(zip(d["pid"], d["rt"]))
+            for pid in pids:
+                paths[key][pid].append([at_rank.get(pid), _r(at_rt.get(pid), 1)])
+    obj = {"updated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "unit": "DOTS",
+           "rule": f"{RANK_MIN_MEETS}+ scored meets, one in the {RANK_ACTIVE_DAYS} days before the date",
+           "dates": [_iso(x) for x in dates], "streams": paths}
+    _write(out / "rank_paths.json", obj)
     return obj
 
 

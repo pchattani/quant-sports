@@ -120,7 +120,7 @@ FB.route('overview', function (el) {
        leaders are Who's hot (the goals-against-xG chart was a second leaders module); the strongest sides tease Teams */
     '<section class="qk-section">' + QK.sectionHead({ kicker: 'Power', title: 'The strongest sides anywhere', sub: 'Every club and national team on one scale: our rating, the points a game we expect against an average side.', actions: '<a class="qk-more" href="#/clubs">Teams</a>' }) +
       FB.grid(
-        '<div class="qk-span-6">' + FB.card('Strongest clubs', 'Our rating: expected points a game against an average side.', '<div id="ov-pool"></div>', { flush: true, foot: '<span></span><a href="#/clubs">The power board →</a>' }) + '</div>' +
+        '<div class="qk-span-6">' + FB.card('Strongest clubs', 'Our rating: expected points a game against an average side.', '<div id="ov-pool"></div>', { flush: true, foot: '<a href="#/power">Power rankings by league →</a><a href="#/clubs">The power board →</a>' }) + '</div>' +
         '<div class="qk-span-6">' + FB.card('Strongest national teams', 'Our international rating, the same scale.', '<div id="ov-nations"></div>', { flush: true, foot: '<span></span><a href="#/clubs/nations">All national teams →</a>' }) + '</div>'
       ) + '</section>' +
     '<section class="qk-section">' + QK.sectionHead({ kicker: 'Leagues', title: 'Every league at a glance', sub: 'How far each league has gone, who leads, our title favourite and the top scorer.', actions: '<a class="qk-more" href="#/competitions">Competitions</a>' }) +

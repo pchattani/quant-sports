@@ -178,7 +178,7 @@ SC.route('overview', function (page, P) {
       '<a class="qk-more" href="' + esc(SC.href(S, 'fixtures')) + '">Every fixture</a>');
     html += '<div id="ov-races"></div>';
     html += U.sec('Power board', 'Who is best right now?', 'Our rating is points better than an average test side on a neutral ground, split into attack (points scored above average) and defence (points kept out). The rank is ours; the World Rugby rank beside it is our rebuild of the official table, a different system, so the two can disagree. Sides that rarely meet tier-one and tier-two opposition are not ranked: their ratings are provisional.',
-      powerBoard(S, d.power), '<a class="qk-more" href="' + esc(SC.href(S, 'rankings', null, 'tab=ours')) + '">Every side</a>');
+      powerBoard(S, d.power), '<a class="qk-more" href="' + esc(SC.href(S, 'power')) + '">Power rankings</a><a class="qk-more" href="' + esc(SC.href(S, 'rankings', null, 'tab=ours')) + '">Every side</a>');
     html += '<div id="ov-stars"></div><div id="ov-leaders"></div>';
     html += U.sec('Stories', 'What the numbers say', 'Movers, runs and the sides doing more (or less) than their rating says.', stories(S, d.stories) +
       '<div class="qk-g75 sc-real"><div>' + U.card('Who’s for real?', 'Our rating across, the share of tests won over two years up. Top-left: winning more than the rating suggests (a soft schedule, close wins). Bottom-right: the reverse.', U.chart('ov-quad', 380, 'Rating against tests won')) +

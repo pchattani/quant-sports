@@ -75,6 +75,16 @@ def main(argv=None) -> int:
         fl = step("follow", follow, report)
         if fl:
             log.info("follow cards: %s", fl)
+
+    def power():
+        # power rankings: data/power/men.json, women.json and data/power.json (oddsmarkets/common/power.py), from the
+        # payloads just written
+        from oddsmarkets.golf import power_build as PWB
+        return PWB.build(data)
+    if counts:
+        pw = step("power rankings", power, report)
+        if pw:
+            log.info("power rankings: %d league files, %.0f KB", pw["n"], pw["bytes"] / 1024)
     mb = size_mb(SITE)
     print(f"size {mb} MB")
     bad = {k: v for k, v in report.items() if not v.get("ok")}

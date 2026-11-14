@@ -130,12 +130,12 @@ def _run_from_form(form) -> str | None:
 def note_for(t: dict, n_teams: int, parts: list[dict], part_ranks: dict, step: str, extra: list[str] | None = None) -> str:
     """One plain line on a ranked side, from what the file already holds: a new No. 1, the move, a run, the unit it
     leads or trails the league in, its headline chance. Deterministic; the two most telling clauses, joined."""
-    out: list[tuple[int, str]] = []
+    out: list[tuple[int, str, str]] = []   # (score, kind, text): one clause per kind
     rk, mv = t.get("rank"), t.get("move")
     since = {"week": "this week", "race": "since the last race", "round": "since the last round", "month": "this month",
              "event": "since the last event", "test": "since the last window"}.get(step, "since the last update")
     if rk == 1 and t.get("prev") not in (None, 1):
-        out.append((100, "New No. 1, up from " + ordinal(t["prev"])))
+        out.append((100, "one", "New No. 1, up from " + ordinal(t["prev"])))
     elif rk == 1 and t.get("path") and len(t["path"]) > 1:
         wk = 0
         for r in reversed(t["path"]):
@@ -143,19 +143,19 @@ def note_for(t: dict, n_teams: int, parts: list[dict], part_ranks: dict, step: s
                 break
             wk += 1
         if wk >= 2:
-            out.append((70, f"No. 1 for {wk} {step}s running" if step in ("week", "race", "round", "month", "event") else f"No. 1 at {wk} snapshots running"))
+            out.append((70, "one", f"No. 1 for {wk} {step}s running" if step in ("week", "race", "round", "month", "event") else f"No. 1 at {wk} snapshots running"))
     if isinstance(mv, int) and mv and not (rk == 1 and t.get("prev") not in (None, 1)):
-        out.append((60 + min(30, 4 * abs(mv)), ("Up " if mv > 0 else "Down ") + f"{abs(mv)} place{'s' if abs(mv) != 1 else ''} {since}"))
+        out.append((60 + min(30, 4 * abs(mv)), "move", ("Up " if mv > 0 else "Down ") + f"{abs(mv)} place{'s' if abs(mv) != 1 else ''} {since}"))
     if t.get("prev") is None and t.get("path") and len(t["path"]) > 1 and rk is not None:
-        out.append((65, "New to the rankings"))
+        out.append((65, "new", "New to the rankings"))
     run = _streak_words(t.get("streak") or _run_from_form(t.get("form")))
     if run:
-        out.append((55 + (10 if run.startswith("Won") and (rk or 99) <= 5 else 0), run))
+        out.append((55 + (10 if run.startswith("Won") and (rk or 99) <= 5 else 0), "run", run))
     else:
         f = str(t.get("form") or "")[-5:]
         if len(f) == 5 and (f.count("W") >= 4 or f.count("L") >= 4):
             k = "W" if f.count("W") >= 4 else "L"
-            out.append((50, ("Won " if k == "W" else "Lost ") + f"{f.count(k)} of the last 5"))
+            out.append((50, "run", ("Won " if k == "W" else "Lost ") + f"{f.count(k)} of the last 5"))
     if parts and part_ranks:
         best = sorted(((part_ranks[p["key"]].get(t["id"]), p["label"]) for p in parts
                        if part_ranks.get(p["key"], {}).get(t["id"]) is not None), key=lambda x: x[0])
@@ -163,25 +163,26 @@ def note_for(t: dict, n_teams: int, parts: list[dict], part_ranks: dict, step: s
             r0, lab0 = best[0]
             r1, lab1 = best[-1]
             if r0 <= 3:
-                out.append((50 - r0, ("Best " if r0 == 1 else ordinal(r0) + "-best ") + lab0.lower() + " in the league"))
+                out.append((50 - r0, "best", ("Best " if r0 == 1 else ordinal(r0) + "-best ") + lab0.lower() + " in the league"))
             if r1 >= n_teams - 2 and n_teams >= 8:
                 w = n_teams - r1 + 1
-                out.append((45, ("Worst " if w == 1 else ordinal(w) + "-worst ") + lab1.lower()))
+                out.append((45, "worst", ("Worst " if w == 1 else ordinal(w) + "-worst ") + lab1.lower()))
     ch = t.get("chance") or {}
     p = num(ch.get("p"))
     if p is not None and ch.get("label") and p >= 0.005 and (rk or 99) <= max(5, n_teams // 4):
-        out.append((40, f"{ch['label']} chance {pct_text(p)}"))
+        out.append((40, "chance", f"{ch['label']} chance {pct_text(p)}"))
     for i, x in enumerate(extra or []):
         if x:
-            out.append((58 - i, x))
+            out.append((58 - i, f"x{i}", x))
     out.sort(key=lambda x: -x[0])
     seen, words = set(), []
-    for _s, w in out:
-        k = w.split(" ")[0]
-        if k in seen:
+    for _s, kind, w in out:
+        if kind in seen:
             continue
-        seen.add(k)
-        if words and k in ("Won", "Lost", "Up", "Down", "Best", "Worst", "New"):
+        seen.add(kind)
+        k = w.split(" ")[0]
+        if words and k in ("Won", "Lost", "Up", "Down", "Best", "Worst", "New", "Title", "Playoff", "Playoffs", "Promotion",
+                           "Relegation", "Top", "Postseason", "Finals", "Tournament"):
             w = w[0].lower() + w[1:]
         words.append(w)
         if len(words) == 2:

@@ -75,6 +75,17 @@ def main(argv=None) -> int:
     counts = step("payloads", payloads, report)
     if counts:
         log.info("payloads: %s", counts)
+
+    def power():
+        # power rankings: data/power/<stream>.json and data/power.json (oddsmarkets/common/power.py), from the payloads
+        # on disk (rankings.json, rank_paths.json, players/, scout/); also after a skipped payload step, so the first
+        # build with this step writes them
+        from oddsmarkets.powerlifting import power_build as PWB
+        return PWB.build(data)
+    if counts:
+        pw = step("power rankings", power, report)
+        if pw:
+            log.info("power rankings: %d league files, %.0f KB", pw["n"], pw["bytes"] / 1024)
     mb = size_mb(SITE)
     print(f"size {mb} MB")
     bad = {k: v for k, v in report.items() if not v.get("ok")}

@@ -20,6 +20,15 @@ MATCH_CARD = `{"id","event","round","date","status","p1","p2","winner","sets","l
 `{"events": {tid: {"name","level","surface","champions": [[year, pid, runner_up]]}}}`.
 `data/<T>/favourites.json` (round 9; the Draws calendar cards and a past season's recap) `{"w_surf", "events": {event_id: [pid, blended Elo, entrants rated]}}`: every tour-level event's top-rated main-draw entrant going in, by the surface-blended Elo before their first match of the event (`events.favourites`).
 `data/<T>/players_index.json` `{pid: [name, short, country, latest_rank, last_match, official]}` (search; all players with ≥1 tour match since 2000/2007; last_match = the date of the latest tour-level match, official = 1 when latest_rank is the current official rank; the follow-card rule reads both).
+`data/power/atp.json`, `data/power/wta.json` and the index `data/power.json` (13 Nov 2026): the power rankings, the shape
+in `oddsmarkets/common/power.py`, built last by `analytics/power_build.py` from `index.json` and each tour's `elo.json`,
+`players.json`, `players_index.json`, `rankings.json`, `race.json` and `<year>/events.json`. The top 100 on our overall
+Elo (kind players), against the average of those 100. Snapshots: the end (Sunday) of each completed week with play, at
+most ten, each player's last `elo.json` history row on or before it with the site's inactivity pull to the next day (as
+`elo.ratings_at`); the week in play folds into now (`current`). A tour with no event in play or to come reads "Final".
+Form from the history's rating moves. Groups: Serve and Return (our serve / return ratings, qualified players), Hard,
+Clay and Grass (surface Elo, the surface floor). About 70 KB a tour. Drawn on `#/<T>/power` (`ta-power.js`); tennis is
+not on Home yet.
 
 ## Per tour
 - `data/<T>/rankings.json`: `{"date","official": [[rank,pid,points,move]], "elo": [[rank,pid,elo,surface_elos]], "race": [[pid,points]],

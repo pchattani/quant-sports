@@ -12,6 +12,8 @@
  *   #/<L>/team/<tid>                    team
  *   #/<L>/player/<pid>                  player
  *   #/<L>/players  teams  leaders  awards  playoffs  lab  markets  calibration
+ *   #/<L>/power[?g=<group>]             power rankings (hw-power.js, the kit's power.js over data/power/<L>.json);
+ *                                       #/power?l=<L> (Home's link) lands on #/<L>/power
  *   #/<L>/value  #/<L>/trade        player value (WAR) and the trade simulator (state in ?t=&m=)
  *   #/<L>/compare                       compare
  *   #/<L>/compare/players/<a>/<b>       compare-players (falls back to a 'compare' handler)
@@ -118,6 +120,7 @@ addRoute('compare/teams/:a/:b', 'compare-teams', ['compare'], { kind: 'teams' })
 addRoute('markets', 'markets');
 addRoute('calibration', 'calibration');
 addRoute('standings', 'standings');
+addRoute('power', 'power');
 addRoute('model', 'model');
 addRoute('glossary', 'glossary', [], {}, true);
 addRoute('methodology', 'methodology', [], {}, true);
@@ -211,13 +214,13 @@ function redirectFor(hash) {
 }
 
 const TITLES = {
-  hub: 'Overview', season: 'Standings', standings: 'Standings', games: 'Games', game: 'Game centre', team: 'Team', player: 'Player',
+  hub: 'Overview', season: 'Standings', standings: 'Standings', power: 'Power rankings', games: 'Games', game: 'Game centre', team: 'Team', player: 'Player',
   players: 'Players', scout: 'Scouting Room', series: 'Playoff series', teams: 'Teams', value: 'Value & Moves', trade: 'Trade simulator', moves: 'Moves', fantasy: 'Fantasy', leaders: 'Leaders', awards: 'Awards', playoffs: 'Playoffs', lab: 'Lab',
   compare: 'Compare', 'compare-players': 'Compare players', 'compare-teams': 'Compare teams', model: 'Model',
   markets: 'Our forecasts v the market', calibration: 'Calibration', glossary: 'Glossary', methodology: 'Methodology', disclaimer: 'Disclaimer & terms'
 };
 /* Which kit section (QK.SECTIONS key) each route belongs to. */
-const SECTION_OF = { hub: 'overview', season: 'standings', standings: 'standings', playoffs: 'standings', series: 'standings', markets: 'model',
+const SECTION_OF = { hub: 'overview', season: 'standings', standings: 'standings', playoffs: 'standings', series: 'standings', power: 'power', markets: 'model',
   games: 'fixtures', game: 'fixtures', team: 'teams', teams: 'teams', 'compare-teams': 'teams',
   player: 'scout', players: 'scout', leaders: 'scout', awards: 'standings', scout: 'scout',
   value: 'value', trade: 'value', moves: 'value', fantasy: 'fantasy',
@@ -1113,9 +1116,9 @@ function fillSeasonPicker() {
 }
 /* Section hrefs carry the league (and the season when it is not the current one). */
 function sectionHref(key, L, S) {
-  const sub = { overview: '', fixtures: 'games', standings: 'standings', teams: 'teams', players: 'scout', scout: 'scout', value: 'value', fantasy: 'fantasy', lab: 'scout', model: 'model' }[key];
+  const sub = { overview: '', fixtures: 'games', standings: 'standings', power: 'power', teams: 'teams', players: 'scout', scout: 'scout', value: 'value', fantasy: 'fantasy', lab: 'scout', model: 'model' }[key];
   if (key === 'overview') return '#/' + L + (S && Number(S) !== currentSeason(L) ? '?s=' + S : '');
-  if (key === 'fantasy' || key === 'model') return '#/' + L + '/' + sub;
+  if (key === 'fantasy' || key === 'model' || key === 'power') return '#/' + L + '/' + sub;
   return href(L, sub, S);
 }
 function updateHeader() {
@@ -1182,13 +1185,13 @@ function initHeader() {
   if (window.QK) {
     SHELL = QK.shell({
       sport: 'basketball', section: 'overview',
-      sections: QK.sections('basketball', { scout: true }).map(s => { s.href = sectionHref(s.key, state.league, null); return s; }),
+      sections: QK.sections('basketball', { scout: true, power: true }).map(s => { s.href = sectionHref(s.key, state.league, null); return s; }),
       ctx: leagueSeg() + '<label class="qk-sr" for="season-select">Season</label><select id="season-select" class="qk-select hw-season" aria-label="Season"></select>',
       search: {
         load: () => Promise.all(LEAGUES.map(l => loadSearch(l, currentSeason(l)))).then(lists => {
           // the league on screen first
           const order = lists.map((x, i) => ({ l: LEAGUES[i], x: x })).sort((a, b) => (a.l === state.league ? -1 : 0) - (b.l === state.league ? -1 : 0));
-          const out = [];
+          const out = order.map(o => ({ sport: 'basketball', t: 'Power rankings: teams and players by position', s: LEAGUE_NAME[o.l] + ' · Page', href: '#/' + o.l + '/power' }));
           order.forEach(o => o.x.forEach(it => out.push({ sport: 'basketball', t: it.label, s: LEAGUE_NAME[o.l] + ' · ' + (it.kind === 'Teams' ? 'Team' : '') + (it.kind === 'Teams' && it.sub ? ' · ' : '') + (it.sub || ''), href: it.href })));
           return out;
         })

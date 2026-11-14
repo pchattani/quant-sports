@@ -120,3 +120,7 @@ body.qk { font-size: var(--fs-md); }
   .ir-controls > * { max-width: 100%; }
   .ir-controls .qk-seg { flex-wrap: wrap; }
 }
+/* #/power (power.js): lifters' surnames run longer than team names; the climb's end labels tighten so they fit */
+.ir-page .qkp-b-lab { gap: 4px; }
+.ir-page .qkp-b-nm { font-size: 13.5px; letter-spacing: 0; }
+.ir-page .qkp-b-v { font-size: 12px; }

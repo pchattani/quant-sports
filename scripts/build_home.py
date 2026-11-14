@@ -1870,6 +1870,11 @@ def power_block(listed, docs: Path = DOCS) -> dict:
         if not leagues:
             continue
         d = idx.get("default") if idx.get("default") in {x["league"] for x in leagues} else leagues[0]["league"]
+        for x in leagues:                           # the strip shows the default league's No. 1 only: keep home.json small
+            if x["league"] == d:
+                x["top"] = x["top"][:1]
+            else:
+                x.pop("top", None)
         out.append({"sport": key, "label": label, "default": d, "leagues": leagues,
                     "_o": POWER_ORDER.get(next((x.get("phase") for x in leagues if x["league"] == d), "season"), 1)})
     out.sort(key=lambda s: s.pop("_o"))           # sorted() is stable: in-season sports first, then the site order

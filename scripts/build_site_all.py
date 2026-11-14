@@ -2957,6 +2957,14 @@ def main() -> int:
     fl = _step("follow cards", lambda: football_follow.build(DATA_DIR))
     if fl:
         logger.info("follow cards: %d clubs, %d KB, the largest %d bytes", fl["n"], fl["bytes"] // 1024, fl["max"])
+    # power rankings: data/power/<league>.json for every domestic league with a table and data/power.json
+    # (oddsmarkets/common/power.py), from the payloads on disk, once every competition is built
+    def _power():
+        from oddsmarkets.football.analytics import power_build as football_power     # the import inside the step too
+        return football_power.build(DATA_DIR)
+    pw = _step("power rankings", _power)
+    if pw:
+        logger.info("power rankings: %d league files, %d KB, the largest %d bytes", pw["n"], pw["bytes"] // 1024, pw["max"])
 
     n_built = sum(1 for c in competitions if c.get("ok"))
     logger.info("Built %d/%d competitions", n_built, len(competitions))

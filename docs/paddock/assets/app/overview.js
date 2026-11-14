@@ -218,7 +218,7 @@ function followBoard(cards, season) {
   });
   return '<div class="pd-ov-flboard"><div class="qk-fc-k">Your drivers v the grid</div><div class="qk-card"><div class="qk-card-body">' +
     QK.powerBars(null, { groups: groups, valueLabel: 'Our Elo', unit: 'points against the grid average', parts: [{ key: 'v', label: 'Driver Elo against the grid average', color: 'var(--c-1)' }] }) +
-    '<p class="qk-caption">Each driver you follow (and a followed team’s drivers) in our driver Elo ratings of this season’s ' + rr.length + ', with the drivers either side. <a class="qk-link" href="#/scout">The Scouting Room →</a></p></div></div></div>';
+    '<p class="qk-caption">Each driver you follow (and a followed team’s drivers) in our driver Elo ratings of this season’s ' + rr.length + ', with the drivers either side. <a class="qk-link" href="#/power">Power rankings →</a> <a class="qk-link" href="#/scout">The Scouting Room →</a></p></div></div></div>';
 }
 
 function render(el) {

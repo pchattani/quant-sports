@@ -137,7 +137,7 @@ IR.page('overview', function (el) {
     var pw = d.power || {};
     html += U.sec('Power board', 'Who is strongest right now?', 'Our rating is the DOTS we expect at the lifter’s next meet. The bar splits it by where the total comes from (squat, bench, deadlift at the best meet of the year); the squares are the last five meets against our expectation (filled: beat it). Movement is against our ranking 90 days ago.',
       '<div class="ir-pw-tabs">' + U.seg('pw-s', IR.STREAM_KEYS.filter(function (k) { return (pw[k] || []).length; }).map(function (k) { return [k, IR.STREAMS[k]]; }), 'men_raw', 'Stream') + '</div><div id="pw-board">' + powerBoard('men_raw', pw.men_raw) + '</div>',
-      '<a class="qk-more" href="#/standings">Full rankings</a>');
+      '<a class="qk-more" href="#/power">Power rankings</a> <a class="qk-more" href="#/standings">Full rankings</a>');
     html += '<div id="ov-hot"></div>';
     html += U.sec('Stories', 'What the numbers say', 'Risers and fallers in our ratings over a year, and all-time records set in the last six months.', stories(d.stories) +
       '<div class="qk-g75 ir-gap"><div>' + U.card('Who’s for real?', 'Our rating across; up, the share of meets in the last two years above our pre-meet expectation (shrunk toward half). Top: lifting above what their record says. The top 80 men raw.', '<div class="ir-pw-tabs">' + U.seg('rq-s', [['men_raw', 'Men raw'], ['women_raw', 'Women raw']], 'men_raw', 'Stream') + '</div>' + U.chart('ov-quad', 380, 'Rating against meets above expectation')) +

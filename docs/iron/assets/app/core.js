@@ -6,6 +6,7 @@
  *   #/fixtures[/<year>]             a year's meets                       [Meets]
  *   #/event/<id>                    a meet                               [Meets]
  *   #/standings[?s=&cls=&t=]        our rankings                         [Rankings]
+ *   #/power[?l=<stream>&g=<class>]  the power rankings                   [Power Rankings]
  *   #/scout[?s=&grp=&view=...]      the Scouting Room                    [Scouting Room]
  *   #/player/<id>                   a lifter                             [Scouting Room]
  *   #/lab[?tab=]                    the Lab                              [Lab]
@@ -36,6 +37,7 @@ addRoute('fixtures', 'meets', 'fixtures');
 addRoute('fixtures/:year', 'meets', 'fixtures');
 addRoute('event/:id', 'event', 'fixtures');
 addRoute('standings', 'rankings', 'standings');
+addRoute('power', 'power', 'power');
 addRoute('scout', 'scout', 'scout');
 addRoute('players', 'scout', 'scout');
 addRoute('player/:id', 'player', 'scout');
@@ -45,7 +47,7 @@ addRoute('model', 'model', 'model');
 addRoute('records', 'records', 'model');
 addRoute('disclaimer', 'disclaimer', 'model');
 
-var TITLES = { overview: '', meets: 'Meets', event: 'Meet', rankings: 'Rankings', scout: 'Scouting Room', player: 'Lifter',
+var TITLES = { overview: '', meets: 'Meets', event: 'Meet', rankings: 'Rankings', power: 'Power rankings', scout: 'Scouting Room', player: 'Lifter',
   lab: 'Lab', model: 'Model', records: 'Records', disclaimer: 'Disclaimer and terms' };
 
 function dec(s) { try { return decodeURIComponent(s); } catch (e) { return s; } }
@@ -223,6 +225,7 @@ function searchRows() {
     var out = [];
     (s.players || []).forEach(function (p, i) { out.push({ t: p[1], s: 'Lifter' + (p[2] ? ' · ' + p[2] : ''), href: playerHref(p[0]), sport: 'powerlifting', w: 6000 - i }); });
     (s.events || []).forEach(function (e) { out.push({ t: e[1], s: e[2] + ' · ' + e[3], href: eventHref(e[0]), sport: 'powerlifting' }); });
+    out.unshift({ t: 'Power rankings: lifters and weight classes', s: 'Page', href: '#/power', sport: 'powerlifting' });
     return out;
   });
 }
@@ -242,8 +245,9 @@ function registerCards() {
 function boot() {
   registerCards();
   var m = parse();
-  var secs = QK.sections('powerlifting', { scout: true, value: 'Lab' }).map(function (s) {
+  var secs = QK.sections('powerlifting', { scout: true, value: 'Lab', power: true }).map(function (s) {
     if (s.key === 'value') s.href = '#/lab';
+    if (s.key === 'power') s.href = '#/power';
     return s;
   });
   SHELL = QK.shell({ sport: 'powerlifting', section: m ? m.route.section : 'overview', sections: secs, search: { load: searchRows } });

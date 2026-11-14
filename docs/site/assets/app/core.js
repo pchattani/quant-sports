@@ -10,6 +10,8 @@
  *   #/competitions[?f=<family>]                  every competition, by family                          [standings]
  *   #/competition/<slug>[/<tab>][?s=<sid>&view=…] one competition: overview, table, fixtures, bracket,
  *                                                odds, power, players, analytics, clubs, seasons       [standings]
+ *   #/power[?l=<league>&g=<group>]               power rankings: a league's clubs on our Elo, week by week,
+ *                                                and the best and worst players by position (power-rankings.js) [power]
  *   #/clubs[/<tab>]                              Teams: clubs on one scale (the power board), leagues,
  *                                                national teams, head to head with "If they met"        [teams]
  *   #/club/<tid>[?c=<slug>&e=<era>&tab=…]        ONE club page across every competition                [teams]
@@ -57,6 +59,7 @@ addRoute('match/:slug/:id', 'match', 'fixtures');
 addRoute('competitions', 'competitions', 'standings');
 addRoute('competition/:slug', 'competition', 'standings');
 addRoute('competition/:slug/:tab', 'competition', 'standings');
+addRoute('power', 'power', 'power');                    // 13 Nov 2026: power rankings (power-rankings.js, ?l=<league>&g=<group>)
 addRoute('clubs', 'clubs', 'teams');
 addRoute('clubs/:tab', 'clubs', 'teams');
 addRoute('club/:tid', 'club', 'teams');
@@ -76,7 +79,7 @@ addRoute('team-legacy/:slug/:team', 'teamLegacy', 'teams');
 
 var TITLES = {
   overview: '', matches: 'Matches', match: 'Match centre', competitions: 'Competitions', competition: 'Competition',
-  clubs: 'Teams', club: 'Club', players: 'Players', player: 'Player', value: 'Value & Transfers', fantasy: 'Fantasy',
+  power: 'Power rankings', clubs: 'Teams', club: 'Club', players: 'Players', player: 'Player', value: 'Value & Transfers', fantasy: 'Fantasy',
   lab: 'Lab', scout: 'Scouting Room', compare: 'Compare', model: 'Model', teamLegacy: 'Club'
 };
 
@@ -1277,7 +1280,7 @@ function heatColour(t) {
 
 // ── shell, search, competition picker ─────────────────────────────────────
 
-var SECTION_HREF = { overview: '#/', fixtures: '#/matches', standings: '#/competitions', teams: '#/clubs', scout: '#/scout', value: '#/value', fantasy: '#/fantasy', model: '#/model' };
+var SECTION_HREF = { overview: '#/', fixtures: '#/matches', standings: '#/competitions', power: '#/power', teams: '#/clubs', scout: '#/scout', value: '#/value', fantasy: '#/fantasy', model: '#/model' };
 function compPickerHTML() {
   var groups = FAMILIES.map(function (f) {
     /* the super cups fold into their host competition's page (round 9): not in the picker */
@@ -1309,7 +1312,7 @@ function searchRows() {
       out.push({ sport: 'football', t: p.name, s: (POS_LABEL[p.pos] || 'Player') + (p.club ? ' · ' + p.club : '') + (p.nt ? ' · ' + p.nt : ''), href: href.player(p.id),
         w: arr[1].names ? 2.5 * p._rank : (isNum(p.mv) && p.mv > 0 ? Math.max(0, Math.log10(p.mv) - 4) : 0) + Math.min(1, (isNum(p.min) ? p.min : 0) / 3000) });
     });
-    [['Matches today', '#/matches'], ['Value leaderboard', '#/value'], ['Transfers', '#/value/transfers'], ['Transfer simulator', '#/value/simulator'],
+    [['Matches today', '#/matches'], ['Power rankings: clubs and players by position, league by league', '#/power'], ['Value leaderboard', '#/value'], ['Transfers', '#/value/transfers'], ['Transfer simulator', '#/value/simulator'],
       ['Fantasy', '#/fantasy'], ['Scouting Room', '#/scout'], ['Player chart (any two metrics)', '#/scout?view=chart'], ['Leaders across competitions', '#/scout?view=leaders'],
       ['Clubs on one scale', '#/clubs'], ['Head to head (if they met)', '#/clubs/h2h'], ['National teams', '#/clubs/nations'], ['Methodology', '#/model/methodology'], ['Glossary', '#/model/glossary']]
       .forEach(function (p) { out.push({ sport: 'football', t: p[0], s: 'Page', href: p[1] }); });
@@ -1317,7 +1320,7 @@ function searchRows() {
   });
 }
 function bootShell() {
-  var secs = QK.sections('football', { fixtures: 'Matches', standings: 'Competitions', teams: 'Teams', value: 'Value & Transfers', scout: true }).map(function (s) {
+  var secs = QK.sections('football', { fixtures: 'Matches', standings: 'Competitions', teams: 'Teams', value: 'Value & Transfers', scout: true, power: true }).map(function (s) {
     s.href = SECTION_HREF[s.key] || s.href;
     return s;
   });

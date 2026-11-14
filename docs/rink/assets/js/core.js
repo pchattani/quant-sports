@@ -8,6 +8,7 @@
  *   #/game/<game_id>                    game centre (NHL gameId 2026020009; the season is its first four digits)
  *   #/standings[/<S>]  #/playoffs[/<S>] standings and playoff race, the bracket (S = 20262027)
  *   #/teams  #/team/<abbr>              teams
+ *   #/power[?g=<group>]                 power rankings (rk-power.js, the kit's power.js over data/power/nhl.json)
  *   #/skaters  #/goalies  #/player/<pid>  #/lines  #/leaders  #/history  #/lab  #/compare[/<a>[/<b>]]
  *   #/markets  #/calibration  #/glossary[/<key>]  #/methodology  #/disclaimer
  *   #/value  #/trade                    player value (GAR, WAR) and the trade simulator (state in ?t=&m=)
@@ -153,6 +154,7 @@ addRoute('games/:date', 'games');
 addRoute('game/:id', 'game');
 addRoute('standings', 'standings');
 addRoute('standings/:S', 'standings', { seasonal: true });
+addRoute('power', 'power');
 addRoute('teams', 'teams');
 addRoute('team/:id', 'team');
 addRoute('players', 'players');
@@ -236,11 +238,11 @@ function redirectFor(hash) {
   return '#/' + to[0] + (all.length ? '?' + all.join('&') : '');
 }
 const TITLES = {
-  hub: 'Overview', games: 'Games', game: 'Game centre', standings: 'Standings', teams: 'Teams', team: 'Team', players: 'Players', player: 'Player', scout: 'Scouting Room', series: 'Playoff series',
+  hub: 'Overview', games: 'Games', game: 'Game centre', standings: 'Standings', power: 'Power rankings', teams: 'Teams', team: 'Team', players: 'Players', player: 'Player', scout: 'Scouting Room', series: 'Playoff series',
   value: 'Value & Moves', fantasy: 'Fantasy', lab: 'Lab', compare: 'Compare', model: 'Model', glossary: 'Glossary', methodology: 'Methodology', disclaimer: 'Disclaimer & terms'
 };
 /* Which kit section each route belongs to (QK.SECTIONS keys). */
-const SECTION_OF = { hub: 'overview', games: 'fixtures', game: 'fixtures', standings: 'standings', series: 'standings', teams: 'teams', team: 'teams',
+const SECTION_OF = { hub: 'overview', games: 'fixtures', game: 'fixtures', standings: 'standings', series: 'standings', power: 'power', teams: 'teams', team: 'teams',
   players: 'scout', player: 'scout', scout: 'scout', value: 'value', fantasy: 'fantasy', lab: 'scout', compare: 'scout',
   model: 'model', glossary: 'model', methodology: 'model', disclaimer: 'model' };
 const NAV_OF = SECTION_OF;
@@ -1447,7 +1449,7 @@ function fillPickers() {
 function updateHeader() {
   const S = state.season;
   if (SHELL) {
-    const map = { overview: '#/', fixtures: gamesHref(null, S), standings: standingsHref(S), teams: href('teams', S), scout: href('scout', S),
+    const map = { overview: '#/', fixtures: gamesHref(null, S), standings: standingsHref(S), power: '#/power', teams: href('teams', S), scout: href('scout', S),
       value: href('value', S), fantasy: '#/fantasy', model: '#/model' };
     document.querySelectorAll('.qk-secnav a[data-sec]').forEach(a => { const h = map[a.getAttribute('data-sec')]; if (h) a.setAttribute('href', h); });
   }
@@ -1554,9 +1556,10 @@ function initHeader() {
   if (window.QK) {
     SHELL = QK.shell({
       sport: 'hockey', section: 'overview',
-      sections: QK.sections('hockey', { scout: true }),
+      sections: QK.sections('hockey', { scout: true, power: true }),
       ctx: '<label class="qk-sr" for="season-select">Season</label><select id="season-select" class="qk-select rk-season" aria-label="Season"></select>',
-      search: { load: () => loadSearch().then(items => items.map(it => ({ sport: 'hockey', t: it.label, s: (it.kind === 'Teams' ? 'Team · ' : '') + (it.sub || ''), href: it.href }))) }
+      search: { load: () => loadSearch().then(items => [{ sport: 'hockey', t: 'Power rankings: teams and players by position', s: 'Page', href: '#/power' }]
+        .concat(items.map(it => ({ sport: 'hockey', t: it.label, s: (it.kind === 'Teams' ? 'Team · ' : '') + (it.sub || ''), href: it.href })))) }
     });
     retheme();
     QK.theme.onChange(() => {
