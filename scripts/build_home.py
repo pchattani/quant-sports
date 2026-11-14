@@ -116,6 +116,9 @@ PENDING = [
 ]
 LAUNCHED: set[str] = {"college", "rugby", "golf", "powerlifting"}   # Campus 21 Oct; Scrum 2 Nov; Green and Iron 6 Nov 2026. Tennis stays off the hub.
 STALE_HOURS = 6   # a sport whose input is older than this is flagged stale in home.json
+# Sports off the hub whose power rankings still show in Home's power section (14 Nov 2026, the user: power rankings for
+# all sports on the landing page; the Ace is in every site's sport menu). Their games and races stay off the hub.
+POWER_ALSO: set[str] = {"tennis"}
 
 # Football competitions in rough order of how many fans care; used to pick which fixtures
 # make the home page when a day has a hundred of them.
@@ -1938,7 +1941,7 @@ def main(argv=None):
     for g in pool:
         g.pop("sig", None)                 # hints for the significance score only; never written
     out["calibration"] = calibration_summary()
-    out["power"] = power_block(SPORTS + [x for x in PENDING if x[0] in LAUNCHED or a.with_pending])
+    out["power"] = power_block(SPORTS + [x for x in PENDING if x[0] in LAUNCHED or x[0] in POWER_ALSO or a.with_pending])
     search = out.pop("search")
     home = {"version": 1, "updated_at": iso(now), "links": a.links, "sports": sports, **out, **top}
     (OUT / "data").mkdir(parents=True, exist_ok=True)

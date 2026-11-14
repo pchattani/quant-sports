@@ -282,3 +282,24 @@ def test_golfer_search_rows_carry_their_follow_key():
     assert "ki = f.indexOf('k')" in js and "iron: function (r)" in js
     for site in ("home", "green", "iron"):
         assert "iron: function (r)" in (ROOT / "docs" / site / "assets" / "qk" / "quant.js").read_text(encoding="utf-8")
+
+
+def test_power_block_reads_each_site_index_and_keeps_only_the_no1(tmp_path):
+    """Home's power section: every listed site's data/power.json, in-season sports first, the default league's No. 1
+    only; tennis is listed for the power section although it stays off the rest of the hub."""
+    assert "tennis" in bh.POWER_ALSO and "tennis" not in bh.LAUNCHED
+
+    def idx(folder, leagues, default):
+        d = tmp_path / folder / "data"
+        d.mkdir(parents=True)
+        (d / "power.json").write_text(json.dumps({"default": default, "leagues": leagues}), encoding="utf-8")
+
+    top = [{"id": "a", "name": "A", "rank": 1}, {"id": "b", "name": "B", "rank": 2}]
+    idx("ace", [{"league": "atp", "label": "ATP", "file": "power/atp.json", "phase": "season", "top": top},
+                {"league": "wta", "label": "WTA", "file": "power/wta.json", "phase": "season", "top": top}], "atp")
+    idx("bullpen", [{"league": "mlb", "label": "MLB", "file": "power/mlb.json", "phase": "offseason", "top": top}], "mlb")
+    listed = [x for x in bh.SPORTS + bh.PENDING if x[0] in ("baseball", "tennis")]
+    p = bh.power_block(listed, docs=tmp_path)
+    assert [s["sport"] for s in p["sports"]] == ["tennis", "baseball"]          # in season first
+    atp, wta = p["sports"][0]["leagues"]
+    assert atp["top"] == top[:1] and "top" not in wta

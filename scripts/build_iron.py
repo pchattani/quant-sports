@@ -67,8 +67,11 @@ def main(argv=None) -> int:
         prev = data / "build.json"
         if prev.exists() and not a.force:
             b = json.loads(prev.read_text(encoding="utf-8"))
+            # rank_paths.json (the power rankings' monthly climb, 13 Nov 2026) is written by pages.build: a tree without it
+            # rebuilds once, so the climb does not fall back to two snapshots until the next day
             if (b.get("model") == pages.MODEL_VERSION and b.get("today") == today.isoformat()
-                    and b.get("stamp") == store.load_stamp().get("etag") and (data / "index.json").exists()):
+                    and b.get("stamp") == store.load_stamp().get("etag") and (data / "index.json").exists()
+                    and (data / "rank_paths.json").exists()):
                 log.info("payloads: unchanged dump, code and day since %s: skipped (--force rebuilds)", b.get("updated_at"))
                 return {"skipped": True}
         return pages.build(data, today=today)
