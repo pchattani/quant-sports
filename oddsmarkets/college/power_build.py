@@ -28,10 +28,10 @@ against our pre-game chance over the games in [a, b) and in (a, b], and on singl
     plus the day after the last game (0.73 v 0.68; Michigan State lost on 12 Nov: 1.05 on 12 Nov, 0.99 on 13 Nov).
     College hockey is played in weekend series, so it is treated as weekly: the same fold rule as football.
   - basketball (hoops/build.py, the Kalman filter's rating at the end of the last game day of each 7-day block,
-    games on that day included: 0.585 v 0.540; Clemson lost on 13 Nov: 17.75 on 7 Nov, 15.90 on 13 Nov). Daily: one
-    snapshot every 7 days counting back from the latest game day (the latest path entry at or before each date), so
-    the move always spans at least a week of games. Early in the season that leaves one snapshot (Now) and the page
-    says the climb starts after two.
+    games on that day included: 0.585 v 0.540; Clemson lost on 13 Nov: 17.75 on 7 Nov, 15.90 on 13 Nov). The path is
+    already one entry per 7-day block, so every entry before the latest is a weekly snapshot (the move spans one block
+    of games); a block that ended under five days before now folds into Now; a level with a single block so far has
+    only Now, and the page says the climb starts after two.
 
 Now is always season.json `ratings` (the rating on every page). Football's and hockey's last path entry is that same
 fit (checked: equal for every team); basketball's path is the Kalman filter and Now the full fit (mean gap 1.5-1.7
@@ -192,15 +192,14 @@ def snapshot_dates(L: str, paths: dict, games: list[dict]) -> tuple[list[date], 
         if cands and in_play(L, games, cands[-1]):
             cands = cands[:-1]
         return cands, now_d
-    picks = []
-    for k in range(1, PW.MAX_SNAPSHOTS):
-        t = now_d - timedelta(days=7 * k)
-        c = max((x for x in cands if x <= t), default=None)
-        if c is None:
-            break
-        if c not in picks:
-            picks.append(c)
-    return sorted(picks), now_d
+    # basketball: the path is already one entry per 7-day block (the end of its last game day), so each earlier entry
+    # is a weekly snapshot as it stands (14 Nov 2026: requiring a full seven days before now dropped the 7 Nov block on
+    # 13 Nov, and with it the whole climb); a block that ended under five days before now folds into Now, so a day or
+    # two of games is never read as the week's move
+    picks = list(cands)
+    if picks and (now_d - picks[-1]).days < 5:
+        picks = picks[:-1]
+    return picks[-(PW.MAX_SNAPSHOTS - 1):], now_d
 
 
 def value_at(path: list, d: date):

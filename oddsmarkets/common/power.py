@@ -182,7 +182,8 @@ def note_for(t: dict, n_teams: int, parts: list[dict], part_ranks: dict, step: s
         seen.add(kind)
         k = w.split(" ")[0]
         if words and k in ("Won", "Lost", "Up", "Down", "Best", "Worst", "New", "Title", "Playoff", "Playoffs", "Promotion",
-                           "Relegation", "Top", "Postseason", "Finals", "Tournament"):
+                           "Relegation", "Top", "Postseason", "Finals", "Tournament", "National",
+                           "Conference", "Division", "League", "Championship"):
             w = w[0].lower() + w[1:]
         words.append(w)
         if len(words) == 2:

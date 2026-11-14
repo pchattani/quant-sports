@@ -1846,9 +1846,11 @@ def season_files(docs: Path = DOCS):
                                      "wch/race_log.json"])):
         if (docs / folder / "data" / "index.json").exists():
             rows += [(folder, f"the-quant-{folder}", rel) for rel in rels]
-    # the power rankings index (data/power.json, fixed path) of every site present
+    # the power rankings index (data/power.json, fixed path) of every site present: any of its summaries fetched (the
+    # Footballer has no index.json, only hub.json and competitions.json; requiring index.json left football off Home's
+    # power section on 14 Nov 2026)
     for key, folder, repo, label, site in SPORTS + PENDING:
-        if (docs / folder / "data" / "index.json").exists():
+        if (docs / folder / "data").is_dir() and any((docs / folder / "data").glob("*.json")):
             rows.append((folder, f"the-quant-{repo}", "power.json"))
     # "How sure are we?" reads each site's calibration.json (fixed paths, listed here so CI fetches them too)
     for key, folder, rel, league, subject in CALIBRATION:

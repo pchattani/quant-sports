@@ -105,7 +105,7 @@ def test_hockey_weekly_grid_and_basketball_every_seven_days(tmp_path):
     hk_paths = {t: [["2026-10-01", 0.1 * i], ["2026-10-08", 0.2 * i], ["2026-10-10", 0.5 - 0.1 * i]] for i, t in enumerate(TEAMS)}
     hk_r = {t: {"rating": 0.5 - 0.1 * i, "off": 0.3 - 0.1 * i, "def": 0.2} for i, t in enumerate(TEAMS)}
     _write(tmp_path, "mch", 2027, _season("mch", hk_paths, hk_r), hk_games)
-    # basketball: end-of-day entries 7 and 13 Nov: nothing is a week old yet, so Now alone
+    # basketball: end-of-day entries 7 and 13 Nov, one per 7-day block: the 7 Nov block is a snapshot, 13 Nov is Now
     bb_paths = {t: [["2026-11-07", 1.0 * i], ["2026-11-13", 2.0 * i]] for i, t in enumerate(TEAMS)}
     bb_r = {t: {"rating": 10.0 - i, "off": 105.0 - i, "def": 95.0} for i, t in enumerate(TEAMS)}
     _write(tmp_path, "mbb", 2027, _season("mbb", bb_paths, bb_r), [_game(1, "2026-11-13T23:00:00Z", "1", "2", 70, 60)])
@@ -118,16 +118,20 @@ def test_hockey_weekly_grid_and_basketball_every_seven_days(tmp_path):
     assert h1["record"] == "3–1–1" and h1["group"] == "C1 · USCHO No. 5" and h1["stats"][1] == {"label": "Goal diff", "text": "+3"}
     assert h1["form"] == "T" and [p["label"] for p in hk["parts"]] == ["Attack", "Defence"]
     bb = _doc(tmp_path, "mbb")
-    assert [s["label"] for s in bb["snapshots"]] == ["Now"] and bb["season_label"] == "2026–27 season"
+    assert [s["label"] for s in bb["snapshots"]] == ["7 Nov", "Now"] and bb["season_label"] == "2026–27 season"
     b1 = {x["id"]: x for x in bb["teams"]}["1"]
     # basketball's parts: offence and defence each against the national average, adding up to the rating
     assert abs(b1["parts"]["off"] + b1["parts"]["def"] - b1["rating"]) < 0.02
     assert bb["players"]["groups"][0]["key"] == "g" and bb["players"]["groups"][0]["min"] == "5+ games and 10 minutes a game"
 
 
-def test_basketball_takes_the_entry_a_week_back():
+def test_basketball_takes_each_weekly_block():
     paths = {"1": [["2026-11-07", 1.0], ["2026-11-14", 2.0], ["2026-11-20", 3.0]]}
     cands, now = C.snapshot_dates("mbb", paths, [])
-    # now is 20 Nov; 13 Nov is the line, so the 7 Nov entry stands for it (14 Nov is less than a week before now)
-    assert [c.isoformat() for c in cands] == ["2026-11-07"] and now.isoformat() == "2026-11-20"
+    # each entry closes a 7-day block: 7 and 14 Nov are snapshots, 20 Nov is now
+    assert [c.isoformat() for c in cands] == ["2026-11-07", "2026-11-14"] and now.isoformat() == "2026-11-20"
     assert C.value_at(paths["1"], cands[0]) == 1.0
+    # a block that closed under five days before now folds into Now (a day or two of games is not the week's move)
+    paths = {"1": [["2026-11-07", 1.0], ["2026-11-14", 2.0], ["2026-11-16", 3.0]]}
+    cands, now = C.snapshot_dates("mbb", paths, [])
+    assert [c.isoformat() for c in cands] == ["2026-11-07"] and now.isoformat() == "2026-11-16"

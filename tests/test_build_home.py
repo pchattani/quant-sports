@@ -303,3 +303,15 @@ def test_power_block_reads_each_site_index_and_keeps_only_the_no1(tmp_path):
     assert [s["sport"] for s in p["sports"]] == ["tennis", "baseball"]          # in season first
     atp, wta = p["sports"][0]["leagues"]
     assert atp["top"] == top[:1] and "top" not in wta
+
+
+def test_season_files_fetch_every_present_sites_power_index(tmp_path):
+    """CI fetches data/power.json for every site whose summaries it fetched, the Footballer (hub.json, no index.json)
+    included."""
+    for folder, f in (("site", "hub.json"), ("gridiron", "index.json"), ("ace", "index.json")):
+        (tmp_path / folder / "data").mkdir(parents=True)
+        (tmp_path / folder / "data" / f).write_text("{}", encoding="utf-8")
+    rows = [r for r in bh.season_files(docs=tmp_path) if r[2] == "power.json"]
+    assert ("site", "the-quant-footballer", "power.json") in rows
+    assert ("gridiron", "the-quant-gridiron", "power.json") in rows and ("ace", "the-quant-ace", "power.json") in rows
+    assert not any(r[0] == "rink" for r in rows)
