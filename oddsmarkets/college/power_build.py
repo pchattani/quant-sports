@@ -182,9 +182,11 @@ def week_done(L: str, games: list[dict], d: date) -> int:
     return max(done) if done else 0
 
 
-def snapshot_dates(L: str, paths: dict, games: list[dict]) -> tuple[list[date], date | None]:
-    """The path dates to snapshot (oldest first) and the now date (the latest path date: the current fit's)."""
-    dates = sorted({x for v in paths.values() for x in (_d(e[0]) for e in v if isinstance(e, list) and e) if x})
+def snapshot_dates(L: str, paths: dict, games: list[dict], cap: date | None = None) -> tuple[list[date], date | None]:
+    """The path dates to snapshot (oldest first) and the now date (the latest path date: the current fit's). `cap` (the
+    season file's build date) drops any path date after it: a path never runs past the day it was built (14 Nov 2026:
+    a women's hockey game listed as final on 13 Jan 2027 carried the path to that date)."""
+    dates = sorted({x for v in paths.values() for x in (_d(e[0]) for e in v if isinstance(e, list) and e) if x and (cap is None or x <= cap)})
     if not dates:
         return [], None
     now_d, cands = dates[-1], dates[:-1]
@@ -290,7 +292,7 @@ def level_doc(data_root: Path, L: str, S, phase_raw: str | None, now: str | None
     paths = {str(t): v for t, v in (sj.get("rating_paths") or {}).items() if isinstance(v, list)}
     phase = PHASE.get(str(phase_raw or sj.get("phase") or ""), "season")
     fb, hk = L == "cfb", L in HOCKEY
-    cands, now_d = snapshot_dates(L, paths, games)
+    cands, now_d = snapshot_dates(L, paths, games, _d(str(sj.get("updated_at") or "")[:10]) or date.today())
     snaps = []
     for d in cands:
         if fb:

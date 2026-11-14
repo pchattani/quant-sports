@@ -148,7 +148,25 @@ def cache_dir() -> Path:
     return cc_store.paths()["cache"] / "hockey"
 
 
-def load_stores(level: str) -> dict[int, dict]:
+def _not_yet(g: dict, now: datetime) -> bool:
+    """A game listed as played (or in play) whose start is more than six hours after the build clock: the source has it
+    wrong (14 Nov 2026: ESPN listed the women's Beanpot game of 13 Jan 2027 as final, 1-3), so it has not happened."""
+    if g.get("status") not in ("post", "in"):
+        return False
+    s = str(g.get("date") or "")
+    try:
+        t = datetime.fromisoformat(s.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if t.tzinfo is None:
+        t = t.replace(tzinfo=timezone.utc)
+    return t > now + timedelta(hours=6)
+
+
+def load_stores(level: str, now: datetime | None = None) -> dict[int, dict]:
+    """Every season's store. No look-ahead: a game dated after the build clock never counts as played, whatever its
+    listed status (it goes back to scheduled, without a score), so no fit, rating path, table or record uses it."""
+    now = now or datetime.now(timezone.utc)
     out = {}
     for s in D.seasons_on_disk(level):
         st = D.load_store(level, s)
@@ -157,6 +175,14 @@ def load_stores(level: str) -> dict[int, dict]:
                 st.pop("chn", None)
                 for g in st.get("games") or []:
                     g.pop("chn", None)
+            bad = [g for g in st.get("games") or [] if _not_yet(g, now)]
+            for g in bad:
+                g["status"] = "pre"
+                for k in ("hs", "as", "res", "result", "ot", "so"):
+                    g.pop(k, None)
+            if bad:
+                logger.warning("%s %s: %d game(s) listed as played but dated after now, kept as scheduled: %s", level, s,
+                            len(bad), ", ".join(str(g.get("id")) for g in bad[:5]))
             out[s] = st
     return out
 
@@ -180,7 +206,8 @@ def context(level: str, refresh: bool = False) -> dict:
         return _CTX[level]
     stores = load_stores(level)
     p = params(level)
-    key = json.dumps({"p": p, "s": {s: [len(st["games"]), st.get("built_at")] for s, st in stores.items()}, "v": 3},
+    key = json.dumps({"p": p, "s": {s: [len(st["games"]), st.get("built_at"), sum(1 for g in st["games"] if g.get("status") == "post")]
+                                    for s, st in stores.items()}, "v": 4},
                      sort_keys=True)
     cp = cache_dir() / f"{level}_wf.pkl"
     preds = ends = None
