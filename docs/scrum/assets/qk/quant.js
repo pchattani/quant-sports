@@ -371,16 +371,28 @@ var SECTION_LABELS = {
  *   QK.sections('baseball', { scout: true })     (or scout: 'Scouting room', a label of its own)
  * QK.SECTIONS itself is unchanged, so every site that does not ask keeps Players and Lab. */
 QK.SCOUT = { key: 'scout', label: 'Scouting Room', route: '#/scout' };
+/* Round 13 (13 Nov 2026): Power Rankings, a section of its own right after Standings (after Overview where a site has
+ * no Standings), for the sites that ask: QK.sections('nfl', { scout: true, power: true }) (or power: 'Power', a label
+ * of its own). The page is the kit's QKR.page (power.js) over data/power/<league>.json. */
+QK.POWER = { key: 'power', label: 'Power Rankings', route: '#/power' };
 QK.sections = function (sportKey, overrides) {
   var lab = SECTION_LABELS[sportKey] || {};
   var o = overrides || {};
   var scout = o.scout ? (typeof o.scout === 'string' ? o.scout : QK.SCOUT.label) : null;
-  return QK.SECTIONS.map(function (s) {
+  var out = QK.SECTIONS.map(function (s) {
     if (scout && s.key === 'players') return { key: QK.SCOUT.key, label: scout, href: QK.SCOUT.route };
     if (scout && s.key === 'lab') return null;
+    if (s.key === 'power') return null;
     var label = s.key in o ? o[s.key] : (s.key in lab ? lab[s.key] : s.label);
     return label === null ? null : { key: s.key, label: label, href: s.route };
   }).filter(Boolean);
+  if (o.power) {
+    var at = -1;
+    out.forEach(function (s, i) { if (s.key === 'standings') at = i; });
+    if (at < 0) out.forEach(function (s, i) { if (s.key === 'overview') at = i; });
+    out.splice(at + 1, 0, { key: QK.POWER.key, label: typeof o.power === 'string' ? o.power : QK.POWER.label, href: QK.POWER.route });
+  }
+  return out;
 };
 
 /* ─────────────────────────────────────── theme: dark only (v3) */

@@ -17,7 +17,10 @@
  * per followed team from its site's follow card, "Your week" (their games in the next seven days, joining the live
  * scores below), the facts feed and the picker over data/search.json. With no follows, a slim "Follow your teams"
  * band with three suggestions from the games that matter. A follow on a site without cards yet is a chip with a
- * link ("Cards coming soon"). A share link (#follow=...) offers to add its teams. */
+ * link ("Cards coming soon"). A share link (#follow=...) offers to add its teams.
+ * Round 13 (power rankings): after "What to watch next", "Who's on top" (the kit's QKR.home, power.js): the No. 1 in every
+ * sport from home.json's `power` block, then a sport (and league) picker over the climb (a bump chart of the top ten,
+ * week by week) and the best and worst players at every position; each sport's file loads from its own site. */
 (function () {
 'use strict';
 var $ = QK.$, $$ = QK.$$, esc = QK.esc, fmt = QK.fmt, isNum = QK.isNum;
@@ -89,7 +92,7 @@ function prep(g) {
 }
 
 function renderAll() {
-  var jobs = [renderYours, renderTicker, renderSportNav, renderFeature, renderToplines, renderAround, renderWatch, renderHot, renderSurprises, renderStats, renderReal, renderRoll, renderRaces, renderChips, renderGames, renderCharts, renderHow];
+  var jobs = [renderYours, renderTicker, renderSportNav, renderFeature, renderToplines, renderAround, renderWatch, renderPower, renderHot, renderSurprises, renderStats, renderReal, renderRoll, renderRaces, renderChips, renderGames, renderCharts, renderHow];
   jobs.forEach(function (f) { try { f(); } catch (e) { if (window.console) console.error(e); } });
   if (QK.stamp) QK.stamp(D.updated_at, { what: 'The hub rebuilds about once an hour from every sport site; live scores come from a separate feed checked every 20 seconds while games are on.' });
   $('#updated').textContent = 'Data built ' + fmt.ago(D.updated_at) + ' (' + fmt.date(D.updated_at) + ' ' + fmt.time(D.updated_at) + '). Live scores come from a separate live feed, checked every 20 seconds while games are on; it can trail play by a few minutes.';
@@ -127,6 +130,14 @@ function renderYours() {
   yours = QK.followSection(el, { suggest: followSuggest(), week: true, feed: true,
     /* a followed team's game that is also in home.json takes the live score and chance from there */
     live: function (g) { var x = byKey()[g.sport + ':' + g.id]; return x || g; } });
+}
+
+/* ───────────────────────────── round 13: power rankings (QKR.home, power.js) */
+function renderPower() {
+  var el = $('#power');
+  if (!el) return;
+  if (!window.QKR || !D.power || !(D.power.sports || []).length) { el.hidden = true; return; }
+  QKR.home(el, D.power, {});
 }
 
 /* ───────────────────────────── ticker (broadcast black) */

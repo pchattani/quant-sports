@@ -65,6 +65,13 @@ Round 11 (a decided title; added field):
                          page says "Champions" on the sport's Around card and runs a story card for ten days after the
                          title is decided; a decided race (one side at 100%) never shows as a title race or a favourite.
 
+Round 13 (power rankings; added field):
+    power                { sports: [{ sport, label, default, leagues: [ the site's data/power.json line per league: league,
+                         label, file, phase, season_label, kind, noun, step, snapshot, rating, groups, n, top (3) ] }] }:
+                         Home's "Power rankings" section (the kit's power.js, QKR.home): the No. 1 in every sport from
+                         here, then the picked sport's full file fetched in the browser from its own site
+                         (data/power/<league>.json); sports in season first. The shape is oddsmarkets/common/power.py.
+
 Sites not launched yet (PENDING, e.g. The Quant Campus) are left out of home.json and search.json unless their key
 is in LAUNCHED or --with-pending is given, so the live home page never links a Pages site that does not exist.
 The kit hides them the same way (QK.SPORTS drops `pending` entries outside local preview).
@@ -1836,11 +1843,37 @@ def season_files(docs: Path = DOCS):
                                      "wch/race_log.json"])):
         if (docs / folder / "data" / "index.json").exists():
             rows += [(folder, f"the-quant-{folder}", rel) for rel in rels]
+    # the power rankings index (data/power.json, fixed path) of every site present
+    for key, folder, repo, label, site in SPORTS + PENDING:
+        if (docs / folder / "data" / "index.json").exists():
+            rows.append((folder, f"the-quant-{repo}", "power.json"))
     # "How sure are we?" reads each site's calibration.json (fixed paths, listed here so CI fetches them too)
     for key, folder, rel, league, subject in CALIBRATION:
         if (docs / folder / "data" / "index.json").exists():
             rows.append((folder, f"the-quant-{folder}", rel))
     return rows
+
+
+POWER_ORDER = {"season": 0, "postseason": 0, "preseason": 1, "offseason": 2}
+
+
+def power_block(listed, docs: Path = DOCS) -> dict:
+    """Home's power section: each listed sport's data/power.json index (oddsmarkets/common/power.py), slimmed to
+    what the No. 1 strip and the league picker need; the full league files load in the browser from each site."""
+    out = []
+    for key, folder, repo, label, site in listed:
+        idx = load(docs / folder / "data" / "power.json")
+        if not isinstance(idx, dict) or not idx.get("leagues"):
+            continue
+        keep = ("league", "label", "file", "phase", "season_label", "kind", "noun", "step", "snapshot", "rating", "groups", "n", "top")
+        leagues = [{k: x.get(k) for k in keep if x.get(k) not in (None, "", [])} for x in idx["leagues"] if x.get("file") and x.get("top")]
+        if not leagues:
+            continue
+        d = idx.get("default") if idx.get("default") in {x["league"] for x in leagues} else leagues[0]["league"]
+        out.append({"sport": key, "label": label, "default": d, "leagues": leagues,
+                    "_o": POWER_ORDER.get(next((x.get("phase") for x in leagues if x["league"] == d), "season"), 1)})
+    out.sort(key=lambda s: s.pop("_o"))           # sorted() is stable: in-season sports first, then the site order
+    return {"sports": out}
 
 
 def main(argv=None):
@@ -1900,6 +1933,7 @@ def main(argv=None):
     for g in pool:
         g.pop("sig", None)                 # hints for the significance score only; never written
     out["calibration"] = calibration_summary()
+    out["power"] = power_block(SPORTS + [x for x in PENDING if x[0] in LAUNCHED or a.with_pending])
     search = out.pop("search")
     home = {"version": 1, "updated_at": iso(now), "links": a.links, "sports": sports, **out, **top}
     (OUT / "data").mkdir(parents=True, exist_ok=True)

@@ -20,6 +20,12 @@ when the home team is favoured (`line.spread_home`, `market.spread`, `model.spre
 - `data/players_index.json` `{pid: [name, team, pos, first_season, last_season]}`
 - `data/glossary.json`, `data/calibration.json`, `data/history.json` (1999→ leaders, era-adjusted), `data/coaches.json`
   (decision grades by coach and season), `data/referees.json`.
+- `data/power/nfl.json` and the index `data/power.json` (13 Nov 2026): the power rankings, the shape in
+  `oddsmarkets/common/power.py`, built last by `analytics/power_build.py` from `index.json` and the current season's
+  `teams.json`, `season.json` and `players.json`. Snapshots: one per completed week (a `teams.json` history entry is
+  the rating after that week's games), the latest replaced by now; a week still being played folds into now. Players:
+  QB composite, Gridiron Value (RB, WR, TE), Splash EPA (edge, interior line, linebackers, cornerbacks, safeties), FG over
+  expected (K), EPA per punt (P), qualified players only. Drawn on `#/power` and Home.
 
 ## Per season — `data/<S>/`
 - `season.json`: standings by division (W-L-T, PF, PA, point diff, our rating, SOS, remaining SOS), sim odds per team

@@ -118,6 +118,7 @@ addRoute('playoffs', 'playoffs', 'standings');
 addRoute('playoffs/:S', 'playoffs', 'standings');
 addRoute('bracket', 'bracket', 'standings');
 addRoute('bracket/:S', 'bracket', 'standings');
+addRoute('power', 'power', 'power');
 addRoute('markets', 'markets', 'model');
 addRoute('model/moves', 'movesmodel', 'model');
 addRoute('teams', 'teams', 'teams');
@@ -163,7 +164,7 @@ const ROUTE_MAP = [
 
 const TITLES = {
   overview: '', games: 'Games', game: 'Game centre', standings: 'Standings', playoffs: 'Playoff picture', futures: 'Season forecasts',
-  teams: 'Teams', team: 'Team', scout: 'Scouting Room', players: 'Players', player: 'Player', leaders: 'Leaders', history: 'All-time',
+  power: 'Power rankings', teams: 'Teams', team: 'Team', scout: 'Scouting Room', players: 'Players', player: 'Player', leaders: 'Leaders', history: 'All-time',
   value: 'Player value', trade: 'Trade simulator', transactions: 'Transactions', fantasy: 'Fantasy',
   lab: 'Lab', compare: 'Compare', fourth: 'Fourth downs', coaches: 'Coaches', coach: 'Coach',
   referees: 'Referees', prospects: 'Draft prospects', calibration: 'How we’re doing', methodology: 'How it works', markets: 'Our forecasts v the market', movesmodel: 'Who moves next: the record', bracket: 'Bracket', glossary: 'Glossary', disclaimer: 'Disclaimer and terms'
@@ -1247,15 +1248,15 @@ function searchRows() {
     rows.sort((a, b) => a._o - b._o);
     [['Games this week', weekHref(cur, currentWeek())], ['Standings', '#/standings'], ['Chances: playoffs, divisions, the Super Bowl', '#/playoffs'], ['Bracket', '#/bracket'], ['Champions since 1999', '#/standings?v=history'], ['Award races', '#/standings?v=races'],
       ['Player value', '#/value'], ['Trade simulator', '#/trade'], ['Transactions', '#/transactions'], ['Fantasy', '#/fantasy'], ['Scouting Room', '#/scout'], ['Leaders', '#/scout?view=leaders'], ['All-time leaders', '#/scout?view=alltime'],
-      ['Scatter chart', '#/scout?view=chart'], ['Compare players', '#/compare'], ['Teams: power board and head to head', '#/teams'], ['Fourth-down calls', '#/fourth-downs'], ['Coaches on fourth down', '#/fourth-downs?tab=coaches'], ['How it works', '#/methodology'], ['How we’re doing', '#/calibration'], ['Our forecasts v the market', '#/markets'], ['Glossary', '#/glossary']]
+      ['Scatter chart', '#/scout?view=chart'], ['Compare players', '#/compare'], ['Power rankings: teams and players by position', '#/power'], ['Teams: power board and head to head', '#/teams'], ['Fourth-down calls', '#/fourth-downs'], ['Coaches on fourth down', '#/fourth-downs?tab=coaches'], ['How it works', '#/methodology'], ['How we’re doing', '#/calibration'], ['Our forecasts v the market', '#/markets'], ['Glossary', '#/glossary']]
       .forEach(p => rows.unshift({ sport: 'nfl', t: p[0], s: 'Page', href: p[1] }));
     return rows;
   });
 }
 function bootShell() {
   const ctx = '<select class="qk-select" id="gi-season" aria-label="Season">' + seasons().map(y => '<option value="' + y + '">' + y + '</option>').join('') + '</select>';
-  const secs = QK.sections('nfl', { scout: true }).map(s => {
-    s.href = { overview: '#/', fixtures: '#/games', standings: '#/standings', teams: '#/teams', scout: '#/scout', value: '#/value', fantasy: '#/fantasy', model: '#/methodology' }[s.key] || s.href;
+  const secs = QK.sections('nfl', { scout: true, power: true }).map(s => {
+    s.href = { overview: '#/', fixtures: '#/games', standings: '#/standings', power: '#/power', teams: '#/teams', scout: '#/scout', value: '#/value', fantasy: '#/fantasy', model: '#/methodology' }[s.key] || s.href;
     return s;
   });
   SHELL = QK.shell({ sport: 'nfl', section: 'overview', sections: secs, ctx: ctx, search: { load: searchRows } });

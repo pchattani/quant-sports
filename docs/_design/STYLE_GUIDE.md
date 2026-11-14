@@ -275,6 +275,21 @@ preference for quant user friendliness")
 | Form pair | `QK.formPair({ left: { name, abbr, colour, form }, right, n })` | game pages: both sides' last five, oldest first, with the record; letters W, D, L, T (tie), O (overtime loss): W-D-L, W-L-T or W-L-O |
 | Miss words | `QK.missWords(p)` | "How sure are we?" lines: "about 3 times in 10" down to a 15% miss, then "about 1 time in 20 / 100 ...", "fewer than 1 time in 1,000"; the preview card and the split hero use it (a 99% call is no longer "1 time in 10") |
 
+**Round 13: power rankings** (13 Nov 2026, the user: "a power ranking for teams and players ... for all sports ... nice
+visuals of this in the main landing page. Not a table but a creative chart"). One file shape for every site,
+`data/power/<league>.json` plus the index `data/power.json` (`oddsmarkets/common/power.py`), drawn by `power.js`
+(namespace `QKR`; `QKP` is progression.js's). A site opts in with `QK.sections(sport, { power: true })`: a "Power
+Rankings" section right after Standings, route `#/power`, page `QKR.page(el, { url, leagues, group })`.
+
+| Component | Builder | Where |
+|---|---|---|
+| The climb | `QKR.mountBump(el, doc, { top, base })` | a bump chart: the current top ten's rank at every snapshot (eight on phones), team colours through `QK.color.team`, end labels with the move chip, mark, name and rating; a line outside the top ten runs along a faint bottom lane; hover, focus or tap a line to pick it out; tooltips on the points |
+| Position spectrum | `QKR.mountSpectrum(el, groups, { base, max })` | every qualified player as a dot on the group's headline number, worse left, better right (a lower-is-better metric is flipped so better is always right), the median as a thin rule, the top three in team colour with a volt ring on the No. 1, the bottom three as coral rings; the last and the No. 1 named at the ends; a row opens its top five and bottom three with three stats |
+| No. 1 strip | `QKR.no1Strip(items)` | Home: a diagonal team-colour tile per sport with the outlined "1", the side and its run at the top |
+| Ranked list | `QKR.list(doc)` | the site page: big outlined rank, the move chip (green up, coral down, "New"), the side with record and group, the rating bar split into its parts around zero with the volt tick, the rating and its change, the headline chance, stats, form, one plain line on why |
+| Position tables | `QKR.groupTables(group)` | the site page: top ten and bottom five with every stat and the percentile (CSV through the table tools) |
+| Home section | `QKR.home(el, home.power)` | "Who's on top, and who's climbing": the strip, a sport (and league) picker, the climb beside the spectrum; each sport's file fetched from its own site when picked |
+
 The CSV helpers are `QK.csv(cols, rows)` and `QK.download(name, text)`. `QK.formDots(f, n)` shows the last n results
 (the power board shows ten). `QKC.scatter` takes `onClick(point)` (the drawer instead of a page change) and `pad: '8%'`.
 The showcase has a "Scouting Room" block (`showcase.html#scouting`).
